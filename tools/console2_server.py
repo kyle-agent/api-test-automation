@@ -413,6 +413,56 @@ def _local_run_ids() -> list[str]:
         return list(_RUNS.keys())
 
 
+def _local_res_index() -> dict:
+    """``{run-rec id: {"ids": set, "names": set}}`` — the resources THIS console's
+    own runs created, from purely LOCAL sources (no bucket, no network):
+
+      * the per-run console-events sink (``rec['events']`` JSONL — the same
+        ``resource-tracked``/``resource-deleted`` events the run detail's 자원 탭
+        renders), carrying the captured resource_id (+ name where the engine had
+        the create body); and
+      * the per-run ``core.registry`` manifest shards
+        (``reports/registry/<rec id>*.jsonl`` — one per xdist worker), carrying
+        resource_id per crash-safe teardown record.
+
+    This is the mine-set source for /runtime ``scope=mine``. It exists because the
+    oplog-bucket join alone went BLANK during an active local run (defect
+    2026-07-04): 'created' res events only reach the bucket after each create's
+    polling completes (minutes after loggingaudit shows Create Start), and a
+    console server process predating the APITEST_RUN_ID stamp files them under
+    ``runs/local/`` — so the bucket must never be the only attribution source."""
+    with _LOCK:
+        recs = [(rid, r.get("events")) for rid, r in _RUNS.items()]
+    out: dict[str, dict] = {}
+    for rid, evp in recs:
+        ids: set[str] = set()
+        names: set[str] = set()
+        for e in (_read_events(evp) if evp else []):
+            if e.get("kind") not in ("resource-tracked", "resource-deleted"):
+                continue
+            if e.get("resource_id"):
+                ids.add(str(e["resource_id"]))
+            if e.get("name"):
+                names.add(str(e["name"]))
+        for shard in (ROOT / "reports" / "registry").glob(f"{rid}*.jsonl"):
+            try:
+                for line in shard.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        r = json.loads(line)
+                    except ValueError:
+                        continue
+                    if r.get("resource_id"):
+                        ids.add(str(r["resource_id"]))
+            except OSError:
+                continue
+        if ids or names:
+            out[rid] = {"ids": ids, "names": names}
+    return out
+
+
 def _local_run_active() -> bool:
     with _LOCK:
         return any(r.get("status") in ("running", "queued") for r in _RUNS.values())
@@ -422,10 +472,16 @@ def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"
     """Return ``(html_or_None, ready)`` without blocking — kick a bg harvest when
     the cache is stale so the popup never hangs on a cold load.
 
-    scope=mine (default) keeps only spans attributable (via the oplog join) to a
-    run THIS console started; when that yields zero spans and no local run is in
-    flight it auto-falls back to scope=all with a banner. deleted=hide (default)
-    drops already-deleted spans; hours ∈ {1,6,24}."""
+    scope=mine (default) keeps spans attributable to a run THIS console started —
+    attributed from the console's own in-process records first
+    (:func:`_local_res_index`, bucket-independent) with the oplog-bucket join kept
+    for CI badge attribution. Fallbacks when mine resolves to zero spans:
+
+      * a local run IS active  → scope=all + '내 실행 귀속 실패' banner (a blank
+        page during an active run is the worst outcome — defect 2026-07-04);
+      * nothing in flight      → scope=all + the informational note (as before).
+
+    deleted=hide (default) drops already-deleted spans; hours ∈ {1,6,24}."""
     from datetime import datetime, timezone
     from audit import live_view as lv
     scope = scope if scope in ("mine", "all") else "mine"
@@ -451,30 +507,38 @@ def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"
     now = datetime.now(timezone.utc)
     spans = lv.build_spans(events, now, ours_only=True)
     lv.annotate_origins(spans, oplog_events, local_run_ids=_local_run_ids())
+    # LOCAL overlay (wins over the bucket join): attribute spans from this
+    # console's own in-process run records, so scope=mine works even when the
+    # bucket is unreachable, lagging, or filing events under runs/local/.
+    lv.annotate_local_origins(spans, _local_res_index())
     banner = note = None
     eff_scope = scope
-    if scope == "mine" and oplog_events is None:
-        # origin join unavailable → scoping is impossible; render as today (all)
-        eff_scope = "all"
-        shown = lv.filter_spans(spans, scope="all", deleted=deleted)
-    elif scope == "mine":
+    if scope == "mine":
         mine = lv.filter_spans(spans, scope="mine", deleted=deleted)
-        if not mine and not _local_run_active():
+        if mine:
+            shown = mine
+        elif _local_run_active():
+            # A local run IS in flight but nothing attributed — attribution
+            # failed (or its resources aren't visible in loggingaudit yet).
+            # NEVER render a blank page here (defect 2026-07-04): degrade to
+            # the account view with a distinct diagnose-me banner.
+            eff_scope = "all"
+            banner = "내 실행 귀속 실패 — 계정 전체 표시 중, 귀속 로직 점검 필요"
+            shown = lv.filter_spans(spans, scope="all", deleted=deleted)
+        else:
             # nothing attributable to my runs and nothing in flight → show the
             # account instead of an empty page, and SAY so.
             eff_scope = "all"
             note = ("내 실행으로 귀속되는 자원이 없어 계정 전체 뷰로 전환했습니다 "
                     "(로컬 실행이 시작되면 기본 '내 실행' 범위로 보세요).")
             shown = lv.filter_spans(spans, scope="all", deleted=deleted)
-        else:
-            shown = mine
     else:
         shown = lv.filter_spans(spans, scope="all", deleted=deleted)
-    if eff_scope == "all":
+    if eff_scope == "all" and not banner:
         banner = "계정 전체 뷰 — 다른 run·CI 자원 포함"
     if oplog_events is None:
         note = ((note + " · ") if note else "") + \
-            "oplog 버킷에 접근할 수 없어 출처(origin) 배지를 붙이지 못했습니다."
+            "oplog 버킷에 접근할 수 없어 CI 출처(origin) 배지가 불완전할 수 있습니다."
     chrome = {"scope": scope, "hours": int(hours), "deleted": deleted,
               "banner": banner, "note": note}
     html_out = lv.render_flow(shown, now, meta, refresh=0, chrome=chrome)
@@ -923,7 +987,21 @@ def _run_worker(rec: dict) -> None:
     logp = Path(rec["log"])
     env = {**os.environ, "PYTHONPATH": str(ROOT),
            # stamp the run-rec id so oplog resource events land under
-           # runs/<rec id>/res/* — the /runtime origin join (scope=mine) keys off it
+           # runs/<rec id>/res/* — the /runtime origin join (scope=mine) keys off it.
+           #
+           # Root-caused 2026-07-04 ("local runs don't mirror res events"): they DO
+           # once this stamp is in the worker env — live-verified: run
+           # 20260704-113744-7350 wrote runs/20260704-113744-7350/res/*.json batches
+           # (compute-virtualserver-full creates incl. res_id+name). The blank
+           # mine-scope came from two inherent lags, not a missing emitter:
+           #   (a) a console server process started BEFORE this stamp existed keeps
+           #       serving runs whose oplog events file under runs/local/ instead;
+           #   (b) the engine emits 'created' only after the create's polling
+           #       completes and the id is captured — minutes after loggingaudit
+           #       already shows Create Start — so early in a run the bucket has
+           #       nothing to join yet.
+           # Both are why /runtime attribution now reads the IN-PROCESS records
+           # (_local_res_index) first and treats the bucket join as CI-only garnish.
            "APITEST_RUN_ID": rec["id"],
            "SCP_CRUD_IDS": ",".join(rec["lifecycle_ids"]),
            "SCP_CONSOLE_EVENTS": rec["events"],

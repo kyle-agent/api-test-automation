@@ -1299,9 +1299,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # a single os.environ.get + return when SCP_CONSOLE_EVENTS unset,
                 # so this is a no-op (zero behaviour change) outside console2.
                 if _cev:
+                    # name included (same value the oplog 'created' event carries)
+                    # so console2's /runtime mine-attribution can fall back to
+                    # name-matching loggingaudit spans whose resource_id is absent.
                     _cev.emit("resource-tracked", lifecycle=lifecycle["id"],
                               resource_id=rid, resource_type=(cu_svc or ""),
-                              service=(cu_svc or ""), path=cu_path)
+                              service=(cu_svc or ""), path=cu_path,
+                              name=(body or {}).get("name", "")
+                              if isinstance(body, dict) else "")
                 if _oplog:
                     _parent = ""
                     if isinstance(body, dict):

@@ -18,12 +18,17 @@
     <p><b style="color:var(--red)">⚠️ 잔존 {{ owned.normal|length }}건</b>
       {% if owned.stuck_rows %}<span class="muted small">+ 기지 항목(문서화된 잔존)
         {{ owned.stuck_rows|length }}건은 아래 접힘 그룹에</span>{% endif %}
-      <span class="muted small">· 마지막 스캔 {{ owned_age or '방금' }}</span></p>
+      <b>· 🕒 마지막 스캔 {{ owned_age or '방금' }}</b></p>
   {% else %}
     <p><b style="color:var(--green)">없음 ✅ — 남은 자원 0건</b>
       {% if owned.stuck_rows %}<span class="muted small">(기지 항목
         {{ owned.stuck_rows|length }}건 제외)</span>{% endif %}
-      <span class="muted small">· 마지막 스캔 {{ owned_age or '방금' }}</span></p>
+      <b>· 🕒 마지막 스캔 {{ owned_age or '방금' }}</b></p>
+  {% endif %}
+
+  {# 실행 중 캐시된 스캔은 오독 유발 — 실행 자원이 잔존처럼 보임 (2026-07-04 관찰) #}
+  {% if busy %}
+    <p class="warn">⚠ 실행 중 — 실행 자원이 잔존으로 보일 수 있음, 종료 후 재스캔</p>
   {% endif %}
 
   <form class="inline" method="post" action="/testing/resources/scan"

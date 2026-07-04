@@ -635,6 +635,41 @@ def annotate_origins(spans, oplog_events, local_run_ids=()) -> None:
         d["origin"] = origin_of_run_id(rid, local_run_ids) if rid else "unknown"
 
 
+def annotate_local_origins(spans, local_index) -> None:
+    """Overlay LOCAL attribution from the console's own IN-PROCESS run records —
+    the per-run console-events sink (``resource-tracked``/``resource-deleted``)
+    plus the per-run ``core.registry`` manifest shards. Matches by res_id first,
+    then by resource name, exactly like :func:`annotate_origins`.
+
+    Runs AFTER :func:`annotate_origins` and WINS over it: for runs THIS console
+    started, its in-process record is authoritative — the oplog-bucket join is
+    best-effort and demonstrably lags/misses local runs (defect 2026-07-04:
+    ``scope=mine`` blank during an ACTIVE local run because the bucket had no
+    ``runs/<rec>/res/*`` objects yet). Local attribution must never depend on
+    the bucket; the bucket join remains for CI (``gha-*``) badge attribution.
+
+    ``local_index``: ``{run_id: {"ids": iterable, "names": iterable}}``.
+    Empty/None index is a no-op (spans render exactly as annotate_origins left
+    them)."""
+    if not local_index:
+        return
+    by_id: dict[str, str] = {}
+    by_name: dict[str, str] = {}
+    for rid, idx in local_index.items():
+        for i in (idx.get("ids") or ()):
+            if i:
+                by_id[str(i)] = str(rid)
+        for n in (idx.get("names") or ()):
+            if n:
+                by_name[str(n)] = str(rid)
+    if not (by_id or by_name):
+        return
+    for d in spans.values():
+        rid = by_id.get(str(d.get("res_id") or "")) or by_name.get(d.get("name") or "")
+        if rid:
+            d["origin"] = f"local:{rid}"
+
+
 def filter_spans(spans, scope: str = "mine", deleted: str = "hide"):
     """Scope/visibility filter for the runtime view. ``scope=mine`` keeps only
     spans whose origin is local:*; ``deleted=hide`` drops spans already in the

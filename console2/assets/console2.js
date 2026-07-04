@@ -1133,9 +1133,13 @@ function drawLeftover() {
     head = `<span class="lo-warn">스캔 실패: ${esc(s.error || "")}</span>`;
   } else {
     const n = s.owned_total != null ? s.owned_total : (s.owned || []).length;
-    head = n === 0
+    // scan freshness is load-bearing: a cached scan mid-run showed stale rows
+    // with no cue (2026-07-04) — show WHEN this inventory was measured, always.
+    const ts = s.ended ? new Date(s.ended * 1000).toLocaleTimeString() : null;
+    head = (n === 0
       ? '<span class="lo-ok">없음 ✅ — 남은 자원 0건</span>'
-      : `<span class="lo-warn">⚠️ ${n}건 — 실행 전 정리 권장</span>`;
+      : `<span class="lo-warn">⚠️ ${n}건 — 실행 전 정리 권장</span>`)
+      + (ts ? ` <b style="margin-left:8px">🕒 마지막 스캔 ${ts}</b>` : "");
     if (n > 0) {
       // group by service for a service · path · count rollup
       const bySvc = {};
@@ -1159,9 +1163,16 @@ function drawLeftover() {
   // while any run is running/queued — grey it out with a tooltip while busy, and
   // surface any non-OK {error} inline (no alert/crash).
   const busy = !!(lastCapacity && ((lastCapacity.running || []).length || (lastCapacity.queued || []).length));
+  // a run in flight makes the scan MISLEADING (its own in-progress resources show
+  // up as 잔존, e.g. TGW/VPC rows mid-run 2026-07-04) — warn, don't let it read
+  // as a leak report.
+  const busyWarn = busy
+    ? '<div class="lo-warn" style="margin-top:5px">⚠ 실행 중 — 실행 자원이 잔존으로 보일 수 있음, 종료 후 재스캔</div>'
+    : "";
   host.innerHTML = `<div class="panel lo-panel">
     <h2>남은 자원(잔존) <span class="muted small">· 실행 전 점검 (read-only) + 강제 클린업</span></h2>
     <div class="lo-head">${head}</div>
+    ${busyWarn}
     ${list}
     <div class="run-ctl">
       <button class="btn ghost" id="lo-scan">🔍 남은 자원 확인</button>
@@ -1197,7 +1208,8 @@ function scanOwned() {
 }
 function pollOwned(id) {
   fetch("/api/runs/" + id).then(r => r.json()).then(j => {
-    ownedScan = { status: j.status, owned: j.owned || [], owned_total: j.owned_total, error: j.error };
+    ownedScan = { status: j.status, owned: j.owned || [], owned_total: j.owned_total,
+                  error: j.error, ended: j.ended };
     if (screen === "run") drawLeftover();
     if (j.status === "running") setTimeout(() => pollOwned(id), 800);
   }).catch(() => { ownedScan = { status: "error", error: "연결 실패" }; if (screen === "run") drawLeftover(); });
