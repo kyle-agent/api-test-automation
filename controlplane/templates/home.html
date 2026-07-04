@@ -79,7 +79,8 @@
     <div class="pl">Testing</div>
     <div class="pv">{{ running|length }}
       <span style="font-size:12px;font-weight:500;color:var(--muted)">진행 중</span></div>
-    <div class="ps">스케줄 {{ schedules|length }} · 오늘 실행 {{ runs_today }}</div>
+    <div class="ps">스케줄 {{ schedules|length }} · 오늘 실행 {{ runs_today }}{%
+      if stale_running %} · <span title="running/dispatched 상태로 24시간 이상 방치된 기록 — 죽은 워커/미회수 run일 가능성이 높아 '진행 중' 집계에서 제외">오래된 미회수 {{ stale_running|length }}</span>{% endif %}</div>
     <span class="chev">→</span>
   </a>
   <a class="pstage" href="/reporting">

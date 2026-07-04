@@ -19,8 +19,10 @@ Config (env): see controlplane/README.md.
 """
 from __future__ import annotations
 
+import calendar
 import json
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlencode
@@ -95,16 +97,36 @@ def _catalog_count() -> int:
         return 0
 
 
+_STALE_RUNNING_S = 24 * 3600
+
+
+def _split_stale_running(runs) -> tuple[list, list]:
+    """표시층 전용 stale 분리 — DB 상태는 건드리지 않는다. running/dispatched인데
+    requested_at이 24h 이상 과거인 run은 죽은 워커/미회수 기록일 가능성이 높아
+    '진행 중' 집계에 넣으면 오신호가 된다(페르소나-2 P2C-6) → 별도 목록으로."""
+    active, stale = [], []
+    for r in runs:
+        if r["status"] not in ("running", "dispatched"):
+            continue
+        try:
+            age = time.time() - calendar.timegm(
+                time.strptime(r["requested_at"] or "", "%Y-%m-%dT%H:%M:%SZ"))
+        except ValueError:
+            age = _STALE_RUNNING_S + 1  # 나이 불명 → 집계 신뢰 불가, stale 쪽으로
+        (stale if age > _STALE_RUNNING_S else active).append(r)
+    return active, stale
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     runs = db.list_runs(limit=50)
-    running = [r for r in runs
-               if r["status"] in ("running", "dispatched")]
+    running, stale_running = _split_stale_running(runs)
     today = db.now()[:10]
     runs_today = sum(1 for r in runs
                      if (r["requested_at"] or "").startswith(today))
     return _render(request, "home.html", "home",
-                   runs=runs[:5], running=running, runs_today=runs_today,
+                   runs=runs[:5], running=running,
+                   stale_running=stale_running, runs_today=runs_today,
                    schedules=db.list_schedules(),
                    coverage=dashdata.latest_coverage(),
                    scenario_stats=_scenario_stats(),
@@ -467,7 +489,7 @@ def _run_preview_data() -> dict:
 def testing(request: Request, suite: str = "", service: str = "",
             profile: str = "", crud_filter: str = ""):
     runs = db.list_runs(limit=15)
-    running = [r for r in runs if r["status"] in ("running", "dispatched")]
+    running, stale_running = _split_stale_running(runs)
     live = []
     for r in running:
         if r["gh_run_id"]:
@@ -480,7 +502,8 @@ def testing(request: Request, suite: str = "", service: str = "",
     prefill = {"suite": suite.strip(), "service": service.strip(),
                "profile": profile.strip(), "crud_filter": crud_filter.strip()}
     return _render(request, "testing.html", "testing",
-                   runs=runs, live=live, schedules=db.list_schedules(),
+                   runs=runs, live=live, stale_running=stale_running,
+                   schedules=db.list_schedules(),
                    preview=_run_preview_data(), prefill=prefill)
 
 
