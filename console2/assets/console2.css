@@ -478,6 +478,8 @@ g.rg-selbox{cursor:pointer}
   box-shadow:0 1px 2px rgba(31,35,40,.1);max-width:60%}
 .hint-pill b{color:var(--ink)}
 .hint-pill .focusinfo{color:var(--accent);font-weight:600}
+/* 빈 힌트 필은 감춘다 — 빈 상태 문구(SVG 좌상단 텍스트)와 빈 필 상자가 겹쳐 보였음 */
+.hint-pill:empty{display:none}
 
 /* 표 mode: hide the stage, the order table becomes the primary view */
 #dag-tableview.tab-primary{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:4px;background:#fff}
@@ -602,7 +604,12 @@ g.rg-selbox{cursor:pointer}
 .nowplaying .np-dot{width:8px;height:8px;border-radius:50%;background:#8a93a0;flex:none}
 .nowplaying .np-dot.run{background:var(--accent);animation:nppulse 1.2s ease-in-out infinite}
 .nowplaying .np-dot.que{background:var(--amber)}
+.nowplaying .np-abort{flex:none;margin-left:6px}
 @keyframes nppulse{50%{opacity:.35}}
+
+/* 실행 기록 필터 (run만 | 전체) */
+.histfilter{display:flex;gap:5px;align-items:center;margin:2px 0 6px}
+.histfilter .minibtn.on{border-color:var(--accent);color:var(--accent);background:#eef4fe}
 
 /* run 뷰 ↔ 구성 미리보기 mode chip (F1·F2) */
 .modechip{display:flex;align-items:center;gap:8px;margin:6px 0 2px;padding:5px 10px;font-size:11.5px;
