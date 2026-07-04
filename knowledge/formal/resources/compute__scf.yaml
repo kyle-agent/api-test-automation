@@ -105,7 +105,7 @@ resources:
     capture: {endpoint_id: "$.endpoint.endpoint_id"}
     delete: {endpoint: "DELETE /v1/cloud-functions/{scf-function.cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: compute/scf/createprivatelinkendpoint
     source: {lifecycle: generated__wave5-appsvc,
              steps: [create-scf-privatelink-endpoint, delete-scf-privatelink-endpoint]}
     notes: "UNPROVEN. R3 해소 (2026-06-13): 구 flat body {subnet_id, endpoint_service_id, name}는 docs DTO와 불일치 — 실제 PrivateLinkEndpointCreateRequest는 중첩 {endpoint: EndpointCreateRequest{alias, service_id}} (subnet 없음)라 verbatim으로 교체, service_id는 신설 networking privatelink-service 노드 ref로 배선. 응답 envelope $.endpoint.endpoint_id (PrivateLinkEndpoint{endpoint: Endpoint}) — docs 파생. request/approval/connection PUT({type} 단일 enum: CANCEL|RE_REQUEST / APPROVE|REJECT / DISCONNECT|RECONNECT)은 상태기계 의존 lifecycle 영역(gen-wave5 gated probes). 경고 유지: 함수의 privatelink-SERVICE enable(PUT .../privatelink-services {privatelink_service_enabled: true})은 함수를 Creating에 고착시켜 teardown을 막는다 — endpoint family만 모델링, service enable 금지(disable=false probe만 lifecycle에서). config write 후 READY 재폴링 시맨틱 적용. [docs-mapper UNPROVEN 2026-06-15, userguide how_to_guides '트리거 설정하기'/'Private 연결 구성']: PrivateLink는 '선택적 준비 서비스'로 PrivateLink Service와 연계하여 사용 — overview는 PL Service/API Gateway를 optional prereq로만 기술하고 endpoint create의 구체 제약/네이밍은 overview에 없음(detail은 'PrivateLink 서비스 연계하기' 하위로 defer). Deploying 상태에서는 함수의 트리거/구성 변경이 차단된다는 docs 진술이 'config write 후 READY 재폴링' 시맨틱을 뒷받침."

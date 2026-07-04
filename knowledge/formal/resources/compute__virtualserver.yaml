@@ -264,7 +264,7 @@ resources:
       - {name: server-volume-show,
          endpoint: "GET /v1/servers/{server.server_id}/volumes/{block-volume.vol_id}",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # evidence: compute/virtualserver/attachvolumetovirtualserver
     source: {lifecycle: compute-virtualserver-full, steps: []}
     notes: "VolumeServerAttachRequest {server_id, delete_on_termination} (api_docs). capture 없음 — detach가 prereq 토큰만 사용 (dotted-prereq-token-in-delete). delete_on_termination false: 볼륨 수명은 우리가 관리(역순 teardown이 detach 후 volume 삭제). [block_storage_vm userguide 2026-06-14] attach 게이트: 볼륨 Available 상태 + VM과 동일 location(블록 스토리지와 서버가 같은 location이어야 연결 대상). VM당 OS(basic) 볼륨 외에 추가 데이터 볼륨 최대 26개. running/stopped VM 모두 온라인 attach 지원(docs는 VM 상태 게이트 명시 안 함). detach는 게스트 OS에서 umount(Linux)/disk-offline(Windows)을 먼저 해야 연결 서버 hang(상태 에러)을 피함 — 우리 합성은 OS 미진입이라 데이터 볼륨(boot 아님)을 빈 채로 detach(안전). OS/boot 볼륨은 detach 불가(termination 차단 조건). _MultiAttach 타입만 다중 서버 동시 attach(Windows VM 불가)."
 
@@ -477,7 +477,7 @@ resources:
          endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: compute/virtualserver/createautoscalinggroupnotification
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-asg-notification, list-asg-notifications, read-asg-notification, delete-asg-notification]}
     notes: "UNPROVEN body/capture (소스는 literal-seed ASG에 4xx). IB-026: capture를 $.id→$.notifications[0].id로 정정 — 응답 모델 autoscalinggroupnotificationlistresponse는 list 봉투(api_docs); 라이브 재검증 대기."

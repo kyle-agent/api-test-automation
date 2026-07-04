@@ -301,7 +301,7 @@ resources:
          note: "id-bound GET getid 갭 (PLS 연결 엔드포인트 목록). create가 UNPROVEN(docs)이라 4xx일 수 있어 관용 status"}
     delete: {endpoint: "DELETE /v1/privatelink-services/{privatelink_service_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/vpc/createprivatelinkservice
     source: {lifecycle: generated__wave5-appsvc,
              steps: [create-privatelink-service, wait-privatelink-service,
                      delete-privatelink-service]}

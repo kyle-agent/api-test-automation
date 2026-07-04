@@ -55,7 +55,7 @@ resources:
     capture:
       backup_server_uuid: "$.contents[0].server_uuid"
       backup_server_guid: "$.contents[0].server_guid"
-    provenance: docs
+    provenance: VALIDATED  # evidence: storage/backup/getbackuptargetlist
     source: {lifecycle: backup-job, steps: []}
     notes: "읽기 전용 LOOKUP 노드 (create=GET, teardown 없음 — validator 경고는 의도). 쿼리 필수: server_category + policy_type (api_docs getbackuptargetlist; server_name/region/page/size는 optional). 응답 BackupTargetListResponse.contents[] = {server_uuid, server_guid, server_name, server_os_version, server_type}. capture는 HARD(soft 아님 — backup-policy를 먹인다): ACTIVE 직후 서버가 목록에 즉시 반영되지 않으면 capture 미충족 → 라이브 1회전에서 전파 지연이 관측되면 create-poll 능력이 필요해진다 (triage 환류 포인트)."
 

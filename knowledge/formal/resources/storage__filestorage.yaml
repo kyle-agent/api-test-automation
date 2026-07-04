@@ -92,7 +92,7 @@ resources:
                  note: "소유자 지식(2026-06-12): replication=타리전 DR 복제, backup=디스크백업(다른 FS 볼륨을 대상으로 — 두 번째 볼륨 선행 생성 필요). backup 변형의 대상 볼륨 필드 매핑은 유저가이드 확인 후 배선 (그 전까지 backup 변형 합성 금지)"}
     capture: {replication_id: "$.replication_id"}
     delete: {endpoint: "DELETE /v1/replications/{replication_id}", destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: storage/filestorage/createvolumereplication
     source: {lifecycle: filestorage-replication-schedule,
              steps: [create-replication, delete-replication]}
     notes: "body는 api_docs ReplicationCreateRequest, capture $.replication_id는 capture_soft (envelope UNPROVEN) — docs 유지. 소유자 지식(2026-06-12): 복제는 볼륨 생성 후 + 대상은 다른 리전(kr-east1). 디스크백업(replication_type=backup 추정)은 두 번째 FS 볼륨이 대상 — services fs-disk-backup-needs-second-volume."

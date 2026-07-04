@@ -440,7 +440,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{mysql-cluster.cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # evidence: database/mysql/mysqlrestartcluster
     source: {lifecycle: database-mysql-cluster, steps: [restart-cluster]}
     notes: "body 없음, 202 (api_docs). 수작업 restart-cluster 스텝은 optional이라 2xx 기록 불확실 → docs. requires 엣지로 start 이후 (stop→start→restart 풀 사이클)."
 
