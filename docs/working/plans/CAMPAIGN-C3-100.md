@@ -164,3 +164,16 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   34 gated). **C3 재계산 72.78% 불변** — A0 기준선이 이미 dashboard-data 증거를
   union했으므로 백필은 내구성(repo 단독 자급) 확보용, 신규 커버리지 아님.
   gap 344(L14/H197/W16/G117) 유효. docs-research 에이전트(§body 미상 7건) 가동.
+- 2026-07-04: docs-research 완료(ef6e061f → `CAMPAIGN-C3-100-docs-research.md`):
+  확보 4(data-flow·vpn·vs-image·dns) / 부분 2(data-ops — `GET
+  /v1/data-ops/image-versions` 선조회 리드, eventstreams — topology 미검증) /
+  차단 1(backup FILESYSTEM — Agent waiver). 적용(90396a7a): vpn phase1/2 공식
+  예시값 교체 + importimage `source`→`url`. HB4/HB7에서 실검증 예정.
+- 2026-07-04: 페르소나-2 저널 접수 → 판정·신규 마찰 13건을 UIUX-AUDIT §6
+  (P2C-1..13)으로 이관. 치명 3(pre-flight 우회 · 재스캔 0건 오보 · 로컬 중단
+  부재) 포함 fix-batch 가동 (완료 시 main 반영). C2 완료(10커밋, README 추상화
+  ·ARCHITECTURE 병합·supersede 12+건·runbook 보강·INDEX 재생성).
+- 2026-07-04 07:28Z: **HB1 디스패치**(f99300c9, run 28699129653) — mysql+mariadb
+  cluster-subops-full, parallel=2, shared VPC 1 adopt 확인. live-watcher 감시 중
+  (13분 주기, stall/leak/실패폭주 임계). 종료 후: fetch-results 브리지 →
+  derive_verified → promote → HB2.

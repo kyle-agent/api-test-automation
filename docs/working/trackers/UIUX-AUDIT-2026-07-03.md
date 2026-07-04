@@ -218,3 +218,31 @@
 스트립(참고 레이아웃 status.claude.com), 데이터는 기존 `reports/results/*.jsonl`
 프로젝션(신규 엔진 개념 없음), run id 딥링크. Effort L · 명시적 deferred
 (2026-06-22 owner 포인터).
+
+## 6. 페르소나 2차 CX 검증 결과 (2026-07-04, LIVE virtualserver 1사이클 37m29s)
+
+phase-3 "Run 관측성 개편" 수용 판정: **A(run 그래프·now-playing·재부착) 합격 ·
+B(fail 가시성·종료 토스트) 합격(부분) · D(rehydrate+DB 미러) 합격 ·
+E(runtime 신선도) 부분 · F(클린업 힌트류) 합격 — C(지연 재스캔·늦출현) 불합격.**
+전일 F1(재부착)·F2(기본선택 오염) 해소 확인. 상세 저널은 세션 기록,
+스크린샷 56장(세션 scratchpad). 수정 배치는 아래 ID로 진행 (task #19).
+
+| ID | 심각도 | 발견 | 수정 상태 |
+|---|---|---|---|
+| P2C-1 | **치명** | 대기열/미리보기 `▶ 실행`(runStaged)이 pre-flight 모달 없이 곧장 POST /api/run — Hard Rule opt-in 우회. 동일 heavy 구성 2건 2.2s 간격 무경고 admit(중복 가드 부재) | fix-batch 진행 중 |
+| P2C-2 | **치명** | +0/+5m 재스캔이 실잔존 6건을 total 0으로 오보(직접 scan_owned는 즉시 검출 — 서버 상태/경합 의심), late_alert 미발화, +15m 일정은 재시작 시 소실(rehydrate 재예약 없음) | fix-batch 진행 중 |
+| P2C-3 | **치명** | 로컬 run UI 중단 수단 부재(개입 채널 CI 전용) + provision 프로세스 사망을 러너가 삼키고 pytest 속행(중단 시맨틱 부재) | fix-batch 진행 중 |
+| P2C-4 | 불편 | base.html htmx CDN(unpkg) 단일 리소스가 전 페이지 12.7s 블로킹(TTFB 1.6s) — 유일하게 설명 없는 대기 | fix-batch (로컬 벤더링) |
+| P2C-5 | 불편 | runtime mine-소스가 삭제 이벤트 미반영 → 삭제된 자원 4건이 '생성됨/테스트중' 유령 표시 + 열린 페이지 자동 갱신 없음 | fix-batch 진행 중 |
+| P2C-6 | 불편 | 홈 TESTING 타일·/testing '진행 중 RUN'에 전일자 stale run(8001·t-run-1) 상시 잔류 = 오신호; 실행 중 로컬 run은 콘솔 밖 완전 비가시 | fix-batch (표시층 stale 처리) |
+| P2C-7 | 불편 | ② 실행 기록에 owned/sim 스캔 기록 20여 건이 실제 run 1건을 파묻음 | fix-batch (기본 필터 run만) |
+| P2C-8 | 불편 | run 시작 시 남은 자원 패널이 "아직 확인하지 않음"으로 리셋 | fix-batch 진행 중 |
+| P2C-9 | 라벨 | '포함 API 25' = 실은 폐쇄집합 **자원** 수(실 API 스텝 98) — 단어·단위 불일치 | fix-batch 진행 중 |
+| P2C-10 | 라벨 | now-playing '평균 ~27m'이 step 옆에서 lifecycle 평균으로 읽히지 않음; ok/soft/fail 정의 툴팁 부재(lifecycle 실패인데 API fail=0 혼란); VPC 칩 '기존/예약' 툴팁 부재 | fix-batch 진행 중 |
+| P2C-11 | 사소 | 빈 상태 문구·힌트 필 겹침 / 중단 run "unknown·57s" 오표기(실 393s) / "M0 이전 run" 전문용어 | fix-batch 진행 중 |
+| P2C-12 | 관찰 | 8일 전 스냅샷 "신규 fail 36" 배너가 현재처럼 읽힘(노후 칩은 있음) — 후속 판단 필요 | 백로그 |
+| P2C-13 | 관찰 | `tools.live_watch`가 러너 주도 heavy run에서 shared VPC를 BILLABLE_SURVIVOR로 오탐 — heavy_batch_start.txt 마커가 로컬 오케스트레이터 전용이라 러너 run을 인지 못함 (2026-07-04 HB1 감시 중 확인) | 백로그 |
+
+부수 확인: run 결과 6/7 passed — `delete-server` 400
+`VirtualServer.InvalidVirtualServerState.DeleteImpossible` **전일과 동일 재현**
+(백엔드 이슈, known-issue 후보). 최종 잔존 0건(독립 프로브 확정).
