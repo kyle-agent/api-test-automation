@@ -36,6 +36,16 @@
 > P1-1 ✅ `33bf61f4` · P1-2 ✅ `98c3b25f` · P1-4 부분(✅ `/local-run` 301, `98c3b25f`;
 > `/testing` 서브탭 라벨/배너는 미착수) · P1-5 ✅ `f686601d` · P1-6 ✅ `1aa96408`.
 > P1-3, P2, P3 은 미착수 (후속 phase).
+>
+> **phase 2 (2026-07-04, 같은 브랜치 — IA 정렬 스프린트, owner 승인 배치):**
+> P1-3 ✅ `fb145d71` · P1-4 잔여 ✅ `bd1a9f9d` (완결) · P2-7 ✅ `eb33ec0c` ·
+> P2-8 ✅ `49b20d4e` · P2-9 🔶 부분(compare 셀렉트 아카이브 병합은 기존 코드로
+> 확인 — 잔여: 아카이브 행 스위트/상태 메타 + run 상세 pass/fail 요약) ·
+> P2-10 ✅ `fb145d71` · P2-11 ✅ `1f8e8b68`+`935fff76`(호출EP vs ok관측 단위
+> 상이 명시) · P2-12 ✅ `c60f48ee` · P3-16 잔여 ✅ `fdf51864` (+A5 Catalog
+> '레시피 편집' 정본 라벨). C-결정: C1 Knowledge 공식화 · C3 /ai 셸 편입+딥링크 ·
+> C4 gated 정본 명기 ✅ `21230d65`. 미착수 잔여 = P2-9 잔여 · P3-13(한/영 정책) ·
+> P3-14(테마) · P3-15(접근성).
 
 ### P1 — 혼란/위험 유발
 1. ✅ **DONE `33bf61f4`** — **`/runtime` 스코프 없음** — 최근 6시간 계정 전체 loggingaudit 토폴로지를 렌더 →
@@ -50,13 +60,17 @@
    → 구현: /testing/resources 상단 '지금 남은 것 (실측)' = scan_owned 비동기 스캔
    (행별 삭제 + pre-scan 강제 클린업 모달 + known_issues.stuck_resources 접힘 그룹),
    ingest 표는 '이력'으로 강등 + 출처 한계 명시.
-3. **ctxbar 스냅샷 불일치** — catalog/modeling/reporting-coverage/ai 라우터가
+3. ✅ **DONE `fb145d71`** — **ctxbar 스냅샷 불일치** — catalog/modeling/reporting-coverage/ai 라우터가
    `ctx_snapshot` 미주입 → "발행 스냅샷 정보 없음" 오탐 문구. IA.md의 "같은 sha를
    모든 화면에" 계약 위반. 개선: `_catalog()`의 ctx_snapshot을 공유 의존성으로 추출. (소)
-4. 🔶 **부분 DONE `98c3b25f`** — **실행 표면 3중화 + 게이트 경로 상이** — 로컬 엔진(`/testing/embed`) / CI dispatch
+   → 구현: `controlplane/common.py` `base_ctx(active)` 단일 빌더 — app/_render ·
+   resource_routes · ai_routes · catalog_routes · reporting_routes 전부 이걸 씀.
+4. ✅ **DONE `98c3b25f` + `bd1a9f9d`** — **실행 표면 3중화 + 게이트 경로 상이** — 로컬 엔진(`/testing/embed`) / CI dispatch
    (`/testing`) / 고아 `/local-run`. 개선: `/local-run` 제거 또는 301, `/testing` 서브탭
    라벨 "CI 디스패치 · 스케줄"로, 상단에 실행 경로 대비 배너. (중)
-   → `/local-run` 은 301 → /testing/resources (러너 UI 은퇴); 서브탭 라벨/배너 미착수.
+   → `/local-run` 은 301 → /testing/resources (러너 UI 은퇴, `98c3b25f`); 서브탭
+   라벨 "🛰 CI 디스패치 · 스케줄" + 두 경로 대비 한 줄 배너 (`bd1a9f9d`).
+   러너 완전 통합은 후속 phase.
 5. ✅ **DONE `f686601d`** — **pre-flight confirm의 blast radius 불충분** — native `confirm()`에 lifecycle 수·heavy
    수·VPC peak만; 서비스/생성·삭제 예상/과금/ETA/"destructive 항상 ON" 없음; preflight
    조회 실패에도 실행 허용. 개선: HTML 모달(대상 서비스·heavy 목록·생성/삭제 예상·ETA·
@@ -68,18 +82,35 @@
    개선: 4-stage 4칸으로 교체, `/planning`→`/planning/resources/map` 리다이렉트, 스테퍼 은퇴. (소)
 
 ### P2 — 효율
-7. **초장문 페이지** — Catalog 55k px·Modeling 17k·Compose 17k·스테퍼 13k. 카테고리
+7. ✅ **DONE `eb33ec0c`** — **초장문 페이지** — Catalog 55k px·Modeling 17k·Compose 17k·스테퍼 13k. 카테고리
    기본 접힘 + 검색 시 전개, 또는 페이지네이션. (중)
-8. **Reporting 서브탭 이중 정의** — reporting.html(영어 4탭)와 reporting_coverage.html
+   → 구현: Catalog·Modeling map·compose·자원 목록 카테고리/그룹 기본 접힘 +
+   검색/필터 시 자동 전개 + sessionStorage 기억 (실측: catalog 55k→1.6k px,
+   map 17k→1.1k, compose 17k→1.0k). 페이지네이션 없음(접힘으로 충분).
+   스테퍼는 phase-1에서 은퇴(`1aa96408`).
+8. ✅ **DONE `49b20d4e`** — **Reporting 서브탭 이중 정의** — reporting.html(영어 4탭)와 reporting_coverage.html
    (한국어 3탭, 대시보드 누락) 하드코딩 이원화; compare엔 서브탭 없음. 단일 include로. (소)
-9. **run 히스토리·비교의 단절** — 아카이브 행에 스위트/상태/결과 없음, compare 셀렉트는
+   → 구현: `templates/_reporting_tabs.html` 6탭(색칠지도·요약·대시보드·실행 기록·
+   비교·트리아지) 단일 정의, 활성 탭 = `rtab` 변수. + 대시보드 탭에
+   '추세 → 공개 대시보드(면②)' 고정 링크아웃.
+9. 🔶 **부분 DONE** — **run 히스토리·비교의 단절** — 아카이브 행에 스위트/상태/결과 없음, compare 셀렉트는
    DB run만(신설 서버 빈 채), run 상세에 pass/fail 요약 없음. index.json 메타 표시 +
    compare에 아카이브 run 포함. (중)
-10. **스냅샷 노후 미표시** — 절대 시각만. 상대 시간 + 임계 초과 노후 경고 칩. (소)
-11. **지표 라벨 혼란** — "2851/1293 · ok/호출"(분자>분모로 읽힘), cov_op/C1~C3 툴팁 부재
+   → compare 셀렉트의 아카이브(index.json) 병합은 기존 코드에 이미 있음을 확인
+   (버킷 credential 있으면 신설 서버도 채워짐) + 서브탭 복원(`49b20d4e`).
+   잔여: 아카이브 행 스위트/상태 메타 · run 상세 pass/fail 요약.
+10. ✅ **DONE `fb145d71`** — **스냅샷 노후 미표시** — 절대 시각만. 상대 시간 + 임계 초과 노후 경고 칩. (소)
+    → 구현: ctxbar + 홈 verdict 배너에 'N일 전' 상대 나이, 48h 초과 시 '노후' 칩.
+11. ✅ **DONE `1f8e8b68`+`935fff76`** — **지표 라벨 혼란** — "2851/1293 · ok/호출"(분자>분모로 읽힘), cov_op/C1~C3 툴팁 부재
     (IA.md S6 glossary 미완). (소)
-12. **에러/빈 상태 폴리시** — `/planning/edit` 무파라미터 raw 422, 없는 `/runs/{id}` 200
+    → 구현: C1/C2/C3·cov_op·cov_get·fail_new title 툴팁(정의 출처 =
+    dashboard/build.py 사다리 + docs/COVERAGE-CRITERIA.md, 의미 신설 없음).
+    '호출/ok'는 단위가 다른 두 수(호출=고유 EP, ok=관측 건수)임을 라벨/툴팁에 명시.
+12. ✅ **DONE `c60f48ee`** — **에러/빈 상태 폴리시** — `/planning/edit` 무파라미터 raw 422, 없는 `/runs/{id}` 200
     빈 페이지 → 404/"기록 없음" 안내. (소)
+    → 구현: edit/view 무파라미터 = HTML 파일 선택기(file_picker.html), 없는
+    run = 404 + '기록 없음 — 전체 목록' 링크 (DB·스냅샷·아카이브·명령 근거가
+    하나라도 있으면 기존대로 200). 오프라인 테스트 2건 추가.
 
 ### P3 — 폴리시
 13. **한/영 혼용 정책 부재** — nav 영어+본문 한국어+서브탭 화면별 혼재, 같은 개념 이중
@@ -87,7 +118,10 @@
 14. **테마 일관성** — 노드 편집·의존 그래프 다크 vs Testing 그래프 라이트. (소)
 15. **접근성 기초** — 본문 13.5px/보조 10~11px, confirm() 스크린리더 맥락 부족,
     nav aria-current 없음. (중)
-16. **셸 없는 화면** — `/runtime`·`/testing/console/` 직접 접근 시 복귀 링크 없음. (소)
+16. ✅ **DONE `33bf61f4`(runtime) + `fdf51864`(console)** — **셸 없는 화면** — `/runtime`·`/testing/console/` 직접 접근 시 복귀 링크 없음. (소)
+    → console2 헤더에 '← Testing 셸' 링크 — /testing/console/* 경로에서
+    ?embed=1 없이 열렸을 때만 노출(정적 발행본엔 안 보임). 같은 커밋에서
+    Catalog 행 딥링크 라벨을 확정 IA 정본 '✏️ 레시피 편집 →'으로 (A5).
 
 ## 3. 핵심 여정 마찰 요약
 - **(a) 상태 파악**: 홈 판독성 양호. 마찰: 스냅샷 노후 비표시 · 파이프라인 어휘 ≠ nav ·

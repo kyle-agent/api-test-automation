@@ -124,10 +124,29 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   .json) + heavy 명명/필수 체크, preflight 실패 = 완전 차단, 강제 클린업 confirm
   2곳도 owned-목록 모달로 (`f686601d`; `_plan` preview 에 est_creates/est_deletes/
   duration_s 추가).
-  - **OPEN (IA/CX 후속):** P1-3 ctxbar ctx_snapshot 공유 의존성 · P1-4 잔여
-    (`/testing` 서브탭 라벨 "CI 디스패치 · 스케줄" + 경로 대비 배너) · P2 초장문
-    페이지 접기 · P2-8 Reporting 서브탭 단일 include · 한/영 정책(P3).
+  - ~~OPEN (IA/CX 후속)~~ → **phase 2 에서 처리됨** (아래 블록).
     `local_run.html` 템플릿은 build_local_demo 가 참조해 보존(라우트만 301).
+- **IA/CX phase 2 (2026-07-04, 같은 브랜치 — IA 정렬 스프린트, owner 승인 배치,
+  no live mutations, .github/ 무변경):** tracker =
+  `docs/working/trackers/UIUX-AUDIT-2026-07-03.md` §2 phase-2 주석.
+  (1) `controlplane/common.py` base_ctx — ctx_snapshot 전 라우터 주입(P1-3) +
+  스냅샷 상대 나이/48h 노후 칩(P2-10) `fb145d71`; (2) Reporting 서브탭 단일
+  include `_reporting_tabs.html`(6탭 한국어, compare 포함) + 대시보드 탭
+  '추세→면②' 링크아웃(P2-8, compare 아카이브 병합은 기존 코드 확인)
+  `49b20d4e`; (3) `/testing` 라벨 "CI 디스패치 · 스케줄" + 두 실행 경로 대비
+  배너(P1-4 완결) `bd1a9f9d`; (4) Catalog·Modeling map·compose·자원 목록
+  카테고리 기본 접힘 + 검색 자동 전개 + sessionStorage(P2-7 — 55k→1.6k px)
+  `eb33ec0c`; (5) 지표 툴팁 C1/C2/C3·cov_op·cov_get·fail_new + '호출 EP vs
+  ok 관측' 단위 명시(P2-11) `1f8e8b68`+`935fff76`; (6) edit/view 무파라미터
+  HTML 선택기 + 없는 /runs/{id} 404(P2-12, 오프라인 테스트 2건 추가)
+  `c60f48ee`; (7) /testing/console 직접 접근 '← Testing 셸' 링크 + Catalog
+  '✏️ 레시피 편집' 정본 라벨(P3-16 잔여·A5) `fdf51864`; (8) C-결정 —
+  IA 문서에 +Knowledge 행(C1)·gated 정본 명기(C4), /ai 네비 편입('🤖 AI'
+  active 상태)+Modeling 딥링크+README AI 문장 정정(C3) `21230d65`.
+  - 테스트: pytest tests/offline 406 ✅ · controlplane 20/16/18/16 ✅ ·
+    validate 243/0 ✅. **OPEN 잔여:** P2-9 잔여(아카이브 행 메타 · run 상세
+    pass/fail 요약) · P3-13 한/영 정책 · P3-14 테마 · P3-15 접근성 ·
+    러너(로컬 vs CI) 완전 통합.
 - **MODEL-PROMOTION pass (2026-07-03, same branch — offline only, no dispatch/live calls):**
   - **18 docs→VALIDATED promoted** off service-scoped 2xx evidence via the NEW
     `python -m tools.promote_validated` (dry-run default; `--apply` = targeted
