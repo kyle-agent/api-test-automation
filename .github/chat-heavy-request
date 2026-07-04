@@ -1,3 +1,13 @@
-# Lane reset to noop — HB1 (run 28699129653) concluded 08:09Z & folded
-# (0 new gap coverage; see CAMPAIGN-C3-100 progress log 2026-07-04).
-action=noop
+# HB2 (CAMPAIGN-C3-100, 2026-07-04): database depth batch 2 — epas + cachestore
+# self-sufficient cluster subops-full lifecycles. Target: 33 gap keys
+# (epas 19 · cachestore 14; eventstreams deferred to HB2b — needs a -full
+# lifecycle authored first, create body is the unverified topology hypothesis).
+# Lane gates verified before push: HB1 concluded+folded+swept, no active runs,
+# owned==1 (muted known-stuck log-group only). parallel=2 (DB ≤3 rule);
+# HB1↔HB2 merge forbidden (DB cluster quota).
+action=run
+mutations=true
+destructive=true
+heavy=true
+crud_ids=epas-cluster-subops-full,cachestore-cluster-subops-full
+parallel=2
