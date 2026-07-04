@@ -211,6 +211,17 @@ async def api_run_start(request: Request) -> JSONResponse:
     heavy = c2._selection_is_heavy(ids)                    # gate DERIVED from selection
     peak = c2._run_peak_vpcs(ids)
     if mode == "live":
+        # dup-admit guard (2026-07-04): a second LIVE run while one is in flight
+        # pollutes the account-wide scan/rescan verdicts — 409, never silent admit.
+        act = c2._active_live_run()
+        if act:
+            return _json({
+                "error": ("이미 진행 중(또는 대기 중)인 LIVE 실행이 있습니다 — "
+                          f"run {act['id']} "
+                          f"({', '.join(act.get('lifecycle_ids') or [])[:120]}). "
+                          "동시 LIVE 실행은 자원 스캔·재스캔 판정을 오염시키므로 "
+                          "차단됩니다. 완료(또는 중단) 후 다시 시작하세요."),
+                "active_run": act["id"]}, 409)
         # live CRUD lifecycles need mutations+destructive; heavy auto-enables iff the
         # selected closure contains a heavy (billable) lifecycle. The deliberate
         # opt-in (Hard Rule 1) is the selection + the client pre-flight confirm.
@@ -251,6 +262,14 @@ def api_cleanup() -> JSONResponse:
             "reconciler 는 owner-tag 로 전체를 reap 하므로 다른 실행이 만든 자원까지 "
             "삭제됩니다. 모든 실행이 끝난 뒤 다시 시도하세요."}, 409)
     return _json(c2._rec_view(c2._start("cleanup", c2._cleanup_worker)), 202)
+
+
+@router.post("/api/runs/{rid}/abort")
+def api_run_abort(rid: str) -> JSONResponse:
+    """로컬 run 중단 (2026-07-04): kill the pytest process tree → teardown 스윕
+    → status '중단됨(aborted)'. Engine half lives in c2._abort_run."""
+    code, payload = c2._abort_run(rid)
+    return _json(payload, code)
 
 
 @router.post("/api/verify")

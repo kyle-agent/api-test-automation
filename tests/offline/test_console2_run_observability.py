@@ -242,6 +242,156 @@ def test_post_run_rescans_no_alert_when_stable_and_errors_tolerated(tmp_path):
     assert rec["rescans"][1]["error"].startswith("creds")
 
 
+def test_post_run_rescans_ignore_readonly_and_simulate_records(tmp_path):
+    """H2-guard precision (2차 수용 결함 2): only resource-CHANGING runs (live
+    lifecycle / cleanup) may skip a rescan round — an owned scan, a verify or a
+    simulate replay must not (the daemon used to see its own concurrent scan
+    record as '다른 실행' and skip itself)."""
+    C2._RUNS["obs-scan"] = {"id": "obs-scan", "kind": "owned",
+                            "mode": "owned", "status": "running"}
+    C2._RUNS["obs-sim"] = {"id": "obs-sim", "kind": "simulate",
+                           "mode": "simulate", "status": "running"}
+    rec = {"id": "obs-t", "log": str(tmp_path / "obs-t.log")}
+    Path(rec["log"]).write_text("", encoding="utf-8")
+    try:
+        C2._post_run_rescans(rec, offsets=(0,), scan=lambda: [],
+                             sleep=lambda s: None)
+        assert rec["rescans"][0]["total"] == 0        # ran, not skipped
+        # …but a LIVE lifecycle run elsewhere still skips the round
+        C2._RUNS["obs-live"] = {"id": "obs-live", "kind": "lifecycle",
+                                "mode": "live", "status": "running"}
+        rec2 = {"id": "obs-t2", "log": str(tmp_path / "obs-t2.log")}
+        Path(rec2["log"]).write_text("", encoding="utf-8")
+        C2._post_run_rescans(rec2, offsets=(0,), scan=lambda: [],
+                             sleep=lambda s: None)
+        assert rec2["rescans"][0].get("skipped")
+        assert rec2["rescans"][0]["total"] is None    # 스킵 ≠ 0건
+    finally:
+        for k in ("obs-scan", "obs-sim", "obs-live"):
+            C2._RUNS.pop(k, None)
+
+
+def test_post_run_rescans_persist_to_sidecar_and_rehydrate(tmp_path):
+    """재스캔 결과·일정 영속화 (2차 수용 결함 2): each round lands in
+    <log>.rescans.json; _rehydrate_one restores it; anchored resume skips the
+    already-run offsets and sleeps to the original wall times."""
+    rec = {"id": "obs-p", "log": str(tmp_path / "obs-p.log")}
+    Path(rec["log"]).write_text("", encoding="utf-8")
+    C2._post_run_rescans(rec, offsets=(0,),
+                         scan=lambda: [{"service": "vpc", "path": "/v1/vpcs/a"}],
+                         sleep=lambda s: None)
+    side = json.loads((tmp_path / "obs-p.rescans.json").read_text())
+    assert side["rescans"][0]["total"] == 1
+    assert side["planned_offsets"] == [0.0]
+    # anchored resume: +0 already recorded → only +300/+900 run, waits anchored
+    waits = []
+    now = time.time()
+    rec2 = {"id": "obs-r", "log": str(tmp_path / "obs-r.log"),
+            "rescans": [{"offset_s": 0.0, "ts": now - 100, "total": 1}],
+            "rescan_offsets": [0.0, 300.0, 900.0]}
+    Path(rec2["log"]).write_text("", encoding="utf-8")
+    C2._post_run_rescans(rec2, offsets=(300.0, 900.0),
+                         scan=lambda: [{"service": "vpc", "path": "/v1/vpcs/a"}],
+                         sleep=waits.append, anchor=now - 100)
+    assert len(waits) == 2 and 190 <= waits[0] <= 200 and 790 <= waits[1] <= 800
+    assert [e.get("total") for e in rec2["rescans"]] == [1, 1, 1]
+    assert "late_alert" not in rec2       # base=1 came from the restored +0 entry
+
+
+def test_rehydrate_reads_rescan_sidecar_and_abort_marker(tmp_path):
+    rd = tmp_path / "runs"
+    rd.mkdir()
+    rid = "20260704-000010-abrt"
+    (rd / f"{rid}.log").write_text(
+        f"# console2 run {rid}  lifecycle_ids=['a']\n"
+        "# gates: mutations=True destructive=True heavy=False  parallel=1\n"
+        "=== pytest ===\n"
+        "=== 실행 중단(aborted) ts=1751600000.0 — pytest 트리 종료됨 ===\n",
+        encoding="utf-8")
+    (rd / f"{rid}.events.jsonl").write_text(
+        json.dumps({"ts": 1751599900.0, "kind": "lifecycle-start",
+                    "lifecycle": "a"}) + "\n", encoding="utf-8")
+    (rd / f"{rid}.rescans.json").write_text(json.dumps(
+        {"rescans": [{"offset_s": 0.0, "ts": 1751600001.0, "total": 2}],
+         "late_alert": None, "planned_offsets": [0.0, 300.0, 900.0],
+         "anchor": 1751600000.0}), encoding="utf-8")
+    assert C2._rehydrate_runs(run_dir=rd) == 1
+    try:
+        rec = C2._RUNS[rid]
+        assert rec["status"] == "aborted"
+        assert rec["ended"] == 1751600000.0         # abort-marker ts, not mtime
+        assert [e["total"] for e in rec["rescans"]] == [2]
+        assert rec["rescan_offsets"] == [0.0, 300.0, 900.0]
+        assert "중단됨" in C2._rec_view(rec)["summary"]
+        # resume: this run ended far outside the grace window → nothing re-armed
+        assert C2._resume_pending_rescans() == 0
+    finally:
+        C2._RUNS.pop(rid, None)
+
+
+def test_abort_run_state_machine():
+    """_abort_run: 404 unknown · 409 ended/unsupported kinds · queued → dequeue
+    + aborted · running live → abort_requested flag (worker does the rest)."""
+    assert C2._abort_run("no-such")[0] == 404
+    C2._RUNS["ab-done"] = {"id": "ab-done", "kind": "lifecycle", "mode": "live",
+                           "status": "done", "log": "/nonexistent"}
+    C2._RUNS["ab-owned"] = {"id": "ab-owned", "kind": "owned", "mode": "owned",
+                            "status": "running", "log": "/nonexistent"}
+    C2._RUNS["ab-run"] = {"id": "ab-run", "kind": "lifecycle", "mode": "live",
+                          "status": "running", "log": "/nonexistent",
+                          "events": "/nonexistent", "lifecycle_ids": ["a"]}
+    try:
+        assert C2._abort_run("ab-done")[0] == 409
+        assert C2._abort_run("ab-owned")[0] == 409
+        code, payload = C2._abort_run("ab-run")
+        assert code == 202 and payload["status"] == "aborting"
+        assert C2._RUNS["ab-run"]["abort_requested"] is True
+    finally:
+        for k in ("ab-done", "ab-owned", "ab-run"):
+            C2._RUNS.pop(k, None)
+
+
+def test_scan_owned_isolates_campaign_state(monkeypatch):
+    """ROOT CAUSE of the '재스캔 0건 오보' (2차 수용 결함 2): run_sweep's
+    module-level _CONVERGED cache persisted across scan_owned calls in one
+    process, so a pre-run scan of a clean account made every later rescan skip
+    re-listing and report 0. scan_owned must run on a CLEAN campaign state and
+    leave zero footprint."""
+    import cleanup.reconciler as recon
+    import cleanup.verify_clean as vc
+    recon._CONVERGED.add(("vpc", "/v1/vpcs"))
+    seen = {}
+
+    def fake_run_sweep(client):
+        seen["during"] = set(recon._CONVERGED)
+        recon._CONVERGED.add(("polluted", "/by-scan"))
+
+    monkeypatch.setattr(recon, "run_sweep", fake_run_sweep)
+    try:
+        vc.scan_owned(client=object())
+        assert seen["during"] == set()                       # clean slate
+        assert ("vpc", "/v1/vpcs") in recon._CONVERGED       # restored
+        assert ("polluted", "/by-scan") not in recon._CONVERGED
+    finally:
+        recon._CONVERGED.clear()
+
+
+def test_active_live_run_guard_matches_only_live_lifecycles():
+    C2._RUNS["g-sim"] = {"id": "g-sim", "kind": "simulate", "mode": "simulate",
+                         "status": "running"}
+    C2._RUNS["g-scan"] = {"id": "g-scan", "kind": "owned", "mode": "owned",
+                          "status": "running"}
+    try:
+        assert C2._active_live_run() is None
+        C2._RUNS["g-live"] = {"id": "g-live", "kind": "lifecycle",
+                              "mode": "live", "status": "queued"}
+        assert C2._active_live_run()["id"] == "g-live"
+        assert C2._active_live_run(exclude="g-live") is None
+    finally:
+        for k in ("g-sim", "g-scan", "g-live"):
+            C2._RUNS.pop(k, None)
+
+
 def test_run_worker_log_line_softened_no_premature_deleted_claim():
     """The run-end log must not claim everything was deleted — teardown was
     ATTEMPTED and the measured re-scans are the verdict (신규1)."""

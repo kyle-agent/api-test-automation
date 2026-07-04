@@ -64,6 +64,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -464,13 +465,32 @@ def _local_res_index() -> dict:
     for rid, evp in recs:
         ids: set[str] = set()
         names: set[str] = set()
+        del_ids: set[str] = set()      # locally-KNOWN deleted (2xx DELETE step)
+        del_names: set[str] = set()
         for e in (_read_events(evp) if evp else []):
-            if e.get("kind") not in ("resource-tracked", "resource-deleted"):
+            kind = e.get("kind")
+            if kind not in ("resource-tracked", "resource-deleted"):
                 continue
             if e.get("resource_id"):
                 ids.add(str(e["resource_id"]))
+                if kind == "resource-deleted":
+                    del_ids.add(str(e["resource_id"]))
             if e.get("name"):
                 names.add(str(e["name"]))
+                if kind == "resource-deleted":
+                    del_names.add(str(e["name"]))
+            if kind == "resource-deleted" and not e.get("resource_id"):
+                # the live engine's resource-deleted carries only the resolved
+                # DELETE path — its trailing concrete segment IS the id (or the
+                # name, e.g. keypairs). Record it so /runtime can grey out /
+                # drop resources we KNOW this run already deleted, instead of
+                # showing them as 생성됨/테스트중 while loggingaudit lags
+                # (유령 자원, persona 2차 수용 2026-07-04).
+                seg = (e.get("path") or "").split("?")[0].rstrip("/") \
+                    .rsplit("/", 1)[-1]
+                if seg and "{" not in seg and len(seg) >= 6:
+                    del_ids.add(seg)
+                    del_names.add(seg)
         for shard in (ROOT / "reports" / "registry").glob(f"{rid}*.jsonl"):
             try:
                 for line in shard.read_text(encoding="utf-8").splitlines():
@@ -486,7 +506,8 @@ def _local_res_index() -> dict:
             except OSError:
                 continue
         if ids or names:
-            out[rid] = {"ids": ids, "names": names}
+            out[rid] = {"ids": ids, "names": names,
+                        "deleted_ids": del_ids, "deleted_names": del_names}
     with _RUNTIME_LOCK:
         _LOCAL_RES_CACHE.update(ts=now, val=out)
     return out
@@ -498,10 +519,36 @@ def _local_run_active() -> bool:
 
 
 def _other_run_active(my_rec_id: str | None) -> bool:
-    """True if any local run OTHER than ``my_rec_id`` is running/queued."""
+    """True if a RESOURCE-CHANGING local run OTHER than ``my_rec_id`` is
+    running/queued. Used by the post-run rescan H2 guard, whose only concern is
+    "could another run's resources pollute an account-wide scan_owned?" — so
+    only live lifecycle runs (create/delete real resources) and force cleanups
+    (delete account-wide) count. Read-only records (owned/verify scans) and
+    cloudless simulate replays must NOT trip the guard: they were making the
+    +0/+5m rescans skip themselves (persona 2차 수용, 2026-07-04 — the rescan
+    daemon saw its own concurrent owned-scan record as '다른 실행')."""
     with _LOCK:
         return any(r.get("status") in ("running", "queued")
+                   and (r.get("kind") == "cleanup"
+                        or (r.get("kind") == "lifecycle"
+                            and r.get("mode") == "live"))
                    for rid, r in _RUNS.items() if rid != my_rec_id)
+
+
+def _active_live_run(exclude: str | None = None) -> dict | None:
+    """The first live lifecycle run currently running/queued (or None).
+
+    Dup-admit guard (persona 2차 수용, 2026-07-04): two identical heavy
+    configurations were admitted 2.2s apart with no warning — POST /api/run now
+    409s a new LIVE run while another live run is in flight. The VPC admission
+    queue still exists for simulate replays and post-abort re-admission."""
+    with _LOCK:
+        for r in _RUNS.values():
+            if (r.get("id") != exclude and r.get("kind") == "lifecycle"
+                    and r.get("mode") == "live"
+                    and r.get("status") in ("running", "queued")):
+                return r
+    return None
 
 
 def _local_run_youngest_age() -> float:
@@ -946,14 +993,20 @@ def _rehydrate_one(rid: str, logp: Path, evp: Path) -> dict | None:
     # verdict from the pytest tail (lifecycle runs) / worker markers (utilities)
     status, rc = "unknown", None
     ms = _PYTEST_SUMMARY_RE.search(txt or "")
+    # ABORT marker (실행 중단 버튼) — carries the abort epoch so the duration
+    # stays honest even after rescan lines bump the log's mtime.
+    ma = re.search(r"=== 실행 중단\(aborted\)(?: ts=([\d.]+))?", txt or "")
     if kind == "lifecycle":
-        if ms:
+        if ma:
+            status, rc = "aborted", 1
+        elif ms:
             status = "done"
             # errors count as failure too — '1 passed, 2 errors' is NOT a
             # success (M2 review 2026-07-04)
             rc = 1 if re.search(r"\d+ (?:failed|errors?)\b", ms.group(1)) else 0
     elif txt:
         status, rc = "done", 0
+    runner_missing = "테스트 러너 없음" in (txt or "")
     # timestamps: event stream first/last ts, else file mtimes
     started = ended = None
     events: list[dict] = []
@@ -973,14 +1026,45 @@ def _rehydrate_one(rid: str, logp: Path, evp: Path) -> dict | None:
         started = mt or 0.0
     if ended is None:
         ended = mt
+    # duration honesty for ABNORMAL endings (지속시간 보정): a crashed/aborted
+    # run's event stream stops early (e.g. 57s) while the log keeps recording
+    # until the real end (393s). Prefer the abort marker's own epoch; else the
+    # log mtime — but never when post-run rescan lines already inflated it.
+    if ma and ma.group(1):
+        try:
+            ended = max(float(ended or 0), float(ma.group(1)))
+        except ValueError:
+            pass
+    elif (status in ("unknown", "aborted") and mt
+          and "종료 후 재스캔" not in (txt or "")):
+        ended = max(float(ended or 0), float(mt))
     rec = {"id": rid, "kind": kind, "mode": "live" if kind == "lifecycle" else kind,
            "status": status, "lifecycle_ids": lifecycle_ids,
            "heavy": gates["heavy"], "mutations": gates["mutations"],
            "destructive": gates["destructive"],
            "started": started, "ended": ended, "rc": rc,
            "log": str(logp), "events": str(evp), "rehydrated": True}
+    if runner_missing:
+        rec["runner_missing"] = True
     if kind == "lifecycle" and events:
         rec["events_summary"] = _events_summary(events)
+    # rescan sidecar (results + plan survive a restart — 신규 persist)
+    try:
+        sc = _rescan_sidecar(rec)
+        if sc is not None and sc.exists():
+            data = json.loads(sc.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                rec["rescans"] = [e for e in (data.get("rescans") or [])
+                                  if isinstance(e, dict)]
+                if data.get("late_alert"):
+                    rec["late_alert"] = data["late_alert"]
+                if data.get("planned_offsets"):
+                    rec["rescan_offsets"] = [float(o) for o
+                                             in data["planned_offsets"]]
+                if data.get("anchor"):
+                    rec["rescan_anchor"] = float(data["anchor"])
+    except Exception:  # noqa: BLE001 — a torn sidecar never blocks rehydration
+        pass
     return rec
 
 
@@ -1039,7 +1123,8 @@ def _record_run_to_db(rec: dict) -> None:
                              "summary": summ}, ensure_ascii=False)
         _cdb.record_local_run(
             "local-" + rec["id"],
-            status="done" if rec.get("rc") == 0 else "failed",
+            status=("aborted" if rec.get("status") == "aborted"
+                    else "done" if rec.get("rc") == 0 else "failed"),
             requested_at=_iso_utc(rec.get("started")),
             finished_at=_iso_utc(rec.get("ended")),
             detail=detail)
@@ -1085,30 +1170,96 @@ def _local_run_summary(gh_run_id: str) -> dict | None:
 
 # ---- 종료 후 지연 재스캔 (신규1) ---------------------------------------------
 _RESCAN_OFFSETS_S = (0.0, 300.0, 900.0)     # +0 · +5m · +15m
+# how long after a run's end an unexecuted rescan offset is still worth running
+# late (server was down at its scheduled time) — beyond this, don't bother.
+_RESCAN_RESUME_GRACE_S = 3600.0
 
 
 def _default_owned_scan() -> list[dict]:
     # read-only-ness guaranteed by scan_owned stubbing _delete/_wait_gone
     os.environ.setdefault("SCP_ALLOW_DESTRUCTIVE", "false")
     from cleanup.verify_clean import scan_owned
-    return scan_owned()
+    errs: list = []
+    owned = scan_owned(list_errors=errs)
+    if not owned and errs:
+        # every collection came back empty BUT some LISTs failed — a "0건"
+        # verdict here would be false comfort (persona 2차 수용: the rescan
+        # reported total 0 while 6 resources survived). Raise so the caller
+        # records '스캔 실패', clearly distinct from a genuine 0.
+        first = errs[0]
+        raise RuntimeError(
+            f"스캔 불완전 — {len(errs)}개 컬렉션 LIST 실패 "
+            f"(첫 실패: {first.get('service')} {first.get('path')} "
+            f"{first.get('error')})")
+    return owned
+
+
+def _rescan_sidecar(rec: dict) -> Path | None:
+    """Disk twin of rec['rescans']/'late_alert' — <run log>.rescans.json. The
+    rescan results/schedule used to live only in this process's memory, so a
+    server restart lost both (persona 2차 수용: +15m 일정 소실, rescans=null)."""
+    logp = rec.get("log")
+    if not logp:
+        return None
+    return Path(logp).with_suffix(".rescans.json")
+
+
+def _persist_rescans(rec: dict) -> None:
+    """Write the rescan state (results + plan) next to the run log. Best-effort
+    atomic (tmp + rename); never raises."""
+    p = _rescan_sidecar(rec)
+    if p is None:
+        return
+    try:
+        with _LOCK:
+            data = {"rescans": list(rec.get("rescans") or []),
+                    "late_alert": rec.get("late_alert"),
+                    "planned_offsets": list(rec.get("rescan_offsets")
+                                            or _RESCAN_OFFSETS_S),
+                    "anchor": rec.get("rescan_anchor")}
+        tmp = p.with_suffix(".rescans.json.tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, default=str),
+                       encoding="utf-8")
+        tmp.replace(p)
+    except Exception:  # noqa: BLE001 — persistence is best-effort
+        pass
 
 
 def _post_run_rescans(rec: dict, offsets=_RESCAN_OFFSETS_S,
-                      scan=None, sleep=time.sleep) -> None:
+                      scan=None, sleep=time.sleep, anchor=None) -> None:
     """Owned re-scans at the given offsets after a run ends. Results accrue on
-    ``rec["rescans"]``; a later scan finding MORE items than the +0 scan sets
-    ``rec["late_alert"]`` (비동기 생성물 의심) — the UI surfaces it prominently.
-    ``scan``/``sleep`` are injectable so tests drive this with a fake clock."""
+    ``rec["rescans"]`` (and are PERSISTED to the run's ``.rescans.json`` sidecar
+    so a restart can't lose them); a later scan finding MORE items than the +0
+    scan sets ``rec["late_alert"]`` (비동기 생성물 의심) — the UI surfaces it
+    prominently. ``scan``/``sleep`` are injectable so tests drive this with a
+    fake clock. ``anchor`` (epoch seconds) schedules offsets relative to the
+    run's END instead of "now" — the restart-resume path; offsets already
+    recorded on the rec are skipped, and overdue ones run immediately."""
     if scan is None:
         scan = _default_owned_scan
     with _LOCK:
-        rec["rescans"] = []
-    base = None
+        rec.setdefault("rescans", [])       # keep rehydrated partial results
+        rec["rescan_offsets"] = [float(o) for o in offsets] \
+            if anchor is None else sorted(
+                {float(o) for o in list(rec.get("rescan_offsets") or [])
+                 + [float(o) for o in offsets]})
+        rec.setdefault("rescan_anchor",
+                       float(anchor) if anchor is not None else time.time())
+        done_offsets = {float(e.get("offset_s", -1))
+                        for e in rec.get("rescans") or []}
+        # base for the late-alert comparison survives a restart too
+        base = next((e["total"] for e in rec.get("rescans") or []
+                     if e.get("total") is not None), None)
+    _persist_rescans(rec)
     prev = 0.0
     for off in offsets:
-        wait = float(off) - prev
-        prev = float(off)
+        if anchor is not None:
+            wait = (float(anchor) + float(off)) - time.time()
+        else:
+            wait = float(off) - prev
+            prev = float(off)
+        if float(off) in done_offsets:
+            continue                        # already ran (before the restart)
         if wait > 0:
             sleep(wait)
         label = f"+{int(off // 60)}m" if off >= 60 else f"+{int(off)}s"
@@ -1121,6 +1272,7 @@ def _post_run_rescans(rec: dict, offsets=_RESCAN_OFFSETS_S,
                      "skipped": "다른 실행 진행 중 — 계정 전체 스캔 비교 불가"}
             with _LOCK:
                 rec.setdefault("rescans", []).append(entry)
+            _persist_rescans(rec)
             try:
                 with open(rec["log"], "a", encoding="utf-8") as f:
                     f.write(f"\n=== 종료 후 재스캔 {label}: 건너뜀 "
@@ -1156,6 +1308,7 @@ def _post_run_rescans(rec: dict, offsets=_RESCAN_OFFSETS_S,
                                 "비동기 생성물 의심 (+0 스캔 이후 나타남)")}
                 line += (f"⚠ 종료 후 자원 늦출현 {delta}건 — 비동기 생성물 의심 "
                          f"(+0 스캔 {base}건 → {entry['total']}건)\n")
+        _persist_rescans(rec)
         try:
             with open(rec["log"], "a", encoding="utf-8") as f:
                 f.write(line)
@@ -1163,10 +1316,43 @@ def _post_run_rescans(rec: dict, offsets=_RESCAN_OFFSETS_S,
             pass
 
 
-def _schedule_post_run_rescans(rec: dict) -> None:
+def _schedule_post_run_rescans(rec: dict, offsets=_RESCAN_OFFSETS_S,
+                               anchor=None) -> None:
     if os.environ.get("SCP_POST_RUN_RESCAN", "true").strip().lower() == "false":
         return
-    threading.Thread(target=_post_run_rescans, args=(rec,), daemon=True).start()
+    threading.Thread(target=_post_run_rescans, args=(rec, offsets),
+                     kwargs={"anchor": anchor}, daemon=True).start()
+
+
+def _resume_pending_rescans() -> int:
+    """Re-arm the +0/+5m/+15m rescan offsets a server restart dropped (persona
+    2차 수용: the +15m scan silently never ran — ``_rehydrate_runs`` restored the
+    run but nothing re-scheduled its rescans). For each rehydrated finished live
+    run whose end is recent enough that unexecuted offsets are still meaningful
+    (< offset + grace), schedule the MISSING offsets anchored to the run's end —
+    overdue ones fire immediately, future ones at their original wall time.
+    Returns the number of runs re-armed."""
+    if os.environ.get("SCP_POST_RUN_RESCAN", "true").strip().lower() == "false":
+        return 0
+    now = time.time()
+    with _LOCK:
+        recs = [r for r in _RUNS.values()
+                if r.get("rehydrated") and r.get("kind") == "lifecycle"
+                and r.get("mode") == "live" and r.get("rc") is not None
+                and not r.get("runner_missing") and r.get("ended")]
+    n = 0
+    for rec in recs:
+        ended = float(rec.get("ended") or 0)
+        done = {float(e.get("offset_s", -1)) for e in rec.get("rescans") or []}
+        planned = [float(o) for o in (rec.get("rescan_offsets")
+                                      or _RESCAN_OFFSETS_S)]
+        missing = [o for o in planned if o not in done
+                   and now - (ended + o) < _RESCAN_RESUME_GRACE_S]
+        if not missing:
+            continue
+        _schedule_post_run_rescans(rec, offsets=tuple(missing), anchor=ended)
+        n += 1
+    return n
 
 
 # --------------------------------------------------------------------------- #
@@ -1192,6 +1378,90 @@ def _start(kind: str, worker, **extra) -> dict:
     rec = _new_rec(kind, **extra)
     threading.Thread(target=worker, args=(rec,), daemon=True).start()
     return rec
+
+
+def _kill_proc_tree(proc, grace_s: float = 10.0) -> None:
+    """SIGTERM the child's whole process group (it was started with
+    ``start_new_session=True``, so pgid == pid == every xdist worker), give it a
+    short grace to flush, then SIGKILL whatever survives. Never raises."""
+    try:
+        pgid = os.getpgid(proc.pid)
+    except Exception:  # noqa: BLE001 — already gone
+        pgid = None
+    try:
+        if pgid is not None:
+            os.killpg(pgid, signal.SIGTERM)
+        else:
+            proc.terminate()
+    except Exception:  # noqa: BLE001
+        pass
+    deadline = time.monotonic() + grace_s
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            return
+        time.sleep(0.25)
+    try:
+        if pgid is not None:
+            os.killpg(pgid, signal.SIGKILL)
+        else:
+            proc.kill()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _abort_run(rid: str) -> tuple[int, dict]:
+    """중단 버튼의 서버 반쪽 — abort a LOCAL run (persona 2차 수용: 로컬 run 은
+    실행 중 중단 수단이 전혀 없었다). Returns ``(http_code, payload)``.
+
+    * queued run  → dequeue + mark aborted (nothing was started).
+    * running LIVE lifecycle run → set ``abort_requested`` and kill the pytest
+      process tree; ``_run_worker`` then runs the teardown paths (shared-VPC
+      teardown + run-scoped reconciler sweep) and records status ``aborted``.
+    * anything else (simulate/cleanup/verify/owned, already-ended) → 409.
+    """
+    with _LOCK:
+        rec = _RUNS.get(rid)
+    if not rec:
+        return 404, {"error": "no such run"}
+    status = rec.get("status")
+    if status == "queued":
+        with _ADMIT:
+            if rid in _QUEUE:
+                _QUEUE.remove(rid)
+            _PENDING.pop(rid, None)
+        with _LOCK:
+            rec["abort_requested"] = True
+            rec["status"], rec["ended"] = "aborted", time.time()
+            if rec.get("rc") is None:
+                rec["rc"] = 1
+        try:
+            with open(rec["log"], "a", encoding="utf-8") as f:
+                f.write(f"\n=== 실행 중단(aborted) ts={time.time():.3f} — "
+                        "대기 큐에서 제거됨 (시작 전) ===\n")
+        except OSError:
+            pass
+        _record_run_to_db(rec)
+        _try_admit_queue()
+        return 202, _rec_view(rec)
+    if status != "running":
+        return 409, {"error": f"이미 종료된 실행입니다 (status={status}) — "
+                              "중단할 수 없습니다."}
+    if rec.get("kind") != "lifecycle" or rec.get("mode") != "live":
+        return 409, {"error": "이 기록 종류는 중단을 지원하지 않습니다 — "
+                              "스캔/시뮬레이션/클린업은 짧은 읽기·정리 작업입니다."}
+    with _LOCK:
+        already = bool(rec.get("abort_requested"))
+        rec["abort_requested"] = True
+        proc = rec.get("_proc")
+    if proc is not None:
+        threading.Thread(target=_kill_proc_tree, args=(proc,),
+                         daemon=True).start()
+    return 202, {"id": rid, "status": "aborting",
+                 "already_requested": already,
+                 "note": ("pytest 프로세스 트리 종료 중 — teardown 스윕 후 "
+                          "'중단됨(aborted)' 으로 기록됩니다."
+                          if proc is not None else
+                          "provision 단계 — pytest 시작 전에 중단됩니다.")}
 
 
 # --------------------------------------------------------------------------- #
@@ -1488,10 +1758,27 @@ def _run_worker(rec: dict) -> None:
             f.write("\n=== pytest ===\n")
             f.flush()
             pos = f.tell()      # remember where the pytest output begins
-            rc = subprocess.run(
-                [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
-                 "-n", n, "-o", "addopts=", "-q"],
-                cwd=str(ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT).returncode
+            if rec.get("abort_requested"):
+                # aborted while provisioning — never start pytest
+                rc = -1
+                f.write("(중단 요청됨 — pytest 시작 전 중단)\n")
+                f.flush()
+            else:
+                # Popen in its OWN session (process group) so the 중단 버튼 can
+                # kill the whole pytest tree (xdist workers included), not just
+                # the leader — subprocess.run gave us no handle at all.
+                proc = subprocess.Popen(
+                    [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
+                     "-n", n, "-o", "addopts=", "-q"],
+                    cwd=str(ROOT), env={**env, **shared}, stdout=f,
+                    stderr=subprocess.STDOUT, start_new_session=True)
+                with _LOCK:
+                    rec["_proc"] = proc
+                try:
+                    rc = proc.wait()
+                finally:
+                    with _LOCK:
+                        rec.pop("_proc", None)
             f.flush()
             # Read back just the pytest output to detect "the runner never ran"
             # (e.g. pytest not installed in this venv). When it didn't run there are
@@ -1502,8 +1789,31 @@ def _run_worker(rec: dict) -> None:
                     pytest_out = rf.read()
             except Exception:  # noqa: BLE001
                 pytest_out = ""
-            runner_missing = _pytest_did_not_run(rc, pytest_out)
-            if runner_missing:
+            aborted = bool(rec.get("abort_requested"))
+            runner_missing = (not aborted) and _pytest_did_not_run(rc, pytest_out)
+            if aborted:
+                # 실행 중단 (사용자 요청): the pytest tree was killed mid-flight,
+                # so the lifecycles' own teardown never finished — run the
+                # EXISTING cleanup paths: precise shared-VPC teardown + a
+                # run-scoped reconciler sweep (the own-run TTL override in
+                # cleanup.reconciler._is_deletable reaps exactly this run's
+                # tagged leftovers via APITEST_RUN_ID; other runs' live
+                # resources keep their TTL protection — Hard Rule 3).
+                f.write(f"\n=== 실행 중단(aborted) ts={time.time():.3f} — "
+                        "pytest 프로세스 트리 종료됨 ===\n")
+                f.flush()
+                _teardown_shared(env, shared, f)
+                f.write("\n=== teardown 스윕 (run-scoped: 이 run 의 잔존 정리) ===\n")
+                f.flush()
+                subprocess.run(
+                    [sys.executable, "-m", "cleanup.reconciler"], cwd=str(ROOT),
+                    env={**env, "SCP_ALLOW_MUTATIONS": "true",
+                         "SCP_ALLOW_DESTRUCTIVE": "true",
+                         "SCP_SWEEP_NOWAIT": "true"},
+                    stdout=f, stderr=subprocess.STDOUT)
+                f.write("\n=== 중단 처리 완료 — 실측 재스캔 예약됨 ===\n")
+                f.flush()
+            elif runner_missing:
                 f.write("\n⚠ 테스트 러너 없음 — pytest 가 실행되지 않았습니다 "
                         "(pip install -r requirements.txt; venv 활성화).\n"
                         "  생성된 자원이 없으므로 teardown/sweep 을 건너뜁니다.\n")
@@ -1527,7 +1837,8 @@ def _run_worker(rec: dict) -> None:
                         "지원하지 않기 때문).\n")
                 f.flush()
         with _LOCK:
-            rec["status"], rec["rc"], rec["ended"] = "done", rc, time.time()
+            rec["status"] = "aborted" if aborted else "done"
+            rec["rc"], rec["ended"] = rc, time.time()
             rec["runner_missing"] = runner_missing
         rec["events_summary"] = _events_summary(_read_events(rec["events"]))
         _record_run_to_db(rec)                     # Reporting ▸ 실행 기록 (P2-9)
@@ -1679,7 +1990,13 @@ def _owned_worker(rec: dict) -> None:
         # _delete/_wait_gone (so no DELETE can fire); this default is just a hint.
         os.environ.setdefault("SCP_ALLOW_DESTRUCTIVE", "false")
         from cleanup.verify_clean import scan_owned
-        owned = scan_owned()
+        errs: list = []
+        owned = scan_owned(list_errors=errs)
+        if not owned and errs:
+            # 0건 could be "the LISTs failed" — never present that as clean
+            raise RuntimeError(
+                f"스캔 불완전 — {len(errs)}개 컬렉션 LIST 실패 "
+                f"(첫 실패: {errs[0].get('service')} {errs[0].get('error')})")
         n_stuck = _annotate_known_stuck(owned)     # 기지 항목 (folded, not red)
         from collections import Counter
         by_svc = Counter(o["service"] for o in owned)
@@ -1714,6 +2031,8 @@ def _summarize(rec: dict, log: str) -> str:
     # flag _run_worker set when it detected the runner was missing.
     if rec.get("runner_missing"):
         return "⚠ 테스트 러너 없음 — pip install -r requirements.txt (venv)"
+    if rec.get("status") == "aborted":
+        return "⏹ 중단됨 — 사용자 요청 (teardown 스윕 수행)"
     if kind == "owned":
         if rec.get("status") == "error":
             return f"⚠️ 스캔 실패: {str(rec.get('error'))[:60]}"
@@ -1753,7 +2072,8 @@ def _summarize(rec: dict, log: str) -> str:
 _REC_VIEW_KEYS = ("id", "kind", "mode", "status", "lifecycle_ids",
                   "heavy", "mutations", "destructive", "rc", "started",
                   "ended", "error", "runner_missing", "peak_vpcs", "queued",
-                  "rehydrated", "rescans", "late_alert")
+                  "rehydrated", "rescans", "late_alert", "rescan_offsets",
+                  "abort_requested")
 
 
 def _rec_view(rec: dict, full: bool = False) -> dict:
@@ -1778,7 +2098,7 @@ def _rec_view(rec: dict, full: bool = False) -> dict:
     v["summary"] = _summarize(rec, log)
     # summary text is rescan-independent (pytest tail / worker markers), so a
     # terminal rec can cache unconditionally — rescans only append log lines.
-    if rec.get("status") in ("done", "error", "unknown"):
+    if rec.get("status") in ("done", "error", "unknown", "aborted"):
         rec["_summary_cache"] = v["summary"]
     if full:
         v["log"] = "".join(log.splitlines(keepends=True)[-250:])
@@ -2035,6 +2355,16 @@ class Handler(BaseHTTPRequestHandler):
             heavy = _selection_is_heavy(ids)
             peak = _run_peak_vpcs(ids)
             if mode == "live":
+                act = _active_live_run()
+                if act:
+                    return self._json(409, {
+                        "error": ("이미 진행 중(또는 대기 중)인 LIVE 실행이 "
+                                  f"있습니다 — run {act['id']} "
+                                  f"({', '.join(act.get('lifecycle_ids') or [])[:120]}). "
+                                  "동시 LIVE 실행은 자원 스캔·재스캔 판정을 "
+                                  "오염시키므로 차단됩니다. 완료(또는 중단) 후 "
+                                  "다시 시작하세요."),
+                        "active_run": act["id"]})
                 # Gates are DERIVED from the selection (no UI axis): CRUD lifecycles
                 # need mutations+destructive; heavy auto-enables iff the selected
                 # closure contains a heavy (billable) lifecycle. The deliberate
@@ -2074,6 +2404,10 @@ class Handler(BaseHTTPRequestHandler):
                     "reconciler 는 owner-tag 로 전체를 reap 하므로 다른 실행이 만든 자원까지 "
                     "삭제됩니다. 모든 실행이 끝난 뒤 다시 시도하세요."})
             return self._json(202, _rec_view(_start("cleanup", _cleanup_worker)))
+        if p.startswith("/api/runs/") and p.endswith("/abort"):
+            rid = p[len("/api/runs/"):-len("/abort")]
+            code, payload = _abort_run(rid)
+            return self._json(code, payload)
         if p == "/api/verify":
             return self._json(202, _rec_view(_start("verify", _verify_worker)))
         if p == "/api/owned":
@@ -2121,6 +2455,10 @@ def main():
 try:
     if os.environ.get("SCP_CONSOLE_REHYDRATE", "true").strip().lower() != "false":
         _rehydrate_runs()
+        # restart-resume: re-arm the +5m/+15m rescans a restart dropped (신규1
+        # follow-up — 일정 소실). Gated by SCP_POST_RUN_RESCAN like the original
+        # scheduling; only offsets still within the grace window are re-armed.
+        _resume_pending_rescans()
 except Exception:  # noqa: BLE001 — history is a convenience, never block startup
     pass
 

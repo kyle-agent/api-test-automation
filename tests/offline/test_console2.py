@@ -389,7 +389,8 @@ def test_owned_worker_records_structured_list(monkeypatch):
     marks it done (no cloud — scan_owned is monkeypatched)."""
     monkeypatch.setattr(
         "cleanup.verify_clean.scan_owned",
-        lambda client=None: [{"service": "networking/vpc", "path": "/v1/vpcs/vpc-1"}])
+        lambda client=None, list_errors=None:
+            [{"service": "networking/vpc", "path": "/v1/vpcs/vpc-1"}])
     rec = C2._new_rec("owned")
     C2._owned_worker(rec)
     assert rec["status"] == "done", rec.get("error")
