@@ -159,3 +159,8 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   build_local_demo+local_run.html · 1회성 publish *.sh 4종 · tracked reports/ 산출물
   9파일 untrack. **poc/scenario-viz(155f)는 보류** — api-test.yml:1121 발행 스텝 소비
   + Pages /platform 사용 여부 오너 확인 필요.
+- 2026-07-04: A0 후속 — dashboard-data 증거 백필 커밋(1bfe4f0d): repo 기준선에
+  +734 키 union(총 2252) + 10노드 VALIDATED 승격(모델 165 VALIDATED / 110 docs /
+  34 gated). **C3 재계산 72.78% 불변** — A0 기준선이 이미 dashboard-data 증거를
+  union했으므로 백필은 내구성(repo 단독 자급) 확보용, 신규 커버리지 아님.
+  gap 344(L14/H197/W16/G117) 유효. docs-research 에이전트(§body 미상 7건) 가동.
