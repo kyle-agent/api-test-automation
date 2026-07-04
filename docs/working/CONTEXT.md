@@ -108,6 +108,29 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **RUN 관측성 개편 (2026-07-04, branch `claude/upbeat-ritchie-ieus5u` — owner 승인
+  배치 A–F, 페르소나 QA 저널 run `20260704-034346-64b5` 근거; live mutation 없음,
+  .github/ 무변경):** tracker = `docs/working/trackers/UIUX-AUDIT-2026-07-03.md`
+  §2 phase-3 주석 (상세). 핵심: (A) console2 master 흐름 그래프가 **run 에
+  바인딩** — 신규 `GET /api/runs/{id}/graph`(run 의 라이프사이클 폐쇄집합,
+  같은 resource_graph.js/graph_view 계약) + 모드 칩("run 뷰 ↔ 구성 미리보기") +
+  활성 run 자동 재접속 + 기본 선택 빈 상태(sessionStorage 보존) + now-playing
+  바(durations.json 평균); (B) lifecycle-end 시 열린 ⏳ API 행 = `fail
+  (timeout/중단)` 로 즉시 닫힘 + run 종료 토스트/로그 자동 새로고침
+  (`PYTHONUNBUFFERED=1` 라이브 tail); (C) run 종료 후 **+0/+5m/+15m owned
+  재스캔** — 늦출현이면 `late_alert` (64b5 의 이미지×2+스냅샷×4 ~20분 지연
+  실증 대응), run-end 로그는 "teardown 시도 완료 — 실측 재스캔 예약됨";
+  (D) 서버 재시작에도 **run 이력 rehydrate** (`reports/console2-runs/*` →
+  `_RUNS`, '복원됨' 칩) + controlplane runs DB 미러(`db.record_local_run`,
+  gh_run_id=`local-<rec id>`) → Reporting ▸ 실행 기록 & `/runs/{id}` pass/fail
+  요약 (P2-9 완결); (E) /runtime "데이터 기준: N분 전 윈도우" 칩 + stale 자동
+  재수집/새로고침; (F) 클린업 종료 후 재스캔+의존잠금 힌트, genuine-removed
+  실측 삭제 수(reconciler 라운드별 라인 신설), console2 남은 자원 known-stuck
+  folding, '폐포'→'포함 API' 라벨, VPC 용량 '내 실행' 귀속(mine_live — 공유
+  VPC 포함, run 자원 id 키잉). 테스트:
+  `tests/offline/test_console2_run_observability.py` +17 (offline 438) ·
+  controlplane 20/16/18/16 · runner 16/16 · validate 243/0 · Playwright 픽스처
+  스모크(재부착·run 뷰·now-playing·늦출현·fail-closure) ✅.
 - **CLEANUP-ROBUSTNESS pass (2026-07-04, branch `claude/upbeat-ritchie-ieus5u` — the
   light-batch-2 TGW/VPC leak, run 28648339307; offline+read-only only, no mutations,
   .github/ untouched):** root causes + fixes in `knowledge/validated-facts.md`

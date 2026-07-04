@@ -37,6 +37,41 @@
 > `/testing` 서브탭 라벨/배너는 미착수) · P1-5 ✅ `f686601d` · P1-6 ✅ `1aa96408`.
 > P1-3, P2, P3 은 미착수 (후속 phase).
 >
+> **phase 3 (2026-07-04, 같은 브랜치 — "Run 관측성 개편", owner 승인 배치;
+> 근거 = 페르소나 QA 저널 run `20260704-034346-64b5`):**
+> A(F1·F2·신규4·신규6) ✅ — master 흐름 그래프가 **run 에 바인딩**(신규
+> `GET /api/runs/{id}/graph` = 그 run 의 라이프사이클 폐쇄집합, 같은
+> `resource_graph.js` scene + overlay; 모드 칩 "run 뷰: id ↔ 구성 미리보기"),
+> 페이지 로드 시 활성 run **자동 재접속**, 구성 선택 sessionStorage 보존 +
+> **기본 선택 = 빈 상태**, **now-playing 바**(lifecycle:step · METHOD path ·
+> 경과 / durations.json 평균) 탭 위 상시 표시.
+> B(F3·신규3) ✅ — lifecycle-end 시 열린 ⏳ API 행을 `fail (timeout/중단)` 로
+> **즉시 닫음**(fail 카운터 동시 반영; 서버측 `_events_summary` 동일 규칙),
+> pytest 자식 `PYTHONUNBUFFERED=1` 로 로그 라이브 tail, run 종료 시 로그 1회
+> 자동 새로고침 + 완료/실패 **토스트**("run 종료: 6/7 passed — 1 failed: …").
+> C(신규1, 치명) ✅ — run 종료 후 **+0/+5m/+15m owned 재스캔**(서버 데몬 스레드,
+> fake-clock 테스트 가능), +0 보다 늘면 `late_alert` → 콘솔 토스트+패널 배너 +
+> 실행 기록 행 "⚠ 종료 후 자원 늦출현 N건" + 남은 자원 자동 재스캔; run-end
+> 로그 문구를 "teardown 시도 완료 — 실측 재스캔 예약됨" 으로 완화.
+> D(신규2, 치명 · P2-9 완결) ✅ — 서버 시작 시 `_RUNS` 를
+> `reports/console2-runs/*` 에서 **rehydrate**(0-byte 잔해 제외; UI 칩
+> '복원됨'), 종료 run 을 controlplane runs DB 에 미러
+> (`db.record_local_run`, gh_run_id=`local-<rec id>`) → Reporting ▸ 실행 기록
+> + `/runs/{id}` 에 lifecycle pass/fail + api ok/soft/fail **결과 요약** 표시.
+> E(신규5) ✅ — /runtime 캐시 윈도우 나이 칩("데이터 기준: N분 전 윈도우"),
+> ~2분 초과 시 자동 재수집+페이지 auto-refresh, 첫 로드 진행 힌트.
+> F(신규7·8·9·10) ✅ — 강제 클린업 **종료를 기다렸다가** 재스캔(잔존 시
+> "의존 잠금 가능성 — 클린업 재실행 필요" 힌트), 삭제 수 = reconciler
+> `genuine-removed` 라인 합산(실측), console2 남은 자원 패널에
+> known_issues.stuck_resources **접힘 folding**(빨간 카운트 제외), 라벨
+> '폐포'→'포함 API'(+툴팁)·preflight "생성 ~N · 삭제 ~M"·서비스 표기 통일·
+> 이력 클릭 시 status 타일 "running" 오표시 제거·재계산 스피너, VPC 용량
+> '내 실행' 귀속을 run 의 자원 id(공유 VPC 포함)로 키잉(`mine_live`).
+> 테스트: `tests/offline/test_console2_run_observability.py` 17건 신설 —
+> offline 438 ✅ · controlplane 20/16/18/16 ✅ · runner 16/16 ✅ · validate
+> 243/0 ✅ · uvicorn+Playwright 스모크(재부착·run 뷰·now-playing·늦출현·
+> fail-closure — 픽스처 기반, live 실행 없음) ✅.
+>
 > **phase 2 (2026-07-04, 같은 브랜치 — IA 정렬 스프린트, owner 승인 배치):**
 > P1-3 ✅ `fb145d71` · P1-4 잔여 ✅ `bd1a9f9d` (완결) · P2-7 ✅ `eb33ec0c` ·
 > P2-8 ✅ `49b20d4e` · P2-9 🔶 부분(compare 셀렉트 아카이브 병합은 기존 코드로
