@@ -83,6 +83,10 @@ uvicorn controlplane.app:app --host 0.0.0.0 --port 8800
 레포 루트에서 실행해야 합니다 — suites/, environments/, data/baselines/를
 직접 읽습니다.
 
+의존성은 의도적으로 가볍게 분리돼 있습니다: `controlplane/requirements.txt`
+(FastAPI/uvicorn/jinja2/croniter) + 선택적 `controlplane/requirements-ai.txt`
+(`anthropic` — AI 기능용; 없어도 서버는 완전 동작, AI 섹션만 비활성 표시).
+
 ## 환경 변수
 
 | 변수 | 용도 |
