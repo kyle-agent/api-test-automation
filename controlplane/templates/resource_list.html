@@ -46,12 +46,20 @@
 </section>
 {% endif %}
 
+<style>
+  /* P2-7: 그룹 기본 접힘 (17k px 방지) — 헤더 클릭 = 펼치기, 세션 기억 */
+  section.grp h2{cursor:pointer;user-select:none}
+  section.grp h2 .caret{color:var(--muted);font-size:11px;width:14px;display:inline-block}
+  section.grp.collapsed .grp-body{display:none}
+</style>
+
 {% for g in groups %}
-<section>
-  <h2>{{ g.gid }}{% if g.label %} — {{ g.label }}{% endif %}
+<section class="grp collapsed" data-gid="{{ g.gid }}">
+  <h2 title="클릭 = 접기/펴기"><span class="caret">▸</span>{{ g.gid }}{% if g.label %} — {{ g.label }}{% endif %}
     {% if g.category %}<span class="cat">{{ g.category }}</span>{% endif %}
     <span class="muted">({{ g.nodes|length }} 노드)</span></h2>
   {% if g.nodes %}
+  <div class="grp-body">
   <table>
     <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
         <th>옵션</th><th>검증상태</th></tr>
@@ -67,10 +75,33 @@
     </tr>
     {% endfor %}
   </table>
+  </div>
   {% else %}
   <p class="muted">이 그룹에는 아직 노드가 없습니다 (_groups.yaml에만 정의됨).</p>
   {% endif %}
 </section>
 {% endfor %}
+
+<script>
+(function () {
+  var SS = "reslist.open", open = {};
+  try { open = JSON.parse(sessionStorage.getItem(SS) || "{}") || {}; } catch (e) {}
+  Array.prototype.forEach.call(document.querySelectorAll("section.grp"), function (sec) {
+    var gid = sec.getAttribute("data-gid");
+    function sync() {
+      sec.classList.toggle("collapsed", !open[gid]);
+      var car = sec.querySelector(".caret");
+      if (car) car.textContent = open[gid] ? "▾" : "▸";
+    }
+    var h = sec.querySelector("h2");
+    if (h) h.addEventListener("click", function () {
+      open[gid] = !open[gid];
+      try { sessionStorage.setItem(SS, JSON.stringify(open)); } catch (e) {}
+      sync();
+    });
+    sync();
+  });
+})();
+</script>
 
 {% endblock %}

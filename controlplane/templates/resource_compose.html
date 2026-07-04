@@ -17,9 +17,20 @@
   {% if targets_error %}<p class="warn">{{ targets_error }}</p>{% endif %}
 </section>
 
+<style>
+  /* P2-7: 카테고리 기본 접힘 — 체크된 노드의 카테고리는 자동 펼침, 검색은 접힘 무시 */
+  tr.cmp-cat td{background:#eef2f7;border-top:2px solid #d3dae3;padding:8px 10px;
+      font-size:13px;font-weight:800;cursor:pointer;user-select:none}
+  tr.cmp-cat .caret{display:inline-block;width:13px;color:var(--muted);font-size:10px}
+  tr.cmp-cat .tally{font-weight:400;font-size:11.5px;color:var(--muted);margin-left:8px}
+</style>
 <form method="post" action="/planning/resources/compose">
 <section>
-  <h2>대상 노드 + 분기/옵션 선택</h2>
+  <h2>대상 노드 + 분기/옵션 선택
+    <input type="text" id="cmp-search" class="search" autocomplete="off"
+           placeholder="검색: id · service…" style="margin-left:12px;font-weight:400"
+           onkeydown="if(event.key==='Enter')event.preventDefault()">
+    <span class="note" id="cmp-count"></span></h2>
   {% if not nodes %}
   <p class="muted">모델에 노드가 없습니다 —
     <a href="/planning/resources">자원 모델</a>에서 먼저 노드를 입력하세요.</p>
@@ -27,8 +38,13 @@
   <table>
     <tr><th></th><th>code</th><th>id</th><th>requires</th>
         <th>one_of 분기</th><th>옵션 값</th></tr>
-    {% for n in nodes %}
-    <tr>
+    {% for cat, items in nodes|groupby('category') %}
+    <tr class="cmp-cat" data-cat="{{ cat }}" title="클릭 = 접기/펴기">
+      <td colspan="6"><span class="caret">▸</span>{{ cat }}
+        <span class="tally">{{ items|length }} 노드</span></td></tr>
+    {% for n in items %}
+    <tr class="cmp-node" data-cat="{{ cat }}"
+        data-search="{{ (n.id ~ ' ' ~ n.service ~ ' ' ~ n.code)|lower }}">
       <td><input type="checkbox" name="targets"
                  value="{{ n.id }}"{{ ' checked' if n.id in selected else '' }}></td>
       <td class="muted">{{ n.code or '—' }}</td>
@@ -54,7 +70,44 @@
       </td>
     </tr>
     {% endfor %}
+    {% endfor %}
   </table>
+  <script>
+  // 접힘/검색 — 숨긴 행의 input도 form 제출엔 그대로 포함된다(display:none).
+  (function () {
+    var rows = Array.prototype.slice.call(document.querySelectorAll("tr.cmp-node"));
+    var cats = Array.prototype.slice.call(document.querySelectorAll("tr.cmp-cat"));
+    var input = document.getElementById("cmp-search");
+    var count = document.getElementById("cmp-count");
+    var SS = "compose.open", open = {};
+    try { open = JSON.parse(sessionStorage.getItem(SS) || "{}") || {}; } catch (e) {}
+    rows.forEach(function (tr) {   // 체크된 대상의 카테고리는 자동 펼침
+      var cb = tr.querySelector('input[name="targets"]');
+      if (cb && cb.checked) open[tr.dataset.cat] = true;
+    });
+    function persist() { try { sessionStorage.setItem(SS, JSON.stringify(open)); } catch (e) {} }
+    function apply() {
+      var q = (input.value || "").trim().toLowerCase();
+      var vis = {}, shown = 0;
+      rows.forEach(function (tr) {
+        var match = !q || tr.dataset.search.indexOf(q) >= 0;
+        tr.style.display = (match && (q ? true : !!open[tr.dataset.cat])) ? "" : "none";
+        if (match) { vis[tr.dataset.cat] = true; shown++; }
+      });
+      cats.forEach(function (tr) {
+        tr.style.display = (!q || vis[tr.dataset.cat]) ? "" : "none";
+        var c = tr.querySelector(".caret");
+        if (c) c.textContent = (q || open[tr.dataset.cat]) ? "▾" : "▸";
+      });
+      count.textContent = q ? (shown + " / " + rows.length + " 노드")
+                            : (rows.length + " 노드 · 카테고리 클릭 = 펼치기");
+    }
+    cats.forEach(function (tr) { tr.addEventListener("click", function () {
+      open[tr.dataset.cat] = !open[tr.dataset.cat]; persist(); apply(); }); });
+    input.addEventListener("input", apply);
+    apply();
+  })();
+  </script>
   <p class="inline" style="margin-top:10px">
     <label>lifecycle id (선택 — 기본 <code>gen-&lt;node&gt;</code>/<code>bundle-&lt;id&gt;</code>)
       <input type="text" name="lifecycle_id" value="{{ lifecycle_id }}" size="24"></label>

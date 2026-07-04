@@ -191,6 +191,16 @@
   var fSearch = document.getElementById("f-search"), fService = document.getElementById("f-service");
   var fCount = document.getElementById("f-count");
   var status = "all", collapsedCats = {}, collapsedSvcs = {};
+  // P2-7: 카테고리 기본 접힘 (17k px 방지) — 펼침 상태는 세션 동안 기억.
+  // 검색/필터 중에는 apply()가 접힘을 무시하므로 매치는 항상 보인다.
+  var SS = "modeling.collapsed", stored = null;
+  try { stored = JSON.parse(sessionStorage.getItem(SS) || "null"); } catch (e) {}
+  if (stored && stored.cats) { collapsedCats = stored.cats; collapsedSvcs = stored.svcs || {}; }
+  else { catRows.forEach(function (tr) { collapsedCats[tr.dataset.cat] = true; }); }
+  function persist() {
+    try { sessionStorage.setItem(SS, JSON.stringify({cats: collapsedCats, svcs: collapsedSvcs})); }
+    catch (e) {}
+  }
 
   function apply() {
     var q = (fSearch.value || "").trim().toLowerCase(), svc = fService.value;
@@ -229,14 +239,14 @@
   });
   // 그룹 헤더 클릭 = 접기/펴기 (필터 없을 때)
   catRows.forEach(function (tr) { tr.addEventListener("click", function () {
-    collapsedCats[tr.dataset.cat] = !collapsedCats[tr.dataset.cat]; apply(); }); });
+    collapsedCats[tr.dataset.cat] = !collapsedCats[tr.dataset.cat]; persist(); apply(); }); });
   svcRows.forEach(function (tr) { tr.addEventListener("click", function () {
-    var k = tr.dataset.cat + "/" + tr.dataset.svc; collapsedSvcs[k] = !collapsedSvcs[k]; apply(); }); });
-  var allCollapsed = false;
+    var k = tr.dataset.cat + "/" + tr.dataset.svc; collapsedSvcs[k] = !collapsedSvcs[k]; persist(); apply(); }); });
+  var allCollapsed = catRows.every(function (tr) { return !!collapsedCats[tr.dataset.cat]; });
   document.getElementById("collapse-all").addEventListener("click", function () {
     allCollapsed = !allCollapsed; collapsedCats = {};
     if (allCollapsed) catRows.forEach(function (tr) { collapsedCats[tr.dataset.cat] = true; });
-    apply();
+    persist(); apply();
   });
   apply();
 

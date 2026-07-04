@@ -91,10 +91,12 @@ def _compose_nodes(model: dict) -> list[dict]:
     rows = []
     for nid in sorted(model):
         node = model[nid]
+        service = str(node.get("service") or "")
         rows.append({**_node_row(nid, node),
+                     "category": service.split("/")[0] if service else "(기타)",
                      "branches": _one_of_branches(node),
                      "opts": resource_model.options_rows(node)})
-    return sorted(rows, key=lambda r: (r["code"] or "zzz", r["id"]))
+    return sorted(rows, key=lambda r: (r["category"], r["code"] or "zzz", r["id"]))
 
 
 # --- 모델 지도(model map) 메타 — provenance/완성도 (계약 §4 Modeling overlay) -----------
