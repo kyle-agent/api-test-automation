@@ -382,9 +382,13 @@ def _state_of(d: dict) -> str:
     with no later Create End and no Delete is a FAILED create — the resource never
     existed (e.g. createpublicdomainname 500). A deferred-delete resource (kms /
     secret) flagged ``terminating`` had its delete accepted (pending-deletion);
-    we show it as scheduled-for-deletion, i.e. effectively deleted."""
+    we show it as scheduled-for-deletion, i.e. effectively deleted. A span the
+    LOCAL console records already deleted (``local_deleted`` — its run's 2xx
+    DELETE step) is deleted regardless of loggingaudit lag (유령 자원 fix)."""
     names = [n for _, n in d["ops"]]
     if any("Delete" in n and "End" in n for n in names):
+        return "deleted"
+    if d.get("local_deleted"):
         return "deleted"
     if d.get("terminating"):
         return "terminating"
@@ -648,13 +652,21 @@ def annotate_local_origins(spans, local_index) -> None:
     ``runs/<rec>/res/*`` objects yet). Local attribution must never depend on
     the bucket; the bucket join remains for CI (``gha-*``) badge attribution.
 
-    ``local_index``: ``{run_id: {"ids": iterable, "names": iterable}}``.
+    ``local_index``: ``{run_id: {"ids": iterable, "names": iterable}}`` — plus
+    optional ``deleted_ids``/``deleted_names`` (resources the run's own 2xx
+    DELETE steps already removed). A span matching a deleted key is flagged
+    ``local_deleted`` so :func:`_state_of` shows it 삭제됨 (and the default
+    ``deleted=hide`` filter drops it) even while loggingaudit still lags the
+    Delete event — the '유령 자원' fix (2026-07-04: already-deleted resources
+    kept rendering as 생성됨/테스트중 in scope=mine).
     Empty/None index is a no-op (spans render exactly as annotate_origins left
     them)."""
     if not local_index:
         return
     by_id: dict[str, str] = {}
     by_name: dict[str, str] = {}
+    del_ids: set = set()
+    del_names: set = set()
     for rid, idx in local_index.items():
         for i in (idx.get("ids") or ()):
             if i:
@@ -662,12 +674,22 @@ def annotate_local_origins(spans, local_index) -> None:
         for n in (idx.get("names") or ()):
             if n:
                 by_name[str(n)] = str(rid)
-    if not (by_id or by_name):
+        for i in (idx.get("deleted_ids") or ()):
+            if i:
+                del_ids.add(str(i))
+        for n in (idx.get("deleted_names") or ()):
+            if n:
+                del_names.add(str(n))
+    if not (by_id or by_name or del_ids or del_names):
         return
     for d in spans.values():
-        rid = by_id.get(str(d.get("res_id") or "")) or by_name.get(d.get("name") or "")
+        rid_s = str(d.get("res_id") or "")
+        name_s = d.get("name") or ""
+        rid = by_id.get(rid_s) or by_name.get(name_s)
         if rid:
             d["origin"] = f"local:{rid}"
+        if (rid_s and rid_s in del_ids) or (name_s and name_s in del_names):
+            d["local_deleted"] = True
 
 
 def filter_spans(spans, scope: str = "mine", deleted: str = "hide"):
@@ -1004,6 +1026,13 @@ function clr(){var svg=document.querySelector('svg');if(svg){svg.classList.remov
 document.addEventListener('click',function(e){if(!e.target.closest('g.n'))clr();});
 ''')
     P.append('</script>')
+    if not refresh:
+        # ambient refresh (2026-07-04): an OPEN runtime popup with a fresh cache
+        # never refreshed again, so it silently drifted stale (deleted resources
+        # kept showing as 생성됨/테스트중). A slow JS reload keeps a left-open
+        # window converging without the aggressive 12s meta-refresh cadence the
+        # stale/generating states use.
+        P.append('<script>setTimeout(function(){location.reload();},90000)</script>')
     P.append('</body></html>')
     return "".join(P)
 
