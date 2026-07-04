@@ -140,10 +140,11 @@ function ensureRunGraph() {
   const id = runId;
   runGraphFor = id; runGraph = null;
   fetch("/api/runs/" + id + "/graph").then(r => r.json()).then(g => {
-    if (runId !== id || g.error || !g.nodes) return;
+    if (runId !== id) return;
+    if (g.error || !g.nodes) { runGraphFor = null; return; }  // allow retry (L1)
     runGraph = g;
     if (screen === "run") drawReport();
-  }).catch(() => { /* keep 구성 preview as fallback */ });
+  }).catch(() => { runGraphFor = null; /* keep 구성 preview; retry next draw (L1) */ });
 }
 
 // ---- ?service=<cat>/<svc> deep-link (from the dashboard's per-service links) ----
@@ -1178,6 +1179,10 @@ function drawCapBar() {
 function loadRunIntoReport(id) {
   // status starts UNKNOWN ("…") until the fetch answers — a finished history
   // row must never flash "running" in the status tile (신규9).
+  // A pending poll timer from a previously-watched ACTIVE run would fire
+  // against the newly bound (already-ended) run and toast a spurious
+  // "run 종료" (M1 review 2026-07-04) — cancel it on rebind.
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
   runId = id; runEvents = []; runStatus = "…";
   detailScope = "*"; scopeAuto = true; expandedApi = null;
   graphMode = "run"; ensureRunGraph();       // run 클릭 = run 뷰로 재바인딩 (F2)
@@ -1195,6 +1200,9 @@ function loadRunIntoReport(id) {
 function drawLeftover() {
   const host = $("leftover-panel");
   if (!host) return;
+  // the 2s capacity poll re-renders this panel wholesale — preserve the 기지
+  // 항목 fold's open state across re-renders or it snaps shut mid-read (L3)
+  const stuckOpen = !!host.querySelector("details.lo-stuck[open]");
   const s = ownedScan;
   let head, list = "";
   if (!s) {
@@ -1244,7 +1252,7 @@ function drawLeftover() {
         <tbody>${rows}</tbody></table></div>`;
     }
     if (stuckRows.length) {
-      list += `<details class="lo-stuck"><summary>기지 항목 ${stuckRows.length}건
+      list += `<details class="lo-stuck"${stuckOpen ? " open" : ""}><summary>기지 항목 ${stuckRows.length}건
           <span class="muted small">— 문서화된 잔존 (API로 삭제 불가 · known_issues.stuck_resources)</span></summary>
         ${stuckRows.map(o => `<div class="lo-stuck-row"><b>${esc(o.service || "?")}</b>
             <code>${esc(o.path || "")}</code>
@@ -2537,7 +2545,18 @@ let lateAlertBanner = null;   // the newest alert text (rendered by drawLeftover
 function handleLateAlerts(runs) {
   (runs || []).forEach(r => {
     if (!r.late_alert || lateAlertSeen[r.id]) return;
+    // seen-state survives page reloads (sessionStorage) and stale alerts
+    // (rescans done >30min ago) don't re-toast/re-scan on every reload (L2)
+    let seenStore = {};
+    try { seenStore = JSON.parse(sessionStorage.getItem("lateAlertSeen") || "{}"); } catch (e) {}
+    if (seenStore[r.id]) { lateAlertSeen[r.id] = true; return; }
+    const rescans = r.rescans || [];
+    const lastTs = rescans.length ? (rescans[rescans.length - 1].ts || 0) : 0;
+    const stale = lastTs && (Date.now() / 1000 - lastTs) > 1800;
     lateAlertSeen[r.id] = true;
+    seenStore[r.id] = true;
+    try { sessionStorage.setItem("lateAlertSeen", JSON.stringify(seenStore)); } catch (e) {}
+    if (stale) return;   // still visible as a history-row chip, just no toast/scan storm
     lateAlertBanner = `run ${r.id}: ${r.late_alert.msg || ("종료 후 자원 늦출현 " + r.late_alert.delta + "건")}`;
     toast("⚠ " + lateAlertBanner, "fail");
     if (screen === "run") scanOwned();       // 남은 자원 패널 실측 자동 갱신

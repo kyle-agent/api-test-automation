@@ -497,6 +497,13 @@ def _local_run_active() -> bool:
         return any(r.get("status") in ("running", "queued") for r in _RUNS.values())
 
 
+def _other_run_active(my_rec_id: str | None) -> bool:
+    """True if any local run OTHER than ``my_rec_id`` is running/queued."""
+    with _LOCK:
+        return any(r.get("status") in ("running", "queued")
+                   for rid, r in _RUNS.items() if rid != my_rec_id)
+
+
 def _local_run_youngest_age() -> float:
     """Seconds since the most recently STARTED active local run (inf if none)."""
     now = time.time()
@@ -905,8 +912,10 @@ _REHY_KIND = (  # log-header marker -> rec kind (see the workers' first write)
     ("# console2 owned-resource scan", "owned"),
     ("# console2 run ", "lifecycle"),
 )
+# any pytest summary token (deselected/xfailed/xpassed/... included — an
+# unrecognized token must not defeat the whole line; M2 review 2026-07-04)
 _PYTEST_SUMMARY_RE = re.compile(
-    r"(?m)^((?:\d+ (?:failed|passed|skipped|error(?:s)?|warnings?),? ?)+) ?in [\d.]+s")
+    r"(?m)^((?:\d+ [a-z]+,? ?)+) ?in [\d.]+s")
 
 
 def _rehydrate_one(rid: str, logp: Path, evp: Path) -> dict | None:
@@ -940,7 +949,9 @@ def _rehydrate_one(rid: str, logp: Path, evp: Path) -> dict | None:
     if kind == "lifecycle":
         if ms:
             status = "done"
-            rc = 1 if re.search(r"\d+ failed", ms.group(1)) else 0
+            # errors count as failure too — '1 passed, 2 errors' is NOT a
+            # success (M2 review 2026-07-04)
+            rc = 1 if re.search(r"\d+ (?:failed|errors?)\b", ms.group(1)) else 0
     elif txt:
         status, rc = "done", 0
     # timestamps: event stream first/last ts, else file mtimes
@@ -1101,6 +1112,22 @@ def _post_run_rescans(rec: dict, offsets=_RESCAN_OFFSETS_S,
         if wait > 0:
             sleep(wait)
         label = f"+{int(off // 60)}m" if off >= 60 else f"+{int(off)}s"
+        # H2 guard (review 2026-07-04): scan_owned is ACCOUNT-WIDE — if another
+        # run is executing during this round, its fresh resources would read as
+        # this run's "늦출현" (false positive, near-guaranteed with a queue).
+        # Skip and label the round instead of comparing apples to oranges.
+        if _other_run_active(rec.get("id")):
+            entry = {"offset_s": float(off), "ts": time.time(), "total": None,
+                     "skipped": "다른 실행 진행 중 — 계정 전체 스캔 비교 불가"}
+            with _LOCK:
+                rec.setdefault("rescans", []).append(entry)
+            try:
+                with open(rec["log"], "a", encoding="utf-8") as f:
+                    f.write(f"\n=== 종료 후 재스캔 {label}: 건너뜀 "
+                            "(다른 실행 진행 중) ===\n")
+            except OSError:
+                pass
+            continue
         try:
             owned = scan()
             from collections import Counter

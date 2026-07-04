@@ -9,6 +9,7 @@ server's pre-flight "남은 자원" panel) can consume the structured inventory 
 shelling out and re-parsing stdout. The ``__main__`` CLI prints the same data.
 """
 import os
+import threading
 os.environ.setdefault("SCP_SWEEP_IGNORE_TTL", "true")  # count unexpired too (full inventory)
 # Fast-fail listing: this is a read-only inventory, so don't sink 60s x retries on
 # a slow/unreachable service host — a short deadline keeps the full sweep tractable.
@@ -17,6 +18,11 @@ os.environ.setdefault("SCP_MAX_RETRIES", "1")
 import time as _t
 import cleanup.reconciler as r  # noqa: E402 — must follow the env setup above
 import core  # noqa: E402 — must follow the env setup above
+
+# scan_owned monkeypatches MODULE GLOBALS (r._delete/_wait_gone + time.sleep);
+# concurrent scans would corrupt each other's stubs and could leave time.sleep
+# permanently no-op'd (post-run auto-rescans made overlap routine — H1 2026-07-04).
+_SCAN_LOCK = threading.Lock()
 
 
 def scan_owned(client=None) -> list[dict]:
@@ -38,13 +44,14 @@ def scan_owned(client=None) -> list[dict]:
     def fake_wait(*a, **k):
         return True
 
-    orig_delete, orig_wait, orig_sleep = r._delete, r._wait_gone, _t.sleep
-    r._delete, r._wait_gone = fake_delete, fake_wait
-    _t.sleep = lambda *a, **k: None     # no internal waits/backoff DURING the scan only
-    try:
-        r.run_sweep(client or core.ApiClient(core.settings))
-    finally:
-        r._delete, r._wait_gone, _t.sleep = orig_delete, orig_wait, orig_sleep
+    with _SCAN_LOCK:
+        orig_delete, orig_wait, orig_sleep = r._delete, r._wait_gone, _t.sleep
+        r._delete, r._wait_gone = fake_delete, fake_wait
+        _t.sleep = lambda *a, **k: None  # no internal waits/backoff DURING the scan only
+        try:
+            r.run_sweep(client or core.ApiClient(core.settings))
+        finally:
+            r._delete, r._wait_gone, _t.sleep = orig_delete, orig_wait, orig_sleep
     # 'json' rides along when the sweep's delete carried a body (bulk ids /
     # secrets waiting_time) so consumers can expand bulk deletes to per-id rows;
     # existing consumers only read service/path and are unaffected.
