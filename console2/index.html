@@ -10,7 +10,11 @@
 <!-- embedded in the control-plane shell (?embed=1): hide console2's own brand +
      external nav (the spine supplies those), KEEP the ①구성/②실행 toggle = the
      Test Planning | Test Execution sub-tabs. -->
-<script>if(new URLSearchParams(location.search).has('embed'))document.documentElement.classList.add('embed');</script>
+<script>if(new URLSearchParams(location.search).has('embed'))document.documentElement.classList.add('embed');
+/* direct access at /testing/console/ WITHOUT ?embed=1 (UIUX-AUDIT P3-16): flag the
+   root so a "← Testing 셸" back-link shows. Path-scoped, so the standalone static
+   build (build_static.py) never shows a dead link. */
+if(!document.documentElement.classList.contains('embed')&&location.pathname.indexOf('/testing/console')===0)document.documentElement.classList.add('bare-console');</script>
 <style>/* hide console2's brand + the redundant external links (📊 대시보드 lives in the
    spine nav now; resource model is just a label) — but KEEP 🌐 런타임 뷰 (no spine
    equivalent: live account topology). */
@@ -19,7 +23,9 @@ html.embed .top{justify-content:space-between;padding:7px 22px;min-height:0}
 /* embedded full-bleed: use the whole width + keep the left-selection | right-DAG
    2-column (build = Test Planning, run = Test Execution) even if it must be wide. */
 html.embed .wrap{max-width:none}
-html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0,1fr)!important}</style>
+html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0,1fr)!important}
+#backToShell{display:none}
+html.bare-console #backToShell{display:inline}</style>
 </head>
 <body>
 <div class="wrap">
@@ -33,6 +39,8 @@ html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0
     <button data-scr="run"><span class="k">②</span>Test Execution</button>
   </div>
   <nav class="nav">
+    <a href="/testing/embed" id="backToShell"
+       title="플랫폼 셸(4단계 네비)의 Testing으로 돌아가기">← Testing 셸</a>
     <a href="../../" id="dashLink" title="결과 대시보드 — 회귀/적합성 커버리지·응답코드·서비스별 추이 (이 콘솔의 실행 결과)">📊 대시보드</a>
     <a href="#" id="runtimeLink" title="런타임 뷰 — 현재 계정에 떠 있는 인스턴스와 연관관계 토폴로지 (별도 창 · loggingaudit)">🌐 런타임 뷰</a>
     <a href="https://127.0.0.1" id="modelLink" onclick="return false" title="모델 출처">resource model</a>
