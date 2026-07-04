@@ -247,7 +247,8 @@
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
             "origin_cluster_id": "$.id",
-            "replica_cluster_id": "$.id"
+            "replica_cluster_id": "$.id",
+            "software_version": "$.software_version"
           }
         },
         {
@@ -390,7 +391,7 @@
             "access_key": "",
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
-            "log_type": "general",
+            "log_type": "alert",
             "schedule_day_of_month": "28",
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "DAY",
@@ -408,7 +409,8 @@
             422
           ],
           "optional": true,
-          "group": "log-export"
+          "group": "log-export",
+          "_note": "log_type changed 'general' -> 'alert' 2026-07-04 (HB1 repair): HB1 got 400 Dbaas.InvalidLogType sending 'general' (run 2026-07-04). data/api_docs.json's response_example for list-log-export-configs is IDENTICAL across mariadb/mysql/postgresql/epas: {\"log_type\":\"alert\",\"log_label\":\"DB Alert Log\",...} — 'alert' is the only log_type value that appears in BOTH the request AND response doc examples for every engine, so it is the strongest offline evidence of a real accepted value. The downstream set/export/delete steps still consume the templated {log_type} — a NEW 'capture-log-type-after-register' step (inserted right after wait-after-register-log-export-config) re-reads the log-export-configs list AFTER this register call so {log_type} resolves to whatever was ACTUALLY persisted, instead of the earlier capture-log-type probe which always finds an empty list on a freshly created cluster. UNVERIFIED LIVE — apply in HB1b/HB2b."
         },
         {
           "name": "wait-after-register-log-export-config",
@@ -438,6 +440,23 @@
             ]
           },
           "group": "log-export"
+        },
+        {
+          "name": "capture-log-type-after-register",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "log_type": "$.contents[0].log_type"
+          },
+          "group": "log-export",
+          "_note": "added 2026-07-04 (HB1 repair): re-reads the log-export-configs list AFTER register-log-export-config so {log_type} is captured from whatever the register step ACTUALLY persisted (rather than from the capture-log-type probe taken before anything was registered, which always finds an empty list on a freshly created cluster and leaves {log_type} an unresolved literal for the downstream set/export/delete steps — the previous state of this lifecycle). Keeps the downstream steps' path templated (so static coverage matching / _norm_path still collapses {log_type} to the catalog '*' segment) instead of hardcoding a literal value in the path."
         },
         {
           "name": "set-log-export-config",
@@ -748,20 +767,23 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
           "json": {
-            "backup_history_ids": []
+            "backup_history_number": []
           },
           "expect_status": [
             200,
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
-          "group": "backup-hist"
+          "group": "backup-hist",
+          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md. ALSO fixed field-name bug 2026-07-04: body key was 'backup_history_ids' (wrong) — data/api_docs.json models['database/mysql/backuphistorynumberrequest'] verbatim field is 'backup_history_number' (identical DTO name to mariadb/postgresql/epas/cachestore). UNVERIFIED LIVE (mysql-cluster-subops-full never reaches this step while create-cluster PFs 500 ContactAdminForAssistance) — fixed for readiness once that PF clears."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -796,7 +818,10 @@
           "name": "patch-minor-version",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/patch",
-          "json": {},
+          "json": {
+            "backup_before_upgrade": false,
+            "software_version": "{software_version}"
+          },
           "expect_status": [
             200,
             201,
@@ -808,7 +833,8 @@
             422
           ],
           "optional": true,
-          "group": "patch"
+          "group": "patch",
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -1216,7 +1242,11 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "epas"
-          }
+          },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
         },
         {
           "name": "epas-wait",
@@ -1268,7 +1298,8 @@
             "instance_group_id": "$.instance_groups[0].id",
             "bsg_id": "$.instance_groups[0].block_storage_groups[0].id",
             "origin_cluster_id": "$.id",
-            "replica_cluster_id": "$.id"
+            "replica_cluster_id": "$.id",
+            "software_version": "$.software_version"
           }
         },
         {
@@ -1314,8 +1345,9 @@
           ],
           "optional": true,
           "capture_soft": {
-            "server_type_name": "$.contents[0].name"
-          }
+            "server_type_name": "$.contents[1].name"
+          },
+          "_note": "repointed to $.contents[1].name 2026-07-04 (HB1 repair, mariadb-analogous fix): this step previously re-captured index[0] — the SAME server type epas-create already used for the instance group, so resize-instance-group's same-type request is expected to hard-fail (see mariadb's identical note; same InstanceGroupResizeRequest DTO). index[1] gives a genuinely different target type. UNVERIFIED LIVE — apply + observe in HB1b/HB2b."
         },
         {
           "name": "set-maintenance",
@@ -1479,13 +1511,16 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -1525,10 +1560,12 @@
             202,
             204,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "destructive": true,
@@ -1864,7 +1901,7 @@
             "access_key": "",
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
-            "log_type": "general",
+            "log_type": "alert",
             "schedule_day_of_month": "28",
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "DAY",
@@ -1882,7 +1919,8 @@
             422
           ],
           "optional": true,
-          "group": "log-export"
+          "group": "log-export",
+          "_note": "log_type changed 'general' -> 'alert' 2026-07-04 (HB1 repair): HB1 got 400 Dbaas.InvalidLogType sending 'general' (run 2026-07-04). data/api_docs.json's response_example for list-log-export-configs is IDENTICAL across mariadb/mysql/postgresql/epas: {\"log_type\":\"alert\",\"log_label\":\"DB Alert Log\",...} — 'alert' is the only log_type value that appears in BOTH the request AND response doc examples for every engine, so it is the strongest offline evidence of a real accepted value. The downstream set/export/delete steps still consume the templated {log_type} — a NEW 'capture-log-type-after-register' step (inserted right after wait-after-register-log-export-config) re-reads the log-export-configs list AFTER this register call so {log_type} resolves to whatever was ACTUALLY persisted, instead of the earlier capture-log-type probe which always finds an empty list on a freshly created cluster. UNVERIFIED LIVE — apply in HB1b/HB2b."
         },
         {
           "name": "wait-after-register-log-export-config",
@@ -1912,6 +1950,23 @@
             ]
           },
           "group": "log-export"
+        },
+        {
+          "name": "capture-log-type-after-register",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "log_type": "$.contents[0].log_type"
+          },
+          "group": "log-export",
+          "_note": "added 2026-07-04 (HB1 repair): re-reads the log-export-configs list AFTER register-log-export-config so {log_type} is captured from whatever the register step ACTUALLY persisted (rather than from the capture-log-type probe taken before anything was registered, which always finds an empty list on a freshly created cluster and leaves {log_type} an unresolved literal for the downstream set/export/delete steps — the previous state of this lifecycle). Keeps the downstream steps' path templated (so static coverage matching / _norm_path still collapses {log_type} to the catalog '*' segment) instead of hardcoding a literal value in the path."
         },
         {
           "name": "set-log-export-config",
@@ -2302,7 +2357,7 @@
           "path": "/v1/clusters/{cluster_id}/patch",
           "json": {
             "backup_before_upgrade": false,
-            "software_version": ""
+            "software_version": "{software_version}"
           },
           "expect_status": [
             200,
@@ -2315,7 +2370,8 @@
             422
           ],
           "optional": true,
-          "group": "patch"
+          "group": "patch",
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -2413,6 +2469,36 @@
           "group": "resize"
         },
         {
+          "name": "wait-after-resize-instance-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "resize",
+          "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
+        },
+        {
           "name": "add-block-storages",
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
@@ -2433,6 +2519,36 @@
           ],
           "optional": true,
           "group": "resize"
+        },
+        {
+          "name": "wait-after-add-block-storages",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "resize",
+          "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
           "name": "resize-block-storage",
@@ -2692,7 +2808,8 @@
             "maria_stype": {
               "list": "$.contents",
               "get": "name"
-            }
+            },
+            "maria_stype2": "$.contents[1].name"
           }
         },
         {
@@ -2766,7 +2883,11 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "mariadb"
-          }
+          },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
         },
         {
           "name": "maria-wait",
@@ -2818,7 +2939,8 @@
             "instance_group_id": "$.instance_groups[0].id",
             "bsg_id": "$.instance_groups[0].block_storage_groups[0].id",
             "origin_cluster_id": "$.id",
-            "replica_cluster_id": "$.id"
+            "replica_cluster_id": "$.id",
+            "software_version": "$.software_version"
           }
         },
         {
@@ -2998,13 +3120,16 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -3044,10 +3169,12 @@
             202,
             204,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "destructive": true,
@@ -3336,7 +3463,7 @@
             "access_key": "",
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
-            "log_type": "general",
+            "log_type": "alert",
             "schedule_day_of_month": "28",
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "DAY",
@@ -3354,7 +3481,8 @@
             422
           ],
           "optional": true,
-          "group": "log-export"
+          "group": "log-export",
+          "_note": "log_type changed 'general' -> 'alert' 2026-07-04 (HB1 repair): HB1 got 400 Dbaas.InvalidLogType sending 'general' (run 2026-07-04). data/api_docs.json's response_example for list-log-export-configs is IDENTICAL across mariadb/mysql/postgresql/epas: {\"log_type\":\"alert\",\"log_label\":\"DB Alert Log\",...} — 'alert' is the only log_type value that appears in BOTH the request AND response doc examples for every engine, so it is the strongest offline evidence of a real accepted value. The downstream set/export/delete steps still consume the templated {log_type} — a NEW 'capture-log-type-after-register' step (inserted right after wait-after-register-log-export-config) re-reads the log-export-configs list AFTER this register call so {log_type} resolves to whatever was ACTUALLY persisted, instead of the earlier capture-log-type probe which always finds an empty list on a freshly created cluster. UNVERIFIED LIVE — apply in HB1b/HB2b."
         },
         {
           "name": "wait-after-register-log-export-config",
@@ -3384,6 +3512,23 @@
             ]
           },
           "group": "log-export"
+        },
+        {
+          "name": "capture-log-type-after-register",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "log_type": "$.contents[0].log_type"
+          },
+          "group": "log-export",
+          "_note": "added 2026-07-04 (HB1 repair): re-reads the log-export-configs list AFTER register-log-export-config so {log_type} is captured from whatever the register step ACTUALLY persisted (rather than from the capture-log-type probe taken before anything was registered, which always finds an empty list on a freshly created cluster and leaves {log_type} an unresolved literal for the downstream set/export/delete steps — the previous state of this lifecycle). Keeps the downstream steps' path templated (so static coverage matching / _norm_path still collapses {log_type} to the catalog '*' segment) instead of hardcoding a literal value in the path."
         },
         {
           "name": "set-log-export-config",
@@ -3774,7 +3919,7 @@
           "path": "/v1/clusters/{cluster_id}/patch",
           "json": {
             "backup_before_upgrade": false,
-            "software_version": ""
+            "software_version": "{software_version}"
           },
           "expect_status": [
             200,
@@ -3787,7 +3932,8 @@
             422
           ],
           "optional": true,
-          "group": "patch"
+          "group": "patch",
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -3869,7 +4015,7 @@
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/resize",
           "json": {
-            "server_type_name": ""
+            "server_type_name": "{maria_stype2}"
           },
           "expect_status": [
             200,
@@ -3882,7 +4028,38 @@
             422
           ],
           "optional": true,
-          "group": "resize"
+          "group": "resize",
+          "_note": "resize-instance-group now targets a DIFFERENT server type than the one used at create 2026-07-04 (HB1 repair): HB1 got 400 Dbaas.ValidationError 'The server type is invalid' (observed mariadb-cluster-subops-full:resize-instance-group). knowledge/formal/resources/database__mariadb.yaml 'mariadb-resize-instance-group' note already flags 'same-type 400 is intentional hard [reject]', so resizing to the SAME captured server_type (or an empty string) is expected to fail by design. Fix: capture the SECOND entry of GET /v1/server-types ($.contents[1].name) as a distinct target type, instead of reusing the first (same one used to create the cluster) or an empty literal. UNVERIFIED LIVE whether the account's server-types list has >=2 entries or whether index[1] is actually resize-eligible from index[0]'s tier — apply + observe in HB1b/HB2b."
+        },
+        {
+          "name": "wait-after-resize-instance-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "resize",
+          "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
           "name": "add-block-storages",
@@ -3905,6 +4082,36 @@
           ],
           "optional": true,
           "group": "resize"
+        },
+        {
+          "name": "wait-after-add-block-storages",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "resize",
+          "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
           "name": "resize-block-storage",
@@ -4164,7 +4371,8 @@
             "cache_stype": {
               "list": "$.contents",
               "get": "name"
-            }
+            },
+            "cache_stype2": "$.contents[1].name"
           }
         },
         {
@@ -4236,7 +4444,11 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "cachestore"
-          }
+          },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
         },
         {
           "name": "cache-wait",
@@ -4450,13 +4662,16 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -4496,10 +4711,12 @@
             202,
             204,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "destructive": true,
@@ -5072,7 +5289,7 @@
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/resize",
           "json": {
-            "server_type_name": ""
+            "server_type_name": "{cache_stype2}"
           },
           "expect_status": [
             200,
@@ -5085,7 +5302,38 @@
             422
           ],
           "optional": true,
-          "group": "resize"
+          "group": "resize",
+          "_note": "resize-instance-group now targets a DIFFERENT server type than the one used at create 2026-07-04 (HB1 repair): HB1 got 400 Dbaas.ValidationError 'The server type is invalid' (observed cachestore-cluster-subops-full:resize-instance-group). knowledge/formal/resources/database__mariadb.yaml 'mariadb-resize-instance-group' note already flags 'same-type 400 is intentional hard [reject]', so resizing to the SAME captured server_type (or an empty string) is expected to fail by design. Fix: capture the SECOND entry of GET /v1/server-types ($.contents[1].name) as a distinct target type, instead of reusing the first (same one used to create the cluster) or an empty literal. UNVERIFIED LIVE whether the account's server-types list has >=2 entries or whether index[1] is actually resize-eligible from index[0]'s tier — apply + observe in HB1b/HB2b."
+        },
+        {
+          "name": "wait-after-resize-instance-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "resize",
+          "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
           "name": "resize-block-storage",
@@ -5343,7 +5591,8 @@
             "db_server_type": {
               "list": "$.contents",
               "get": "name"
-            }
+            },
+            "db_server_type2": "$.contents[1].name"
           }
         },
         {
@@ -5467,7 +5716,8 @@
           "optional": true,
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
-            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id",
+            "software_version": "$.software_version"
           }
         },
         {
@@ -5663,13 +5913,16 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -5709,10 +5962,12 @@
             202,
             204,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "destructive": true,
@@ -6048,7 +6303,7 @@
             "access_key": "",
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
-            "log_type": "general",
+            "log_type": "alert",
             "schedule_day_of_month": "28",
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "DAY",
@@ -6066,7 +6321,8 @@
             422
           ],
           "optional": true,
-          "group": "log-export"
+          "group": "log-export",
+          "_note": "log_type changed 'general' -> 'alert' 2026-07-04 (HB1 repair): HB1 got 400 Dbaas.InvalidLogType sending 'general' (run 2026-07-04). data/api_docs.json's response_example for list-log-export-configs is IDENTICAL across mariadb/mysql/postgresql/epas: {\"log_type\":\"alert\",\"log_label\":\"DB Alert Log\",...} — 'alert' is the only log_type value that appears in BOTH the request AND response doc examples for every engine, so it is the strongest offline evidence of a real accepted value. The downstream set/export/delete steps still consume the templated {log_type} — a NEW 'capture-log-type-after-register' step (inserted right after wait-after-register-log-export-config) re-reads the log-export-configs list AFTER this register call so {log_type} resolves to whatever was ACTUALLY persisted, instead of the earlier capture-log-type probe which always finds an empty list on a freshly created cluster. UNVERIFIED LIVE — apply in HB1b/HB2b."
         },
         {
           "name": "wait-after-register-log-export-config",
@@ -6096,6 +6352,23 @@
             ]
           },
           "group": "log-export"
+        },
+        {
+          "name": "capture-log-type-after-register",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "log_type": "$.contents[0].log_type"
+          },
+          "group": "log-export",
+          "_note": "added 2026-07-04 (HB1 repair): re-reads the log-export-configs list AFTER register-log-export-config so {log_type} is captured from whatever the register step ACTUALLY persisted (rather than from the capture-log-type probe taken before anything was registered, which always finds an empty list on a freshly created cluster and leaves {log_type} an unresolved literal for the downstream set/export/delete steps — the previous state of this lifecycle). Keeps the downstream steps' path templated (so static coverage matching / _norm_path still collapses {log_type} to the catalog '*' segment) instead of hardcoding a literal value in the path."
         },
         {
           "name": "set-log-export-config",
@@ -6532,7 +6805,7 @@
           "path": "/v1/clusters/{cluster_id}/patch",
           "json": {
             "backup_before_upgrade": false,
-            "software_version": ""
+            "software_version": "{software_version}"
           },
           "expect_status": [
             200,
@@ -6545,7 +6818,8 @@
             422
           ],
           "optional": true,
-          "group": "patch"
+          "group": "patch",
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -6627,7 +6901,7 @@
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/resize",
           "json": {
-            "server_type_name": "{db_server_type}"
+            "server_type_name": "{db_server_type2}"
           },
           "expect_status": [
             200,
@@ -6640,7 +6914,38 @@
             422
           ],
           "optional": true,
-          "group": "resize"
+          "group": "resize",
+          "_note": "resize-instance-group now targets a DIFFERENT server type than the one used at create 2026-07-04 (HB1 repair): HB1 got 400 Dbaas.ValidationError 'The server type is invalid' (observed postgresql-cluster-subops-full:resize-instance-group). knowledge/formal/resources/database__mariadb.yaml 'mariadb-resize-instance-group' note already flags 'same-type 400 is intentional hard [reject]', so resizing to the SAME captured server_type (or an empty string) is expected to fail by design. Fix: capture the SECOND entry of GET /v1/server-types ($.contents[1].name) as a distinct target type, instead of reusing the first (same one used to create the cluster) or an empty literal. UNVERIFIED LIVE whether the account's server-types list has >=2 entries or whether index[1] is actually resize-eligible from index[0]'s tier — apply + observe in HB1b/HB2b."
+        },
+        {
+          "name": "wait-after-resize-instance-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "resize",
+          "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
           "name": "add-block-storages",
@@ -6663,6 +6968,36 @@
           ],
           "optional": true,
           "group": "resize"
+        },
+        {
+          "name": "wait-after-add-block-storages",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "resize",
+          "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
           "name": "resize-block-storage",

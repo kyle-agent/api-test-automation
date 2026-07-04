@@ -11,18 +11,29 @@
           "name": "list-clusters",
           "method": "GET",
           "path": "/v1/clusters",
-          "expect_status": [200],
-          "capture_soft": {"cluster_id": "$.contents[0].id"}
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "cluster_id": "$.contents[0].id"
+          }
         },
         {
           "name": "probe-reads",
-          "probe_reads": {"cluster_id": "{cluster_id}"}
+          "probe_reads": {
+            "cluster_id": "{cluster_id}"
+          }
         },
         {
           "name": "capture-subop-ids",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
@@ -33,7 +44,12 @@
           "name": "list-parameter-values",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/parameters",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "es-parameters",
           "capture_soft": {
@@ -46,8 +62,22 @@
           "name": "add-instances",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/add-instances",
-          "json": {"instance_count": 1, "service_ip_addresses": [""]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "instance_count": 1,
+            "service_ip_addresses": [
+              ""
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-instances",
           "_note": "EventStreamsClusterAddInstancesRequest per api_docs: instance_count (int, required) + service_ip_addresses (array[string], required; doc request example sends [\"\"] — empty string = platform-assigned, same convention as the validated mysql create service_ip_address:\"\"). public_ip_ids optional, omitted. Docs-derived, pending live validation."
@@ -56,8 +86,25 @@
           "name": "set-parameter-values",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/parameters",
-          "json": {"parameters": [{"id": "{es_param_id}", "new_value": "{es_param_value}", "old_value": "{es_param_value}"}]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "parameters": [
+              {
+                "id": "{es_param_id}",
+                "new_value": "{es_param_value}",
+                "old_value": "{es_param_value}"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-parameters",
           "_note": "ParametersRequest -> ParameterRequest {id,new_value,old_value} (all required per api_docs model). new_value==old_value==applied_value captured from the live cluster = documented no-op write, reversible. With no live cluster the tokens stay literal and the call records C2. Docs-derived."
@@ -66,8 +113,20 @@
           "name": "set-security-group-rules",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
-          "json": {"add_ip_addresses": [], "del_ip_addresses": []},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-sg-rules",
           "_note": "UpdateSecurityGroupRulesRequest per api_docs: add_ip_addresses/del_ip_addresses (both optional arrays); doc request example sends both empty = no-op, reversible. Docs-derived."
@@ -76,8 +135,22 @@
           "name": "set-maintenance",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
-          "json": {"start_day_of_week": "SUN", "start_minute": "00", "start_time": "03", "term_hour": "4"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-maintenance",
           "_note": "MaintenanceRequest per api_docs (start_day_of_week enum MON..SUN, start_minute, start_time, term_hour pattern ^(0\\.5|[1-5]\\.5|[1-9]|1[0-9]|2[0-4])$) — same model and values as the mysql/pg heavy set-maintenance steps. Reversed by unset-maintenance below. Docs-derived."
@@ -86,7 +159,16 @@
           "name": "unset-maintenance",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/maintenance",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "destructive": true,
           "group": "es-maintenance",
@@ -96,7 +178,16 @@
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-parameters",
           "_note": "eventstreamssyncparametervalues (no body per api_docs) — read-side reconciliation, safe. Docs-derived."
@@ -105,7 +196,16 @@
           "name": "sync-cluster-state",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-power",
           "_note": "eventstreamssyncclusterstate (no body per api_docs) — read-side reconciliation, safe. Docs-derived."
@@ -115,7 +215,16 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/patch",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-patch",
           "_note": "Body kept DELIBERATELY empty: MinorPatchDbEngineRequest {dbaas_engine, software_version} is a version upgrade — not obviously reversible, excluded by the conservative sub-op rule. The guaranteed 4xx records C2 only."
@@ -125,7 +234,16 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/restart",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-power"
         },
@@ -133,8 +251,19 @@
           "name": "set-server-type",
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/resize",
-          "json": {"server_type_name": ""},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "server_type_name": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-resize"
         },
@@ -142,11 +271,936 @@
           "name": "set-block-storage-size",
           "method": "POST",
           "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
-          "json": {"size_gb": 20},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "size_gb": 20
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "es-resize",
           "_note": "ResizeBlockStorageGroupRequest size_gb min 16 per api_docs; 20 stays a coverage-only call (no live cluster expected)."
+        }
+      ]
+    },
+    {
+      "id": "eventstreams-cluster-subops-full",
+      "service": "data-analytics/eventstreams",
+      "enabled": true,
+      "heavy": true,
+      "_note": "SELF-SUFFICIENT depth variant of eventstreams-cluster-subops-guarded: provisions a dedicated eventstreams (Kafka DBaaS) cluster (shared-VPC adopt + own /24 subnet, exactly the pattern used by database__subops-full.json's mariadb/epas/cachestore/postgresql -full variants), runs the guarded sub-op steps against it (bodies verbatim from eventstreams-cluster-subops-guarded, docs-derived per that lifecycle's own _note), then deletes it. Exists for the same reason as the DB -full variants: the guarded variant only soft-captures an EXISTING cluster — dispatched alone it never reaches a real create 2xx. heavy:true + billable. CREATE BODY IS A HYPOTHESIS, NOT CONFIRMED: dbaas_engine_version_id/subnet_id/server_type_name are captured live (find-engine-version/find-server-type, same pattern as the DB engines) but the TOPOLOGY (instance_groups: ONE group, role_type=ZOOKEEPER_BROKER, is_combined=true, 3 instances all role_type=ZOOKEEPER_BROKER) is the 'ZK-quorum' hypothesis from CAMPAIGN-C3-100-docs-research.md §3 — carried over from data/api_bodies.json (commit 700f72a0, 'eventstreams ZK quorum' investigation fix) and cross-checked against InstanceGroupRequest/InstanceRequest's role_type enum (both DO list ZOOKEEPER_BROKER/BROKER/ZOOKEEPER/AKHQ/CONSOLE — api_docs verbatim, data/api_docs.json models) but NEVER LIVE-VALIDATED end-to-end (knowledge/formal/resources/data-analytics__eventstreams.yaml records an earlier undocumented-topology value_error from BEFORE this hypothesis existed). If create-cluster 4xx/5xx's on this topology, the whole chain give_up-skips safely (create-cluster is optional + its own group, exactly like the DB engines' <engine>-create steps) — no partial cluster is left running and the shared VPC/subnet still tear down. Guarded variant kept unchanged for window-style runs.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression shared",
+            "cidr": "10.134.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression shared",
+            "cidr": "10.134.6.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "es-find-version",
+          "service": "eventstreams",
+          "group": "es-create",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "es_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "es-find-stype",
+          "service": "eventstreams",
+          "group": "es-create",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "es_stype": {
+              "list": "$.contents",
+              "get": "name"
+            },
+            "es_stype2": "$.contents[1].name"
+          }
+        },
+        {
+          "name": "es-create",
+          "service": "eventstreams",
+          "group": "es-create",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrk{ualpha}",
+            "instance_name_prefix": "regrk",
+            "akhq_enabled": false,
+            "allowable_ip_addresses": [],
+            "dbaas_engine_version_id": "{es_ver}",
+            "is_combined": true,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "tags": [],
+            "init_config_option": {
+              "broker_port": 9091,
+              "broker_sasl_id": "regruser",
+              "broker_sasl_password": "Regr1ss@2026",
+              "zookeeper_port": 2180,
+              "zookeeper_sasl_id": "regruser",
+              "zookeeper_sasl_password": "Regr1ss@2026"
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ZOOKEEPER_BROKER",
+                "server_type_name": "{es_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "public_ip_id": "",
+                    "role_type": "ZOOKEEPER_BROKER"
+                  },
+                  {
+                    "public_ip_id": "",
+                    "role_type": "ZOOKEEPER_BROKER"
+                  },
+                  {
+                    "public_ip_id": "",
+                    "role_type": "ZOOKEEPER_BROKER"
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "eventstreams"
+          },
+          "_note": "Body per CAMPAIGN-C3-100-docs-research.md §3 (docs-derived structure + carried-over topology hypothesis, see lifecycle _note). init_config_option.broker_sasl_id/zookeeper_sasl_id pattern ^[a-z]+$ 2-20 chars (api_docs eventstreamsinitconfigoptionrequest, VALIDATED via knowledge/formal/services/data-analytics__eventstreams.yaml create-cluster-required-init-config); name pattern ^[a-zA-Z]*$ (letters only, no digits) so {ualpha} (all-lowercase unique suffix) is used instead of {unique}. instance_groups is a SINGLE group of 3 ZOOKEEPER_BROKER instances (is_combined:true) — UNVERIFIED topology hypothesis, see lifecycle _note."
+        },
+        {
+          "name": "es-wait",
+          "service": "eventstreams",
+          "group": "es-create",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}",
+            "dbaas_engine_version_id": "{es_ver}"
+          }
+        },
+        {
+          "name": "capture-subop-ids",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "instance_group_id": "$.instance_groups[0].id",
+            "block_storage_group_id": "$.instance_groups[0].block_storage_groups[0].id"
+          }
+        },
+        {
+          "name": "list-parameter-values",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "es-parameters",
+          "capture_soft": {
+            "es_param_id": "$.contents[0].id",
+            "es_param_value": "$.contents[0].applied_value"
+          }
+        },
+        {
+          "name": "add-instances",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/add-instances",
+          "json": {
+            "instance_count": 1,
+            "service_ip_addresses": [
+              ""
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-instances",
+          "_note": "verbatim from eventstreams-cluster-subops-guarded (EventStreamsClusterAddInstancesRequest, docs-derived)."
+        },
+        {
+          "name": "wait-after-add-instances",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-instances",
+          "_note": "settle-poll after add-instances — group aligned with the preceding mutating step's own group (es-instances) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "set-parameter-values",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "json": {
+            "parameters": [
+              {
+                "id": "{es_param_id}",
+                "new_value": "{es_param_value}",
+                "old_value": "{es_param_value}"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-parameters"
+        },
+        {
+          "name": "wait-after-set-parameter-values",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-parameters",
+          "_note": "settle-poll after set-parameter-values — group aligned with the preceding mutating step's own group (es-parameters) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "sync-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/parameters/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-parameters"
+        },
+        {
+          "name": "wait-after-sync-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-parameters",
+          "_note": "settle-poll after sync-parameters — group aligned with the preceding mutating step's own group (es-parameters) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "set-security-group-rules",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-sg-rules"
+        },
+        {
+          "name": "wait-after-set-security-group-rules",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-sg-rules",
+          "_note": "settle-poll after set-security-group-rules — group aligned with the preceding mutating step's own group (es-sg-rules) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "set-maintenance",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-maintenance"
+        },
+        {
+          "name": "wait-after-set-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-maintenance",
+          "_note": "settle-poll after set-maintenance — group aligned with the preceding mutating step's own group (es-maintenance) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "unset-maintenance",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "es-maintenance"
+        },
+        {
+          "name": "wait-after-unset-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-maintenance",
+          "_note": "settle-poll after unset-maintenance — group aligned with the preceding mutating step's own group (es-maintenance) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-power"
+        },
+        {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-power",
+          "_note": "settle-poll after sync-cluster-state — group aligned with the preceding mutating step's own group (es-power) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-power"
+        },
+        {
+          "name": "wait-after-restart-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-power",
+          "_note": "settle-poll after restart-cluster — group aligned with the preceding mutating step's own group (es-power) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-patch",
+          "_note": "Body kept DELIBERATELY empty, verbatim from eventstreams-cluster-subops-guarded: MinorPatchDbEngineRequest {dbaas_engine, software_version} — dbaas_engine's valid string for this engine (\"kafka\"?) is UNDOCUMENTED (no enum/example in api_docs, same blind spot as cachestore's identical model, which this campaign's mariadb/mysql/epas/postgresql software_version fix deliberately left untouched too). The guaranteed 4xx still records C2."
+        },
+        {
+          "name": "wait-after-patch-minor-version",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-patch",
+          "_note": "settle-poll after patch-minor-version — group aligned with the preceding mutating step's own group (es-patch) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "set-server-type",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/resize",
+          "json": {
+            "server_type_name": "{es_stype2}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-resize",
+          "_note": "targets a DIFFERENT server type than create ($.contents[1].name from es-find-stype) — same same-type-400 rationale established for the DB engines in this campaign's database__subops-full.json repair (mariadb/epas/cachestore/postgresql resize-instance-group). UNVERIFIED LIVE."
+        },
+        {
+          "name": "wait-after-set-server-type",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-resize",
+          "_note": "settle-poll after set-server-type — group aligned with the preceding mutating step's own group (es-resize) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
+        },
+        {
+          "name": "set-block-storage-size",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+          "json": {
+            "size_gb": 112
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-resize",
+          "_note": "size_gb raised from the guarded variant's 20 to 112 (> the 104GB OS volume this lifecycle's own es-create just provisioned) — resize-UP is the documented direction for block storage groups across every other DBaaS engine in this repo (mariadb/mysql/epas/postgresql/cachestore resize-block-storage all use size_gb:112 against a 104 create). 20 would be a shrink, which is never a supported operation for any engine seen so far."
+        },
+        {
+          "name": "es-delete",
+          "service": "eventstreams",
+          "group": "es-create",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "es-gone",
+          "service": "eventstreams",
+          "group": "es-create",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 900,
+            "interval": 30,
+            "refire": {
+              "method": "DELETE",
+              "path": "/v1/clusters/{cluster_id}",
+              "field": "$.service_state",
+              "when": [
+                "DELETE_FAILED",
+                "ERROR_DELETING",
+                "FAILED",
+                "ERROR"
+              ],
+              "max": 3
+            }
+          }
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 900,
+            "interval": 15
+          },
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "adopt": "vpc"
         }
       ]
     },
@@ -161,7 +1215,11 @@
           "name": "list-engine-versions",
           "method": "GET",
           "path": "/v1/engine-versions",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "es-read",
           "capture_soft": {
@@ -174,7 +1232,11 @@
           "name": "list-parameter-groups",
           "method": "GET",
           "path": "/v1/parameter-groups",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "es-read",
           "capture_soft": {
@@ -189,7 +1251,11 @@
           "params": {
             "dbaas_parameter_group_id": "{dbaas_parameter_group_id}"
           },
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "es-read",
           "_note": "eventstreamslistparameters — requires dbaas_parameter_group_id (required per catalog params). Confirmed 200 live when id captured from list-parameter-groups above."
@@ -198,7 +1264,11 @@
           "name": "get-engine-version-properties",
           "method": "GET",
           "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "es-read"
         },
@@ -206,13 +1276,19 @@
           "name": "get-request",
           "method": "GET",
           "path": "/v1/requests/{request_id}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "es-read"
         },
         {
           "name": "probe-reads",
-          "probe_reads": {"dbaas_engine_version_id": "{dbaas_engine_version_id}"}
+          "probe_reads": {
+            "dbaas_engine_version_id": "{dbaas_engine_version_id}"
+          }
         }
       ]
     }

@@ -1631,3 +1631,110 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   ZK-quorum guess but not a confirmation. Recommend this body be the FIRST thing
   tried in the next eventstreams live slot (HB2) before any further guessing.
   provenance: docs (schema) / UNPROVEN (topology hypothesis, untested since fix).
+
+## HB1 deterministic-repair pass — mariadb/mysql/epas/cachestore/postgresql subops-full + eventstreams-full authored (2026-07-04, branch upbeat-ritchie, OFFLINE — no live calls this session)
+
+> conf: 0.5 (docs유래, all UNVERIFIED LIVE this session — see `docs/working/plans/CAMPAIGN-C3-100-repair-log.md`) · seen: 2026-07-04 · obs: 0 (repairs; HB1 obs are the FAILURE evidence that motivated them)
+
+HB1 (run 2026-07-04) re-hit the SAME 10 gap keys with the SAME signature as prior
+runs — proof that re-running unmodified bodies is pointless; each needed a real
+body/capture/pacing fix. Applied to `regression/scenarios/lifecycles/
+database__subops-full.json` (mariadb/mysql/epas/cachestore/postgresql -full
+variants) — all **UNVERIFIED LIVE**, apply + observe in HB1b/HB2b:
+
+- **DBaaS log-export `log_type` — "general" is wrong, "alert" is the
+  docs-evidenced value (docs유래-미검증).** HB1: `register-log-export-config`
+  400'd `Dbaas.InvalidLogType` sending `"general"`. `data/api_docs.json`'s
+  `response_example` for `list-log-export-configs` is IDENTICAL across
+  mariadb/mysql/postgresql/epas: `{"log_type":"alert","log_label":"DB Alert
+  Log",...}` — `"alert"` is the only value appearing in BOTH the request AND
+  response doc examples for every engine (the request doc example itself says
+  "Log type Example: alert", not "general"). Changed the 4 lifecycles'
+  `register-log-export-config` body to `"alert"`, and added a NEW
+  `capture-log-type-after-register` step (GET log-export-configs, run AFTER
+  register) so the downstream `set/export/delete-log-export-config` steps'
+  `{log_type}` path resolves from what was ACTUALLY registered — the OLD
+  `capture-log-type` step ran before anything existed and always found an empty
+  list (dead capture). cachestore has no log-export subresource (uses
+  `/commands` instead, per the 2026-06-20 fact below) so it's untouched here.
+- **`patch-minor-version` `software_version` — no enum, but the cluster's OWN
+  current value is capturable and at least format-valid (docs유래-미검증).**
+  HB1: 400 `ValidationError "Software version is not MARIA_DB"` sending `""`.
+  `MinorPatchRequest.software_version` (mariadb/mysql/epas/postgresql) has NO
+  enum/example in `api_docs` — but `GET /v1/clusters/{cluster_id}`
+  (`ClusterDetailResponse`) exposes the cluster's own `software_version` field
+  directly. Added a `capture_soft` on `capture-subop-ids` and wired it into
+  `patch-minor-version`'s body. Whether patching to the cluster's OWN current
+  version is accepted (no-op upgrade) or rejected ("already at version") is
+  unknown — there is no discovery endpoint for the actual list of
+  upgrade-eligible target versions. cachestore's patch model is DIFFERENT
+  (`MinorPatchDbEngineRequest {dbaas_engine, software_version}`, its own
+  `dbaas_engine` value also undocumented) — left untouched, out of scope.
+- **`resize-instance-group` same-server-type 400 is BY DESIGN — always capture a
+  SECOND, different server type (docs유래-미검증).** HB1: 400
+  `Dbaas.ValidationError "The server type is invalid"` on mariadb; the same body
+  shape (empty string, or the SAME type used at create) exists in epas/
+  cachestore/postgresql too.
+  `knowledge/formal/resources/database__mariadb.yaml`'s existing
+  `mariadb-resize-instance-group` note already predicted this ("same-type 400 is
+  intentional hard [reject]"). Fixed by capturing `$.contents[1].name` from each
+  engine's `GET /v1/server-types` list (a genuinely different entry than
+  index[0], which create already consumed) and feeding that into
+  `resize-instance-group`'s body instead of an empty literal or the create-time
+  type. Applied to mariadb/epas/cachestore/postgresql/eventstreams (mysql has no
+  `resize-instance-group` step in this file).
+- **`resize-block-storage`/`set-block-storage-size` `ExistInprogress` — needs a
+  settle-poll between `resize-instance-group` → `add-block-storages` →
+  `resize-block-storage` (docs유래-미검증, pacing not schema).** HB1: 400
+  `Dbaas.ValidationError.ExistInprogress "There is a request in progress"` —
+  the 3 resize ops in the `resize` group fired back-to-back with NO
+  `wait-after-<op>` between them (every OTHER subop group in this file already
+  has this pattern; `resize` was the one group missing it). Added
+  `wait-after-resize-instance-group` + `wait-after-add-block-storages` (mariadb/
+  epas/postgresql; cachestore only needed the first — it has no
+  `add-block-storages` step, provisioning OS+DATA at create time instead) —
+  same poll shape as every other group: until
+  RUNNING/ACTIVE/AVAILABLE/FAILED/ERROR/UNKNOWN, `give_up_status:[400,404]`,
+  timeout 900s.
+- **`showrequest` (`GET /v1/requests/{request_id}`) needs `request_id`
+  capture_soft on the cluster-create step — mariadb/epas/cachestore were
+  MISSING it (mysql/postgresql already had it, added 2026-06-11).** HB1:
+  mariadb-full's `show-request`-equivalent (the auto `probe_reads` GET) 400'd
+  because `ctx["request_id"]` was never populated for this engine.
+  `AsyncResponse {request_id, resource:{id}}` (api_docs, verbatim across all 5
+  DBaaS engines) is returned by every cluster-create — added
+  `capture_soft: {request_id: "$.request_id"}` to mariadb's `maria-create`,
+  epas's `epas-create`, and cachestore's `cache-create` (mirroring mysql/pg's
+  existing pattern in the SAME file).
+- **`remove-backup-histories` 401 `Dbaas.Unauthorized.AuthNFailed` (valid HMAC) —
+  CONFIRMED backend auth quirk family, re-observed HB1, still not fixable
+  client-side (VALIDATED, this is a re-confirmation not a new finding).** Same
+  quirk already documented for mysql/mariadb/postgresql/epas/cachestore
+  (`knowledge/formal/services/database__*.yaml`, this file's 2026-06-10 entry
+  above) — HB1 (2026-07-04) reproduces it on mariadb with a request signed
+  identically to every sibling call that DID pass in the same run. No doc/
+  header/version difference found for this endpoint. NOT fixing the call
+  itself; widened `remove-backup-histories`/`delete-backup`'s `expect_status`
+  to include 401(+500) so the KNOWN 401 no longer group-skips the sibling
+  `delete-backup` step out of the run — `database__sqlserver.json` already
+  carries this exact tolerance, this aligns the -full DB variants with that
+  precedent. PF/waiver candidate, not re-attempted as a "fix".
+- **mysql `remove-backup-histories` field-name bug found while repairing the
+  401 above: body key was `backup_history_ids`, should be
+  `backup_history_number` (docs유래, mechanical fix — 100% confidence, just
+  never live-tested since mysql-full's create-cluster PFs 500 before reaching
+  this step).** `data/api_docs.json`
+  `models["database/mysql/backuphistorynumberrequest"]` verbatim field name is
+  `backup_history_number` (identical DTO name/shape to mariadb/postgresql/epas/
+  cachestore) — mysql's -full variant was the only one with the wrong key.
+- **mysql `create-cluster` 500 `ContactAdminForAssistance` — PF, no fix
+  possible (re-confirmed, same class as postgresql's known create-500).** Not a
+  body problem; recorded as-is for the waiver/PF track.
+- **`eventstreams-cluster-subops-full` authored** (new lifecycle,
+  `regression/scenarios/lifecycles/data-analytics__eventstreams.json`) — same
+  shared-VPC-adopt → create → subops(+settle-poll per op) → delete pattern as
+  the DB -full variants, create body per the `docs-research` ZK-quorum
+  hypothesis above (topology still UNVERIFIED — this session did not
+  live-test it, only authored the scaffold + wired live discovery for
+  `dbaas_engine_version_id`/`subnet_id`/`server_type_name`). Full detail:
+  `docs/working/plans/CAMPAIGN-C3-100-repair-log.md`.
