@@ -915,6 +915,6 @@ def api_local_log(run_id: str):
 def local_run_page():
     """RETIRED (고아 페이지 — UIUX-AUDIT P1-4): 러너 UI는 Testing 콘솔(/testing/embed)
     이, 계정 위생 역할은 /testing/resources(실측 owned 스캔 단일 정본)가 대체.
-    /api/local/* 는 콘솔이 계속 쓰므로 유지. local_run.html 템플릿은
-    build_local_demo(정적 데모 발행기)가 아직 참조하여 남겨둠."""
+    /api/local/* 는 콘솔이 계속 쓰므로 유지. (local_run.html + build_local_demo 는
+    2026-07-04 리포 정비 C1 에서 retire — REPO-AUDIT-2026-07-04.md §2)"""
     return RedirectResponse("/testing/resources", status_code=301)

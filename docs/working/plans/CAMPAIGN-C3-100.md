@@ -155,3 +155,7 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
 ## 진행 로그 (오케스트레이터가 갱신)
 
 - 2026-07-04: 캠페인 개시. A0 + C1 병렬 가동 (라이브 레인은 페르소나 2차 점유 중).
+- 2026-07-04: C1 감사 완료(464b4acf) → 저위험 retire 승인·집행: console_server.py ·
+  build_local_demo+local_run.html · 1회성 publish *.sh 4종 · tracked reports/ 산출물
+  9파일 untrack. **poc/scenario-viz(155f)는 보류** — api-test.yml:1121 발행 스텝 소비
+  + Pages /platform 사용 여부 오너 확인 필요.
