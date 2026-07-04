@@ -1,3 +1,14 @@
+---
+status: superseded (잔여 backlog는 UIUX-AUDIT-2026-07-03 §5로 이관)
+for: all
+superseded_by: trackers/UIUX-AUDIT-2026-07-03.md
+---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 이 리뷰의 **미완 backlog는
+> [`trackers/UIUX-AUDIT-2026-07-03.md`](trackers/UIUX-AUDIT-2026-07-03.md) §5**로
+> 병합됐다 (원본 ID Q*/B* 유지) — 이후 상태 전이는 그쪽에서만 한다. 아래는
+> 2026-06-22 리뷰 전문의 역사 기록 (DONE 표기 포함).
+
 # console2 — IA + UX Review (design backlog)
 
 > Independent IA/UX critique of console2 (review-only; produced by a design-reviewer

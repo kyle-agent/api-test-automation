@@ -189,3 +189,32 @@
 4. README "AI는 Plan 인라인, top-nav 아님" — 실제는 독립 `/ai` 페이지.
 5. "하나의 viz.js" — 실제 console2.js/resource_graph.js/runtime SVG 3계열.
 6. IA.md deep-link 기본 포트 8000 vs 실제 8800.
+
+## 5. 병합 — console2 디자인 백로그 (2026-06-22 리뷰에서 이관, 2026-07-04)
+
+> 출처: `docs/working/console2-ia-ux-review.md` (SUPERSEDED — 잔여 backlog는 이
+> 절이 정본). 원본 ID(Q*/B*) 유지. 원본에서 이미 DONE인 항목(Q1·Q2 build-1/2 ·
+> B1 `f73afadb` · B2 `6f5ae673` · B4 Suite ▾ · B6 착수)은 원본에 역사로 남기고
+> 여기엔 **미완 항목만** 옮긴다. 북극성 원칙(원본 §4): **구성 DAG는 plan/live/
+> coverage 세 삶을 사는 한 객체** — intent로 칠하고, progress로 칠하고,
+> coverage로 칠한다.
+
+| # | Prio | 문제 → 개선 | Effort | 2026-07-04 비고 |
+|---|------|-------------|--------|------------------|
+| Q3 | P0 | 색 채널 과적재(amber=공유dedup/docs/soft-fail · green=의존완료/validated) → 시각 속성별 채널 예산(role=fill, provenance=테두리, run-state=fill(실행), result=badge 모양) + 모드당 범례 1개, hue 단독 금지 | M | 미착수 (P3-14 테마와 연접) |
+| Q4 | P1 | DAG 노드 클릭이 상세 탭과 무연결 → 노드 클릭 시 자원/API/로그 탭을 해당 lifecycle로 cross-filter | S–M | 미착수 (B1 master-detail 위에 얹는 다음 단계) |
+| Q5 | P1 | run 후 스코프 재구성 → 실행→구성 왕복 간 선택 보존 | S | **사실상 DONE** — phase-3 A: 구성 선택 sessionStorage 보존 |
+| Q6 | P1 | 상세 탭에서 전역 run 상태 안 보임 → progress ring + run badge 상시 표시 | S | phase-3 A now-playing 바가 상당 부분 대체 — 잔여: 전체 진행률 링 |
+| Q7 | P1 | blocking `alert()` · model-load "로딩 중…" 고착 → 인라인 오류 배너 + 재시도 + 스켈레톤 | S–M | preflight confirm은 P1-5 모달로 대체됨 — 잔여: model-load 실패 경로 |
+| Q8 | P2 | 부분 선택 서비스는 모달 재호출 필요 → 행에 "3/8 리소스" 표기 | S | 미착수 |
+| Q9 | P2 | 검색이 리소스명 미포함 → 리소스명 + 상위 경로 검색 | S | 미착수 |
+| Q10 | P2 | 실행 화면에서 Axis 재제공(중도 변경 오해) → read-only "this run used: …" | S | 미착수 |
+| B3 | P1 | 선택 폐포가 집합으로 안 보임 → "닫힘 보기" 드로어(평면·그룹·trim 가능, "pulled by …" 근거) = "suite로 저장"의 토대 | M–L | 미착수 |
+| B5 | P1 | run 히스토리 종속적·비교 없음·큐 미정의 → Runs build-list rail(queue=상태) | M–L | phase-3 D가 로컬 run을 Reporting 실행 기록에 미러 — 잔여: rail UI·비교 |
+| B7 | P2 | plan↔run 전환 시 order/quota 판독 상실 → order/peak-VPC/dedup 스트립을 실행으로 carry | S–M | 미착수 |
+
+**[later] 스케줄 회귀 HISTORY 대시보드 (status-page 스타일)** — 원본 §5 그대로
+이월: 서비스/엔드포인트별 스케줄 run의 pass/soft/fail/delayed/skip 히스토리
+스트립(참고 레이아웃 status.claude.com), 데이터는 기존 `reports/results/*.jsonl`
+프로젝션(신규 엔진 개념 없음), run id 딥링크. Effort L · 명시적 deferred
+(2026-06-22 owner 포인터).
