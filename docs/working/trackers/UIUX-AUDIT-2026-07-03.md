@@ -54,6 +54,16 @@
    토글, origin 배지(local/CI run-id/외부), 시간 윈도우 셀렉트, 삭제됨 기본 숨김. (중)
    → 구현: oplog(runs/<id>/res/*) join 으로 origin 주석, scope=mine 기본(빈 결과 +
    로컬 실행 없음 → all 폴백+배너), hours∈{1,6,24}, deleted 기본 숨김, Testing 셸 헤더.
+   → **후속 결함 수정 ✅ `20ab510c` (2026-07-04, 오너 실측):** ACTIVE 로컬 실행 중
+   scope=mine 이 빈 화면 — 버킷 join 은 create 폴링 완료 후에야 이벤트가 도달하고
+   (수 분 지연) 스탬프 이전 서버 프로세스는 runs/local/ 로 기록해 join 이 비었음.
+   수정: mine 귀속을 **버킷 독립** in-process 소스(rec 이벤트 파일 + core.registry
+   per-run 샤드; `annotate_local_origins` overlay가 버킷 join 에 우선)로 전환,
+   버킷 join 은 CI(gha-*) 배지용으로만 유지; mine 0건 + 실행 ACTIVE → all 폴백 +
+   진단 배너("내 실행 귀속 실패 — 계정 전체 표시 중, 귀속 로직 점검 필요") — 실행
+   중 빈 화면 금지. 로컬 oplog 미러 자체는 동작 확인(라이브 검증: run
+   20260704-113744-7350 → runs/&lt;rec&gt;/res/*). 남은 자원 패널에도 '🕒 마지막
+   스캔' 시각 + 실행 중 재스캔 경고 추가(console2 + /testing/resources).
 2. ✅ **DONE `98c3b25f`** — **잔존 자원 표면 4개가 서로 다른 답** — `/testing/resources`(ingest만, "0 live") vs
    `/runtime` vs console2 `/api/owned` 패널 vs `/local-run`. 개선: `/api/owned`
    (reconciler 소유 태그)를 단일 정본으로 한 화면에 통합, 타 표면은 인용+출처 명시. (중)

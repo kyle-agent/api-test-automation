@@ -173,6 +173,25 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
     validate 243/0 ✅. **OPEN 잔여:** P2-9 잔여(아카이브 행 메타 · run 상세
     pass/fail 요약) · P3-13 한/영 정책 · P3-14 테마 · P3-15 접근성 ·
     러너(로컬 vs CI) 완전 통합.
+- **RUNTIME-SCOPE 결함 수정 (2026-07-04, 같은 브랜치 — P1-1 후속, 오너 실측 재현,
+  live mutation 없음):** `20ab510c`. ACTIVE 로컬 실행(compute-virtualserver-full)
+  중 `/runtime?scope=mine` 이 빈 화면 — (a) mine 귀속이 oplog 버킷 join 에만
+  의존했는데 'created' res 이벤트는 create 폴링 완료 후에야 도달(수 분 지연;
+  33bf61f4 이전에 뜬 서버 프로세스는 `runs/local/` 로 기록), (b) 폴백 규칙이
+  실행 중일 때 all 강등을 막아 최악(빈 화면)을 렌더. 수정: **mine 귀속은
+  버킷 독립** — `_local_res_index()`(rec 이벤트 파일 resource-tracked/-deleted +
+  `core.registry` per-run 샤드) → `lv.annotate_local_origins` overlay 가 버킷
+  join 에 우선(버킷 join 은 CI gha-* 배지용 유지); mine 0건 + 실행 ACTIVE →
+  all 폴백 + 진단 배너("내 실행 귀속 실패 …"); engine resource-tracked 에
+  name 추가(이름 fallback 매칭); 남은 자원 패널(console2 + /testing/resources)
+  에 '🕒 마지막 스캔' 상시 + 실행 중 재스캔 경고. **로컬 oplog 미러는 동작
+  확인** (라이브 검증: 오너 run `20260704-113744-7350` → `runs/<rec>/res/*`
+  28 배치, res_id+name 포함 — "전혀 안 남는다"는 스탬프 이전 프로세스/초기
+  지연 관측). 테스트: offline 420 ✅ · validate 243/0 ✅ · uvicorn 스모크
+  (mine 렌더 + 폴백 배너) ✅. **주의(발견):** 자격증명이 export 된 환경에서
+  offline 테스트(cmd-test 등 engine 합성 라이프사이클)가 실 버킷
+  `runs/local/res/` 에 이벤트를 쓴다 — 오프라인 스위트 실행 시
+  `SCP_OPLOG_BUCKET=` 로 끄고 돌릴 것 (후속: conftest 자동 차단 검토).
 - **MODEL-PROMOTION pass (2026-07-03, same branch — offline only, no dispatch/live calls):**
   - **18 docs→VALIDATED promoted** off service-scoped 2xx evidence via the NEW
     `python -m tools.promote_validated` (dry-run default; `--apply` = targeted
