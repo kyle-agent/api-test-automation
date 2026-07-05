@@ -22,6 +22,36 @@ duplicating. Add a new `##` section when you take on a new service.
   not `type`, `$.servers[0].id`, rename regex, stop/start, attach volume).
 - **Lookups:** images `/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50`;
   server-types `/v1/server-types` (pick id starting with `s`).
+- **createport `fixed_ip_address`** (HB3, run 28723287734, 2026-07-05):
+  `data/api_docs.json` networking/vpc/portcreaterequest documents this field
+  as optional `any of [string, null]` default `""`, and the doc's OWN
+  request_example sends `"fixed_ip_address":""` — but live it 400s
+  `scp-network.port.fixed_ip.format-error` ("The requested Fixed IP() is
+  invalid IP format.") on that exact documented default. Fix: **omit the key
+  entirely** (let the backend auto-assign from the subnet) rather than send
+  `""`. Fixed in `compute-virtualserver-full`'s `create-port` step
+  (`regression/scenarios/scenarios.json`); unblocks the whole `vs-port` group
+  (map-sg-to-port/attach-port-to-server/read-attached-port/
+  detach-port-from-server/delete-port). Not yet re-verified live.
+- **delete-server `InvalidVirtualServerState.DeleteImpossible`** (HB3, run
+  28723287734, 2026-07-05): reproduced 3x in the SAME run, right after
+  image-delete/detach-volume/detach-security-group — a transient post-mutation
+  settle window, not a hard block: `cleanup/reconciler.py`'s later sweep
+  deletes the exact same server successfully with no special handling beyond
+  elapsed time (it just retries across sweep rounds). The doc-visible
+  `$.server.state` field doesn't appear to expose an in-between task_state, so
+  a fixed pre-delay is the load-bearing fix, not a value-based poll. Fixed in
+  `compute-virtualserver-full` (`regression/scenarios/scenarios.json`): added
+  a `wait-server-settled` step (20s fixed wait + up-to-120s poll top-up)
+  before `delete-server`, plus `retry_on_status:[400,409]` (6×20s) on
+  `delete-server` itself as a second line of defense. Not yet re-verified
+  live.
+- **image-update (`PUT /v1/images/{id}`) `Image.InvalidVolumeOnMinDiskUpdate`**
+  (HB3, run 28723287734, 2026-07-05): `min_disk` must be >= the size of the
+  volume the custom image was created from (the server's boot volume).
+  `compute-virtualserver-full` creates its boot volume at `size:104` but the
+  `image-update` step sent `min_disk:100` — bumped to `104` to match. Not yet
+  re-verified live.
 
 ## compute / virtualserver — autoscaling
 
@@ -130,6 +160,18 @@ lifecycle `heavy-asg-full-coverage` in
   `?backup_name=regrtest` → `{"result":false}`.
 - **listbackups** list envelope: `{contents:[], count}` (NOT `{backups:[], ...}`).
 - **createbackup** returns 500 `ContactAdminForAssistance` — product-bug (baselined).
+- **getbackuptargetlist inventory-registration lag** (HB3, run 28723287734,
+  2026-07-05): even with `policy_type=FILESYSTEM` (the only usable value —
+  VM_IMAGE 500s), `GET /v1/backups/backup-targets?...&server_name=<own
+  server>` right after the server flips ACTIVE can still return 200 with
+  `contents:[]` — the server hasn't been indexed as a backup target yet. Fix
+  (`regression/scenarios/lifecycles/generated__heavy-backup.json`
+  `create-backup-target` step, HB3b): poll on `$.count` (not the uuid — the
+  engine's poll only does exact-value equality, `count` is the one field
+  whose target value is *predictable*, `until:[1]`) instead of a single shot.
+  Response schema per `data/api_docs.json` confirms top-level `count` +
+  `contents[].{server_uuid,server_guid,server_name}`. NOT yet re-verified
+  live (this fix was authored offline, HB3b session).
 
 ## storage / archivestorage
 

@@ -100,3 +100,130 @@ python -m regression.scenarios.validate
    확보).
 4. `remove-backup-histories` 401은 계속 PF/waiver 트랙 유지 — 수정 시도 대상
    아님(§6 근거 참조).
+
+---
+
+# §HB3b — compute-virtualserver-full / gen-heavy-backup 수리 (2026-07-05, OFFLINE)
+
+> 배경: `docs/working/plans/CAMPAIGN-C3-100.md` 진행 로그 "HB3 종결 — 신규 커버
+> 0 (3연속)" — run 28723287734 (success ~41m, 110 obs: ok 82 · soft 28 · fail
+> 0)의 job-log 진단 5건을 lifecycle 수리로 옮긴 세션. **라이브 SCP 호출 없음**
+> (HB4 heavy run이 레인 점유 중이었으므로 오프라인 전용). 실검증은 다음 HEAVY
+> 디스패치가 담당.
+>
+> 산출물: `regression/scenarios/lifecycles/generated__heavy-backup.json`
+> (create-backup-target 스텝) + `regression/scenarios/scenarios.json`
+> (compute-virtualserver-full의 create-port/image-update/delete-server 3스텝)
+> + `knowledge/services.md` (storage/backup, compute/virtualserver 섹션에
+> 근거 기록) + 본 섹션. `python -m regression.scenarios.validate` → **244
+> lifecycle(s) checked · 0 error(s) · 5 warning(s)** (5개 경고는 이 세션
+> 이전부터 있던 무관 항목 — 전임 HB1 repair 세션과 동일한 5건, 본 세션에서
+> 변경한 3개 파일과 무관함을 diff로 확인).
+
+## 수리 4건
+
+| # | 갭 (HB3 job-log 진단) | 상태 | 수리 내용 | 근거 |
+|---|---|---|---|---|
+| 1 | `gen-heavy-backup` create-backup-target 200이지만 `$.contents[0].server_uuid` 캡처 실패 → 엔진 assert로 lifecycle 중단 | **수리됨** | 같은 스텝을 poll로 전환: `field:"$.count"`, `until:[1]`, `timeout:300s`, `interval:15s`, `give_up_status:[400,401,403,404,500]` (구조적 오류는 즉시 반환, 등록-지연만 재시도). `server_uuid` 자체는 값이 예측 불가능해 엔진의 등가-비교 poll(`field`+`until`)로는 폴링할 수 없음(엔진에 "필드 존재까지" 폴 옵션 없음, `regression/scenarios/engine.py:_run_step` 확인) — 값을 예측 가능한 `count`(0→1 전이)로 대체. 쿼리 자체가 `server_name=regrsrv{unique}`로 이미 자기 서버만 필터링하므로 `count=1`이면 `contents[0]`이 곧 자기 서버 — 별도 이름 필터는 불필요·불가능(엔진 jsonpath는 배열 인덱스 리터럴만 지원, 조건 필터 없음) 하다는 전제를 스텝 `_note`에 명기. | `data/api_docs.json` `storage/backup/getbackuptargetlist`의 `response_example`이 `{"contents":[{...}],"count":1}` — top-level `count` 필드가 문서로 확정. `regression/scenarios/engine.py` `_run_step`(약 L579-632)이 poll을 `until_status` 또는 `field`+`until`(등가 리스트) 두 가지로만 지원함을 코드로 확인(존재-여부 poll 없음). |
+| 2 | `compute-virtualserver-full` delete-server 400 `InvalidVirtualServerState.DeleteImpossible` 3회 재현 (직후 리컨실러 삭제는 성공) | **수리됨** | delete-server 직전에 `wait-server-settled` 스텝 신설: 고정 `wait:20`(초) + `$.server.state`를 `[ACTIVE,STOPPED,SHUTOFF,RUNNING]`까지 최대 120s/15s 간격 poll(`give_up_status:[404]`). 또한 delete-server 자체에 `retry_on_status:[400,409]`(6×20s) 추가 — 2차 방어선. | `cleanup/reconciler.py`의 서버 삭제 경로(`_delete`+`_wait_gone`, L817-822)를 확인 — 특별한 상태-체크 없이 그냥 재삭제 시도하고, **경과 시간**만으로 다음 라운드에 성공함. 즉 하드 블록이 아니라 타이밍 이슈. `$.server.state` 필드가 전이 중간상태(task_state)를 노출한다는 문서 근거는 없어(응답 예시 스키마 확인, `showvirtualserver`) 고정 대기가 핵심 수리, poll은 보강용으로 명기. |
+| 3 | `compute-virtualserver-full` create-port 400 `scp-network.port.fixed_ip.format-error` (port 체인 6키 404 강등) | **수리됨** | body에서 `fixed_ip_address` 키를 완전히 제거(빈 문자열 `""` 대신 생략). | `data/api_docs.json` `networking/vpc/portcreaterequest` 모델은 `fixed_ip_address`를 `any of [string, null]`(옵션, default `""`)로 문서화하고 API 문서의 request_example도 실제로 `"fixed_ip_address":""`를 보내지만, HB3 라이브 에러 메시지 `"The requested Fixed IP() is invalid IP format."`(빈 괄호 — 즉 빈 문자열이 그대로 전달됐다는 증거)가 **문서 예시 자체를 백엔드가 거부**함을 확정. 필드를 생략(자동 할당)하는 쪽으로 수리. |
+| 4 | `compute-virtualserver-full` image-update 400 `Image.InvalidVolumeOnMinDiskUpdate` | **수리됨** | `min_disk: 100` → `min_disk: 104`(부팅 볼륨 크기와 동일). | 같은 파일의 `create-server` 스텝이 부팅 볼륨을 `size:104`로 고정 생성하는 리터럴이 이미 존재 — 별도 캡처 없이 동일 상수로 주입(문서상 안전값보다 실제 생성값과 일치가 더 확실). `image-update`는 이미지가 참조하는 소스 볼륨 크기 이상을 요구한다는 에러명(`InvalidVolumeOnMinDiskUpdate`)에서 직접 추론, 100 < 104가 원인. |
+
+## 조사 5 — create-image / import-image 2xx 전환 (실행 계획만, 업로드/라이브 검증 없음)
+
+**현재 상태**: `vs-image-write-coverage`(`regression/scenarios/lifecycles/compute__virtualserver.json`)의
+`create-image`/`import-image` 스텝은 **의도적으로 존재하지 않는 qcow2 URL**을
+보내 `Image.InvalidObjectStorageUrl`(createimage) / `ValidationError`
+(importimage, url 정규식 `.*\.qcow2$`/255자 위반 시)를 유발하도록 저작되어
+있음 — heavy/billable이라 스코프 밖으로 명시(`_note` 참조). 즉 body
+스키마(`os_distro`, `url` 필드명 등)는 이미 확정되어 있고, 남은 변수는
+**실존하는 qcow2 URL 하나**뿐.
+
+**(a) 버킷 위치/권한**: `core/oplog.py`가 이미 관리하는 영구 버킷
+`apitest-oplog-permanent`(sweep 어떤 매처에도 불일치, `ensure_bucket()`으로
+생성/CORS/ACL 설정)가 후보. `SCP_REGION`(기본 `kr-west1`) 환경변수로 지어지므로
+VM 라이프사이클이 쓰는 `{region}` placeholder와 **같은 리전으로 맞추는 것은
+설정상 가능**하나, importimage 문서 설명("Object Storage bucket ... must be
+in the same zone as the server you are creating")의 "zone"이 리전과 동일
+개념인지 별도 AZ 단위인지는 미확정. 계정 접근키가 오브젝트 스토리지 API와
+동일하다는 것은 `knowledge/validated-facts.md` 2026-06-11 검증 항목으로 이미
+확정됨(`SCP Object Storage S3 (oplog 버킷에서 검증)`).
+
+**URL 포맷 불일치(중요 리스크)**: 같은 리포 안에 이미 **서로 다른 두 도메인
+표기**가 존재함 — (i) `create-image` 스텝은
+`object-store.{region}.e.samsungsdscloud.com/regression-coverage/...`
+(env=`e`, `core/oplog.py`의 API-엔드포인트 추정 규칙과 동일 패턴), (ii)
+`import-image` 스텝 및 `data/api_docs.json`의 API 문서 예시 자체는
+`object-store.kr-west1.s.samsungsdscloud.com/<account_id>/<bucket>/<obj>`
+(env=`s`, 리전 하드코딩, 슬래시 구분). 그런데
+`knowledge/validated-facts.md`(2026-06-11, oplog 버킷 라이브 검증)는 **익명/공개
+경로는 RGW 테넌트 문법 `/<account_id>:<bucket>/<key>`**(콜론 구분, 슬래시
+구분 시 `NotFoundBucketNameInPath`)라고 명시 — 즉 API 문서의 request_example
+URL 형태(슬래시 구분)를 그대로 신뢰하면 이미지 서비스가 그 URL을 못 읽을
+가능성이 있음. **어느 쪽이 실제로 이미지 서비스가 내부적으로 fetch하는
+경로인지는 라이브로 확인된 바 없음** — 이 불일치 자체가 이번 조사의 핵심
+발견.
+
+**(b) qcow2 매직바이트 초소형 파일**: `qemu-img create -f qcow2 <path> 1M`
+(또는 그보다 작은 사이즈)로 로컬에서(라이브 SCP 호출과 무관) 유효한 qcow2
+헤더 + 희소(sparse) 컨텐츠를 가진 수백 바이트~수 KB급 파일 생성 가능 —
+매직바이트(`QFI\xfb`)와 기본 헤더 파싱은 통과할 개연성이 높음. 다만 백엔드가
+헤더 이상(가상 디스크 크기, 클러스터 테이블 등)까지 깊게 검증하는지는
+미확인 — "포맷 통과 → 곧 2xx"라고 확정할 근거 없음.
+
+**(c) 다운스트림 async 실패의 leak 가능성**: `importimage`는 `202 Accepted`
+(빈 바디, 완전 비동기) — 성공/실패는 이후 `GET /v1/images/{id}`로만 드러남.
+`createimage`의 문서 response_example은 `status:"active"`인 성공 케이스만
+보여줄 뿐, 실제 처리가 동기인지 비동기인지는 그 예시만으로 단정 불가.
+이미지가 실패 상태(예: error/killed 유사)로 전이될 경우 `DELETE
+/v1/images/{id}`가 그 상태에서도 수락되는지는 **이 리포의 어떤 lifecycle도
+아직 실측한 적 없음** — 이것이 leak 리스크의 핵심이며, 라이브 세션에서
+가장 먼저 확인해야 할 항목.
+
+**실행 계획 (다음 라이브 세션 — 이번 세션은 조사만, 업로드/호출 없음)**:
+1. `python -m core.oplog ensure` — 버킷 존재/리전 확인 (VM 라이프사이클의
+   `{region}`과 일치하는지 로그로 확인).
+2. 로컬에서 `qemu-img create -f qcow2 /tmp/regr-min.qcow2 1M` (또는 동급)로
+   최소 qcow2 생성 — 라이브 호출 아님, 순수 로컬 파일 생성.
+3. `core/oplog.py`가 이미 쓰는 `put_object(..., ACL="public-read")` 패턴을
+   재사용해 `apitest-oplog-permanent`의 임시 키(예:
+   `images/regr-min-{unique}.qcow2`)에 업로드 — **오브젝트 단위 public-read
+   ACL 필수**(버킷 ACL만으로는 GET 불가, 이미 검증된 사실).
+4. **createimage/importimage를 호출하기 전에** 후보 URL 두 형태(콜론-테넌트
+   vs 슬래시) 각각에 대해 **순수 HTTPS GET**(anonymous curl, SCP API 호출
+   아님)으로 어느 쪽이 실제로 200을 반환하는지 먼저 확인 — 잘못된 형태로
+   이미지 API를 호출해 async job을 낭비/오염시키는 것을 피함.
+5. 올바른 URL이 확정되면 `vs-image-write-coverage`의 create-image(또는
+   import-image)를 그 URL로 1회 라이브 시도 → 성공 시 `GET
+   /v1/images/{image_id}`를 폴링해 최종 상태(active vs error류)와 그 상태에서
+   `DELETE`가 수락되는지 확인 → 확인되면 lifecycle의 synthetic URL을 실
+   URL(캡처 방식 또는 고정값)로 교체하고 `optional`/`expect_status`를 2xx
+   전용으로 좁힘. 실패 시(async error) 이미지가 삭제 가능한 상태로
+   남는지까지 확인한 뒤 teardown.
+6. 임시 오브젝트는 검증 후 `delete_object`로 회수(영구 버킷이므로 회수는
+   agent 책임, sweep 대상 아님).
+
+**결론**: (a)(b)(c) 모두 "가능성 있음"이나 **URL 도메인/경로 문법 불일치가
+확인 전 최대 리스크** — 잘못된 형태로 실 이미지 서비스를 호출하면 낭비뿐
+아니라 상태 불명 이미지가 남을 수 있음. 이번 세션은 업로드/라이브 호출을
+하지 않았으므로 이 결론은 **문서 대조 기반 추론**이며 다음 라이브 세션의
+1차 작업으로 위 실행계획 1-4(HTTPS 형태 확인까지)를 먼저 마치고 나서
+5-6(실제 이미지 API 호출)으로 넘어갈 것을 권고.
+
+## 검증 명령 재현
+
+```
+python -m regression.scenarios.validate
+# -> 244 lifecycle(s) checked · 0 error(s) · 5 warning(s)  (5개는 이 리포의 기존/무관 경고, diff로 확인됨)
+```
+
+## 남은 작업 (다음 HEAVY 디스패치용)
+
+1. `compute-virtualserver-full` 재디스패치로 위 2·3·4번 수리가 실제 2xx로
+   전환되는지 확인 (port 체인 6키 신규 커버 기대).
+2. `gen-heavy-backup` 재디스패치로 1번 수리(backup-target count-poll)가
+   `create-backup-policy` 이후 전체 verify/manual-backup 체인을 살리는지
+   확인.
+3. `create-image`/`import-image` 2xx 전환은 위 실행계획 1-4(URL 형태 확인)를
+   업로드 없이 먼저 마친 뒤에만 5-6(라이브 이미지 API 호출)로 진행 — 순서
+   준수.

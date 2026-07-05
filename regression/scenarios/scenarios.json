@@ -3088,9 +3088,9 @@
             "description": "API regression standalone port",
             "subnet_id": "{subnet_id}",
             "security_groups": [],
-            "fixed_ip_address": "",
             "tags": []
           },
+          "_note": "HB3b (2026-07-05, run 28723287734): CONFIRMED live 400 `scp-network.port.fixed_ip.format-error` (\"The requested Fixed IP() is invalid IP format.\" — note the empty parens) when `fixed_ip_address` was sent as `\"\"`. data/api_docs.json networking/vpc/portcreaterequest documents the field as `any of [string, null]` (optional, default \"\") and the doc's own request_example literally sends `\"fixed_ip_address\":\"\"` — so the DOCUMENTED default is rejected live; fix is to OMIT the key entirely (let the backend auto-assign from the subnet) rather than send an empty string. This unblocks the whole vs-port group (map-sg-to-port/attach-port-to-server/read-attached-port/detach-port-from-server/delete-port — 6 catalog keys share this group, previously 404-demoted once create-port failed). Not re-verified live this session (offline-only, no SCP calls) — next HEAVY dispatch should confirm 2xx.",
           "capture_soft": {
             "std_port_id": "$.port.id"
           },
@@ -3502,14 +3502,15 @@
           "method": "PUT",
           "path": "/v1/images/{custom_image_id}",
           "json": {
-            "min_disk": 100,
+            "min_disk": 104,
             "min_ram": 0,
             "protected": false
           },
           "expect_status": [
             200,
             202
-          ]
+          ],
+          "_note": "HB3b (2026-07-05, run 28723287734): CONFIRMED live 400 `Image.InvalidVolumeOnMinDiskUpdate` with min_disk:100 — image-create snapshots the server's boot volume, which this lifecycle's create-server step provisions at `size: 104` (literal, same file); an update's min_disk must be >= that source volume size. Fixed to 104 (matching the literal, not a doc default) rather than capturing dynamically since the boot size is already a fixed constant in this same lifecycle. Not re-verified live this session (offline-only)."
         },
         {
           "name": "updateserverinterface",
@@ -3598,6 +3599,31 @@
           "destructive": true
         },
         {
+          "name": "wait-server-settled",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "wait": 20,
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "ACTIVE",
+              "STOPPED",
+              "SHUTOFF",
+              "RUNNING"
+            ],
+            "timeout": 120,
+            "interval": 15,
+            "give_up_status": [
+              404
+            ]
+          },
+          "_note": "HB3b (2026-07-05, run 28723287734): CONFIRMED delete-server 400 `InvalidVirtualServerState.DeleteImpossible` reproduced 3x in the same run, immediately after image-delete/detach-volume/detach-security-group — yet the reconciler's LATER sweep (cleanup/reconciler.py `_delete`+next-round retry, no special server-state handling, just elapsed time) deletes the SAME server successfully, so this is a transient post-mutation settle window, not a hard backend block. `state` itself may already read a stable value (ACTIVE/STOPPED) throughout the transition — the doc-visible field does not expose a task_state — so the fixed 20s pre-wait is the load-bearing part; the poll is a best-effort top-up in case state does briefly report something outside the accepted list. Paired with retry_on_status on delete-server itself (belt-and-suspenders, matching how the reconciler's cross-round retry eventually succeeds). Not re-verified live this session (offline-only)."
+        },
+        {
           "name": "delete-server",
           "method": "DELETE",
           "path": "/v1/servers/{server_id}",
@@ -3606,7 +3632,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 20
         },
         {
           "name": "wait-server-gone",
