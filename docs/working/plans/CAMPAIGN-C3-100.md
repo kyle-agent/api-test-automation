@@ -203,3 +203,14 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   VM 클로저 — heavy 게이트 이중 잠금 유지; -restore는 leak-unsafe로 계속 비활성).
   구성: compute-virtualserver-full + vs-image-write-coverage + gen-heavy-backup,
   parallel=3, VPC shared 1 + backup 자체 1 = 2/5.
+- 2026-07-05 00:19Z **HB3 종결 — 신규 커버 0 (3연속)**: run 28723287734 success
+  ~41m, 110 obs (ok 82 · soft 28 · fail 0), teardown 완전 수렴(잔존 volume 1은
+  TTL 보호로 말미 스윕이 스킵 → 오케스트레이터가 IGNORE_TTL 강제 스윕으로 회수).
+  진단(job log): ① gen-heavy-backup은 VM 클로저 완주 후
+  `create-backup-target 200 → $.contents[0].server_uuid 캡처 실패`로 중단 —
+  서버 ACTIVE 직후 backup-target 인벤토리 랙 추정, **조회 settle-poll 필요**;
+  ② delete-server 400 `DeleteImpossible` 3번째 재현 — 직후 리컨실러는 삭제
+  성공 → 백엔드 하드블록 아닌 **상태 settle 타이밍**, pre-delete 대기 필요;
+  ③ create-port 400 fixed_ip 포맷 → port 체인 6키 404 강등; ④ image-update
+  400 InvalidVolumeOnMinDiskUpdate; ⑤ create-image 400 InvalidObjectStorageUrl
+  (실 qcow2 업로드 시 2xx 전환 가능 — 소액, HB3b 검토). 수리분은 HB3b로.
