@@ -1,11 +1,14 @@
-# HB4 (CAMPAIGN-C3-100, 2026-07-05): networking depth — LB members/NAT + VPN
-# gateway/tunnel (FIRST live test of official phase1/2 example values, 90396a7a)
-# + TGW children + vpc-endpoint. Target: H 31 + W 1. VPC 3 + shared = 4/5 cap.
-# Lane gates verified: HB3 concluded 00:19Z + folded, leftover volume force-swept,
-# owned==1 muted known-stuck log-group only, no active workflow runs.
+# HB3b (CAMPAIGN-C3-100, 2026-07-06): repair-validation re-run of HB3 pair.
+# Validates 6aef9663 repairs: gen-heavy-backup backup-target settle-poll (count
+# until [1]) unlocking the ~20-key backup family; compute-virtualserver-full
+# create-port fixed_ip fix (port chain 6 keys) + image-update min_disk 104 +
+# wait-server-settled + delete-server retry_on_status[400,409].
+# vs-image-write-coverage EXCLUDED (needs real qcow2 — pending investigation).
+# Lane gates verified: HB4 concluded 10:52Z(-05) + folded, owned==1 muted
+# known-stuck log-group only, no active workflow runs.
 action=run
 mutations=true
 destructive=true
 heavy=true
-crud_ids=networking-loadbalancer-members-nat,networking-vpn-gateway-tunnel,vpc-transit-gateway-children,vpc-endpoint
-parallel=4
+crud_ids=compute-virtualserver-full,gen-heavy-backup
+parallel=2

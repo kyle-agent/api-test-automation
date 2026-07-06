@@ -214,3 +214,16 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   ③ create-port 400 fixed_ip 포맷 → port 체인 6키 404 강등; ④ image-update
   400 InvalidVolumeOnMinDiskUpdate; ⑤ create-image 400 InvalidObjectStorageUrl
   (실 qcow2 업로드 시 2xx 전환 가능 — 소액, HB3b 검토). 수리분은 HB3b로.
+- 2026-07-05 10:52Z **HB4 종결 — 신규 커버 0 (4연속), 단 전 서명 진단 완료**:
+  run 28738115294, 97 obs (ok 30 · soft 67). ① VPN: create-gateway 400
+  `ValidationError ["Field required"]`(필수 필드 누락 — 게이트웨이 body 버그,
+  공식 phase1/2 터널 값은 시험 도달 못함) → 체인 8키 404 강등. ② LB: LB 생성은
+  성공했으나 healthcheck가 LB 없는 subnet(`SubnetNotAssociatedWithLoadBalancer`)
+  참조 → servergroup/members/listener 캐스케이드; static-nat 400
+  `igw-required-for-static-nat`(IGW 선행 생성 필요); private-static-nat 403
+  `PrivateNatIpForbidden`(entitlement → waiver). ③ TGW: create 성공(10:51:57)
+  직후 children 전부 400 `transit-gateway.not-active` — **ACTIVE settle-poll
+  부재**(delete-server와 동류 타이밍 클래스); delete도 invalid-state.
+  ④ vpc-endpoint: 400 `subnet-not-found`(endpoint 타입 subnet 요건 조사 필요).
+  → repair-3 대상. 계정 기준선 복귀(muted 1). **다음 슬롯: HB3b(수리 검증 —
+  6aef9663 반영분: VS-full port/settle/delete + gen-heavy-backup poll)**.
