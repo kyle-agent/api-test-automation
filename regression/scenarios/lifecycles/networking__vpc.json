@@ -602,7 +602,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes vpc-endpoints: POST /v1/vpc-endpoints, PUT/DELETE /v1/vpc-endpoints/{id}. Body from data/api_bodies.json (networking/vpc/createvpcendpoint) -> UNPROVEN. Needs a real resource_key (the target service, e.g. an SCR registry) + subnet under a VPC; we adopt the shared VPC and create our own subnet, but resource_key/resource_info are {unique}/synthetic so the create likely 4xx's. All vpc-endpoint steps optional+grouped+broad expect_status. capture envelope $.vpc_endpoint.id UNPROVEN. heavy:true (real VPC fallback + billable endpoint).",
+      "_note": "Closes vpc-endpoints: POST /v1/vpc-endpoints, PUT/DELETE /v1/vpc-endpoints/{id}. Body from data/api_bodies.json (networking/vpc/createvpcendpoint) -> UNPROVEN. Needs a real resource_key (the target service, e.g. an SCR registry) + a DEDICATED VPC_ENDPOINT-type subnet under a VPC (REPAIR 2026-07-06: create-subnet now sends type:VPC_ENDPOINT and self-creates every run — see the create-subnet step's own _note for the full HB4 root-cause + evidence); we adopt the shared VPC but resource_key/resource_info are still {unique}/synthetic so the create likely still 4xx's on that separate, not-yet-fixed axis. All vpc-endpoint steps optional+grouped+broad expect_status. capture envelope $.vpc_endpoint.id UNPROVEN. heavy:true (real VPC fallback + billable endpoint).",
       "steps": [
         {
           "name": "create-vpc",
@@ -656,7 +656,7 @@
             "name": "regrsub{unique}",
             "description": "API regression vpc-endpoint",
             "cidr": "10.129.8.0/24",
-            "type": "GENERAL",
+            "type": "VPC_ENDPOINT",
             "vpc_id": "{vpc_id}",
             "tags": []
           },
@@ -673,7 +673,7 @@
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
           },
-          "adopt": "subnet"
+          "_note": "REPAIR 2026-07-06 (HB4 400 scp-network.vpc-endpoint.subnet-not-found 'VPC Endpoint Type Subnet not found', run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): a VPC Endpoint needs a DEDICATED subnet of type=VPC_ENDPOINT, not a GENERAL subnet — this is already CONFIRMED/VALIDATED durable knowledge (knowledge/validated-facts.md 'Subnet type enum...VPC Endpoint needs a dedicated VPC_ENDPOINT-type subnet'; knowledge/formal/resources/networking__vpc.yaml 'endpoint-subnet' node, provenance VALIDATED, live-validated run 27583285457 2026-06-15) that this lifecycle had not yet applied — it was still sending type:GENERAL. type enum confirmed from data/api_docs.json models['networking/vpc/subnetcreaterequest'].type = 'enum (GENERAL, LOCAL, VPC_ENDPOINT)'. Dropped {\"adopt\":\"subnet\"}: the session-shared subnet (knowledge/vpc-scheduling-strategy.md) is GENERAL-type, so adopting it would reintroduce the exact same subnet-not-found 400 for this lifecycle even though the VPC itself is still adopted (adopt:vpc, above) — this endpoint needs its OWN dedicated VPC_ENDPOINT subnet every run, self-created + torn down like before 2026-06's adopt rollout. NOT fixed this session (separate, still-open gap, investigation only per task scope — do not fabricate): resource_key below is still a synthetic {unique} value; knowledge/formal/resources/networking__vpc.yaml's vpc-endpoint node (provenance: docs, NOT yet VALIDATED) shows resource_key must be a REAL target-service resource id (e.g. an actual filestorage volume_id when resource_type=FS) — a disabled composed lifecycle `gen-wave5-vpce` in regression/scenarios/lifecycles/generated__wave5-net.json already models wiring a real storage/filestorage volume for this (cross-service, out of this session's file scope) but is NOT live-validated (_disabled_reason: IB-013, ready for live re-validation, do not enable here). Expect the subnet fix alone to move the error signature from subnet-not-found to a resource_key-related 4xx (or 2xx if the backend doesn't hard-validate resource_key) — next heavy dispatch must observe which."
         },
         {
           "name": "wait-subnet",
@@ -1302,6 +1302,23 @@
           }
         },
         {
+          "name": "wait-tgw-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-06 (HB4 400 transit-gateway.not-active-state on EVERY child create, run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): create-transit-gateway returns 202 (Accepted, async) and the TGW sits in state CREATING for a while (live detail: 'Transit Gateway state is not Active.:(CREATING)') — every child write (vpc-connection, firewall, firewall-connection, routing-rule, uplink-routing-rule, set) was firing immediately after create with no settle-poll, so all 10 children + set-transit-gateway 400'd in lockstep, cascading soft-capture misses to the deletes too (ResourceNotFound / not-in-vpc-connection on placeholder ids). Fix mirrors the settle-poll pattern already proven in database__subops-full.json (field+until+give_up_status) and networking__vpc.json's own create-internet-gateway-for-nat/wait-igw-for-nat-active pair: poll $.transit_gateway.state (field confirmed from api_docs.json networking/vpc/{createtransitgateway,showtransitgateway} response_example: {\"state\":\"ACTIVE\", ...}) until ACTIVE before any child touches the TGW. give_up_status on 400/403/404 so a create that itself soft-failed doesn't hang the poll for the full timeout. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx cascade to children."
+        },
+        {
           "name": "create-tgw-vpc-connection",
           "service": "vpc",
           "method": "POST",
@@ -1609,6 +1626,23 @@
           "_note": "Closes settransitgateway (PUT /v1/transit-gateways/{transit_gateway_id}). Uses the transit_gateway_id captured by create-transit-gateway."
         },
         {
+          "name": "wait-tgw-active-before-delete",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-06 (HB4 400 transit-gateway.invalid-state on delete-transit-gateway, run 28738115294, OFFLINE repair): live detail 'Transit Gateway state is not deletable state(Active, Error)' — the preceding vpc-connection/firewall/routing-rule children can each transition the TGW through a non-Active state (same CREATING-class timing as wait-tgw-active), so re-settle to ACTIVE right before delete rather than assuming it stayed ACTIVE since the earlier poll. Same settle-poll pattern as wait-tgw-active; give_up_status covers a TGW that never became ACTIVE (already-4xx create) so this doesn't hang out the full timeout."
+        },
+        {
           "name": "delete-transit-gateway",
           "service": "vpc",
           "method": "DELETE",
@@ -1626,6 +1660,7 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 4,

@@ -85,30 +85,6 @@
           "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 300, "interval": 10}
         },
         {
-          "name": "lb-healthcheck-create",
-          "method": "POST",
-          "path": "/v1/lb-health-checks",
-          "group": "lb",
-          "optional": true,
-          "json": {
-            "lb_health_check": {
-              "description": "API regression suite",
-              "health_check_count": 3,
-              "health_check_interval": 5,
-              "health_check_port": 80,
-              "health_check_timeout": 5,
-              "name": "regrhc{ualpha}",
-              "protocol": "TCP",
-              "subnet_id": "{subnet_id}",
-              "tags": [],
-              "vpc_id": "{vpc_id}"
-            }
-          },
-          "capture_soft": {"lb_health_check_id": "$.lb_health_check.id"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "cleanup": {"method": "DELETE", "path": "/v1/lb-health-checks/{lb_health_check_id}", "service": "loadbalancer"}
-        },
-        {
           "name": "lb-create",
           "method": "POST",
           "path": "/v1/loadbalancers",
@@ -141,6 +117,31 @@
           "optional": true,
           "expect_status": [200, 404],
           "poll": {"field": "$.loadbalancer.state", "until": ["ACTIVE", "CREATED", "RUNNING", "AVAILABLE"], "timeout": 600, "interval": 20}
+        },
+        {
+          "name": "lb-healthcheck-create",
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "group": "lb",
+          "optional": true,
+          "json": {
+            "lb_health_check": {
+              "description": "API regression suite",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "name": "regrhc{ualpha}",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture_soft": {"lb_health_check_id": "$.lb_health_check.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/lb-health-checks/{lb_health_check_id}", "service": "loadbalancer"},
+          "_note": "REPAIR 2026-07-06 (HB4 400 SubnetNotAssociatedWithLoadBalancer, run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): live error was 'Unable to process the request because the chosen subnet does not contain a Load Balancer ... Please ensure a Load Balancer exists within the subnet before attempting again' for THIS SAME {subnet_id} (own subnet, not a mismatched reference — both lb-create and lb-healthcheck-create already read the identical {subnet_id} captured by this lifecycle's own create-subnet step). Root cause was ORDERING, not a wrong subnet reference: the prior 2026-06-xx fix moved lb-healthcheck-create BEFORE lb-create so lb-servergroup-create could select a PRE-CREATED health check (avoiding LbHealthCheckNotFoundError) — but that made lb-healthcheck-create run before any LB existed in the subnet, which the health-check API requires. Fix: lb-create + lb-wait now run FIRST (LB lands in {subnet_id}), THEN lb-healthcheck-create (subnet now has an LB), THEN lb-servergroup-create (health check already exists) — satisfies both constraints in one order. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx."
         },
         {
           "name": "lb-servergroup-create",
@@ -221,6 +222,46 @@
           "expect_status": [200, 202, 204, 400, 403, 404, 409]
         },
         {
+          "name": "create-igw-for-static-nat",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "group": "staticnat",
+          "optional": true,
+          "json": {
+            "description": "API regression IGW for LB static-nat",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "tags": [],
+            "type": "IGW",
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"igw_id": "$.internet_gateway.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/internet-gateways/{igw_id}", "service": "vpc"},
+          "_note": "REPAIR 2026-07-06 (HB4 400 igw-required-for-static-nat, run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): static-nat-create failed 'Cannot create Public NAT: No Internet Gateway (IGW) found in the VPC'. Pattern lifted verbatim from the proven networking__vpc.json create-internet-gateway-for-nat fix (CONFIRMED live 2026-06-23: nat-gateway also requires an attached IGW) — create IGW on the same VPC, wait ACTIVE, PUT/set it (the set call is what the NAT-gateway precedent found necessary to mark the VPC's IGW as attached/active before the NAT-family create), THEN attempt static-nat-create. Grouped+optional (staticnat) so a shared-VPC IGW collision with another concurrent adopter (409/quota) only skips this NAT family, not the whole LB lifecycle; teardown deletes the IGW after static-nat-delete, before the VPC/subnet teardown. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx."
+        },
+        {
+          "name": "wait-igw-for-static-nat-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{igw_id}",
+          "group": "staticnat",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"field": "$.internet_gateway.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10, "give_up_status": [400, 403, 404]}
+        },
+        {
+          "name": "set-igw-for-static-nat",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/internet-gateways/{igw_id}",
+          "group": "staticnat",
+          "optional": true,
+          "json": {"description": "IGW for LB static-nat (API regression)", "loggable": false},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
           "name": "static-nat-create",
           "method": "POST",
           "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
@@ -241,6 +282,20 @@
           "expect_status": [200, 202, 204, 400, 403, 404, 409]
         },
         {
+          "name": "delete-igw-for-static-nat",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{igw_id}",
+          "group": "staticnat",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [400, 409],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "Delete the IGW created for static-nat-create, children-first (after static-nat-delete, before delete-subnet/delete-vpc). Retry 400 to ride out the not-deletable-state transition (same quirk CONFIRMED for this endpoint in networking__vpc.json)."
+        },
+        {
           "name": "private-static-nat-create",
           "method": "POST",
           "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
@@ -248,7 +303,8 @@
           "optional": true,
           "json": {"static_nat": {"private_nat_id": "", "private_nat_ip_id": ""}},
           "capture_soft": {"private_static_nat_id": "$.static_nat.id"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "HB4 (run 28738115294, 2026-07-05) live 403 scp-loadbalancer.loadbalancers.PrivateNatIpForbidden ('You do not have permission to access the private NAT IP resource') — WAIVER CANDIDATE (entitlement), not a body/param bug: this account is not entitled to private-NAT-IP resources regardless of body content. 403 already in expect_status so it still records reach-coverage. Deliberately NOT modified this session (CAMPAIGN-C3-100 task instruction: leave entitlement-403 alone, record as waiver candidate — see CAMPAIGN-C3-100-repair-log.md #HB4b)."
         },
         {
           "name": "private-static-nat-delete",

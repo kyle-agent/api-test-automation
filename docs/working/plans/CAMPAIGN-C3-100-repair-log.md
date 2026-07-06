@@ -227,3 +227,60 @@ python -m regression.scenarios.validate
 3. `create-image`/`import-image` 2xx 전환은 위 실행계획 1-4(URL 형태 확인)를
    업로드 없이 먼저 마친 뒤에만 5-6(라이브 이미지 API 호출)로 진행 — 순서
    준수.
+
+---
+
+# §HB4b — networking/vpn · loadbalancer · vpc(TGW/vpc-endpoint) 수리 (2026-07-06, OFFLINE)
+
+> 배경: `docs/working/plans/CAMPAIGN-C3-100.md` 진행 로그 "HB4 종결 — 신규 커버
+> 0 (4연속), 단 전 서명 진단 완료" — run 28738115294 (97 obs: ok 30 · soft 67)의
+> `reports/results/hb4/observations-gw*.jsonl` note 필드 오류 전문을 lifecycle
+> 수리로 옮긴 세션. **라이브 SCP 호출 없음**(HB3b heavy run이 레인 점유 중이라
+> 오프라인 전용). 실검증은 다음 HEAVY 디스패치(가칭 HB4c)가 담당.
+>
+> 산출물: `regression/scenarios/lifecycles/networking__vpn.json` +
+> `regression/scenarios/lifecycles/networking__loadbalancer.json` +
+> `regression/scenarios/lifecycles/networking__vpc.json` (vpc-transit-gateway-children
+> + vpc-endpoint) + `knowledge/services.md`(networking/vpn·vpc·loadbalancer 섹션에
+> 근거 기록, loadbalancer 섹션 신규) + 본 섹션. `python -m regression.scenarios.validate`
+> → **244 lifecycle(s) checked · 0 error(s) · 5 warning(s)** (5개는 이 리포의
+> 기존/무관 경고 — HB1/HB3b 세션과 동일 항목, 이번 세션에서 수정한 3개 파일과
+> 무관함을 diff로 확인).
+
+## 수리 6건
+
+| # | 갭 (HB4 job-log/observations 진단) | 상태 | 수리 내용 | 근거 |
+|---|---|---|---|---|
+| 1 | `networking-vpn-gateway-tunnel:create-vpn-gateway` → 400 `ValidationError ["Field required"]` (필드명 미표기) — 체인 8키 전부 soft 강등 | **수리됨** | `data/api_docs.json` models `networking/vpn/vpngatewaycreaterequest`의 `ip_address` 필드가 `required:true`인데 현행 body에 없었음(`ip_id`/`ip_type`/`name`/`tags`/`vpc_id`만 있었음). `create-publicip` 스텝에 `$.publicip.ip_address` capture 추가(`publicip_ip_address`) → `create-vpn-gateway` body에 `ip_address: "{publicip_ip_address}"` 주입(같은 publicip의 실 IP를 게이트웨이 자신의 IP로 사용 — ip_id/ip_type과 짝을 이루는 필드이므로 자연스러운 짝). | `data/api_docs.json` `models['networking/vpn/vpngatewaycreaterequest']` 필드 목록에서 `ip_address`(`required:true`, `schema:string`)를 직접 확인 — request_example도 `ip_id`/`ip_type`과 나란히 `ip_address:"123.0.0.1"`을 보냄. `networking/vpc/createpublicip`의 response_example이 `publicip.ip_address`(예: `"192.167.0.5"`)를 노출함을 확인해 캡처 경로 확정. **라이브 미검증** — 값 자체(같은 IP를 gateway/publicip 양쪽에 재사용하는 것이 accepted인지)는 다음 라이브 세션 확인 대상. |
+| 2 | `networking-loadbalancer-members-nat:lb-healthcheck-create` → 400 `SubnetNotAssociatedWithLoadBalancer`(subnet_id 9ab0704d…, LB 없는 subnet) — servergroup/members/listener 캐스케이드 | **수리됨(순서)** | 라이브 에러 본문이 "Please ensure a Load Balancer exists within the subnet before attempting again"임을 확인 — subnet_id 자체는 LB-create와 동일한 `{subnet_id}`(이 lifecycle의 create-subnet 캡처값, 필요 시 세션 공유 subnet 채택)라서 "잘못된 참조"가 아니라 **순서 문제**였음: 2026-06 수정에서 lb-servergroup-create가 PRE-CREATED health check를 요구해 lb-healthcheck-create를 lb-create보다 앞으로 옮겼는데, 그 결과 health check 생성 시점에 이 subnet에 LB가 아직 없어 매번 400. 해법: lb-create + lb-wait를 먼저(LB가 subnet에 안착) → lb-healthcheck-create(이제 subnet에 LB 존재) → lb-servergroup-create(health check 이미 존재) 순서로 재배치 — 두 제약을 동시 충족. | HB4 observations: `lb-healthcheck-create`의 note가 정확히 "the chosen subnet does not contain a Load Balancer (subnet_id: '9ab0704d...')"라고 명시(대상 subnet 실체 확인). 기존 파일 자체의 이전 `_note`(2026-06 수정 이력)가 "server-group이 PRE-CREATED health check를 요구"한다고 이미 기록해 두 제약의 존재를 교차 확인. **라이브 미검증**. |
+| 3 | `networking-loadbalancer-members-nat:static-nat-create` → 400 `igw-required-for-static-nat`("No Internet Gateway (IGW) found in the VPC") | **수리됨** | `networking__vpc.json`의 기존 검증된 `create-internet-gateway-for-nat`/`wait-igw-for-nat-active`/`set-internet-gateway-for-nat` 3단 패턴(2026-06-23 CONFIRMED: NAT gateway도 IGW attach 필요)을 그대로 LB의 static-nat 앞에 이식 — `create-igw-for-static-nat`(POST, group `staticnat`, optional, capture_soft `igw_id`) → `wait-igw-for-static-nat-active`(poll `$.internet_gateway.state` until ACTIVE) → `set-igw-for-static-nat`(PUT) → 기존 `static-nat-create`. Teardown: `delete-igw-for-static-nat`을 `static-nat-delete` 뒤·`delete-subnet`/`delete-vpc` 앞에 추가(수명주기 균형 — 생성했으면 삭제), 409/400 retry 8×15s. 전부 group `staticnat` + optional이라 공유 VPC상 다른 동시 어댑터와의 IGW 충돌(409/quota)이 있어도 이 NAT 패밀리만 스킵. | `networking__vpc.json`의 동일 3단 패턴이 이미 "CONFIRMED 2026-06-23: scp-network.nat-gateway.internet-gateway-not-associated"로 라이브 검증되어 있음 — LB static-nat의 에러 코드(`igw-required-for-static-nat`)도 "IGW가 VPC에 없다"는 동일 계열 사전조건이므로 검증된 패턴 이식이 가장 안전한 근거. **패턴은 검증됨, 이 특정 적용(LB 컨텍스트)은 라이브 미검증**. |
+| 4 | `private-static-nat-create` → 403 `PrivateNatIpForbidden` | **수정 안 함 — entitlement, waiver 후보로 기록만** | 손대지 않음. body 문제가 아니라 "You do not have permission to access the private NAT IP resource" — 계정 entitlement 벽. `expect_status`에 이미 403 포함되어 reach-coverage는 유지됨. `_note`에 waiver 후보임을 명기. | HB4 observations 그대로: 어떤 body를 보내도 바뀌지 않을 계정 단위 권한 오류(과제 지시 #4 준수 — 수정 금지). |
+| 5 | `vpc-transit-gateway-children`의 10개 child write 전부 400 `transit-gateway.not-active-state`("... (CREATING)") — delete도 `invalid-state`("... not deletable state(Active, Error)") | **수리됨** | `create-transit-gateway` 뒤에 `wait-tgw-active`(poll `$.transit_gateway.state` until ACTIVE, give_up_status 400/403/404, timeout 300s/15s) 추가 — 모든 10개 child write가 이 폴 뒤에 실행되므로 캐스케이드 전체 해소 기대. `delete-transit-gateway` 직전에도 `wait-tgw-active-before-delete`(동일 패턴) 추가 — 선행 child(vpc-connection 등)가 TGW를 다시 비-ACTIVE로 전이시킬 수 있어 재확인. `delete-transit-gateway`의 `retry_on_status`에 400도 추가(409뿐이었음). | HB4 observations의 모든 child create/set/delete 에러 본문이 예외 없이 "Transit Gateway state is not Active.:(CREATING)" 또는 "... not deletable state(Active, Error)" — 순수 타이밍 문제임을 직접 증거. `data/api_docs.json`의 `createtransitgateway`/`showtransitgateway` response_example에서 `$.transit_gateway.state` 필드 확인(둘 다 `"state":"ACTIVE"` 예시). 패턴은 `database__subops-full.json`의 기존 settle-poll(`field`+`until`+`give_up_status`) 및 `networking__vpc.json` 자체의 `wait-igw-for-nat-active`와 동일 구조. **라이브 미검증**. |
+| 6 | `vpc-endpoint:create-vpc-endpoint` → 400 `subnet-not-found`("VPC Endpoint Type Subnet not found. subnet_id:9ab0704d…") | **수리됨(부분) + 조사 기록** | subnet `type`을 `GENERAL` → `VPC_ENDPOINT`로 변경, 해당 create-subnet 스텝의 `"adopt":"subnet"`도 제거(세션 공유 subnet은 GENERAL이라 채택하면 동일 오류 재현 — 매 실행 전용 subnet 자체 생성으로 되돌림). **resource_key는 손대지 않음** — `knowledge/formal/resources/networking__vpc.yaml`의 vpc-endpoint 노드(provenance: docs, 아직 미검증)에 resource_key가 실제 대상 서비스 자원 id(FS면 실 filestorage volume_id)여야 한다고 이미 기록되어 있으나, 이는 cross-service(storage/filestorage) 자원 생성이 필요한 별도 축이라 이번 세션(과제 지시 #6 "확실치 않으면 조사 결과만") 스코프 밖 — `generated__wave5-net.json`의 비활성 `gen-wave5-vpce`가 이미 실 FS volume 배선을 모델링했으나 그 자체도 라이브 미검증(`_disabled_reason` IB-013)이므로 참고만 하고 손대지 않음. | subnet type enum이 `data/api_docs.json` `models['networking/vpc/subnetcreaterequest']`에서 `enum (GENERAL, LOCAL, VPC_ENDPOINT)`로 확정. **VPC_ENDPOINT-타입 subnet 자체는 이미 VALIDATED**(`knowledge/formal/resources/networking__vpc.yaml` endpoint-subnet 노드, "live-validated run 27583285457 (2026-06-15)" 기록) — 이 lifecycle이 그 기지 사실을 아직 반영하지 않고 있었던 것. resource_key 요건은 같은 yaml의 vpc-endpoint 노드 주석("subnet_id MUST be a VPC_ENDPOINT-type subnet")과 `_disabled_reason`(IB-013)에서 확인. |
+
+## docs fetch 시도 실패 (기록)
+
+`createvpcendpoint`의 API 문서 페이지(`https://docs.e.samsungsdscloud.com/apireference/networking/vpc/apis/createvpcendpoint/1.2/`)를 WebFetch로 재확인 시도(subnet 요건에 대한 문서 본문 서술 유무 확인 목적) — **2회 모두 HTTP 503**(프록시/사이트 일시 장애로 추정, SCP API 호출 아님이므로 offline 제약과 무관). 대신 이미 리포에 축적된 `data/api_docs.json` 모델 필드 + `knowledge/formal/resources/networking__vpc.yaml`의 기존 VALIDATED 근거로 충분히 확정 가능해 문서 재조회 없이 수리 진행. 다음 세션에서 여유가 있으면 재시도해 문서 서술과 대조 권장.
+
+## 검증 명령 재현
+
+```
+python -m regression.scenarios.validate
+# -> 244 lifecycle(s) checked · 0 error(s) · 5 warning(s)  (5개는 이 리포의 기존/무관 경고, diff로 확인됨)
+```
+
+## 남은 작업 (다음 HEAVY 디스패치용, 가칭 HB4c)
+
+1. `networking-vpn-gateway-tunnel` 재디스패치 — create-vpn-gateway가 2xx로
+   전환되는지, 이어서 공식 phase1/phase2 터널 값(90396a7a)이 실제로 도달·검증
+   되는지 확인.
+2. `networking-loadbalancer-members-nat` 재디스패치 — 순서 변경 후
+   lb-healthcheck-create/lb-servergroup-create가 2xx로 전환되는지, IGW 3단
+   패턴이 static-nat-create를 2xx로 바꾸는지 확인. private-static-nat-create의
+   403은 계속 waiver 트랙(수정 시도 대상 아님).
+3. `vpc-transit-gateway-children` 재디스패치 — settle-poll이 10개 child +
+   set/delete를 실제로 2xx(또는 각 child 고유의 다음 단계 에러)로 바꾸는지 확인.
+4. `vpc-endpoint` 재디스패치 — subnet type 수정 후 에러 서명이 subnet-not-found
+   에서 resource_key 관련 4xx(또는 2xx)로 실제로 바뀌는지 관찰. resource_key
+   축(실 FS volume 배선)은 이번 세션 스코프 밖 — 관찰 결과에 따라 별도 세션에서
+   `gen-wave5-vpce` 패턴 이식 여부 결정.

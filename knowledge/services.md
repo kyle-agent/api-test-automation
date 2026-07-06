@@ -312,6 +312,58 @@ lifecycle `heavy-asg-full-coverage` in
   - Subnet create: POST /v1/subnets (NOT /v1/vpcs/{id}/subnets); body: top-level fields
     `{name, cidr, type: GENERAL, vpc_id, tags: []}`. Returns 202; poll $.subnet.state → ACTIVE.
   - Response fields: `$.privatelink_service.id`, `$.privatelink_endpoint.id`.
+- **Transit gateway CREATING → ACTIVE settle timing (CONFIRMED, HB4 run 28738115294, 2026-07-05):**
+  `POST /v1/transit-gateways` returns 202 (async) and the TGW sits in `CREATING` for a while — any
+  child call issued immediately (vpc-connection/firewall/firewall-connection/routing-rule/
+  uplink-routing-rule create, `setTransitGateway`, even `deletetransitgateway`) 400s with
+  `scp-network.transit-gateway.not-active-state` ("Transit Gateway state is not
+  Active.:(CREATING)") / on delete, `scp-network.transit-gateway.invalid-state` ("... not
+  deletable state(Active, Error)"). Poll `$.transit_gateway.state` (`GET
+  /v1/transit-gateways/{id}`, field confirmed from `data/api_docs.json`
+  createtransitgateway/showtransitgateway `response_example`) until `ACTIVE` before EVERY child
+  op AND again right before delete (children can re-transition the TGW). Fixed OFFLINE
+  2026-07-06 in `vpc-transit-gateway-children` (`networking__vpc.json`) — UNVERIFIED LIVE.
+- **VPC Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet, not `GENERAL` (CONFIRMED —
+  already VALIDATED via `knowledge/formal/resources/networking__vpc.yaml` endpoint-subnet node,
+  live-validated run 27583285457 2026-06-15; re-confirmed by HB4 run 28738115294, 2026-07-05):**
+  `POST /v1/vpc-endpoints` with `subnet_id` pointing at a `GENERAL` subnet 400s
+  `scp-network.vpc-endpoint.subnet-not-found` ("VPC Endpoint Type Subnet not found"). Subnet
+  `type` enum is `(GENERAL, LOCAL, VPC_ENDPOINT)` (`data/api_docs.json`
+  `subnetcreaterequest`). The `vpc-endpoint` lifecycle in `networking__vpc.json` had not applied
+  this already-known fix (was still sending `type:GENERAL`, and adopting the shared/GENERAL
+  subnet) — fixed OFFLINE 2026-07-06 (self-creates its own `VPC_ENDPOINT`-type subnet every run,
+  no longer adopts the shared subnet). Separately, `resource_key` still needs a REAL
+  target-service resource id (e.g. an actual filestorage `volume_id` when `resource_type: FS`) —
+  this axis remains synthetic/UNPROVEN in `networking__vpc.json` (a disabled composed
+  `gen-wave5-vpce` lifecycle in `generated__wave5-net.json` models the real-FS-volume wiring but
+  is itself not live-validated).
+
+## networking / loadbalancer
+
+- **Host:** regional. 34 endpoints. Base LB stack (subnet → health-check → LB → server-group) is
+  `heavy: true`; light collection GETs (`networking-loadbalancer-reads`) are read-only.
+- **Health-check ↔ load-balancer creation ORDER constraint (CONFIRMED, HB4 run 28738115294,
+  2026-07-05):** `POST /v1/lb-health-checks` requires a Load Balancer to ALREADY exist in the
+  target `subnet_id` — live 400 `scp-loadbalancer.lb-health-checks.SubnetNotAssociatedWithLoadBalancer`
+  ("... the chosen subnet does not contain a Load Balancer ... Please ensure a Load Balancer
+  exists within the subnet before attempting again"). This is in tension with the earlier
+  (2026-06) fix that made `lb-server-group-create` need a PRE-CREATED health check (to avoid
+  `LbHealthCheckNotFoundError`). Resolution: create the LB FIRST (wait ACTIVE), THEN the health
+  check (subnet now has an LB), THEN the server group (health check now exists) — one order
+  satisfies both constraints. Fixed OFFLINE 2026-07-06 in `networking-loadbalancer-members-nat`
+  (`networking__loadbalancer.json`) — UNVERIFIED LIVE.
+- **Public static-NAT requires an Internet Gateway attached to the LB's VPC (CONFIRMED, same
+  run):** `POST /v1/loadbalancers/{id}/static-nats` 400s `scp-loadbalancer.loadbalancers.igw-required-for-static-nat`
+  ("Cannot create Public NAT: No Internet Gateway (IGW) found in the VPC") when the VPC has no
+  IGW — same precondition as NAT gateways (`networking/vpc` NAT-gateway note above: create IGW,
+  wait ACTIVE, PUT/set it, THEN the NAT-family create). Fixed OFFLINE 2026-07-06 (IGW
+  create/wait/set steps added before `static-nat-create`, delete added after `static-nat-delete`,
+  before VPC/subnet teardown) — UNVERIFIED LIVE.
+- **Private static-NAT is an entitlement wall, not a body bug (CONFIRMED, same run):**
+  `POST /v1/loadbalancers/{id}/private-static-nats` → 403
+  `scp-loadbalancer.loadbalancers.PrivateNatIpForbidden` ("You do not have permission to access
+  the private NAT IP resource") regardless of body content — WAIVER CANDIDATE (entitlement), do
+  not chase with body changes.
 
 ## networking / firewall
 
@@ -475,6 +527,14 @@ lifecycle `heavy-asg-full-coverage` in
   (2 id-bound GETs + 6 writes). Needs SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE + SCP_RUN_HEAVY,
   with VPC + public-ip prereqs provisioned first.
 - **Coverage 2026-06-19:** 0→2/10 (both list GETs).
+- **`createvpngateway` requires `ip_address` (CONFIRMED, docs — HB4 run 28738115294, 2026-07-05):**
+  `vpngatewaycreaterequest` (`data/api_docs.json`) lists `ip_address` as `required:true` alongside
+  `ip_id`/`ip_type`/`name`/`vpc_id` — the lifecycle body was missing it and got a generic 400
+  `ValidationError ["Field required"]` (no field name in the error body). Fix (OFFLINE repair,
+  2026-07-06, UNVERIFIED LIVE): capture `$.publicip.ip_address` from the preceding `create-publicip`
+  step (real IP, e.g. `192.167.0.5`) and send it as the gateway's `ip_address` (paired with the
+  same publicip's `ip_id`). Blocks the whole chain including the official phase1/phase2 tunnel
+  values (`data/api_docs.json` request_example) from ever being tried live.
 
 ## management / cloudcontrol
 
