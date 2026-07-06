@@ -1,2 +1,13 @@
-# Lane reset to noop — HB4b (run 28827996068) concluded & folded (+24 keys).
-action=noop
+# HB5 (CAMPAIGN-C3-100, 2026-07-07): untouched networking family — peering +
+# direct-connect routing + private-NAT + private DNS hosted zone.
+# Target: H 13 + W 7. VPC: peering 2 + DC-side 1 + shared = 4/5 cap.
+# This push also fixes the stale-junit defect (pytest --junitxml explicit +
+# tracked reports/junit-crud.xml untracked) — first run with real junit.
+# Lane gates verified: HB4b folded (+24), TGW+VPC leftovers force-swept to
+# baseline (owned==1 muted log-group), no active workflow runs.
+action=run
+mutations=true
+destructive=true
+heavy=true
+crud_ids=vpc-peering,networking-direct-connect-routing,vpc-private-nat,networking-dns-hosted-zone-private
+parallel=4

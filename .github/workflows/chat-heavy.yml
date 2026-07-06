@@ -130,7 +130,11 @@ jobs:
         run: |
           K="${{ steps.req.outputs.crud_filter }}"
           N="${{ steps.req.outputs.parallel }}"; N="${N:-6}"
-          ARGS="tests/crud -m crud -n $N -o addopts= -q"
+          # --junitxml explicit: `-o addopts=` clears pytest.ini addopts, so junit was
+          # never written and the tracked stale reports/junit-crud.xml rode into the
+          # artifact byte-identical across runs (campaign log 2026-07-04). Fixed + file
+          # untracked in the same commit.
+          ARGS="tests/crud -m crud -n $N -o addopts= -q --junitxml=reports/junit-crud.xml"
           if [ -n "$K" ]; then
             python -m pytest $ARGS -k "$K" || true
           else
