@@ -227,3 +227,17 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   ④ vpc-endpoint: 400 `subnet-not-found`(endpoint 타입 subnet 요건 조사 필요).
   → repair-3 대상. 계정 기준선 복귀(muted 1). **다음 슬롯: HB3b(수리 검증 —
   6aef9663 반영분: VS-full port/settle/delete + gen-heavy-backup poll)**.
+- 2026-07-06 04:22Z **HB3b 종결 — 수리 루프 첫 실수확: verified store +13
+  (2252→2265)**: run 28766151214 success 44m, 108 obs (ok 97 · soft 11 · fail 0).
+  검증된 수리: create-port/map-sg/delete-port 2xx(fixed_ip 수리 유효),
+  delete-server 무400 성공(settle+retry 유효), backup-target poll 통과.
+  잔여 3서명(job log 전문 확보): ① backup-targets 응답이 서버 ACTIVE 후에도
+  `{"contents":[],"count":0}` — 타이밍 아닌 **조회 파라미터/자격 요건** 문제,
+  getbackuptargetlist docs 조사 필요; ② image-update 400 "Image with volumes
+  cannot update min disk" — **min_disk는 볼륨 있는 이미지에서 불가**, 다른
+  필드(description)로 교체 필요; ③ attach-port 400 `CreateInterface.Duplicated`
+  — 서버가 이미 해당 subnet에 인터페이스 보유, 테스트 port는 별도 subnet에.
+  부수: VS boot volume이 TTL 보호로 말미 스윕을 2연속 생존(IGNORE_TTL 수동
+  회수) — 말미 스윕 TTL 정책 or 명시 삭제 스텝 검토. → repair-4. 계정 기준선.
+  **다음 슬롯: HB4b(네트워킹 수리 검증 — c2223d75: VPN ip_address · LB 순서
+  +IGW · TGW settle · vpce subnet 타입)**.

@@ -1,14 +1,13 @@
-# HB3b (CAMPAIGN-C3-100, 2026-07-06): repair-validation re-run of HB3 pair.
-# Validates 6aef9663 repairs: gen-heavy-backup backup-target settle-poll (count
-# until [1]) unlocking the ~20-key backup family; compute-virtualserver-full
-# create-port fixed_ip fix (port chain 6 keys) + image-update min_disk 104 +
-# wait-server-settled + delete-server retry_on_status[400,409].
-# vs-image-write-coverage EXCLUDED (needs real qcow2 — pending investigation).
-# Lane gates verified: HB4 concluded 10:52Z(-05) + folded, owned==1 muted
-# known-stuck log-group only, no active workflow runs.
+# HB4b (CAMPAIGN-C3-100, 2026-07-06): networking repair-validation re-run.
+# Validates c2223d75 repairs: VPN gateway ip_address (unblocks official phase1/2
+# tunnel values, 8 keys) · LB create-before-healthcheck ordering + IGW for
+# static-NAT (7 keys) · TGW ACTIVE settle-polls (10 keys) · vpc-endpoint
+# VPC_ENDPOINT-type subnet. private-static-nat 403 = entitlement (expected).
+# Lane gates verified: HB3b concluded+folded(+13 keys), boot-volume force-swept,
+# owned==1 muted known-stuck log-group only, no active workflow runs.
 action=run
 mutations=true
 destructive=true
 heavy=true
-crud_ids=compute-virtualserver-full,gen-heavy-backup
-parallel=2
+crud_ids=networking-loadbalancer-members-nat,networking-vpn-gateway-tunnel,vpc-transit-gateway-children,vpc-endpoint
+parallel=4
