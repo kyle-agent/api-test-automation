@@ -13535,66 +13535,154 @@
     "norm_path": "v1/gslbs/*",
     "path": "/v1/gslbs/{gslb_id}"
   },
+  "networking-loadbalancer-members-nat:create-igw-for-static-nat": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "POST",
+    "norm_path": "v1/internet-gateways",
+    "path": "/v1/internet-gateways"
+  },
+  "networking-loadbalancer-members-nat:delete-igw-for-static-nat": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/internet-gateways/*",
+    "path": "/v1/internet-gateways/{igw_id}"
+  },
   "networking-loadbalancer-members-nat:lb-create": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "POST",
     "norm_path": "v1/loadbalancers",
     "path": "/v1/loadbalancers"
   },
   "networking-loadbalancer-members-nat:lb-delete": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/loadbalancers/*",
     "path": "/v1/loadbalancers/{loadbalancer_id}"
   },
+  "networking-loadbalancer-members-nat:lb-healthcheck-create": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "POST",
+    "norm_path": "v1/lb-health-checks",
+    "path": "/v1/lb-health-checks"
+  },
+  "networking-loadbalancer-members-nat:lb-healthcheck-delete": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/lb-health-checks/*",
+    "path": "/v1/lb-health-checks/{lb_health_check_id}"
+  },
+  "networking-loadbalancer-members-nat:lb-listener-create": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "POST",
+    "norm_path": "v1/lb-listeners",
+    "path": "/v1/lb-listeners"
+  },
+  "networking-loadbalancer-members-nat:lb-listener-delete": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/lb-listeners/*",
+    "path": "/v1/lb-listeners/{listener_id}"
+  },
+  "networking-loadbalancer-members-nat:lb-servergroup-create": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "POST",
+    "norm_path": "v1/lb-server-groups",
+    "path": "/v1/lb-server-groups"
+  },
+  "networking-loadbalancer-members-nat:lb-servergroup-delete": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/lb-server-groups/*",
+    "path": "/v1/lb-server-groups/{lb_server_group_id}"
+  },
   "networking-loadbalancer-members-nat:lb-wait": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/loadbalancers/*",
     "path": "/v1/loadbalancers/{loadbalancer_id}"
   },
   "networking-loadbalancer-members-nat:list-lb-certificates": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/loadbalancers/certificates",
     "path": "/v1/loadbalancers/certificates"
   },
+  "networking-loadbalancer-members-nat:members-remove-bulk": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/lb-server-groups/*/members",
+    "path": "/v1/lb-server-groups/{lb_server_group_id}/members"
+  },
   "networking-loadbalancer-members-nat:private-static-nat-delete": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/loadbalancers/*/private-static-nats",
     "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats"
   },
+  "networking-loadbalancer-members-nat:set-igw-for-static-nat": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "PUT",
+    "norm_path": "v1/internet-gateways/*",
+    "path": "/v1/internet-gateways/{igw_id}"
+  },
   "networking-loadbalancer-members-nat:static-nat-delete": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/loadbalancers/*/static-nats",
     "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats"
   },
+  "networking-loadbalancer-members-nat:wait-igw-for-static-nat-active": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "GET",
+    "norm_path": "v1/internet-gateways/*",
+    "path": "/v1/internet-gateways/{igw_id}"
+  },
   "networking-loadbalancer-members-nat:wait-subnet": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
   },
   "networking-loadbalancer-members-nat:wait-vpc": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -13936,25 +14024,25 @@
     "path": "/v1/subnets/{subnet_id}"
   },
   "networking-vpn-gateway-tunnel:create-publicip": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "POST",
     "norm_path": "v1/publicips",
     "path": "/v1/publicips"
   },
   "networking-vpn-gateway-tunnel:delete-publicip": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/publicips/*",
     "path": "/v1/publicips/{publicip_id}"
   },
   "networking-vpn-gateway-tunnel:wait-vpc": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -14255,34 +14343,82 @@
     "norm_path": "v1/gslbs/*",
     "path": "/v1/gslbs/{gslb_id}"
   },
+  "networking/loadbalancer/createlbhealthcheck": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "POST",
+    "norm_path": "v1/lb-health-checks",
+    "path": "/v1/lb-health-checks"
+  },
+  "networking/loadbalancer/createlblistener": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "POST",
+    "norm_path": "v1/lb-listeners",
+    "path": "/v1/lb-listeners"
+  },
+  "networking/loadbalancer/createlbservergroup": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "POST",
+    "norm_path": "v1/lb-server-groups",
+    "path": "/v1/lb-server-groups"
+  },
   "networking/loadbalancer/createloadbalancer": {
-    "count": 11,
+    "count": 12,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "POST",
     "norm_path": "v1/loadbalancers",
     "path": "/v1/loadbalancers"
   },
+  "networking/loadbalancer/deletelbhealthcheck": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/lb-health-checks/*",
+    "path": "/v1/lb-health-checks/{lb_health_check_id}"
+  },
+  "networking/loadbalancer/deletelblistener": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/lb-listeners/*",
+    "path": "/v1/lb-listeners/{listener_id}"
+  },
+  "networking/loadbalancer/deletelbservergroup": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/lb-server-groups/*",
+    "path": "/v1/lb-server-groups/{lb_server_group_id}"
+  },
   "networking/loadbalancer/deleteloadbalancer": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/loadbalancers/*",
     "path": "/v1/loadbalancers/{loadbalancer_id}"
   },
   "networking/loadbalancer/deleteloadbalancerprivatenatip": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/loadbalancers/*/private-static-nats",
     "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats"
   },
   "networking/loadbalancer/deleteloadbalancerpublicnatip": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/loadbalancers/*/static-nats",
     "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats"
@@ -14302,6 +14438,14 @@
     "method": "GET",
     "norm_path": "v1/lb-listeners",
     "path": "/v1/lb-listeners"
+  },
+  "networking/loadbalancer/listlbservergroupmembers": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "GET",
+    "norm_path": "v1/lb-server-groups/*/members",
+    "path": "/v1/lb-server-groups/{lb_server_group_id}/members"
   },
   "networking/loadbalancer/listlbservergroups": {
     "count": 27,
@@ -14327,26 +14471,50 @@
     "norm_path": "v1/loadbalancers",
     "path": "/v1/loadbalancers"
   },
+  "networking/loadbalancer/removelbservergroupmembers": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "DELETE",
+    "norm_path": "v1/lb-server-groups/*/members",
+    "path": "/v1/lb-server-groups/{lb_server_group_id}/members"
+  },
   "networking/loadbalancer/showlbhealthcheck": {
-    "count": 30,
+    "count": 31,
     "first_run": "27583285457",
-    "last_run": "",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/lb-health-checks/*",
     "path": "/v1/lb-health-checks/{lb_health_check_id}"
   },
+  "networking/loadbalancer/showlblistener": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "GET",
+    "norm_path": "v1/lb-listeners/*",
+    "path": "/v1/lb-listeners/{listener_id}"
+  },
+  "networking/loadbalancer/showlbservergroup": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "GET",
+    "norm_path": "v1/lb-server-groups/*",
+    "path": "/v1/lb-server-groups/{lb_server_group_id}"
+  },
   "networking/loadbalancer/showloadbalancer": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/loadbalancers/*",
     "path": "/v1/loadbalancers/{loadbalancer_id}"
   },
   "networking/loadbalancer/showloadbalancerprivatenatip": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/loadbalancers/*/private-static-nats",
     "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats"
@@ -14448,9 +14616,9 @@
     "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/connection"
   },
   "networking/vpc/createinternetgateway": {
-    "count": 74,
+    "count": 75,
     "first_run": "27593608514",
-    "last_run": "27599547083",
+    "last_run": "28827996068",
     "method": "POST",
     "norm_path": "v1/internet-gateways",
     "path": "/v1/internet-gateways"
@@ -14488,9 +14656,9 @@
     "path": "/v1/privatelink-services"
   },
   "networking/vpc/createpublicip": {
-    "count": 64,
+    "count": 65,
     "first_run": "27583285457",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "POST",
     "norm_path": "v1/publicips",
     "path": "/v1/publicips"
@@ -14528,17 +14696,17 @@
     "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports"
   },
   "networking/vpc/createtransitgateway": {
-    "count": 24,
+    "count": 25,
     "first_run": "27593608514",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "POST",
     "norm_path": "v1/transit-gateways",
     "path": "/v1/transit-gateways"
   },
   "networking/vpc/createtransitgatewayvpcconnection": {
-    "count": 1,
+    "count": 2,
     "first_run": "28648339307",
-    "last_run": "28648339307",
+    "last_run": "28827996068",
     "method": "POST",
     "norm_path": "v1/transit-gateways/*/vpc-connections",
     "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
@@ -14560,12 +14728,12 @@
     "path": "/v1/vpc-peerings"
   },
   "networking/vpc/deleteinternetgateway": {
-    "count": 58,
+    "count": 59,
     "first_run": "27593608514",
-    "last_run": "27599547083",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/internet-gateways/*",
-    "path": "/v1/internet-gateways/{internet_gateway_id}"
+    "path": "/v1/internet-gateways/{igw_id}"
   },
   "networking/vpc/deletenatgateway": {
     "count": 13,
@@ -14600,9 +14768,9 @@
     "path": "/v1/privatelink-services/{privatelink_service_id}"
   },
   "networking/vpc/deletepublicip": {
-    "count": 48,
+    "count": 49,
     "first_run": "27583285457",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "DELETE",
     "norm_path": "v1/publicips/*",
     "path": "/v1/publicips/{publicip_id}"
@@ -14736,9 +14904,9 @@
     "path": "/v1/subnets/{subnet_id}/vips"
   },
   "networking/vpc/listtransitgatewayrules": {
-    "count": 21,
+    "count": 22,
     "first_run": "27593608514",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/transit-gateways/*/routing-rules",
     "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules"
@@ -14752,9 +14920,9 @@
     "path": "/v1/transit-gateways"
   },
   "networking/vpc/listtransitgatewayvpcconnections": {
-    "count": 21,
+    "count": 22,
     "first_run": "27593608514",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/transit-gateways/*/vpc-connections",
     "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
@@ -14808,12 +14976,12 @@
     "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/request"
   },
   "networking/vpc/setinternetgateway": {
-    "count": 31,
+    "count": 32,
     "first_run": "27803424208",
-    "last_run": "",
+    "last_run": "28827996068",
     "method": "PUT",
     "norm_path": "v1/internet-gateways/*",
-    "path": "/v1/internet-gateways/{internet_gateway_id}"
+    "path": "/v1/internet-gateways/{igw_id}"
   },
   "networking/vpc/setnatgateway": {
     "count": 13,
@@ -14952,9 +15120,9 @@
     "path": "/v1/subnets/{subnet_id}/vips/{vip_id}"
   },
   "networking/vpc/showtransitgateway": {
-    "count": 21,
+    "count": 22,
     "first_run": "27593608514",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/transit-gateways/*",
     "path": "/v1/transit-gateways/{transit_gateway_id}"
@@ -17432,9 +17600,9 @@
     "path": "/v1/subnets/{subnet_id}"
   },
   "vpc-endpoint:wait-vpc": {
-    "count": 7,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -17975,10 +18143,18 @@
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
   },
+  "vpc-transit-gateway-children:create-tgw-vpc-connection": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "POST",
+    "norm_path": "v1/transit-gateways/*/vpc-connections",
+    "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
+  },
   "vpc-transit-gateway-children:create-transit-gateway": {
-    "count": 13,
+    "count": 14,
     "first_run": "27593608514",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "POST",
     "norm_path": "v1/transit-gateways",
     "path": "/v1/transit-gateways"
@@ -18000,33 +18176,49 @@
     "path": "/v1/vpcs/{vpc_id}"
   },
   "vpc-transit-gateway-children:get-tgw-routing-rules": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/transit-gateways/*/routing-rules",
     "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules"
   },
   "vpc-transit-gateway-children:get-tgw-vpc-connections": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/transit-gateways/*/vpc-connections",
     "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
   },
   "vpc-transit-gateway-children:show-transit-gateway": {
-    "count": 2,
+    "count": 3,
     "first_run": "28738115294",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
+    "method": "GET",
+    "norm_path": "v1/transit-gateways/*",
+    "path": "/v1/transit-gateways/{transit_gateway_id}"
+  },
+  "vpc-transit-gateway-children:wait-tgw-active": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
+    "method": "GET",
+    "norm_path": "v1/transit-gateways/*",
+    "path": "/v1/transit-gateways/{transit_gateway_id}"
+  },
+  "vpc-transit-gateway-children:wait-tgw-active-before-delete": {
+    "count": 1,
+    "first_run": "28827996068",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/transit-gateways/*",
     "path": "/v1/transit-gateways/{transit_gateway_id}"
   },
   "vpc-transit-gateway-children:wait-vpc": {
-    "count": 13,
+    "count": 14,
     "first_run": "27593608514",
-    "last_run": "28738115294",
+    "last_run": "28827996068",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"

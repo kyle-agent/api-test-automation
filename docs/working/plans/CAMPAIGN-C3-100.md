@@ -241,3 +241,16 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   회수) — 말미 스윕 TTL 정책 or 명시 삭제 스텝 검토. → repair-4. 계정 기준선.
   **다음 슬롯: HB4b(네트워킹 수리 검증 — c2223d75: VPN ip_address · LB 순서
   +IGW · TGW settle · vpce subnet 타입)**.
+- 2026-07-06 23:3xZ **HB4b 종결 — verified store +24 (2265→2289), 수리 루프 2연속
+  실수확**: run 28827996068, 109 obs (ok 58 · soft 51). 검증된 수리: **LB 패밀리
+  돌파**(healthcheck/listener/servergroup 생성·삭제 + members-remove-bulk +
+  show/list — 카탈로그형 키 10건 등재; 순서 수리 + IGW 패턴 유효), TGW
+  vpc-connection 2xx(ACTIVE settle 유효). 잔여: ① VPN create-gateway가 검증
+  통과 후 404 `internet-gateway` 요구 — **VPC에 IGW 필요**(LB와 동일 패턴,
+  즉시 수리 가능); ② TGW firewall/routing children은 vpc-connection 후 재차
+  `not-active` — **connection 후 settle 추가 필요**; ③ LB members-add 403
+  `InvalidVmI…`(실 VM 필요 — VS 동승 배치로), members-set/remove-single은
+  add 실패 캐스케이드; static-nat 404(선행 요건 재조사); show-lb-certificate
+  404(cert 필요 — 기존 W 분류대로 selfsign 동승). → repair-5. backup 패밀리는
+  이중 차단(FILESYSTEM=agent waiver · VM_IMAGE=create-500 PF) 확정 — waiver
+  레저로 이동(repair-log §HB3b-2, 5090eef2).

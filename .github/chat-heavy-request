@@ -1,13 +1,2 @@
-# HB4b (CAMPAIGN-C3-100, 2026-07-06): networking repair-validation re-run.
-# Validates c2223d75 repairs: VPN gateway ip_address (unblocks official phase1/2
-# tunnel values, 8 keys) · LB create-before-healthcheck ordering + IGW for
-# static-NAT (7 keys) · TGW ACTIVE settle-polls (10 keys) · vpc-endpoint
-# VPC_ENDPOINT-type subnet. private-static-nat 403 = entitlement (expected).
-# Lane gates verified: HB3b concluded+folded(+13 keys), boot-volume force-swept,
-# owned==1 muted known-stuck log-group only, no active workflow runs.
-action=run
-mutations=true
-destructive=true
-heavy=true
-crud_ids=networking-loadbalancer-members-nat,networking-vpn-gateway-tunnel,vpc-transit-gateway-children,vpc-endpoint
-parallel=4
+# Lane reset to noop — HB4b (run 28827996068) concluded & folded (+24 keys).
+action=noop
