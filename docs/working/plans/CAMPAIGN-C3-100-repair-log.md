@@ -284,3 +284,59 @@ python -m regression.scenarios.validate
    에서 resource_key 관련 4xx(또는 2xx)로 실제로 바뀌는지 관찰. resource_key
    축(실 FS volume 배선)은 이번 세션 스코프 밖 — 관찰 결과에 따라 별도 세션에서
    `gen-wave5-vpce` 패턴 이식 여부 결정.
+
+---
+
+# §HB3b-2 — compute-virtualserver-full 잔여 3서명 + boot volume 스윕 정책 (2026-07-06, OFFLINE)
+
+> 배경: `docs/working/plans/CAMPAIGN-C3-100.md` 진행 로그 "HB3b 종결 — 수리
+> 루프 첫 실수확: verified store +13 (2252→2265)" — run 28766151214 (success
+> 44m, 108 obs: ok 97 · soft 11 · fail 0)에서 HB3b(2026-07-05) 수리 3건은
+> 실제로 검증되었으나(create-port/map-sg/delete-port 2xx, delete-server
+> 무400, backup-target poll 통과) 잔여 3서명 + 스윕 정책 1건이 새로 확인된
+> 세션. **라이브 SCP 호출 없음**(HB4b heavy run이 레인 점유 중이라 오프라인
+> 전용). 실검증은 다음 HEAVY 디스패치가 담당.
+>
+> 산출물: `regression/scenarios/scenarios.json` (compute-virtualserver-full의
+> image-update / create-port+attach-port-to-server(+신규 create-port-subnet/
+> wait-port-subnet) / 신규 delete-boot-volume 4곳) + `knowledge/services.md`
+> (storage/backup 섹션 REVISED 항목 + compute/virtualserver 섹션 4건 추가) +
+> 본 섹션. `generated__heavy-backup.json`은 **의도적으로 변경하지 않음**(항목
+> 1 참조 — 조사 결과 파라미터 문제가 아님이 확인되어 수리 대상이 아님).
+> `python -m regression.scenarios.validate` → **244 lifecycle(s) checked · 0
+> error(s) · 5 warning(s)** (5개 경고는 이전 HB1/HB3b/HB4b 세션과 동일한
+> 무관 항목 — diff로 확인).
+
+## 항목별 상태
+
+| # | 갭 (HB3b job-log 진단, run 28766151214) | 상태 | 수리/조사 내용 | 근거 |
+|---|---|---|---|---|
+| 1 | `gen-heavy-backup` create-backup-target: 서버 ACTIVE 후에도 `{"contents":[],"count":0}` 지속 — HB3b의 `$.count until 1` 폴이 300s 전체 소진(observations의 `wait-server`→`create-backup-target` 타임스탬프 간격 ≈303s vs 스텝 자체 `elapsed_ms`≈828ms로 폴 소진 확정) | **수정 안 함 — 조사 결과 blocked (product-bug + owner-waiver 이중 차단), 가설 창작 금지 지시 준수** | `knowledge/formal/resources/storage__backup.yaml` line 40에 이미 기록된 사실을 이번에 이 증상과 연결: `policy_type=FILESYSTEM`은 **Agent형** 백업 카테고리 — 서버에 Backup Agent가 설치/구성되어야만 대상 목록에 나타남("Agent backups require prior agent creation and configuration on target servers"). agent 계열 8 ops는 owner waiver(2026-06-10 "agent 없는 백업으로만")라 이 계정/런은 절대 agent를 설치하지 않으므로 `contents:[]`는 **정상 응답**이지 타이밍/파라미터 버그가 아님. 우리가 원하는 agentless 경로의 올바른 쿼리는 `policy_type=VM_IMAGE`이지만 이건 별도의 기지(旣知) 제품버그(500 `ContactAdminForAssistance`, `data/baselines/known_issues.json`, 2026-06-20 확정)로 막혀있음. **결론: 현재 이 계정 상태로는 어떤 쿼리 파라미터 조합도 agentless 목표에 맞는 non-empty 응답을 줄 수 없다** — 새 근거(VM_IMAGE 500 해소 또는 agent waiver 해제) 없이는 재시도 금지. `$.count until 1` 폴은 그대로 둠(무해 — VM_IMAGE 버그가 언젠가 풀리면 `policy_type`만 바꿔도 그대로 작동할 self-healing 코드이므로) 단 이게 실제 수리가 아님을 `knowledge/services.md`에 명기. | `data/api_docs.json` storage/backup/getbackuptargetlist 쿼리 파라미터 전수 확인(server_name/server_category/policy_type/region/page/size — 우리가 이미 전부 정확히 사용 중, 추가 파라미터 없음). `knowledge/formal/resources/storage__backup.yaml` L10-18, L40. `data/baselines/known_issues.json` `storage/backup/getbackuptargetlist`. `reports/results/hb3b/observations-gw0.jsonl` 타임스탬프 대조로 폴 소진 확정. |
+| 2 | `compute-virtualserver-full` image-update 400 `Image with volumes cannot update min disk`(HB3b의 min_disk:104 수리가 무효 — 값이 아니라 **범주적** 거부, 다른 메시지) | **수리됨** | `min_disk` 키를 body에서 완전히 제거. `data/api_docs.json` `compute/virtualserver/imagesetrequest`(PUT body 모델)의 필드는 `min_disk`/`min_ram`/`protected`/`visibility` 4개뿐 — `description` 필드 자체가 모델에 없음(과제 지시가 예시로 든 필드가 이 모델엔 부재). 안전한 대체로 `visibility:"private"`(문서 enum `private\|shared`, 기존값 유지라 부작용 없음)를 min_ram/protected와 함께 전송. | `data/api_docs.json` models `compute/virtualserver/imagesetrequest` 필드 전수(4개, description 없음 확인). run 28766151214 job-log 에러 문자열 자체("Image with volumes cannot update min disk")가 범주적 거부임을 직접 증거(HB3b의 값-일치 가설을 반증). |
+| 3 | `compute-virtualserver-full` attach-port 400 `VirtualServer.CreateInterface.Duplicated`(서버가 이미 `{subnet_id}`에 인터페이스 보유 — create-port/attach-port-to-server 둘 다 서버 자신의 subnet을 참조하고 있었음) | **수리됨** | `vs-port` 그룹에 신규 `create-port-subnet`(같은 VPC 안 `10.135.3.0/24`, 자체 cleanup) + `wait-port-subnet` 스텝 추가, `create-port`/`attach-port-to-server`의 `subnet_id`를 `{subnet_id}`→`{port_subnet_id}`로 교체. 이 lifecycle엔 DB엔진 `-full` 계열의 `adopt: subnet#db` 같은 공유 2번째 subnet이 없음을 먼저 확인(grep으로 전 파일 대조) — 그래서 그룹 전용 신규 subnet을 저작(그룹 실패 시 `_teardown_group`이 이 subnet도 즉시 회수하도록 cleanup 등록). | `regression/scenarios/scenarios.json` 내 기존 `adopt: subnet#db` 사용처 전수 확인(database `-full` 계열/eventstreams만 해당, compute-virtualserver-full엔 없음). `create-server`의 `networks[].subnet_id`가 `{subnet_id}`와 동일함을 코드로 대조 — 곧 서버 자신의 boot NIC가 이미 그 subnet에 있다는 직접 증거. |
+| 4 | boot volume이 `delete-server` 이후에도 말미 sweep을 2연속 생존(수동 `SCP_SWEEP_IGNORE_TTL=true` 회수 반복) | **수리됨(lifecycle 명시 삭제 스텝 추가) — (b) 워크플로 TTL 변경은 검토 후 기각, 문서 권고만** | (a) 채택: `wait-server-gone`(서버 404 확인) 직후 신규 `delete-boot-volume` 스텝 추가, 기존에 있었지만 아무 데도 쓰이지 않던 dead capture `boot_vol_id`(`capture-server-volume`의 `$.volumes[0].id`)를 사용. `optional:true` + `expect_status`에 400/404 포함(카스케이드가 이미 회수했거나 detach 중이어도 lifecycle을 절대 실패시키지 않음). (b) 기각: 말미 sweep을 무조건 `SCP_SWEEP_IGNORE_TTL=true`로 돌리는 안은 **검토 후 채택하지 않음** — `cleanup/reconciler.py _is_deletable`의 TTL은 정확히 "동시에 실행 중인 다른 에이전트의 아직 살아있는 자원"을 보호하는 장치(owner-tag는 있되 만료 전인 리소스는 스킵)이므로, 이걸 통째로 끄면 동시 실행 중인 다른 캠페인 에이전트의 리소스를 오삭제할 위험이 생김(VPC budget이 동시 5개 에이전트에 걸쳐 공유된다는 세션 브리프 규칙과 직접 충돌). `.github/` 워크플로 자체는 이번 세션에서 손대지 않음(지시 준수) — 대신 이 문서에 "sweep을 IGNORE_TTL로 바꾸지 말 것"이라는 권고만 남김. | `cleanup/reconciler.py` `_is_deletable`(L98-131) 코드 확인: `has_tag` 분기의 own-run 예외(`RUN_KEY` 일치 시 TTL 무시)가 있지만, 말미 sweep이 원본 테스트 job과 별도 job/run-id 컨텍스트로 돈다면 `APITEST_RUN_ID` 불일치로 이 예외가 적용되지 않을 수 있음(정확한 원인은 라이브 job 구조 확인 필요 — 오프라인이라 재현 못 함, 그래서 근본원인 대신 "가장 안전한 최소 수정"인 명시적 delete를 택함). `create-server`의 `volumes[0].delete_on_termination:true`가 실제로는 sweep 시점까지 항상 완료를 보장하지 않는다는 것이 이번 관측(2연속 생존)의 직접 증거. |
+
+## 검증 명령 재현
+
+```
+python -m regression.scenarios.validate
+# -> 244 lifecycle(s) checked · 0 error(s) · 5 warning(s)  (5개는 이전 세션과 동일한 기존/무관 경고, diff로 확인됨)
+```
+
+## 남은 작업 (다음 HEAVY 디스패치용)
+
+1. `compute-virtualserver-full` 재디스패치 — 항목 2(image-update)·3(attach-port
+   +port-subnet)·4(delete-boot-volume) 3건이 실제로 2xx/생존-0 으로 전환되는지
+   확인. 특히 4번은 말미 sweep 로그에서 IGNORE_TTL 수동 개입이 더 이상
+   필요 없는지 관찰.
+2. `gen-heavy-backup`은 **재디스패치해도 이번 세션 수정분이 없으므로** 현재
+   상태(FILESYSTEM 빈 목록 + VM_IMAGE 500) 그대로일 것으로 예상 — 항목 1의
+   이중 차단(product-bug + owner-waiver) 중 하나가 해소되기 전까지는 신규
+   커버 기대하지 않음. 다음 세션이 재조사할 경우 "agent waiver 해제 후 실제
+   agent 설치가 API로 완결 가능한지"(현재 문서상 "게스트 OS 안에서 설치
+   파일 실행/구성 필요"로 API 완결 불가로 기록됨, `knowledge/formal/
+   resources/storage__backup.yaml` L35) 재확인부터 시작할 것.
+3. sweep의 TTL 정책 자체를 바꿀 필요가 있다고 판단되면(예: 항목 4의 lifecycle
+   수정 후에도 다른 리소스 종류에서 유사 증상 재발), `.github/` 워크플로
+   수정은 오케스트레이터/owner 승인을 받아 별도 세션에서 진행 — 이번 세션은
+   권고만 남김(위 표 항목 4 참조).

@@ -52,6 +52,50 @@ duplicating. Add a new `##` section when you take on a new service.
   `compute-virtualserver-full` creates its boot volume at `size:104` but the
   `image-update` step sent `min_disk:100` — bumped to `104` to match. Not yet
   re-verified live.
+- **image-update `min_disk` is CATEGORICALLY rejected, not value-tunable**
+  (HB3b-2, 2026-07-06, run 28766151214): the `min_disk:104` fix above (matched
+  to the source volume size) still 400s, but with a DIFFERENT message this
+  time: `Image with volumes cannot update min disk` — an outright rejection
+  of the `min_disk` field on any image whose source had attached volumes (this
+  lifecycle's custom image is such a snapshot), independent of the value sent.
+  `data/api_docs.json` `compute/virtualserver/imagesetrequest` (the PUT body
+  model) has exactly 4 fields — `min_disk`, `min_ram`, `protected`,
+  `visibility` — no `description` field exists on this model (unlike some
+  other services' update bodies). Fixed `compute-virtualserver-full`'s
+  `image-update` step (`regression/scenarios/scenarios.json`) to drop
+  `min_disk` entirely and send `{min_ram, protected, visibility:"private"}`
+  instead. Not yet re-verified live.
+- **attach-port `VirtualServer.CreateInterface.Duplicated`** (HB3b-2,
+  2026-07-06, run 28766151214): `compute-virtualserver-full`'s standalone
+  `create-port`/`attach-port-to-server` steps pointed the new port at
+  `{subnet_id}` — the SAME subnet the server's own boot NIC already lives on
+  (`create-server`'s `networks[].subnet_id`) — so attaching a second interface
+  there is a genuine duplicate, not a param bug. This lifecycle has no
+  existing second/shared subnet (checked — no `adopt: subnet#db` pattern here,
+  unlike the DB-engine `-full` lifecycles). Fix: added a dedicated
+  `create-port-subnet` step (own subnet in the same VPC, `10.135.3.0/24`,
+  scoped to the `vs-port` group with its own cleanup) and repointed
+  `create-port`/`attach-port-to-server`'s `subnet_id` at the new
+  `{port_subnet_id}`. Not yet re-verified live.
+- **Boot volume TTL-survives the final sweep** (HB3b-2, 2026-07-06, run
+  28766151214): `compute-virtualserver-full`'s server (`delete_on_termination:
+  true` on its boot volume) left the boot volume behind after `delete-server`
+  succeeded — the account-wide sweep at the end of the chat-heavy job could not
+  reclaim it TWICE in a row (needed a manual `SCP_SWEEP_IGNORE_TTL=true` rescue
+  both times), meaning `delete_on_termination`'s async cascade doesn't reliably
+  finish before that final sweep pass runs. `capture-server-volume`
+  (`$.volumes[0].id` → `boot_vol_id`) was already in the lifecycle but was a
+  DEAD capture (nothing consumed it). Fixed: added an explicit
+  `delete-boot-volume` step right after `wait-server-gone` (404-confirmed)
+  using `{boot_vol_id}`, `optional:true` + `expect_status` including 400/404 so
+  a volume the cascade already reaped, or one still mid-detach, never fails
+  the lifecycle. Considered (and rejected) forcing the workflow's *final*
+  sweep to `SCP_SWEEP_IGNORE_TTL=true` unconditionally instead — rejected
+  because the TTL is exactly what protects OTHER concurrently-running agents'
+  still-live resources from a cross-run reap (`core.registry`/
+  `cleanup/reconciler.py _is_deletable`); an explicit in-lifecycle delete is
+  the safe fix, a blanket IGNORE_TTL sweep is not. `.github/` workflow files
+  were not touched (out of scope). Not yet re-verified live.
 
 ## compute / virtualserver — autoscaling
 
@@ -160,18 +204,45 @@ lifecycle `heavy-asg-full-coverage` in
   `?backup_name=regrtest` → `{"result":false}`.
 - **listbackups** list envelope: `{contents:[], count}` (NOT `{backups:[], ...}`).
 - **createbackup** returns 500 `ContactAdminForAssistance` — product-bug (baselined).
-- **getbackuptargetlist inventory-registration lag** (HB3, run 28723287734,
-  2026-07-05): even with `policy_type=FILESYSTEM` (the only usable value —
-  VM_IMAGE 500s), `GET /v1/backups/backup-targets?...&server_name=<own
-  server>` right after the server flips ACTIVE can still return 200 with
-  `contents:[]` — the server hasn't been indexed as a backup target yet. Fix
-  (`regression/scenarios/lifecycles/generated__heavy-backup.json`
-  `create-backup-target` step, HB3b): poll on `$.count` (not the uuid — the
-  engine's poll only does exact-value equality, `count` is the one field
-  whose target value is *predictable*, `until:[1]`) instead of a single shot.
-  Response schema per `data/api_docs.json` confirms top-level `count` +
-  `contents[].{server_uuid,server_guid,server_name}`. NOT yet re-verified
-  live (this fix was authored offline, HB3b session).
+- **getbackuptargetlist EMPTY for FILESYSTEM is NOT a timing lag — REVISED
+  2026-07-06 (HB3b-2, run 28766151214 job log)**: the HB3b (2026-07-05)
+  hypothesis below ("inventory-registration lag", fixed with a `$.count until
+  1` poll) was tested live in run 28766151214 and FALSIFIED — the poll ran
+  its full 300s budget (confirmed via the ~303s gap between `wait-server`'s
+  and `create-backup-target`'s timestamps in
+  `reports/results/hb3b/observations-gw0.jsonl`, vs. the step's own last-call
+  `elapsed_ms` of only ~828ms) and `count` never left 0. Root cause per
+  `knowledge/formal/resources/storage__backup.yaml` line 40 (already
+  documented, just not connected to this symptom until now): `policy_type=
+  FILESYSTEM` is the **Agent-type** backup category — a server only appears
+  in that list once a Backup Agent is installed/configured on it ("Agent
+  backups require prior agent creation and configuration on target
+  servers", userguide overview). The agent family (8 ops, incl.
+  createbackupagent) is an **owner WAIVER** (2026-06-10, "agent 없는 백업으로만"
+  — `data/baselines/coverage_waivers.json`), so this account/run deliberately
+  never installs an agent on the test VM — `contents:[]` for FILESYSTEM is
+  therefore the CORRECT, expected response, not a bug or a race. The
+  semantically-right query for our AGENTLESS goal is `policy_type=VM_IMAGE`,
+  which is blocked by a separate, already-baselined product bug (500
+  `ContactAdminForAssistance`, `data/baselines/known_issues.json`
+  `storage/backup/getbackuptargetlist`, confirmed 2026-06-20). **Net: there is
+  currently no live query-parameter combination that returns non-empty
+  contents for our agentless-VM backup chain** — this is a genuine
+  product-bug + owner-waiver double-block, not a fixable param/timing issue.
+  Do not re-attempt a param tweak here without new evidence (e.g. the
+  VM_IMAGE 500 clearing, or the agent waiver being lifted). The `$.count
+  until 1` poll in `generated__heavy-backup.json`'s `create-backup-target`
+  step is left in place (harmless — it still returns the correct 200/empty
+  response after its timeout, and would self-heal for free if the VM_IMAGE
+  bug is ever fixed and the step's `policy_type` is swapped back to
+  VM_IMAGE) but is NOT the actual fix for this gap.
+- **(superseded) getbackuptargetlist inventory-registration lag** (HB3, run
+  28723287734, 2026-07-05): even with `policy_type=FILESYSTEM`, `GET
+  /v1/backups/backup-targets?...&server_name=<own server>` right after the
+  server flips ACTIVE can still return 200 with `contents:[]`. HB3b guessed
+  this was a registration-lag race and added a `$.count until 1` poll — HB3b-2
+  above shows the real cause is the FILESYSTEM/agent-waiver interaction, not
+  timing. Kept here for history only.
 
 ## storage / archivestorage
 
