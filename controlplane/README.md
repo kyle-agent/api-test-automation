@@ -18,18 +18,21 @@ run 레코드/스케줄/UI는 두 모드에서 동일합니다. Docker Compose �
 ## IA — 두 런타임 (2026-06-17 reorg)
 
 정보 구조(IA)의 단일 소스는 **`docs/working/plans/PLATFORM-IA-DIRECTION.md`**
-§"✅ 확정 IA (2026-06-26)" 입니다 (오너 확정: **`Catalog · Modeling · Testing ·
-Reporting`**; 구 `docs/IA.md`는 SUPERSEDED). 두 런타임으로 깔끔히 분리됩니다:
+§"✅ 확정 IA (2026-06-26)" + **§"개정 (2026-07-07)"** 입니다 (오너 확정 후 개정:
+Catalog는 네비 단계에서 우측 유틸 링크로, Modeling이 흡수; 구 `docs/IA.md`는
+SUPERSEDED). 두 런타임으로 깔끔히 분리됩니다:
 
 - **정적 대시보드** (GitHub Pages, 면②) — 공개 커버리지·conformance.
   `dashboard/build.py`가 한 번만 렌더하고, `ops.html`이 라이브 ops를 보여줌.
-- **라이브 control plane** (이 서버, 면①) — 4단계 작업 콘솔.
+- **라이브 control plane** (이 서버, 면①) — 3단계 작업 콘솔.
 
-상단 네비게이션은 **`Catalog · Modeling · Testing · Reporting (+ Knowledge)`**
-입니다 — ① 엔드포인트 인벤토리(카탈로그 RO) → ② 테스트 모델 저작(모델 지도·
-노드 편집) → ③ 실행(Test Planning · Test Execution = console2) → ④ 평가
-(커버리지·runs·triage,
-면② 링크아웃). 헤더의 장식용 환경/스위트 셀렉트는 제거됐고(ctxbar는 발행
+상단 네비게이션은 **`Modeling · Testing · Reporting (+ Knowledge · 🤖AI ·
+📖 카탈로그 · 📊 대시보드)`** 입니다 — ① 테스트 모델 저작(모델 지도·노드 편집,
+서비스 그룹 행에 카탈로그 엔드포인트 인라인: "API N (모델됨 M · 미모델 K)" 집계
++ 드로어) → ② 실행(Test Planning · Test Execution = console2) → ③ 평가
+(커버리지·runs·triage, 면② 링크아웃). 엔드포인트 인벤토리(`/catalog`, RO)는
+우측 유틸 **📖 카탈로그** 링크의 참조 화면으로 유지됩니다.
+헤더의 장식용 환경/스위트 셀렉트는 제거됐고(ctxbar는 발행
 스냅샷 상태만 표시), 정식 Report가 표준이라 bare `/runs` 리디렉트는 **제거**
 됐습니다(`/runs/{id}` 상세는 유지).
 

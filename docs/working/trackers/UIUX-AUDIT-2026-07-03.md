@@ -246,3 +246,16 @@ E(runtime 신선도) 부분 · F(클린업 힌트류) 합격 — C(지연 재스
 부수 확인: run 결과 6/7 passed — `delete-server` 400
 `VirtualServer.InvalidVirtualServerState.DeleteImpossible` **전일과 동일 재현**
 (백엔드 이슈, known-issue 후보). 최종 잔존 0건(독립 프로브 확정).
+
+### 6-1. 오너 피드백 추가분 + IA 개정 구현 (2026-07-07, append-only — P2C 번호 승계)
+
+> 오너 결정(세션 대화): **"Modeling이 Catalog를 흡수"** — 상세 근거·정본은
+> `docs/working/plans/PLATFORM-IA-DIRECTION.md` §개정 (2026-07-07). 함께 접수된
+> Modeling 표 CX 피드백 3건을 같은 배치로 수정.
+
+| ID | 심각도 | 발견 | 수정 상태 |
+|---|---|---|---|
+| P2C-14 | IA | Catalog가 최상위 네비 단계로는 약함 — 데이터(분모·미모델 질의·conformance 단위)로는 필수지만 사용자는 "목록 훑기"가 아니라 "모델링/검증"에서 시작 | ✅ 구현 (d7e56c92 + a241d777 — 네비 3단계 `Modeling→Testing→Reporting`, Catalog는 우측 유틸 📖 링크(라우트·딥링크 유지), 홈 파이프라인 4→3칸, Modeling 서비스 행에 "API N (모델됨 M · 미모델 K)" 집계 + htmx lazy 엔드포인트 드로어(모델됨→노드 편집 딥링크), 애매 매핑은 '미매핑' 별도 버킷으로 과대계상 방지 — 규칙: `controlplane/resource_routes.py` 주석; 회귀 테스트 9c7d026d) |
+| P2C-15 | 불편 | Modeling 표의 카테고리 접힘 행이 colspan 셀 안 '작은 카드'처럼 떠 보임 | ✅ 수정 (4e483c2e — 전폭 그룹 헤더 행: 배경 줄무늬·좌 캐럿·집계 우측 정렬, 표 문법·접기/세션 기억 유지) |
+| P2C-16 | 라벨 | 표 컬럼 과밀·은어 — code/opt 컬럼이 판단에 기여 없음, provenance 헤더 비직관, 헤더 툴팁 부재 | ✅ 수정 (4e483c2e — code→id 셀 툴팁·검색 인덱스, opt 컬럼 제거(편집 화면에 이미 있음), provenance→'검증상태', 4개 헤더 title 툴팁 + 표 상단 한 줄 범례) |
+| P2C-17 | 라벨 | 그래프 토글 '그림 (의존 그래프)'이 용도를 안 알림 | ✅ 수정 (4e483c2e — '의존 그래프 (영향 파악)' + 패널 캡션 "노드를 건드리기 전 영향 범위를 보는 뷰 — 편집은 표에서", 기능 변경 없음) |
