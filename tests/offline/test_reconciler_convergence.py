@@ -466,6 +466,43 @@ def test_deleting_tgw_not_redeleted_and_counts_in_progress():
         "both the TGW and its connection count as in-progress"
 
 
+def test_is_tgw_settling_predicate():
+    """CREATING/EDITING are transitional-not-yet-deletable; ACTIVE/ERROR are
+    the only DELETE-acceptable states (live error string: 'Transit Gateway
+    state is not deletable state(Active, Error)'); an already-DELETING item is
+    left to _is_async_deleting, not double-counted here."""
+    assert recon._is_tgw_settling({"state": "EDITING"})
+    assert recon._is_tgw_settling({"state": "CREATING"})
+    assert not recon._is_tgw_settling({"state": "ACTIVE"})
+    assert not recon._is_tgw_settling({"state": "ERROR"})
+    assert not recon._is_tgw_settling({"state": "DELETING"})  # _is_async_deleting's turn
+    assert not recon._is_tgw_settling({})
+
+
+def test_editing_tgw_delete_skipped_and_counts_in_progress():
+    """REPAIR 2026-07-07 (HB4b-2 item 5): a TGW settling in EDITING (e.g. right
+    after its own create, or after a vpc-connection create/delete flips it back
+    from ACTIVE) must NOT have its DELETE attempted this round — it would just
+    400 'not deletable state(Active, Error)', and unlike DELETING that 400 was
+    never counted in-progress, so a sweep whose only remaining owned item was
+    such a TGW converged ('stop') one round before it would have settled
+    (2026-07-06 HB4b run 28827996068: final sweep left the TGW+VPC pair for a
+    human FORCE re-sweep hours later)."""
+    tgw = _owned("regrtgw-e", id="tgw-e", state="EDITING")
+    client = FakeClient(lists={
+        "/v1/transit-gateways": [tgw],
+        "/v1/transit-gateways/tgw-e/vpc-connections": [],
+    })
+    recon._INPROGRESS_THIS_ROUND[0] = 0
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    assert "/v1/transit-gateways/tgw-e" not in seq, \
+        "an EDITING TGW's doomed-to-400 DELETE must not even be attempted"
+    assert recon._INPROGRESS_THIS_ROUND[0] >= 1, \
+        "the settling TGW must count as in-progress so the round loop waits " \
+        "instead of converging early"
+
+
 def test_vpc_409_with_detectable_holder_single_attempt():
     """A VPC whose delete 409s while an owned TGW's vpc-connection still points
     at it must be attempted ONCE (with a blocked-by line + in-progress defer),

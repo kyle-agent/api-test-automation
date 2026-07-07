@@ -474,6 +474,40 @@ def _is_async_deleting(item: dict) -> bool:
     return False
 
 
+# A transit-gateway's own DELETE is only accepted while its state is ACTIVE or
+# ERROR — live evidence (HB4b repair-log, run 28827996068): "Transit Gateway
+# state is not deletable state(Active, Error)" on a TGW sitting in CREATING/
+# EDITING (the same transitional-non-active class that blocks child writes,
+# CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2 — creating/updating a
+# vpc-connection flips an ACTIVE TGW back to EDITING for a settle window that
+# HAS measured >300s live). Unlike _ASYNC_DELETING_STATES (DELETING/…), this
+# CREATING/EDITING window was NOT counted toward _INPROGRESS_THIS_ROUND by the
+# TGW delete call below (only a 2xx/404 counted as genuine, nothing counted
+# the 400) — so a sweep whose only remaining owned item was a transiently-
+# EDITING TGW (no vpc-connection left for _vpc_409_holder to detect either)
+# could report genuine=0/inprog=0 and converge ("stop") one round before the
+# TGW would have settled, stranding it (and, transitively, its VPC) for a
+# human FORCE re-sweep. _TGW_DELETABLE_STATES is the allow-list from that same
+# live error string.
+_TGW_DELETABLE_STATES = frozenset({"active", "error"})
+
+
+def _is_tgw_settling(item: dict) -> bool:
+    """True when a transit-gateway item's own ``state`` is present but is
+    neither a already-``_is_async_deleting`` state nor a DELETE-acceptable one
+    (ACTIVE/ERROR) — i.e. CREATING/EDITING. Callers should treat this the same
+    as ``_is_async_deleting``: count toward ``_INPROGRESS_THIS_ROUND`` and skip
+    the doomed-to-400 DELETE attempt this round rather than silently letting it
+    fail uncounted."""
+    v = item.get("state")
+    if not isinstance(v, str):
+        return False
+    norm = v.lower().replace(" ", "").replace("_", "").replace("-", "")
+    if norm in _ASYNC_DELETING_STATES:
+        return False  # already handled by _is_async_deleting
+    return norm not in _TGW_DELETABLE_STATES
+
+
 def _delete(client, service, path, json=None):
     key = (service, path, str(sorted((json or {}).items())))
     try:
@@ -1031,6 +1065,20 @@ def run_sweep(client) -> int:
         #    also counted a truthy 409 as a deletion, which inflated `reported`
         #    and helped the premature "converged" stop.
         if _is_async_deleting(it):
+            continue
+        # REPAIR 2026-07-07 (HB4b-2, offline, see CAMPAIGN-C3-100-repair-log.md
+        # #HB4b-2 item 5): a TGW still CREATING/EDITING (settling after its own
+        # create or after a vpc-connection create/delete) 400s "not deletable
+        # state(Active, Error)" on DELETE — that failure was never counted
+        # in-progress, so a sweep whose only remaining item was such a TGW
+        # converged one round early instead of granting the settle time. Skip
+        # the doomed DELETE and count it as in-progress instead, same as
+        # _is_async_deleting.
+        if _is_tgw_settling(it):
+            _INPROGRESS_THIS_ROUND[0] += 1
+            print(f"  transit-gateway {_name_of(it) or tid} ({tid}) state="
+                  f"{it.get('state')} — not yet settled (CREATING/EDITING), "
+                  f"deferring delete to next round")
             continue
         st = _delete(c, "vpc", f"/v1/transit-gateways/{tid}")
         if _is_2xx_or_gone(st):

@@ -262,12 +262,25 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
+          "name": "create-publicip-for-static-nat",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "group": "staticnat",
+          "optional": true,
+          "json": {"description": "API regression public IP for LB static-nat", "type": "IGW", "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"static_nat_publicip_id": "$.publicip.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/publicips/{static_nat_publicip_id}", "service": "vpc"},
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 4): static-nat-create 404s `scp-loadbalancer.loadbalancers.PublicIpNotFound` (\"Public IP '' is not found\") even AFTER the HB4b IGW fix — CONFIRMED from the observation: the body sent `publicip_id:\"\"` BY DESIGN (see this lifecycle's top-level _note, written when there was no real publicip_id available), and `data/api_docs.json` models['networking/loadbalancer/staticnatcreaterequestdetail'] confirms `publicip_id` is the ONLY field and is required:true — so an empty string was always going to 404, independent of IGW timing (the IGW fix was still necessary — it's a separate precondition — but not sufficient on its own). Fix: create a real public IP (pattern lifted verbatim from networking__vpc.json's proven create-publicip-for-nat / create-publicip-for-vip, both `type:IGW` -> `$.publicip.id`), feed its id into static-nat-create. Own capture name (`static_nat_publicip_id`) to avoid clashing with lb-create's own (intentionally empty) `publicip_id` field elsewhere in this file. Grouped+optional (staticnat) — a quota-limited publicip create only skips this NAT family. Teardown deletes the public IP after static-nat-delete (children-first, alongside delete-igw-for-static-nat). UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx."
+        },
+        {
           "name": "static-nat-create",
           "method": "POST",
           "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
           "group": "staticnat",
           "optional": true,
-          "json": {"static_nat": {"publicip_id": ""}},
+          "json": {"static_nat": {"publicip_id": "{static_nat_publicip_id}"}},
           "capture_soft": {"static_nat_id": "$.static_nat.id"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
@@ -280,6 +293,20 @@
           "destructive": true,
           "json": {"static_nat_id_list": ["{static_nat_id}"]},
           "expect_status": [200, 202, 204, 400, 403, 404, 409]
+        },
+        {
+          "name": "delete-publicip-for-static-nat",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/publicips/{static_nat_publicip_id}",
+          "group": "staticnat",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [400, 409],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "Delete the public IP created for static-nat-create, children-first (after static-nat-delete releases it, before delete-igw-for-static-nat/delete-subnet/delete-vpc)."
         },
         {
           "name": "delete-igw-for-static-nat",

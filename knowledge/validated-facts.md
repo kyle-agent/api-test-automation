@@ -1306,6 +1306,29 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   ownership** — selection still goes through `is_owned`/`is_expired`; stuck-tracking only
   suppresses a known-futile retry so the sweep CONVERGES instead of looping to its cap.
 
+- **a transit-gateway "settling" in CREATING/EDITING (not yet ACTIVE/ERROR) was NOT
+  counted in-progress on its own DELETE attempt — a gap distinct from the 2026-07-03
+  DELETING-state fix above (CAMPAIGN-C3-100 repair-log #HB4b-2 item 5, 2026-07-07).**
+  `DELETE /v1/transit-gateways/{id}` only succeeds while `state` is `ACTIVE` or `ERROR`
+  (live error: *"Transit Gateway state is not deletable state(Active, Error)"*) —
+  `CREATING`/`EDITING` are transitional (a TGW re-enters `EDITING` for a settle window
+  after its OWN create, or after a vpc-connection create/delete on it — HB4b-2 item 2,
+  measured >300s live). The reconciler's TGW pass already treated `DELETING`-class
+  states specially (`_is_async_deleting`/`_ASYNC_DELETING_STATES`, the 2026-07-03 fix
+  above) but a 400 from a `CREATING`/`EDITING` TGW fell through to a bare `print()` with
+  NO `_INPROGRESS_THIS_ROUND` increment — so a sweep whose only remaining owned item
+  was a transiently-`EDITING` TGW (its vpc-connection already reaped, so
+  `_vpc_409_holder` no longer protected the VPC either) could report genuine=0/inprog=0
+  and **converge one round before the TGW would have settled**, stranding it (and its
+  VPC) for a human FORCE re-sweep hours later (exactly the 2026-07-06 HB4b incident,
+  run 28827996068 — a manual re-sweep succeeded cleanly once the TGW had settled on its
+  own). Fix: `_is_tgw_settling(item)` (allow-list `{"active","error"}`, deliberately
+  excluding the already-handled `_ASYNC_DELETING_STATES`) — when true, the TGW pass
+  SKIPS the doomed DELETE and counts it in-progress instead, mirroring the precedent
+  `_is_async_deleting` already set for the DELETING state. Offline-tested:
+  `tests/offline/test_reconciler_convergence.py::test_is_tgw_settling_predicate` +
+  `::test_editing_tgw_delete_skipped_and_counts_in_progress`.
+
 ## DBaaS sub-op depth: window-only guarded lifecycles, ExistInprogress pacing, chat-heavy evidence sink (2026-07-02, branch upbeat-ritchie)
 
 > conf: 0.8 · seen: 2026-07-02 · obs: 2 (runs 28595785223 + 28599889165)

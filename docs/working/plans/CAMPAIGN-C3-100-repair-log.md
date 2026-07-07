@@ -340,3 +340,75 @@ python -m regression.scenarios.validate
    수정 후에도 다른 리소스 종류에서 유사 증상 재발), `.github/` 워크플로
    수정은 오케스트레이터/owner 승인을 받아 별도 세션에서 진행 — 이번 세션은
    권고만 남김(위 표 항목 4 참조).
+
+---
+
+# §HB4b-2 — networking/vpn·vpc(TGW)·loadbalancer 재수리 + reconciler TGW settle 갭 (2026-07-07, OFFLINE)
+
+> 배경: `docs/working/plans/CAMPAIGN-C3-100.md` 진행 로그 "HB4b 종결" — run
+> 28827996068 (109 obs: ok 58 · soft 51)의
+> `reports/results/hb4b/observations-gw*.jsonl` note 필드 오류 전문 + `ts` 타임스탬프
+> 간격을 원인 확정 증거로 사용. **라이브 SCP 호출 없음**(HB5 heavy run이 레인
+> 점유 중이라 오프라인 전용). 실검증은 다음 HEAVY 디스패치가 담당. 오너 지시
+> "오류난 건은 원인확인 필요" 준수 — 각 건 아래 표의 "증거" 열이 관측
+> 원본/문서 근거, 근거 없이 수리한 항목 없음.
+>
+> 산출물: `regression/scenarios/lifecycles/networking__vpn.json` (IGW 3단 +
+> teardown) · `regression/scenarios/lifecycles/networking__vpc.json` (TGW
+> vpc-connection capture-key 수정 3건 + 신규 settle-poll) ·
+> `regression/scenarios/lifecycles/networking__loadbalancer.json`
+> (static-nat용 실 public IP 발급) · `cleanup/reconciler.py` (+
+> `tests/offline/test_reconciler_convergence.py` 신규 테스트 2건) ·
+> `knowledge/services.md`(networking/vpn·vpc·loadbalancer 섹션) ·
+> `knowledge/validated-facts.md`(reconciler TGW settle 갭) · 본 섹션.
+> `python -m regression.scenarios.validate` → **244 lifecycle(s) checked · 0
+> error(s) · 5 warning(s)** (5개 경고는 이전 HB1/HB3b/HB4b 세션과 동일한
+> 무관 항목 — 이번 세션에서 수정한 4개 파일과 무관함을 diff로 확인).
+> `python -m pytest tests/offline` → 449 passed + 3 failed(모두 이번 변경과
+> **무관한 기존 실패** — `git stash`로 변경 전 상태에서도 동일하게 실패함을
+> 확인: `test_docs_index.py::test_index_is_up_to_date`,
+> `test_validate_dag.py::test_real_graph_is_a_complete_dag`,
+> `test_validate_dag.py::test_main_check_returns_zero_on_complete_graph` — DAG
+> 정합성/문서 인덱스 이슈로 이번 네트워킹 lifecycle 변경과 무관, 손대지 않음).
+
+## 원인확인 + 조치 표
+
+| # | 증상 | 원인(증거) | 조치 |
+|---|---|---|---|
+| 1 | `networking-vpn-gateway-tunnel:create-vpn-gateway` 404 `scp-network.vpn-gateway.internet-gateway-not-found` | 관측 note 전문: `"Cannot found the Internet Gateway on VPC(58da5a4d...)."` — VPC에 IGW가 없다는 요건이 에러 코드/문구로 직접 확정(추정 아님). `data/api_docs.json`에 IGW 1개/VPC 카디널리티 제한 서술은 없음; 반면 같은 shared VPC에 이미 IGW를 붙이는 **검증 전례 2건**(networking/vpc의 create-internet-gateway-for-nat, 2026-06-23 라이브 CONFIRMED; networking/loadbalancer의 create-igw-for-static-nat, HB4b 오프라인 수리)이 하드 충돌 보고 없이 존재 — 신규 리스크 등급이 아니라고 판단, **자체 VPC 전환은 기각**(VPC 예산 cap 5 낭비, 커버리지 이득 없음). | `networking__vpn.json`에 `create-igw-for-vpn`/`wait-igw-for-vpn-active`/`set-igw-for-vpn` 3단(create-igw-for-static-nat 패턴 이식) + `delete-igw-for-vpn` teardown 추가. group `vpn` + optional + 4xx/409 허용 유지 — 충돌 발생 시 이 family만 soft-fail, 다른 동시 lifecycle의 IGW를 침범하지 않음. **라이브 미검증.** |
+| 2a | `vpc-transit-gateway-children`의 firewall/routing-rule/uplink-routing-rule/set 400 `not-active-state:(EDITING)` — `create-tgw-vpc-connection` **성공(202) 직후** 발생 | 관측 타임스탬프 대조로 확정: `wait-tgw-active` 200(ts …894) → `create-tgw-vpc-connection` 202(ts …897, +3s) → GET 3개(읽기 전용, 문제없음) → `create-tgw-firewall` 400(ts …904, connection 생성 후 겨우 ~7s). TGW가 이미 ACTIVE였다가 connection 생성 자체가 다시 EDITING으로 되돌린다는 것을 시간차로 직접 증거(추정 아님) — HB4b 오너 가설("vpc-connection 후 재전이")과 일치. | `create-tgw-vpc-connection` 뒤에 `wait-tgw-active-after-connection`(기존 `wait-tgw-active`와 동일 field/until/give_up_status poll) 신규 삽입, 이후 모든 child create 앞에 위치. |
+| 2b | `delete-tgw-vpc-connection` 400 `not-in-vpc-connection` — 에러 본문에 **미치환 리터럴 `{vpc_connection_id}`**가 그대로 노출 | 오너 지시는 "2a와 동일 처리(TGW non-active)"였으나, 에러 문구의 리터럴 placeholder 자체가 **capture_soft 실패**(TGW 상태와 무관)를 직접 증거함 — 가설을 관측으로 반증하고 실제 원인을 재확정. `data/api_docs.json` `createtransitgatewayvpcconnection`의 `response_example`은 `transit_gateway_vpc_connection.id`로 감싸는데(문서 확인), lifecycle의 `capture_soft`는 `$.vpc_connection.id`를 사용 중이었음 — 키 자체가 틀림. | `capture_soft`를 `$.transit_gateway_vpc_connection.id`로 정정. 같은 패턴으로 `create-tgw-routing-rule`/`create-tgw-uplink-routing-rule`의 `capture_soft`도 문서 대조 결과 동일하게 틀려 있어(`$.routing_rule.id` → 실제는 `$.transit_gateway_rule.id`, 양쪽 endpoint 모두 `data/api_docs.json` response_example로 확인) 동일 세션에서 정정. |
+| 3 | `networking-loadbalancer-members-nat:members-add` 403 `scp-loadbalancer.members.InvalidVmInMember` — `"object_id: '', ip: '10.124.0.31'"` | 관측 note 전문이 실 VM object_id 요건을 직접 명시(빈 문자열이 거부됨). 이 lifecycle은 VM을 만들지 않음 — cross-service(compute/virtualserver) 선행 자원이 필요. | **수정 안 함 — 조사만, 판단 근거는 아래.** (a) cross-lifecycle capture 불가 확인: repo 전체에서 `"adopt"` 값은 `vpc`/`subnet`/`subnet#db` 3종뿐(grep 전수 확인) — `shared_infra.py`의 아웃오브밴드 프로비저닝(`.github/workflows/api-test.yml`이 pytest 시작 전에 실행, `SCP_SHARED_VPC_ID`류를 export)과 동일한 방식으로 VM을 공유하려면 엔진 변경 + `.github/` 변경이 모두 필요(이번 세션 금지 대상). (b) LB lifecycle 안에 자체 VM 클로저를 넣는 안은 기술적으로 가능하나, `compute-virtualserver-full` 자체가 port/volume/image 엣지케이스로 오프라인 수리 3라운드(HB3/HB3b/HB3b-2)를 거쳤을 만큼 그 create-server 바디 자체가 불안정 이력이 있어, 이미 34-엔드포인트급인 LB lifecycle에 동일 취약 클래스를 이식하는 비용(실 컴퓨트 과금 + 수분 대기 + 오프라인 미검증 리스크) 대비 이득(members 4종만)이 낮다고 판단. **권고**: (i) `shared_infra.py`+워크플로에 `SCP_SHARED_VM_ID`류를 추가해 `"adopt":"server"`를 엔진 1급 기능으로 만들거나, (ii) 다음 heavy 배치에서 이 LB lifecycle을 `compute-virtualserver-full`과 같은 배치에 넣고 그 run의 `server_id` 캡처가 라이브로 증명된 뒤 별도 소규모 오프라인 세션에서 `"adopt":"server"`를 이식 — 둘 중 오너 승인 필요, 이번 세션은 미실행. |
+| 4 | `networking-loadbalancer-members-nat:static-nat-create` 404 `scp-loadbalancer.loadbalancers.PublicIpNotFound` — `"Public IP '' is not found."` | 관측 note가 빈 문자열 public IP를 직접 명시. IGW 수리(HB4b)는 여전히 필요하지만 충분조건이 아니었음 — `data/api_docs.json` `staticnatcreaterequestdetail` 모델은 `publicip_id`가 유일 필드이자 `required:true`인데 body가 의도적으로 `""`(당시 실 IP 확보 수단이 없어 설계된 상태, lifecycle 자체 주석에 명시)를 보내고 있었음. | `create-publicip-for-static-nat`(`type:IGW`, networking/vpc의 검증된 create-publicip-for-nat/for-vip 패턴 이식) 신규 추가 → `$.publicip.id`를 `static-nat-create`의 `publicip_id`로 주입, teardown에 `delete-publicip-for-static-nat` 추가(static-nat-delete 뒤, delete-igw-for-static-nat와 함께). |
+| 5 | HB4b 말미 스윕이 TGW+VPC 쌍을 못 거둠(수 시간 뒤 수동 재스윕은 성공) | `cleanup/reconciler.py` 코드 확인으로 원인 확정(라이브 재현 불가, 코드 추적만): TGW 자신의 DELETE는 `state`가 `ACTIVE`/`ERROR`일 때만 수락됨(에러 문구 "not deletable state(Active, Error)")인데, 2026-07-03에 추가된 `_is_async_deleting`/`_ASYNC_DELETING_STATES`는 `DELETING`류(철거중) 상태만 in-progress로 집계하고 `CREATING`/`EDITING`(항목 2a처럼 vpc-connection 생성/삭제가 유발하는 재전이)는 집계 대상이 아니었음 — 즉 TGW의 connection이 이미 걷혔는데 TGW 자신이 잠깐 EDITING인 라운드에서 `_vpc_409_holder`도 더 이상 보호하지 않으면 genuine=0/inprog=0으로 수렴("stop") 판정 → 다음 라운드가 없었으면 실제로 남을 수 있는 코드 경로가 확인됨. 이는 워크플로 파라미터(`SCP_SWEEP_NOWAIT` 자체) 문제가 아니라 **리컨실러 TGW 경로의 상태-집계 누락**이라 최소 수정이 자연스러움(.github 불변). | `_is_tgw_settling(item)`(허용 상태 `{active, error}`, `_ASYNC_DELETING_STATES`는 제외) 신규 헬퍼 추가 — TGW 자신의 DELETE 직전에 검사해 참이면 DELETE를 시도하지 않고 `_INPROGRESS_THIS_ROUND`를 증가시켜 다음 라운드를 보장(기존 `_is_async_deleting`과 동일 취급). 오프라인 테스트 2건 추가(`test_is_tgw_settling_predicate`, `test_editing_tgw_delete_skipped_and_counts_in_progress`) — `python -m pytest tests/offline/test_reconciler_convergence.py` 30 passed(신규 2건 포함). |
+
+## 검증 명령 재현
+
+```
+python -m regression.scenarios.validate
+# -> 244 lifecycle(s) checked · 0 error(s) · 5 warning(s)  (5개는 이전 세션과 동일한 무관 경고)
+
+python -m pytest tests/offline/test_reconciler_convergence.py tests/offline/test_reconciler_vpc_prefix.py
+# -> 30 passed
+
+python -m pytest tests/offline
+# -> 449 passed, 3 failed (모두 변경 전에도 동일하게 실패하는 기존 이슈 — git stash로 확인)
+```
+
+## 남은 작업 (다음 HEAVY 디스패치용, 가칭 HB4c/HB5 이후)
+
+1. `networking-vpn-gateway-tunnel` 재디스패치 — IGW 3단 추가 후 create-vpn-gateway가
+   2xx로 전환되는지, 공식 phase1/2 터널 값까지 도달하는지 확인. 동시에 다른
+   IGW-필요 lifecycle(NAT gateway, LB static-nat)과 같은 배치일 때 409 충돌
+   신호가 있는지 관찰(항목 1의 "충돌 없음" 판단 재검증).
+2. `vpc-transit-gateway-children` 재디스패치 — `wait-tgw-active-after-connection`
+   추가 후 firewall/routing-rule/uplink-routing-rule/set/delete가 실제 2xx로
+   전환되는지, capture-key 수정(vpc_connection_id/routing_rule_id/
+   uplink_routing_rule_id) 후 delete 계열이 실 id로 동작하는지 확인.
+3. `networking-loadbalancer-members-nat` 재디스패치 — static-nat-create가 실
+   public IP로 2xx 전환되는지 확인. members-add는 항목 3의 권고(i)/(ii) 중
+   오너가 택한 방향으로 후속.
+4. 다음 말미 스윕에서 TGW+VPC 잔존이 재발하는지 관찰 — 재발하면 항목 5의
+   `_is_tgw_settling` 수정이 충분한지, 아니면 TGW settle 자체가 라운드 예산
+   (`SCP_SWEEP_ROUNDS`/`SCP_SWEEP_INPROGRESS_SLEEP_S`)보다 오래 걸리는 케이스가
+   있는지(그 경우는 워크플로 파라미터 조정 권고 — `.github/` 승인 필요) 구분.

@@ -63,6 +63,46 @@
           "cleanup": {"method": "DELETE", "path": "/v1/publicips/{publicip_id}", "service": "vpc"}
         },
         {
+          "name": "create-igw-for-vpn",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "group": "vpn",
+          "optional": true,
+          "json": {
+            "description": "API regression IGW for VPN gateway",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "tags": [],
+            "type": "IGW",
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"igw_id": "$.internet_gateway.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/internet-gateways/{igw_id}", "service": "vpc"},
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 1): create-vpn-gateway 404s `scp-network.vpn-gateway.internet-gateway-not-found` (\"Cannot found the Internet Gateway on VPC(...)\") — CONFIRMED from the observation's own error body, not a guess. Pattern lifted verbatim from the proven networking__loadbalancer.json create-igw-for-static-nat fix (same live error class, itself lifted from networking__vpc.json's create-internet-gateway-for-nat, CONFIRMED live 2026-06-23) — create IGW on the same (session-shared) VPC, wait ACTIVE, PUT/set it, THEN create-vpn-gateway. CONFLICT CHECK (per task instruction — this lifecycle ADOPTS the shared VPC, does not self-create one, so a concurrently-scheduled heavy lifecycle could try to attach a 2nd IGW to the same VPC at the same time): `data/api_docs.json` has no documented 1-IGW-per-VPC cardinality limit, and TWO other lifecycles already create/attach an IGW on this same shared VPC as an established, previously-proven pattern (networking__vpc.json create-internet-gateway-for-nat, live-CONFIRMED 2026-06-23; networking__loadbalancer.json create-igw-for-static-nat, HB4b OFFLINE repair) without a reported hard collision — so this is not a new risk class. Decided AGAINST switching to a self-created VPC (would add avoidable VPC-budget consumption, cap-5 shared across concurrent agents, for zero coverage benefit): instead this step follows the same defensive convention already used by both precedents — group:vpn + optional + broad expect_status (400/403/404/409/422 all tolerated) so a genuine collision (409 'IGW already exists' or similar) only soft-fails this vpn family (captured, not fatal) exactly like a missing-publicip failure already does, rather than corrupting or blocking any other concurrent lifecycle's own IGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx AND watch for a concurrent-IGW 409 if run alongside the NAT-gateway or LB static-nat lifecycles in the same batch."
+        },
+        {
+          "name": "wait-igw-for-vpn-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{igw_id}",
+          "group": "vpn",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"field": "$.internet_gateway.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10, "give_up_status": [400, 403, 404]}
+        },
+        {
+          "name": "set-igw-for-vpn",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/internet-gateways/{igw_id}",
+          "group": "vpn",
+          "optional": true,
+          "json": {"description": "IGW for VPN gateway (API regression)", "loggable": false},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
           "name": "create-vpn-gateway",
           "method": "POST",
           "path": "/v1/vpn-gateways",
@@ -192,6 +232,20 @@
           "retry_on_status": [409],
           "retries": 8,
           "retry_interval": 15
+        },
+        {
+          "name": "delete-igw-for-vpn",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{igw_id}",
+          "group": "vpn",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [400, 409],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "Delete the IGW created for the VPN gateway, children-first (after delete-vpn-gateway, before delete-publicip/delete-vpc). Retry 400 to ride out the not-deletable-state transition (same quirk CONFIRMED for this endpoint in networking__vpc.json / mirrored in networking__loadbalancer.json's delete-igw-for-static-nat)."
         },
         {
           "name": "delete-publicip",

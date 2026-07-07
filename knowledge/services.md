@@ -394,6 +394,23 @@ lifecycle `heavy-asg-full-coverage` in
   createtransitgateway/showtransitgateway `response_example`) until `ACTIVE` before EVERY child
   op AND again right before delete (children can re-transition the TGW). Fixed OFFLINE
   2026-07-06 in `vpc-transit-gateway-children` (`networking__vpc.json`) — UNVERIFIED LIVE.
+- **`create-tgw-vpc-connection` ALSO re-transitions the TGW to EDITING (CONFIRMED by observation
+  timestamps, HB4b run 28827996068, 2026-07-06):** even after the `wait-tgw-active` settle-poll
+  above, `POST .../vpc-connections` (202) is followed ~7s later (after 3 read-only GETs) by
+  `create-tgw-firewall` 400 `not-active-state:(EDITING)` — the connection create itself flips an
+  ACTIVE TGW back to EDITING for another settle window, same as the initial CREATING one. Fixed
+  OFFLINE 2026-07-07: added `wait-tgw-active-after-connection` (same field/until/give_up_status
+  poll) right after `create-tgw-vpc-connection`, before any further child create.
+- **`createtransitgatewayvpcconnection` / `createtransitgatewayrule` / `createtransitgatewayuplinkrule`
+  response envelopes are NOT `vpc_connection`/`routing_rule` (CONFIRMED from `data/api_docs.json`
+  response_example, 2026-07-07):** the actual wrapper keys are `transit_gateway_vpc_connection.id`
+  and `transit_gateway_rule.id` respectively. The `vpc-transit-gateway-children` lifecycle's
+  `capture_soft` used the wrong keys (`$.vpc_connection.id` / `$.routing_rule.id`), so
+  `vpc_connection_id`/`routing_rule_id`/`uplink_routing_rule_id` never resolved even when the
+  create itself succeeded — DIRECT ROOT CAUSE of `delete-tgw-vpc-connection`'s 400
+  `not-in-vpc-connection` showing a literal unresolved `{vpc_connection_id}` placeholder in its
+  error body (proof of a missed capture, not a TGW-state issue as first hypothesized). Fixed
+  OFFLINE 2026-07-07 (all three capture paths corrected in `networking__vpc.json`).
 - **VPC Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet, not `GENERAL` (CONFIRMED —
   already VALIDATED via `knowledge/formal/resources/networking__vpc.yaml` endpoint-subnet node,
   live-validated run 27583285457 2026-06-15; re-confirmed by HB4 run 28738115294, 2026-07-05):**
@@ -435,6 +452,47 @@ lifecycle `heavy-asg-full-coverage` in
   `scp-loadbalancer.loadbalancers.PrivateNatIpForbidden` ("You do not have permission to access
   the private NAT IP resource") regardless of body content — WAIVER CANDIDATE (entitlement), do
   not chase with body changes.
+- **Public static-NAT ALSO needs a real `publicip_id`, not just the IGW precondition (CONFIRMED
+  live error, HB4b run 28827996068, 2026-07-06):** even after the IGW fix above, `static-nat-create`
+  404s `scp-loadbalancer.loadbalancers.PublicIpNotFound` ("Public IP '' is not found") — the
+  lifecycle body sent `publicip_id:""` BY DESIGN (no real public IP was available at the time the
+  IGW fix was written). `data/api_docs.json` `staticnatcreaterequestdetail` confirms `publicip_id`
+  is the ONLY field and `required:true`. Fixed OFFLINE 2026-07-07: added
+  `create-publicip-for-static-nat` (verbatim `type:IGW` pattern from `networking/vpc`'s proven
+  `create-publicip-for-nat`/`create-publicip-for-vip`), feeding its `$.publicip.id` into
+  `static-nat-create`; teardown deletes it after `static-nat-delete`. UNVERIFIED LIVE.
+- **`addlbservergroupmembers` needs a REAL VM object_id, not an arbitrary IP (CONFIRMED live error,
+  HB4b run 28827996068, 2026-07-06):** `members-add` → 403
+  `scp-loadbalancer.members.InvalidVmInMember` ("Member VM object_id is invalid. (object_id: '',
+  ip: '10.124.0.31')") — the lifecycle sends `object_id:""` (no VM ever created in this
+  lifecycle). This is a cross-service prerequisite (a live `compute/virtualserver` instance's id),
+  not a body/param bug — **investigated, NOT fixed this session (2026-07-07):**
+  1. **Cross-lifecycle capture is NOT feasible today.** The engine's only cross-test resource
+     sharing is `regression/scenarios/shared_infra.py`'s OUT-OF-BAND provisioning (before pytest
+     starts, driven by the `.github/workflows/api-test.yml` step that exports
+     `SCP_SHARED_VPC_ID`/`SCP_SHARED_SUBNET_ID`), and the lifecycle-side `"adopt"` key only ever
+     appears as `"vpc"` / `"subnet"` / `"subnet#db"` across the whole repo (grep-confirmed, 2026-07-07)
+     — there is no `"adopt": "server"` precedent, and adding one would need both an engine change
+     AND a `.github/` workflow change (forbidden this session, and a bigger ask than "coordinate
+     via a peer" — it needs a NEW shared out-of-band VM the whole campaign would depend on).
+  2. **Embedding a self-contained VM closure directly in this LB lifecycle is technically
+     possible** (mirrors `compute-virtualserver-full`'s own create-server/wait-active/delete
+     chain) but was judged NOT worth it this session: `compute-virtualserver-full` itself needed
+     3 separate offline repair rounds (HB3/HB3b/HB3b-2) for port/volume/image edge cases even
+     with a dedicated owner, so duplicating that create-server body here would import the same
+     fragility class into an already-large 34-endpoint LB lifecycle for a payoff of only 4
+     endpoints (members-add/set/remove-single/remove-bulk cascade) — plus real compute billing
+     and multi-minute wall time this offline session cannot live-verify.
+  3. **Recommendation to the orchestrator:** either (a) approve a follow-up session to extend
+     `shared_infra.py` + `.github/workflows/api-test.yml` with an `SCP_SHARED_VM_ID` (mirroring
+     the existing shared-VPC pattern) so `"adopt": "server"` becomes a real engine feature reused
+     by every LB/member-needing lifecycle, or (b) schedule `networking-loadbalancer-members-nat`
+     in the SAME heavy batch as `compute-virtualserver-full` and — once that run's `server_id`
+     capture pattern is proven live — do a small follow-up offline session that adds the engine's
+     `"adopt": "server"` support the same way `"vpc"`/`"subnet"` already work, instead of
+     re-solving VM creation flakiness a second time inside the LB lifecycle. Not implemented this
+     session; `members-add`/`members-set`/`members-remove-single`/`members-remove-bulk` remain a
+     reach-only (403/404) soft-coverage gap.
 
 ## networking / firewall
 
@@ -606,6 +664,22 @@ lifecycle `heavy-asg-full-coverage` in
   step (real IP, e.g. `192.167.0.5`) and send it as the gateway's `ip_address` (paired with the
   same publicip's `ip_id`). Blocks the whole chain including the official phase1/phase2 tunnel
   values (`data/api_docs.json` request_example) from ever being tried live.
+- **`createvpngateway` ALSO requires the VPC to already have an Internet Gateway (CONFIRMED live
+  error, HB4b run 28827996068, 2026-07-06):** even with `ip_address` fixed, the create 404s
+  `scp-network.vpn-gateway.internet-gateway-not-found` ("Cannot found the Internet Gateway on
+  VPC(...)") — same precondition class as LB static-NAT and NAT gateway (see `networking/vpc` and
+  `networking/loadbalancer` sections). Fixed OFFLINE 2026-07-07 (`networking__vpn.json`
+  `networking-vpn-gateway-tunnel`): added `create-igw-for-vpn`/`wait-igw-for-vpn-active`/
+  `set-igw-for-vpn` (verbatim pattern from the proven `create-internet-gateway-for-nat` /
+  `create-igw-for-static-nat`) before `create-vpn-gateway`, + `delete-igw-for-vpn` in teardown.
+  **Shared-VPC IGW collision check:** this lifecycle ADOPTS the session-shared VPC (does not
+  self-create one, to conserve the cap-5 VPC budget); `data/api_docs.json` documents no 1-IGW-
+  per-VPC cardinality limit, and two other lifecycles already attach an IGW to this same shared
+  VPC (`networking/vpc` NAT-gateway, `networking/loadbalancer` static-NAT) without a reported hard
+  collision, so the new step follows the same convention (group+optional+broad expect_status,
+  degrading to a soft-fail of just the `vpn` family on a genuine 409) rather than switching to a
+  self-created VPC. UNVERIFIED LIVE — watch for a concurrent-IGW 409 if this lifecycle is
+  scheduled in the same batch as the NAT-gateway or LB static-nat lifecycles.
 
 ## management / cloudcontrol
 
