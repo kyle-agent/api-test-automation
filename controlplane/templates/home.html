@@ -5,9 +5,16 @@
 {% if coverage %}
   {% set fail_new = coverage.get('fail_new') or 0 %}
   {% set fail_known = coverage.get('fail_known') or 0 %}
-  <div class="verdict {{ 'bad' if fail_new else '' }}">
+  {% set snap_is_stale = snap_stale is defined and snap_stale %}
+  {# P2C-12: 48h+ 지난 스냅샷의 빨간 REGRESSIONS 배너가 '지금' 깨진 것처럼 읽혔다
+     (노후 칩만으로 부족). snap_stale(공통 컨텍스트, common.snapshot_age 재사용)이면
+     경고 톤 대신 기존 중립 회색 톤(.verdict.none)으로 낮추고, "N일 전 스냅샷 기준"을
+     배너 본문 맨 앞에 병기한다. 신선한 스냅샷의 빨강/초록 판정은 그대로. #}
+  <div class="verdict {{ 'none' if snap_is_stale else ('bad' if fail_new else '') }}">
     <span class="pip"></span>
     <div>
+      {% if snap_is_stale %}<b>{{ snap_age or '48시간 이상 전' }} 스냅샷 기준 —</b>
+      {% endif %}
       {% if fail_new %}
       <b>REGRESSIONS — 신규 fail {{ fail_new }}건.</b>
       마지막 스냅샷에서 새로 깨진 5xx/auth가 있습니다 — Report › Triage에서 분류를 확인하세요.
