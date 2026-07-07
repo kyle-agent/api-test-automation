@@ -89,7 +89,8 @@ def _render(request: Request, name: str, active: str, **ctx) -> HTMLResponse:
 # --- home ----------------------------------------------------------------------
 
 def _catalog_count() -> int:
-    """엔드포인트 수 — 홈 파이프라인의 ① Catalog 칸 (best-effort, 부재 시 0)."""
+    """엔드포인트 수 — 홈 Modeling 칸의 '전체 N API' 분모 (2026-07-07 IA 개정:
+    Catalog 칸은 제거, Modeling이 카탈로그를 흡수 — best-effort, 부재 시 0)."""
     try:
         from controlplane import catalog_routes
         return len(catalog_routes._load_catalog())

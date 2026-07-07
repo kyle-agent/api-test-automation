@@ -67,19 +67,15 @@
       git 원격 접근을 확인하세요.</div></div>
 {% endif %}
 
-<h2>파이프라인 <span class="hint">4단계 현황 — 클릭하면 해당 영역으로 (상단 네비와 동일)</span></h2>
+{# 2026-07-07 오너 결정: Catalog 칸 제거(4→3칸) — Modeling이 카탈로그를 흡수,
+   부제에 전체 API 분모(catalog_count)로 흡수를 표기. 인벤토리 참조는 상단 📖 카탈로그. #}
+<h2>파이프라인 <span class="hint">3단계 현황 — 클릭하면 해당 영역으로 (상단 네비와 동일)</span></h2>
 <div class="pipe">
-  <a class="pstage" href="/catalog">
-    <div class="pl">Catalog</div>
-    <div class="pv">{{ catalog_count }}</div>
-    <div class="ps">API 엔드포인트 (재료 인벤토리)</div>
-    <span class="chev">→</span>
-  </a>
   <a class="pstage" href="/planning/resources/map">
     <div class="pl">Modeling</div>
     <div class="pv">{{ model_stats.validated }}<span
       style="font-size:13px;font-weight:600;color:var(--muted)">/{{ model_stats.nodes }}</span></div>
-    <div class="ps">VALIDATED / 전체 노드 (테스트 모델 저작)</div>
+    <div class="ps">전체 {{ catalog_count }} API의 테스트 모델 저작 — VALIDATED/전체 노드</div>
     <span class="chev">→</span>
   </a>
   <a class="pstage" href="/testing/embed">
