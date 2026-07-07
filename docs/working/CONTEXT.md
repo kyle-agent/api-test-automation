@@ -130,6 +130,18 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
     `management/cloudcontrol` + `storage/archivestorage` (reachability-only by design → 403/401 =
     access evidence, never a verified 2xx). Light/read coverage is MAXED.
   - **OPEN / DEFERRED (what a next session could pick up):**
+    · **Testing 단순화 재설계 — "heavy-전제" 모델 (owner 방향 확정, 2026-07-07 대화).** 문제:
+      Test Plan에서 서비스 선택 시 역할 구분 없이 라이프사이클 7조각(검증형+도달 프로브)이
+      전부 실행돼, 검증 의도의 런에 의미 없는 404 중복(예: VS 런 107콜 중 soft 45)이 섞임.
+      확정 방향: **사용자 축은 "무엇을" 하나** — 서비스/리소스 선택 → (프로브 제외) **풀 DAG
+      합성** → pre-flight가 생성 자원·비용·시간 표시 → confirm → 실행 (Hard Rule 1 철학 그대로).
+      light/heavy 어휘는 화면에서 제거: heavy 플래그는 pre-flight 견적 + CI 레인 배정용
+      메타데이터로 강등, **도달 프로브(vs-*-coverage류)는 CI 상시 스윕 전용**으로 내리고 대화형
+      런에서 배제. 리포트는 soft를 `중복/갭/정책(waived)`으로 분류. 구현 단계: (1) 선택 의미론
+      + 프로브 배제 + 게이트-prune + 리포트 분류(중간 규모) → (2) 수제 라이프사이클(예:
+      compute-virtualserver-full 55-step)의 노하우를 리소스 노드로 이관해 합성-일원화(큼,
+      Modeling의 존재 이유와 동일 방향). 부수 숙제: password/rebuild/dump/server-type 4종을
+      VS heavy 레시피에 추가(2xx 승격 가능), lock/unlock은 reachability waiver 명시.
     · **Heavy deep-coverage D2–D7** (mysql/backup/epas/mariadb/sqlserver/cachestore) — **HALTED**.
       D1(postgresql) timed out at ~40% in-session, cluster CREATE went `FAILED` + leaked → recovered
       via force `POST /api/cleanup` (owned==0 confirmed). Each run is ~1.5–2h, **billable**, leak-prone,
