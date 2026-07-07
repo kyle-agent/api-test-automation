@@ -1,3 +1,13 @@
-# Lane reset to noop — HB4d+HB5b (run 28835929967) concluded & folded (+43 keys,
-# 2 node promotions). Next: HB6 after main sync.
-action=noop
+# HB6 (CAMPAIGN-C3-100, 2026-07-07): container + ai-ml family — SKE cluster/
+# nodepool + aimlops platform (~75m est, longest batch). Target: H 4 + W 5
+# (ske kubeconfig, aimlops internal x2, data-flow SKE-deps x2 ride windows).
+# Lane gates: HB4d folded (+43, 2 promotions, main synced 26c4f41e), LB static-
+# NAT wedge manually unwound + hidden vpce subnet holder deleted (API quirk:
+# subnet invisible in vpc_id listing but named in VPC delete 409 — noted),
+# owned==1 muted log-group. repair-8 (213a4f1d) rides this checkout.
+action=run
+mutations=true
+destructive=true
+heavy=true
+crud_ids=container-ske-cluster-nodepool,gen-heavy-aimlops
+parallel=2
