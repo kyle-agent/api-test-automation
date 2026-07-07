@@ -240,8 +240,8 @@ E(runtime 신선도) 부분 · F(클린업 힌트류) 합격 — C(지연 재스
 | P2C-9 | 라벨 | '포함 API 25' = 실은 폐쇄집합 **자원** 수(실 API 스텝 98) — 단어·단위 불일치 | ✅ 수정 (fd847d86 — '포함 자원 N (API 스텝 ~M)') |
 | P2C-10 | 라벨 | now-playing '평균 ~27m'이 step 옆에서 lifecycle 평균으로 읽히지 않음; ok/soft/fail 정의 툴팁 부재(lifecycle 실패인데 API fail=0 혼란); VPC 칩 '기존/예약' 툴팁 부재 | ✅ 수정 (fd847d86 — lifecycle 평균 라벨 + ok/soft/fail·VPC 칩 툴팁) |
 | P2C-11 | 사소 | 빈 상태 문구·힌트 필 겹침 / 중단 run "unknown·57s" 오표기(실 393s) / "M0 이전 run" 전문용어 | ✅ 수정 (fd847d86+cdfb6180+0b597c62) |
-| P2C-12 | 관찰 | 8일 전 스냅샷 "신규 fail 36" 배너가 현재처럼 읽힘(노후 칩은 있음) — 후속 판단 필요 | 백로그 |
-| P2C-13 | 관찰 | `tools.live_watch`가 러너 주도 heavy run에서 shared VPC를 BILLABLE_SURVIVOR로 오탐 — heavy_batch_start.txt 마커가 로컬 오케스트레이터 전용이라 러너 run을 인지 못함 (2026-07-04 HB1 감시 중 확인) | 백로그 |
+| P2C-12 | 관찰 | 8일 전 스냅샷 "신규 fail 36" 배너가 현재처럼 읽힘(노후 칩은 있음) — 후속 판단 필요 | ✅ 수정 (0d42037d — 48h+ 스냅샷이면 배너를 중립 회색 톤(.verdict.none)으로 낮추고 "N일 전 스냅샷 기준"을 배너 안에 병기; 신선 스냅샷의 빨강/초록 판정은 그대로) |
+| P2C-13 | 관찰 | `tools.live_watch`가 러너 주도 heavy run에서 shared VPC를 BILLABLE_SURVIVOR로 오탐 — heavy_batch_start.txt 마커가 로컬 오케스트레이터 전용이라 러너 run을 인지 못함 (2026-07-04 HB1 감시 중 확인) | ✅ 수정 (73a68a54 — 택일 (b): regrvpcsh 이름이 생성 epoch-hex를 내장(engine.py)하므로 이름 나이 <2h grace 동안 SURVIVOR 판정 유보, 해독 불가/노후 이름은 종전대로 탐지; 오프라인 테스트 6건 추가) |
 
 부수 확인: run 결과 6/7 passed — `delete-server` 400
 `VirtualServer.InvalidVirtualServerState.DeleteImpossible` **전일과 동일 재현**
