@@ -113,6 +113,29 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **CAMPAIGN-C3-100 진행 중 (2026-07-04~07, 정본: `docs/working/plans/
+  CAMPAIGN-C3-100.md` 진행 로그 + `CAMPAIGN-C3-100-repair-log.md`).** 방법론이
+  확립됨: **heavy 배치(chat-heavy 레인, 직렬) → fold(derive_verified→promote)
+  → 실패 서명 원인확인(관측 전문+api_docs 대조) → repair 에이전트(오프라인)
+  → 재검증 배치** 루프. 실적: verified store **2252→2344**(+92), 노드 승격 3
+  (vpn-gateway·vpn-tunnel·lb-static-nat → **VALIDATED 168**/275), 배치별
+  +13/+24/+12/+43. 실증된 실패 클래스: ①settle 부재(생성/자식 op가 부모를
+  EDITING 재전이 — TGW는 child마다, VPN/peering/static-NAT/DNS도 동일),
+  ②캡처 래퍼 키 오류, ③필수 필드 누락(모델 대조로 해결), ④선행 자원 요건
+  (IGW는 VPC당 1 — adopt-or-create 필수), ⑤PF/entitlement(waiver행:
+  epas·mysql·pg create-500 · backup 이중차단 · private-NAT 403 · DC 로깅
+  스토리지 계정요건). HB1~HB6 종결, HB7(data-flow/ops)·HB8(iam)·HB4e(repair-8
+  검증)·HB1b/2b(DB 수리 검증)·aimlops 필수필드(repair-9) 잔여. **main 동기
+  26c4f41e+**(UI 개편 포함), 대시보드 dashboard-data `b1d6d621`(C3 71.1%,
+  재발행 예정). 플랫폼: IA 개정(**Modeling이 Catalog 흡수**, 네비 3단계 —
+  PLATFORM-IA-DIRECTION §개정 2026-07-07) + Testing 실행 중심 재배치 +
+  페르소나-2 수정 전체(pre-flight 우회·재스캔 오보 근본수리 등) 반영됨.
+  운영 주의: 배치 fold 후 잔존은 verify_clean → IGNORE_TTL 강제 스윕으로
+  기준선(muted log-group 1) 복귀 확인 후 다음 디스패치; **VPC delete 409의
+  related_resources가 목록 조회에 안 보이는 숨은 subnet을 지목할 수 있음**
+  (2026-07-07 실증). main 반영은 반드시 레인 유휴(request=noop) 시점에 —
+  chat-heavy는 push 경로 트리거 + cancel-in-progress라 실행 중 머지가 run을
+  죽인다.
 - **RUN 관측성 개편 (2026-07-04, branch `claude/upbeat-ritchie-ieus5u` — owner 승인
   배치 A–F, 페르소나 QA 저널 run `20260704-034346-64b5` 근거; live mutation 없음,
   .github/ 무변경):** tracker = `docs/working/trackers/UIUX-AUDIT-2026-07-03.md`
