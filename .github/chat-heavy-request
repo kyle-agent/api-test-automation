@@ -1,13 +1,14 @@
-# HB4c (CAMPAIGN-C3-100, 2026-07-07): networking repair-validation round 2.
-# Validates 80ec40da (repair-5, all causes evidence-confirmed): VPN IGW prereq
-# (official phase1/2 tunnel values finally reachable) · TGW post-connection
-# settle + 3 corrected capture keys (connection/routing-rule wrappers) · LB
-# static-NAT publicip prereq. members-add stays 403 (real-VM requirement,
-# documented). Lane gates: HB5 concluded+folded (0 new; peering/DC walls
-# diagnosed -> repair-6), peering+VPC leftovers force-swept, owned==1 muted.
+# HB4d+HB5b (CAMPAIGN-C3-100, 2026-07-07): combined networking repair-validation.
+# Validates 17e0f634 (repair-7: VPN gateway ACTIVE settle -> tunnel chain with
+# official phase1/2 values; IGW adopt-or-create both families; TGW per-child
+# settles x10; vpce subnet CIDR 10.124.9.0/24) + 85327572 (repair-6: same-account
+# peering approve removed + settle repositioning; DNS post-disconnect settle).
+# LB included for igw/static-nat revalidation (members-add stays 403 real-VM).
+# VPC: shared 1 + tgw 1 + peering 2 = 4/5. Lane gates: HB4c folded (+12, vpn-gw
+# node promoted), TGW leftover force-swept, owned==1 muted log-group only.
 action=run
 mutations=true
 destructive=true
 heavy=true
-crud_ids=networking-loadbalancer-members-nat,networking-vpn-gateway-tunnel,vpc-transit-gateway-children,vpc-endpoint
-parallel=4
+crud_ids=networking-vpn-gateway-tunnel,vpc-transit-gateway-children,vpc-endpoint,vpc-peering,networking-dns-hosted-zone-private,networking-loadbalancer-members-nat
+parallel=6
