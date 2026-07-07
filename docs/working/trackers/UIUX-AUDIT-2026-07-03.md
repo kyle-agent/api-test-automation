@@ -259,3 +259,22 @@ E(runtime 신선도) 부분 · F(클린업 힌트류) 합격 — C(지연 재스
 | P2C-15 | 불편 | Modeling 표의 카테고리 접힘 행이 colspan 셀 안 '작은 카드'처럼 떠 보임 | ✅ 수정 (4e483c2e — 전폭 그룹 헤더 행: 배경 줄무늬·좌 캐럿·집계 우측 정렬, 표 문법·접기/세션 기억 유지) |
 | P2C-16 | 라벨 | 표 컬럼 과밀·은어 — code/opt 컬럼이 판단에 기여 없음, provenance 헤더 비직관, 헤더 툴팁 부재 | ✅ 수정 (4e483c2e — code→id 셀 툴팁·검색 인덱스, opt 컬럼 제거(편집 화면에 이미 있음), provenance→'검증상태', 4개 헤더 title 툴팁 + 표 상단 한 줄 범례) |
 | P2C-17 | 라벨 | 그래프 토글 '그림 (의존 그래프)'이 용도를 안 알림 | ✅ 수정 (4e483c2e — '의존 그래프 (영향 파악)' + 패널 캡션 "노드를 건드리기 전 영향 범위를 보는 뷰 — 편집은 표에서", 기능 변경 없음) |
+
+### 6-2. 오너 피드백 — console2 ② Test Execution CX 재배치 (2026-07-07, append-only — P2C 번호 승계)
+
+> 오너 피드백(2026-07-07): "Test Execution에 과거 히스토리가 전면에 보이고, 현재
+> 실행이 Test Planning에서 본 것(DAG·리소스 순서표)과 인라인이 안 되고, 런타임도
+> 팝업을 따로 띄워야 보인다." 목표 흐름: 선택→DAG·순서표→대기열→실행→**계획했던
+> 그 그림이 라이브로**→로그·런타임 인라인. 구현 배치 = `43a85eec` (console2
+> 프런트만 — 서버·controlplane 무변경; 페이즈-3 메커니즘 재사용, 재발명 없음).
+
+| ID | 심각도 | 발견 | 수정 상태 |
+|---|---|---|---|
+| P2C-18 | CX | ② 화면 중단을 실행 기록 목록이 차지해 "무엇이 지금인가"를 흐림 — 현재 실행이 전면이어야 | ✅ 수정 (43a85eec — 실행 기록을 기본 접힘 섹션("실행 기록 N건 ▸", sessionStorage `c2.histOpen.v1`)으로 강등; 상시 노출은 현재 실행 히어로 + 유휴 시 최근 종료 1건 요약 행뿐, 'run만/전체' 필터(fd847d86)는 접힘 안에서 유지) |
+| P2C-19 | CX | run 시작 후 ② 그래프가 ①에서 계획한 것과 같은 그림인지 명시 안 됨 · 생성·검증·삭제 순서표는 ①에만 | ✅ 수정 (43a85eec — run 바인딩 시 "①→② ① 에서 계획한 폐쇄집합 그대로 실행 중 — N 리소스 · 생성 순서 동일" 칩(종료 시 문구 전환); ② 그래프 아래 접힘 순서표 = ①과 동일 빌더(orderRowsData/orderRowHtml 공용 추출) + now-playing active lifecycle 행 하이라이트(.ordnow)를 폴마다 동기, details 열림 유지) |
+| P2C-20 | CX | 런타임(계정 실측)이 별도 팝업으로만 — 실행 흐름과 단절 | ✅ 수정 (43a85eec — 자원/API/로그 옆 4번째 탭 '런타임(계정 실측)' = 기존 /runtime?scope=mine iframe 임베드; URL 단일 소스 `runtimeUrl()` (팝업·pre-flight 링크·iframe 공유), 페이지 자체 주기 갱신(6fa9ec12) 그대로 — 로직 복제 없음. 팝업 버튼 유지 + '(새 창)' 라벨) |
+| P2C-21 | CX | 실행 admit 후 히어로가 뷰포트 밖일 수 있음 (auto-switch 부분 존재) | ✅ 수정 (43a85eec — postRun 기존 ② 전환 유지 + admit 시 히어로(md-report) scrollIntoView 보강) |
+
+검증: `node --check` · `pytest tests/offline -k console2` 52 passed (계약 테스트
+`test_execution_cx_relayout_frontend_contract` 추가) · :8832 read-only smoke
+(SCP_ALLOW_MUTATIONS=false — ② 렌더·rt 탭·접힘·/runtime 200·run graph 계약).
