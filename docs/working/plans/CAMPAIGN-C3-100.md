@@ -254,3 +254,15 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   404(cert 필요 — 기존 W 분류대로 selfsign 동승). → repair-5. backup 패밀리는
   이중 차단(FILESYSTEM=agent waiver · VM_IMAGE=create-500 PF) 확정 — waiver
   레저로 이동(repair-log §HB3b-2, 5090eef2).
+- 2026-07-07: **수리→검증 루프 성숙 — HB4c +12(vpn-gateway 승격, 166), HB5 0
+  (peering approve 불필요·DC 로깅스토리지 계정요건 확정 → repair-6), HB4d+HB5b
+  +43 (누적 2344, 최대 수확)**: VPN 터널 체인 돌파(공식 phase1/2 값 실전 2xx,
+  createvpntunnel 등재) · TGW connection/uplink/firewall-connection+delete-tgw
+  (child별 settle ×10 유효) · static-NAT create(IGW adopt-or-create 유효) ·
+  DNS delete. 노드 승격 2건 추가: **lb-static-nat · vpn-tunnel → VALIDATED
+  (모델 168)**. 잔여(repair-8 후보): set-vpn-tunnel invalid-state(터널 settle),
+  tgw-firewall 신규 오류·routing-rule destination 검증, peering ACTIVE 미도달
+  미스터리(waits 통과·set/delete 여전히 400), LB teardown 순서(static-nat
+  delete→publicip detach→igw), vpce check-i* 신규 오류. junit 수리 검증됨
+  (HB5부터 실제 junit). 플랫폼: IA 개정 구현(Modeling이 Catalog 흡수, d7e56c92
+  ~675596e3) + Testing 실행 중심 재배치(43a85eec) — 오너 화면 피드백 반영.
