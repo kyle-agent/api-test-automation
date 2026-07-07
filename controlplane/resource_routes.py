@@ -307,7 +307,8 @@ def _modeling_rows(model: dict, meta: dict, deps_idx: dict) -> list[dict]:
             "requires": _requires_summary(node),
             "n_requires": len(node.get("requires") or []),
             "dependents": len(deps_idx.get(nid, [])),
-            "options": len(((node.get("create") or {}).get("options")) or {}),
+            # P2C-16: options 카운트 컬럼은 표에서 제거 — 옵션은 노드 편집 화면에
+            # 이미 상세히 있어 표의 'opt N'은 판단에 기여하지 못했다.
         })
     return rows
 
