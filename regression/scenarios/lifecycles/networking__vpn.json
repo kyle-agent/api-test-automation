@@ -63,6 +63,18 @@
           "cleanup": {"method": "DELETE", "path": "/v1/publicips/{publicip_id}", "service": "vpc"}
         },
         {
+          "name": "list-igw-for-vpn",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways",
+          "group": "vpn",
+          "optional": true,
+          "params": {"vpc_id": "{vpc_id}"},
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {"igw_id": "$.internet_gateways[0].id"},
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 2): adopt-or-create bootstrap, added because create-igw-for-static-nat in networking__loadbalancer.json (same shared VPC) 400'd `already-associated` in this SAME run — CONFIRMED at most ONE IGW per VPC (the error body names the existing one), and both this lifecycle and the LB one adopt the single session-shared VPC without self-creating one, so whichever family's create fires SECOND now collides. List existing IGWs on `{vpc_id}` first (`networking/vpc/listinternetgateways`, response_example wraps as `internet_gateways[]`); if one already exists (created by the LB family, or a prior run) capture its id into `igw_id` so wait/set/create-vpn-gateway proceed against a real IGW either way. If none exists yet this finds nothing and the following create-igw-for-vpn step makes one. See that step's own note for why the DELETE step must NOT reuse this adopted `igw_id`."
+        },
+        {
           "name": "create-igw-for-vpn",
           "service": "vpc",
           "method": "POST",
@@ -78,9 +90,9 @@
             "vpc_id": "{vpc_id}"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {"igw_id": "$.internet_gateway.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/internet-gateways/{igw_id}", "service": "vpc"},
-          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 1): create-vpn-gateway 404s `scp-network.vpn-gateway.internet-gateway-not-found` (\"Cannot found the Internet Gateway on VPC(...)\") — CONFIRMED from the observation's own error body, not a guess. Pattern lifted verbatim from the proven networking__loadbalancer.json create-igw-for-static-nat fix (same live error class, itself lifted from networking__vpc.json's create-internet-gateway-for-nat, CONFIRMED live 2026-06-23) — create IGW on the same (session-shared) VPC, wait ACTIVE, PUT/set it, THEN create-vpn-gateway. CONFLICT CHECK (per task instruction — this lifecycle ADOPTS the shared VPC, does not self-create one, so a concurrently-scheduled heavy lifecycle could try to attach a 2nd IGW to the same VPC at the same time): `data/api_docs.json` has no documented 1-IGW-per-VPC cardinality limit, and TWO other lifecycles already create/attach an IGW on this same shared VPC as an established, previously-proven pattern (networking__vpc.json create-internet-gateway-for-nat, live-CONFIRMED 2026-06-23; networking__loadbalancer.json create-igw-for-static-nat, HB4b OFFLINE repair) without a reported hard collision — so this is not a new risk class. Decided AGAINST switching to a self-created VPC (would add avoidable VPC-budget consumption, cap-5 shared across concurrent agents, for zero coverage benefit): instead this step follows the same defensive convention already used by both precedents — group:vpn + optional + broad expect_status (400/403/404/409/422 all tolerated) so a genuine collision (409 'IGW already exists' or similar) only soft-fails this vpn family (captured, not fatal) exactly like a missing-publicip failure already does, rather than corrupting or blocking any other concurrent lifecycle's own IGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx AND watch for a concurrent-IGW 409 if run alongside the NAT-gateway or LB static-nat lifecycles in the same batch."
+          "capture_soft": {"igw_id": "$.internet_gateway.id", "owned_igw_id": "$.internet_gateway.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/internet-gateways/{owned_igw_id}", "service": "vpc"},
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 1): create-vpn-gateway 404s `scp-network.vpn-gateway.internet-gateway-not-found` (\"Cannot found the Internet Gateway on VPC(...)\") — CONFIRMED from the observation's own error body, not a guess. Pattern lifted verbatim from the proven networking__loadbalancer.json create-igw-for-static-nat fix (same live error class, itself lifted from networking__vpc.json's create-internet-gateway-for-nat, CONFIRMED live 2026-06-23) — create IGW on the same (session-shared) VPC, wait ACTIVE, PUT/set it, THEN create-vpn-gateway. CONFLICT CHECK (per task instruction — this lifecycle ADOPTS the shared VPC, does not self-create one, so a concurrently-scheduled heavy lifecycle could try to attach a 2nd IGW to the same VPC at the same time): `data/api_docs.json` has no documented 1-IGW-per-VPC cardinality limit, and TWO other lifecycles already create/attach an IGW on this same shared VPC as an established, previously-proven pattern (networking__vpc.json create-internet-gateway-for-nat, live-CONFIRMED 2026-06-23; networking__loadbalancer.json create-igw-for-static-nat, HB4b OFFLINE repair). UPDATE 2026-07-07 (HB4c): this WAS observed as a genuine collision in run 28833316852 — the LB lifecycle's create-igw-for-static-nat 400'd `already-associated` while this lifecycle ran concurrently. Rather than switching to a self-created VPC (VPC-budget cap-5 waste for zero coverage benefit), added the `list-igw-for-vpn` adopt-or-create bootstrap above so a 400 here (this family running second) is a non-event — `igw_id` was already resolved to the other family's IGW by the list step. `owned_igw_id` is captured ONLY here (from OUR OWN create response), separately from the adoption-tolerant `igw_id`, so the cleanup dict above and the explicit `delete-igw-for-vpn` teardown step below key off `owned_igw_id` — if this create 400s (adopted, not owned), `owned_igw_id` stays unset and both those DELETE calls hit an unresolved literal path (safe 404), NEVER the other family's real IGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx AND that a concurrent run with the LB static-nat family no longer 400s on either side's create."
         },
         {
           "name": "wait-igw-for-vpn-active",
@@ -120,6 +132,16 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture_soft": {"vpn_gateway_id": "$.vpn_gateway.id"},
           "cleanup": {"method": "DELETE", "path": "/v1/vpn-gateways/{vpn_gateway_id}", "service": "vpn"}
+        },
+        {
+          "name": "wait-vpn-gateway-active",
+          "method": "GET",
+          "path": "/v1/vpn-gateways/{vpn_gateway_id}",
+          "group": "vpn",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"field": "$.vpn_gateway.state", "until": ["ACTIVE"], "timeout": 300, "interval": 15, "give_up_status": [400, 403, 404]},
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 1): observation timestamps CONFIRM create-vpn-gateway (202 at ts …299.5) is followed ~3s later (ts …302.4) by set-vpn-gateway 400 `scp-network.vpn-gateway.invalid-state` (\"Unable to modify or terminate VPN Gateway in CREATING state.\"), then create-vpn-tunnel 400 the SAME error class 2s after that — the gateway create is async and every dependent write fired before it settled, same class of bug already CONFIRMED+fixed for transit-gateway (networking__vpc.json wait-tgw-active, HB4b) and vpc-peering (wait-peering-active, HB5). Fix: settle-poll `$.vpn_gateway.state` (field confirmed from `data/api_docs.json` networking/vpn/showvpngateway response_example: `\"state\":\"ACTIVE\"`) until ACTIVE, mirroring the TGW pattern (field/until/give_up_status), inserted right after create-vpn-gateway and before get/set-vpn-gateway and create-vpn-tunnel. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm the set-gateway/create-tunnel cascade (8 keys) clears."
         },
         {
           "name": "get-vpn-gateway",
@@ -237,7 +259,7 @@
           "name": "delete-igw-for-vpn",
           "service": "vpc",
           "method": "DELETE",
-          "path": "/v1/internet-gateways/{igw_id}",
+          "path": "/v1/internet-gateways/{owned_igw_id}",
           "group": "vpn",
           "optional": true,
           "destructive": true,
@@ -245,7 +267,7 @@
           "retry_on_status": [400, 409],
           "retries": 8,
           "retry_interval": 15,
-          "_note": "Delete the IGW created for the VPN gateway, children-first (after delete-vpn-gateway, before delete-publicip/delete-vpc). Retry 400 to ride out the not-deletable-state transition (same quirk CONFIRMED for this endpoint in networking__vpc.json / mirrored in networking__loadbalancer.json's delete-igw-for-static-nat)."
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 2): path changed from `{igw_id}` to `{owned_igw_id}` — `igw_id` may now be an ADOPTED IGW (see list-igw-for-vpn's note) belonging to a concurrently-running lifecycle (e.g. networking__loadbalancer.json's LB static-nat family), and this suite must never delete another family's live resource. `owned_igw_id` is captured only by create-igw-for-vpn's own 2xx and stays unset when we adopted instead of created, so an adopted case leaves this DELETE targeting an unresolved literal path (safe 404, matches this codebase's established soft-capture-miss convention) instead of the foreign IGW. Delete the IGW created for the VPN gateway, children-first (after delete-vpn-gateway, before delete-publicip/delete-vpc). Retry 400 to ride out the not-deletable-state transition (same quirk CONFIRMED for this endpoint in networking__vpc.json / mirrored in networking__loadbalancer.json's delete-igw-for-static-nat)."
         },
         {
           "name": "delete-publicip",

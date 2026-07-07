@@ -479,3 +479,67 @@ python -m pytest tests/offline
    `create-direct-connect`가 실제로 2xx 전환되는지 재검증.
 4. `vpc-private-nat`을 실 DC id에 배선할지(오케스트레이터 결정 필요, 크로스-lifecycle
    capture 확장) — 결정 시 별도 세션에서 처리.
+
+---
+
+# §HB4c — VPN gateway settle-poll · LB/VPN IGW adopt-or-create · TGW child settle · vpce subnet CIDR (2026-07-07, OFFLINE)
+
+> 배경: A-repair-7 에이전트. HB4c heavy run 28833316852이 레인 점유 중이라 **라이브 SCP
+> 호출 없음** — `reports/results/hb4c/observations-gw{0,1,2,3}.jsonl`(note 필드 오류
+> 전문 + `ts` 타임스탬프)만을 원인 증거로 사용. 산출물: `regression/scenarios/lifecycles/networking__vpn.json`
+> (`networking-vpn-gateway-tunnel` — create-vpn-gateway 뒤 `wait-vpn-gateway-active`
+> settle-poll 신규 + `list-igw-for-vpn` adopt-or-create 부트스트랩 신규 +
+> `owned_igw_id`/`igw_id` 분리로 delete-igw-for-vpn을 소유권 안전하게 재배선) ·
+> `regression/scenarios/lifecycles/networking__loadbalancer.json`
+> (`networking-loadbalancer-members-nat` — `list-igw-for-static-nat` adopt-or-create
+> 부트스트랩 신규 + 동일한 `owned_igw_id`/`igw_id` 분리) ·
+> `regression/scenarios/lifecycles/networking__vpc.json` (`vpc-transit-gateway-children`
+> — child create/delete 10건 전부 직전에 개별 `wait-tgw-active-before-*` settle-poll
+> 신규 10건; `vpc-endpoint` — `create-subnet`의 cidr을 `10.129.8.0/24`→`10.124.9.0/24`로
+> 교정) · 본 섹션. `python -m regression.scenarios.validate` → **244 lifecycle(s)
+> checked · 0 error(s) · 5 warning(s)** (경고 5건은 `git stash` 대조로 이전 세션과
+> 완전히 동일한 무관 항목임을 확인). `python -m pytest tests/offline` → 450 passed,
+> 3 failed(전부 이번 변경과 **무관한 기존 실패** —
+> `test_docs_index.py::test_index_is_up_to_date`, `test_validate_dag.py::test_real_graph_is_a_complete_dag`,
+> `test_validate_dag.py::test_main_check_returns_zero_on_complete_graph`, 모두
+> `eventstreams-cluster-subops-full`/`gen-heavy-backup`의 기존 DAG gap — `git stash`로
+> 변경 전 상태에서도 동일하게 실패함을 확인, 네트워킹 파일과 무관).
+
+## 원인확인 + 조치 표
+
+| # | 증상 | 원인(증거) | 조치 |
+|---|---|---|---|
+| 1 | `networking-vpn-gateway-tunnel:set-vpn-gateway`/`create-vpn-tunnel` 400 `scp-network.vpn-gateway.invalid-state` `"Unable to modify or terminate VPN Gateway in CREATING state."` | 타임스탬프 대조로 확정: `create-vpn-gateway` 202(ts …299.55) 직후 `set-vpn-gateway`가 ts …302.43(약 2.9s 후)에 400, `create-vpn-tunnel`이 ts …304.40(그 2s 후)에 같은 오류로 400 — 게이트웨이 create가 비동기(202)인데 후속 스텝들이 settle-poll 없이 즉시 발사됨. TGW(`wait-tgw-active`, HB4b)·vpc-peering(`wait-peering-active`, HB5)에서 이미 CONFIRMED된 것과 동일 계열의 "async-create 뒤 바로 후속 write" 패턴. | `wait-vpn-gateway-active` settle-poll 신규(`$.vpn_gateway.state` until `ACTIVE`, field는 `data/api_docs.json` `networking/vpn/showvpngateway` response_example의 `"state":"ACTIVE"`로 확정, timeout 300s/interval 15s/give_up_status 400·403·404, TGW `wait-tgw-active`와 동일 패턴)을 `create-vpn-gateway` 직후·`get-vpn-gateway` 이전에 삽입. **라이브 미검증** — 다음 heavy 디스패치가 터널 체인 8키 전환을 확인해야 함. |
+| 2 | `networking-loadbalancer-members-nat:create-igw-for-static-nat` 400 `scp-network.internet-gateway.already-associated` — `"The VPC(db4199d8...) is already associated with an Internet Gateway(be570ce4...)."` | 관측 note 전문이 VPC당 IGW 1개 카디널리티를 직접 확정(추측 아님). 같은 런(28833316852)에서 VPN(`networking-vpn-gateway-tunnel`)과 LB(`networking-loadbalancer-members-nat`) 둘 다 세션-공유 VPC에 IGW를 붙이려 시도 — 둘 다 `create-vpc`에 `adopt:vpc`를 쓰고 자체 VPC를 만들지 않으므로 같은 VPC를 겨냥함; 이번 병행 실행에서 처음(먼저) 붙인 쪽은 성공하고 두 번째가 이 400을 받음 — 직전 라운드(HB4b-2)가 "무충돌 전례 2건"이라 판단한 근거는 비병행 실행이었기 때문에 이 충돌을 못 본 것. | 양쪽 파일에 **adopt-or-create** 부트스트랩 추가: `list-igw-for-vpn`/`list-igw-for-static-nat` 신규 스텝(GET `/v1/internet-gateways?vpc_id={vpc_id}`, `data/api_docs.json` `networking/vpc/listinternetgateways` response_example이 `internet_gateways[]`로 감싸는 것 확인)을 각 `create-igw-for-*` 직전에 삽입 — `igw_id`를 capture_soft(먼저 만든 쪽이 있으면 그 id, 없으면 못 찾고 지나감). `create-igw-for-*`은 그대로 실행되어 없으면 실제로 만들고(igw_id 갱신), 있으면 400(already-associated)으로 soft-skip. **소유권 분리**: `create-igw-for-*`가 자신의 2xx에서만 별도로 `owned_igw_id`를 capture_soft — cleanup dict와 명시적 `delete-igw-for-*` 스텝의 DELETE 경로를 `{igw_id}`(입양 가능) 대신 `{owned_igw_id}`(자기 소유만)로 재배선. 자기가 못 만든 경우(입양) `owned_igw_id`는 끝까지 미설정 상태로 남아 DELETE가 미해석 리터럴 경로(안전한 404)를 때리고, 절대 상대 family의 실제 IGW를 지우지 않음(이 코드베이스의 기존 soft-capture-miss 관례와 동일). **라이브 미검증** — 다음 heavy 디스패치가 VPN+LB 병행 실행에서 양쪽 create가 더 이상 400하지 않는지, teardown이 서로의 IGW를 건드리지 않는지 확인해야 함. |
+| 3 | `vpc-transit-gateway-children`의 `wait-tgw-active-after-connection`이 200으로 통과했음에도 뒤이은 firewall/firewall-connection/routing-rule/uplink-routing-rule/delete-firewall-connection/delete-vpc-connection/set 전부 400 `not-active-state:(EDITING)` | 타임스탬프 정밀 대조: `create-tgw-vpc-connection`(202, ts …465.07) 후 `wait-tgw-active-after-connection`이 ts …771.05에 200 반환 — 이 간격은 **약 305.98초**로, 해당 스텝 자신의 poll 예산(timeout 300s)과 거의 정확히 일치함. `regression/scenarios/engine.py`의 poll 구현(L579-632)은 타임아웃에 도달하면 `until` 조건 충족 여부와 무관하게 **마지막 응답을 그대로 반환**하므로, 이 200은 실제로 `state==ACTIVE`를 관측한 것이 아니라 타임아웃 후 마지막 GET의 HTTP 상태만 반영했을 가능성이 매우 높음(즉 "connection 1회가 재전이"라기보다, TGW가 vpc-connection create 이후 300s 안에 실제로 ACTIVE에 도달하지 못했을 가능성). 뒤이어 4초 뒤부터 시작된 firewall/firewall-connection/routing-rule/uplink-routing-rule create가 **전부 즉시** EDITING 400을 받았고(하나도 성공한 적 없음), 그 뒤의 delete들도 연쇄 400 — 어느 자식도 실제로 만들어지지 않았으므로 "성공한 자식이 다시 EDITING을 유발"하는 시나리오는 이 관측만으로는 확정할 수 없으나, 어느 원인이든(단일 settle 타임아웃 vs 반복 재전이) **각 자식 직전에 독립적인 settle 예산을 하나씩 더 주는 것**이 두 가설 모두를 커버하는 유일한 안전한 수정. | `wait-tgw-active-before-firewall`/`-before-firewall-connection`/`-before-routing-rule`/`-before-uplink-routing-rule`/`-before-delete-firewall-connection`/`-before-delete-firewall`/`-before-delete-routing-rule`/`-before-delete-uplink-routing-rule`/`-before-delete-vpc-connection`/`-before-set` 10건 신규(기존 `wait-tgw-active`/`wait-tgw-active-after-connection`/`wait-tgw-active-before-delete`와 동일한 field/until/timeout 300s/interval 15s/give_up_status 패턴) — 지루하지만 이미 HB4b/HB4b-2에서 실증된 패턴을 자식 op 10개 전부로 확장. 이렇게 하면 vpc-connection 이후 최대 (300s × 11회) 누적 settle 예산이 주어지므로, 실제 원인이 "한 번의 매우 느린 settle"이든 "매 op 재전이"든 둘 다 흡수함. `delete-transit-gateway` 409 `related-resource`는 children delete가 실제로 성공하면 자연 해소될 것으로 기대(기존 `wait-tgw-active-before-delete` + 이번 신규 8건이 delete 경로도 커버). **라이브 미검증** — 다음 heavy 디스패치가 10개 child 2xx 전환 + 최종 delete 409 해소를 확인해야 함. |
+| 4 | `vpc-endpoint:create-subnet` 400 `scp-network.subnet.include-vp-cidr` — `"Cidr should be included in the vpc cidr. : (10.129.8.0/24)"` | 같은 워커(gw3)의 관측에 `create-vpc` POST 기록이 전혀 없음(오직 `wait-vpc` 200만 존재) — `engine.py`의 `{"adopt":"vpc"}` 처리(POST 스텝은 shared_vpc_id가 있으면 실제 호출 없이 스킵하고 그 id를 그대로 캡처)와 정확히 일치, 즉 이 워커에서 `{vpc_id}`는 세션-공유 VPC로 입양되었음이 확정됨. 공유 VPC의 실제 CIDR은 `engine.py`의 하드코드 상수 `_SHARED_VPC_CIDR = "10.124.0.0/20"`(`knowledge/vpc-scheduling-strategy.md`에도 문서화)이며, 이 스텝이 보낸 `10.129.8.0/24`는 그 range 밖(10.129.x는 이 lifecycle 자신의 create-vpc **폴백 바디**의 CIDR로, 입양이 일어난 이번 경로에서는 아예 쓰이지 않음) — 오류 문구가 정확히 이를 지목. | `create-subnet`의 cidr을 `10.129.8.0/24` → `10.124.9.0/24`로 교정 — 공유 VPC(`10.124.0.0/20`) 안의 미사용 /24 슬롯(기존 공유 subnet `10.124.0.0/24`/`_SHARED_SUBNET_CIDR`, 공유 DB subnet `10.124.7.0/24`/`_SHARED_DB_SUBNET_CIDR`, 그리고 다른 모든 lifecycle 파일의 하드코드 `10.124.x` IP/CIDR와 grep으로 비충돌 확인). **잔여 리스크(미해결, 정직하게 기록)**: 이 lifecycle 자신의 create-vpc 폴백 바디(`10.129.0.0/20`, 공유 VPC가 없는 극히 드문 non-xdist 단일 프로세스 경로에서만 실제 POST됨)는 이제 이 새 subnet cidr과 호환되지 않음 — 그러나 xdist 하에서는 공유 VPC 부재 시 IB-049(`engine.py` ~L920)에 의해 이 lifecycle 전체가 self-create 대신 **skip**되므로, 실제 heavy-dispatch 운영 모델(gw0-gw3 멀티워커)에서는 그 폴백 바디가 사실상 죽은 코드 경로 — 이번 세션에서는 고치지 않고 다음 레버로 남김. |
+
+## 검증 명령 재현
+
+```
+python -m regression.scenarios.validate
+# -> 244 lifecycle(s) checked · 0 error(s) · 5 warning(s)  (5개는 이전 세션과 동일한 무관 경고, diff로 확인됨)
+
+python -m pytest tests/offline
+# -> 450 passed, 3 failed (모두 변경 전에도 동일하게 실패하는 기존 이슈 — git stash로 확인,
+#    eventstreams-cluster-subops-full/gen-heavy-backup의 기존 DAG gap, 네트워킹 파일과 무관)
+```
+
+## 남은 작업 (다음 HEAVY 디스패치용)
+
+1. `networking-vpn-gateway-tunnel` 재디스패치 — `wait-vpn-gateway-active` 추가 후
+   set-vpn-gateway/create-vpn-tunnel 이하 터널 체인 8키가 2xx로 전환되는지 확인.
+2. `networking-vpn-gateway-tunnel` + `networking-loadbalancer-members-nat` 병행
+   재디스패치 — adopt-or-create IGW 부트스트랩 후 양쪽 create-igw가 더 이상
+   already-associated 400을 내지 않는지, teardown이 서로의 IGW를 침범하지
+   않는지(owned_igw_id 분리가 실제로 안전한지) 확인.
+3. `vpc-transit-gateway-children` 재디스패치 — 10개 신규 settle-poll 추가 후
+   firewall/firewall-connection/routing-rule/uplink-routing-rule 및 그 delete들,
+   set-transit-gateway, 최종 delete-transit-gateway가 실제로 2xx(또는 정상적인
+   비-state 4xx)로 전환되는지 확인. 여전히 EDITING 400이 반복되면 TGW의 vpc-connection
+   후 실제 settle 시간이 300s×11 누적 예산보다도 길다는 뜻이므로 timeout 상향 또는
+   TGW child 순서 재설계(예: connection을 마지막에) 검토.
+4. `vpc-endpoint` 재디스패치 — create-subnet cidr 교정 후 실제로 2xx 전환되는지,
+   그 다음 이어지는 create-vpc-endpoint의 resource_key 관련 4xx로 신호가 이동하는지
+   확인. non-xdist 단일 프로세스 경로(self-create fallback)를 쓸 계획이면 create-vpc의
+   폴백 cidr도 함께 정리 필요.

@@ -222,6 +222,18 @@
           "expect_status": [200, 202, 204, 400, 403, 404, 409]
         },
         {
+          "name": "list-igw-for-static-nat",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways",
+          "group": "staticnat",
+          "optional": true,
+          "params": {"vpc_id": "{vpc_id}"},
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {"igw_id": "$.internet_gateways[0].id"},
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 2): create-igw-for-static-nat 400 `scp-network.internet-gateway.already-associated` (\"The VPC(...) is already associated with an Internet Gateway(...)\") — CONFIRMED from the observation's own error body: at most ONE IGW per VPC is permitted, and this SAME shared VPC is ALSO targeted by networking__vpn.json's own create-igw-for-vpn in the SAME concurrent run (both adopt the one session-shared VPC, do not self-create) — whichever family's create runs SECOND now 400s. Fix: adopt-or-create — list existing IGWs on `{vpc_id}` first (`networking/vpc/listinternetgateways`, response_example wraps as `internet_gateways[]`); if one already exists (created by the VPN family, or a prior run) capture its id into `igw_id` so wait/set-igw and the static-nat family proceed against a real IGW either way. If none exists yet this finds nothing and the following create-igw-for-static-nat step makes one. See that step's note for why the DELETE step must NOT reuse this adopted `igw_id`."
+        },
+        {
           "name": "create-igw-for-static-nat",
           "service": "vpc",
           "method": "POST",
@@ -237,9 +249,9 @@
             "vpc_id": "{vpc_id}"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {"igw_id": "$.internet_gateway.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/internet-gateways/{igw_id}", "service": "vpc"},
-          "_note": "REPAIR 2026-07-06 (HB4 400 igw-required-for-static-nat, run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): static-nat-create failed 'Cannot create Public NAT: No Internet Gateway (IGW) found in the VPC'. Pattern lifted verbatim from the proven networking__vpc.json create-internet-gateway-for-nat fix (CONFIRMED live 2026-06-23: nat-gateway also requires an attached IGW) — create IGW on the same VPC, wait ACTIVE, PUT/set it (the set call is what the NAT-gateway precedent found necessary to mark the VPC's IGW as attached/active before the NAT-family create), THEN attempt static-nat-create. Grouped+optional (staticnat) so a shared-VPC IGW collision with another concurrent adopter (409/quota) only skips this NAT family, not the whole LB lifecycle; teardown deletes the IGW after static-nat-delete, before the VPC/subnet teardown. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx."
+          "capture_soft": {"igw_id": "$.internet_gateway.id", "owned_igw_id": "$.internet_gateway.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/internet-gateways/{owned_igw_id}", "service": "vpc"},
+          "_note": "REPAIR 2026-07-06 (HB4 400 igw-required-for-static-nat, run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): static-nat-create failed 'Cannot create Public NAT: No Internet Gateway (IGW) found in the VPC'. Pattern lifted verbatim from the proven networking__vpc.json create-internet-gateway-for-nat fix (CONFIRMED live 2026-06-23: nat-gateway also requires an attached IGW) — create IGW on the same VPC, wait ACTIVE, PUT/set it (the set call is what the NAT-gateway precedent found necessary to mark the VPC's IGW as attached/active before the NAT-family create), THEN attempt static-nat-create. Grouped+optional (staticnat) so a shared-VPC IGW collision with another concurrent adopter (409/quota) only skips this NAT family, not the whole LB lifecycle; teardown deletes the IGW after static-nat-delete, before the VPC/subnet teardown. UPDATE 2026-07-07 (HB4c): this WAS observed as a genuine collision in run 28833316852 (400 already-associated, VPN family created the IGW first) — added the list-igw-for-static-nat adopt-or-create bootstrap above, so this 400 (this family running second) is now a non-event. `owned_igw_id` is captured ONLY here (from OUR OWN create response), separately from the adoption-tolerant `igw_id`, so the cleanup dict above and the explicit `delete-igw-for-static-nat` teardown step below key off `owned_igw_id` — if this create 400s (adopted, not owned), `owned_igw_id` stays unset and both those DELETE calls hit an unresolved literal path (safe 404), NEVER the VPN family's real IGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx AND that a concurrent run with networking-vpn-gateway-tunnel no longer 400s on either side's create."
         },
         {
           "name": "wait-igw-for-static-nat-active",
@@ -312,7 +324,7 @@
           "name": "delete-igw-for-static-nat",
           "service": "vpc",
           "method": "DELETE",
-          "path": "/v1/internet-gateways/{igw_id}",
+          "path": "/v1/internet-gateways/{owned_igw_id}",
           "group": "staticnat",
           "optional": true,
           "destructive": true,
@@ -320,7 +332,7 @@
           "retry_on_status": [400, 409],
           "retries": 8,
           "retry_interval": 15,
-          "_note": "Delete the IGW created for static-nat-create, children-first (after static-nat-delete, before delete-subnet/delete-vpc). Retry 400 to ride out the not-deletable-state transition (same quirk CONFIRMED for this endpoint in networking__vpc.json)."
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 2): path changed from `{igw_id}` to `{owned_igw_id}` — `igw_id` may now be an ADOPTED IGW (see list-igw-for-static-nat's note) belonging to a concurrently-running lifecycle (e.g. networking__vpn.json's VPN gateway family), and this suite must never delete another family's live resource. `owned_igw_id` is captured only by create-igw-for-static-nat's own 2xx and stays unset when we adopted instead of created, so an adopted case leaves this DELETE targeting an unresolved literal path (safe 404, matches this codebase's established soft-capture-miss convention) instead of the foreign IGW. Delete the IGW created for static-nat-create, children-first (after static-nat-delete, before delete-subnet/delete-vpc). Retry 400 to ride out the not-deletable-state transition (same quirk CONFIRMED for this endpoint in networking__vpc.json)."
         },
         {
           "name": "private-static-nat-create",
