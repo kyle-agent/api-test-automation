@@ -16,6 +16,7 @@ app.py를 건드리지 않고 착륙한다 — 오케스트레이터가 머지 �
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -169,6 +170,119 @@ def _dependents_index(model: dict) -> dict[str, list[str]]:
                 if t:
                     rev.setdefault(str(t), set()).add(nid)
     return {k: sorted(v) for k, v in rev.items()}
+
+
+# --- 카탈로그 인라인 (2026-07-07 오너 결정: Modeling이 Catalog를 흡수) -------------------
+#
+# 각 서비스 그룹 행에 "API N (모델됨 M · 미모델 K)" 집계 + 엔드포인트 드로어를 단다.
+# 데이터 = catalog_routes._load_catalog()(카탈로그 단일 소스 재사용) × 모델 노드들의
+# endpoint 참조(create/verify/ready/delete 어디에 있든 "METHOD /path" 문자열 —
+# _walk_endpoints 가 노드 정의를 재귀로 훑는다).
+#
+# 분류 규칙 (미모델 과대계상 금지 — 애매하면 '미매핑'):
+#   정규화: method 대문자 · 쿼리스트링 제거 · path 를 '/' 세그먼트로 나누고
+#   '{...}' 를 포함한 세그먼트는 이름을 버리고 자리표시자 '{}' 로 치환
+#   (catalog 의 {subnetId} 와 노드의 {subnet_id}·{vpc.vpc_id}·"stg{unique}" 가
+#   같은 자리로 맞춰진다).
+#   · 모델됨  — 정규화 키 (method, segments) 가 어떤 노드 endpoint 참조와 정확히 일치.
+#   · 미매핑  — 정확 일치는 없지만 '호환 가능'한 참조가 있음: method·세그먼트 수가
+#              같고 리터럴 세그먼트끼리는 전부 같으며, 최소 1개 자리에서 한쪽만
+#              자리표시자(예: catalog {stage_name} vs 노드 리터럴 "dev"). 모델이
+#              그 endpoint 를 구체값으로 치는지 다른 endpoint 인지 단정할 수
+#              없으므로 미모델로 세지 않고 별도 버킷으로 뺀다.
+#   · 미모델  — 위 둘 다 아님 (모델 어디에도 참조가 없음).
+
+_EP_STR_RE = re.compile(r"^([A-Z]+)\s+(\S+)$")
+
+
+def _walk_endpoints(obj):
+    """노드 정의(dict/list 트리)에서 모든 'endpoint' 문자열을 yield."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "endpoint" and isinstance(v, str):
+                yield v
+            elif isinstance(v, (dict, list)):
+                yield from _walk_endpoints(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            yield from _walk_endpoints(item)
+
+
+def _norm_endpoint(ep: str):
+    """'METHOD /path' -> (METHOD, (seg, ...)) 정규화 키 (규칙은 위 주석). 실패 None."""
+    m = _EP_STR_RE.match((ep or "").strip())
+    if not m:
+        return None
+    method, path = m.group(1), m.group(2).split("?", 1)[0]
+    segs = tuple("{}" if "{" in s else s
+                 for s in path.strip("/").split("/") if s)
+    return (method, segs) if segs else None
+
+
+def _endpoint_ref_index(model: dict) -> dict:
+    """정규화 키 -> 그 endpoint 를 참조하는 (첫) 노드 id — 드로어의 편집 딥링크용.
+    노드의 service 와 무관하게 전역으로 모은다(교차 서비스 verify 도 '모델됨')."""
+    idx: dict = {}
+    for nid in sorted(model):
+        for ep in _walk_endpoints(model[nid]):
+            key = _norm_endpoint(ep)
+            if key and key not in idx:
+                idx[key] = nid
+    return idx
+
+
+def _catalog_by_service() -> dict:
+    """catalog -> {'category/service': [{method, path, name}, ...]} (경로·method 정렬)."""
+    from controlplane import catalog_routes
+    by: dict = {}
+    for e in catalog_routes._load_catalog():
+        skey = (f"{e.get('category') or '(uncategorized)'}/"
+                f"{e.get('service') or '(unknown)'}")
+        by.setdefault(skey, []).append({
+            "method": str(e.get("method") or "").upper(),
+            "path": str(e.get("http_path") or e.get("path") or ""),
+            "name": str(e.get("name") or ""),
+        })
+    for rows in by.values():
+        rows.sort(key=lambda r: (r["path"], r["method"]))
+    return by
+
+
+def _classify_endpoints(eps: list[dict], ref_idx: dict) -> list[dict]:
+    """카탈로그 엔드포인트마다 status(modeled|unmapped|unmodeled) + node 를 붙인다."""
+    # 호환 검사용: (method, 세그먼트 수) -> [(segs, node_id)]
+    by_shape: dict = {}
+    for (method, segs), nid in ref_idx.items():
+        by_shape.setdefault((method, len(segs)), []).append((segs, nid))
+    out = []
+    for ep in eps:
+        key = _norm_endpoint(f"{ep['method']} {ep['path']}")
+        status, node = "unmodeled", ""
+        if key and key in ref_idx:
+            status, node = "modeled", ref_idx[key]
+        elif key:
+            for segs, nid in by_shape.get((key[0], len(key[1])), []):
+                if all(a == b or a == "{}" or b == "{}"
+                       for a, b in zip(key[1], segs)):
+                    status, node = "unmapped", nid
+                    break
+        out.append({**ep, "status": status, "node": node})
+    return out
+
+
+def _service_endpoint_stats(model: dict) -> dict:
+    """'category/service' -> {api, modeled, unmodeled, unmapped} — svc 그룹 행 집계."""
+    ref_idx = _endpoint_ref_index(model)
+    stats: dict = {}
+    for skey, eps in _catalog_by_service().items():
+        rows = _classify_endpoints(eps, ref_idx)
+        stats[skey] = {
+            "api": len(rows),
+            "modeled": sum(1 for r in rows if r["status"] == "modeled"),
+            "unmodeled": sum(1 for r in rows if r["status"] == "unmodeled"),
+            "unmapped": sum(1 for r in rows if r["status"] == "unmapped"),
+        }
+    return stats
 
 
 def _modeling_rows(model: dict, meta: dict, deps_idx: dict) -> list[dict]:
@@ -430,6 +544,11 @@ def map_page(request: Request):
     deps_idx = _dependents_index(model)
     rows = _modeling_rows(model, meta, deps_idx)
     tree = _modeling_tree(rows)
+    # 카탈로그 흡수(2026-07-07): 서비스 그룹 행에 "API N (모델됨 M · 미모델 K)" 집계
+    ep_stats = _service_endpoint_stats(model)
+    for cat in tree:
+        for svc in cat["services"]:
+            svc["ep"] = ep_stats.get(svc["service"])
     total = len(model)
     validated = sum(1 for v in meta.values() if v["provenance"] == "VALIDATED")
     gated = sum(1 for v in meta.values()
@@ -442,6 +561,25 @@ def map_page(request: Request):
                    total=total, validated=validated, docs=docs, gated=gated,
                    incomplete=incomplete, anchors=len(targets),
                    tree=tree, services=services, has_composer=True)
+
+
+@router.get("/map/endpoints", response_class=HTMLResponse)
+def map_endpoints(request: Request, service: str = ""):
+    """서비스 엔드포인트 드로어 파셜 (htmx lazy) — 카탈로그의 그 서비스 슬라이스를
+    METHOD path + 상태 칩(모델됨→노드 편집 링크 / 미매핑 / 미모델)으로 렌더.
+    1,372개 전체를 map 페이지에 한 번에 렌더하지 않기 위한 서버 파셜이다."""
+    skey = (service or "").strip()
+    eps = _catalog_by_service().get(skey)
+    if eps is None:
+        return templates.TemplateResponse(
+            request, "resource_map_endpoints.html",
+            {"endpoints": [], "service": skey,
+             "error": f"카탈로그에 '{skey}' 서비스가 없습니다"})
+    model = resource_model.load_model()
+    rows = _classify_endpoints(eps, _endpoint_ref_index(model))
+    return templates.TemplateResponse(
+        request, "resource_map_endpoints.html",
+        {"endpoints": rows, "service": skey, "error": ""})
 
 
 @router.get("/worklist", response_class=HTMLResponse)

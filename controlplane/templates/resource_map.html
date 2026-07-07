@@ -40,6 +40,21 @@
   .prov.docs{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
   .prov.q{background:var(--grey-bg);color:var(--grey);border-color:var(--grey)}
   .ok{color:var(--green);font-weight:700}.bad{color:#b26a00;font-weight:700}.miss{color:#cf222e}
+  /* 엔드포인트 드로어 (카탈로그 흡수 2026-07-07) — svc 행의 집계 토글 + lazy 파셜 */
+  .epbtn{margin-left:14px;font-size:11.5px;font-weight:600;color:var(--blue);white-space:nowrap;
+      text-decoration:none;cursor:pointer}
+  .epbtn:hover{text-decoration:underline}
+  .epbtn .epu{color:var(--amber)} .epbtn .epq{color:var(--grey)}
+  tr.epdrawer td{background:#fbfcfd;padding:6px 10px 8px 34px;border-bottom:1px solid var(--border)}
+  table.eplist{width:100%;border-collapse:collapse;font-size:12px}
+  table.eplist td{padding:3px 8px;border-bottom:1px solid #eef1f3;vertical-align:middle}
+  table.eplist tr:last-child td{border-bottom:0}
+  .epchip{display:inline-block;padding:1px 8px;border-radius:11px;font-size:10.5px;font-weight:700;
+      white-space:nowrap;text-decoration:none}
+  .epchip.ok{background:var(--green-bg);color:var(--green)}
+  .epchip.ok:hover{text-decoration:underline}
+  .epchip.q{background:var(--amber-bg);color:var(--amber)}
+  .epchip.no{background:var(--grey-bg);color:var(--grey)}
   td.idc a{font-weight:700;color:var(--blue);text-decoration:none}
   td.idc a:hover{text-decoration:underline}
   .editbtn{padding:3px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);
@@ -75,9 +90,10 @@
     <a href="/ai/task-draft" style="font-size:13px;font-weight:600"
        title="모델 공백 서비스의 자원 task 정의를 AI가 초안 — drafts/ 검토용">AI 초안 →</a>
   </h2>
-  <div class="vs"><b>Catalog</b>은 "어떤 <b>API 엔드포인트</b>가 있나"(1,372개·읽기 전용)라면,
-    <b>Modeling</b>은 그 자원을 "어떻게 <b>만들고·검증·삭제</b>하는지" 테스트 <b>모델 노드</b>(273개)로
-    저작한다 — 의존관계·완성도·검증상태(provenance)를 <b>편집</b>. 행 클릭 = 그 노드 정의 편집.</div>
+  <div class="vs"><b>Modeling</b>은 전체 <b>API 엔드포인트</b>(카탈로그, 서비스 그룹 행에
+    "API N" 집계로 인라인 — 클릭=목록 펼침)를 "어떻게 <b>만들고·검증·삭제</b>하는지" 테스트
+    <b>모델 노드</b>로 저작한다 — 의존관계·완성도·검증상태를 <b>편집</b>. 행 클릭 = 그 노드
+    정의 편집. 전체 인벤토리 참조는 상단 <a href="/catalog">📖 카탈로그</a>.</div>
 
   <div class="cards" style="margin-bottom:12px">
     <div class="card"><div class="num">{{ total }}</div><div class="lbl">모델 노드</div></div>
@@ -124,8 +140,23 @@
           <td colspan="8"><span class="caret">▾</span>
             <span class="srv">{{ svc.service }}</span>
             <span class="tally">{{ svc.n }} 노드 · <span class="v">✓{{ svc.val }}</span>
-              <span class="i">⚠{{ svc.inc }}</span> <span class="d">docs {{ svc.docs }}</span>{% if svc.gated %} <span class="g" title="계정 게이트 — 할 수 없음">🔒{{ svc.gated }}</span>{% endif %}</span></td>
+              <span class="i">⚠{{ svc.inc }}</span> <span class="d">docs {{ svc.docs }}</span>{% if svc.gated %} <span class="g" title="계정 게이트 — 할 수 없음">🔒{{ svc.gated }}</span>{% endif %}</span>
+            {%- if svc.ep %}
+            <a class="epbtn" href="#"
+               hx-get="/planning/resources/map/endpoints?service={{ svc.service|urlencode }}"
+               hx-target="#epd-{{ svc.service|replace('/','--') }}" hx-trigger="click once"
+               hx-swap="innerHTML"
+               title="이 서비스의 카탈로그 엔드포인트 펼치기 — 모델됨=노드 편집 링크 · 미모델=참조 없음 · 미매핑=참조가 구체값이라 단정 불가(미모델로 세지 않음)">API {{ svc.ep.api }}
+              (모델됨 {{ svc.ep.modeled }} · <span class="epu">미모델 {{ svc.ep.unmodeled }}</span>{% if svc.ep.unmapped %} · <span class="epq">미매핑 {{ svc.ep.unmapped }}</span>{% endif %}) ▸</a>
+            {%- endif %}</td>
         </tr>
+        {% if svc.ep %}
+        <tr class="epdrawer" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}"
+            style="display:none">
+          <td colspan="8"><div id="epd-{{ svc.service|replace('/','--') }}"
+              class="muted small">엔드포인트 목록 로딩…</div></td>
+        </tr>
+        {% endif %}
           {% for r in svc.nodes %}
           <tr class="node" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}"
               data-prov="{{ r.provenance }}" data-complete="{{ '1' if r.complete else '0' }}"
@@ -190,9 +221,10 @@
   var nodeRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.node"));
   var catRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.cat"));
   var svcRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.svc"));
+  var epRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.epdrawer"));
   var fSearch = document.getElementById("f-search"), fService = document.getElementById("f-service");
   var fCount = document.getElementById("f-count");
-  var status = "all", collapsedCats = {}, collapsedSvcs = {};
+  var status = "all", collapsedCats = {}, collapsedSvcs = {}, openDrawers = {};
   // P2-7: 카테고리 기본 접힘 (17k px 방지) — 펼침 상태는 세션 동안 기억.
   // 검색/필터 중에는 apply()가 접힘을 무시하므로 매치는 항상 보인다.
   var SS = "modeling.collapsed", stored = null;
@@ -225,6 +257,14 @@
       tr.style.display = vis ? "" : "none";
       var car = tr.querySelector(".caret"); if (car) car.textContent = collapsedSvcs[key] ? "▸" : "▾";
     });
+    // 엔드포인트 드로어: 열림 상태 + 소속 svc 행이 보이고 접히지 않았을 때만
+    // (검색/필터 중엔 숨김 — 매치 대상은 노드 행이지 카탈로그 목록이 아니다)
+    epRows.forEach(function (tr) {
+      var key = tr.dataset.cat + "/" + tr.dataset.svc;
+      var vis = openDrawers[key] && !filtering && svcVis[key] &&
+                !collapsedCats[tr.dataset.cat] && !collapsedSvcs[key];
+      tr.style.display = vis ? "" : "none";
+    });
     catRows.forEach(function (tr) {
       tr.style.display = catVis[tr.dataset.cat] ? "" : "none";
       var car = tr.querySelector(".caret"); if (car) car.textContent = collapsedCats[tr.dataset.cat] ? "▸" : "▾";
@@ -244,6 +284,16 @@
     collapsedCats[tr.dataset.cat] = !collapsedCats[tr.dataset.cat]; persist(); apply(); }); });
   svcRows.forEach(function (tr) { tr.addEventListener("click", function () {
     var k = tr.dataset.cat + "/" + tr.dataset.svc; collapsedSvcs[k] = !collapsedSvcs[k]; persist(); apply(); }); });
+  // 엔드포인트 집계 토글 — svc 행 접기 클릭과 분리(stopPropagation). 첫 클릭은
+  // htmx(hx-trigger="click once")가 파셜을 lazy 로드하고, 이후엔 열림/닫힘만.
+  document.querySelectorAll(".epbtn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var tr = btn.closest("tr");
+      var key = tr.dataset.cat + "/" + tr.dataset.svc;
+      openDrawers[key] = !openDrawers[key]; apply();
+    });
+  });
   var allCollapsed = catRows.every(function (tr) { return !!collapsedCats[tr.dataset.cat]; });
   document.getElementById("collapse-all").addEventListener("click", function () {
     allCollapsed = !allCollapsed; collapsedCats = {};
