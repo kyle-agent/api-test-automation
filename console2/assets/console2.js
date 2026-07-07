@@ -227,14 +227,41 @@ function wireNav() {
   // detail sub-tabs (자원·API·로그) — switch the DETAIL pane's tab; the master 흐름
   // scene is persistent and untouched by a tab switch.
   els("#detail-subtabs button").forEach(b => b.onclick = () => { setDetailTab(b.dataset.d); });
-  // 🌐 런타임 뷰 — open the current live-resource topology in a separate popup.
-  // Static demo (no backend) → baked snapshot; live server → the dynamic endpoint.
+  // 🌐 런타임 뷰 (새 창) — open the current live-resource topology in a separate
+  // popup. Static demo (no backend) → baked snapshot; live server → the dynamic
+  // endpoint. The INLINE face of the same page is the ② detail '런타임' tab.
   const rl = $("runtimeLink");
   if (rl) rl.onclick = (e) => {
     e.preventDefault();
-    const url = window.__C2_STATIC__ ? "runtime.html" : "/runtime";
-    window.open(url, "scp-runtime", "width=1320,height=900,scrollbars=yes,resizable=yes");
+    window.open(runtimeUrl(), "scp-runtime", "width=1320,height=900,scrollbars=yes,resizable=yes");
   };
+  // 실행 기록 fold — 기본 접힘 (CX 재배치: 과거 히스토리가 현재 실행을 가리지 않게)
+  const ht = $("hist-toggle");
+  if (ht) ht.onclick = () => setHistOpen(!histOpen);
+  syncHistFold();
+}
+
+// the ONE runtime-view URL (single source — popup 링크와 인라인 iframe 이 공유).
+// scope=mine 기본 · 페이지 자체가 주기 자동 갱신(6fa9ec12)을 갖고 있다.
+function runtimeUrl() {
+  return window.__C2_STATIC__ ? "runtime.html" : "/runtime?scope=mine";
+}
+
+// ---- 실행 기록 접힘 (CX 재배치 2026-07-07) --------------------------------------
+// 과거 히스토리는 기본 접힘 — 항상 노출되는 것은 토글 헤더 + (실행이 없을 때)
+// 최근 종료 1건 요약 행뿐. 펼침 상태는 sessionStorage 유지.
+let histOpen = false;
+try { histOpen = sessionStorage.getItem("c2.histOpen.v1") === "1"; } catch (e) { /* private mode */ }
+function setHistOpen(v) {
+  histOpen = !!v;
+  try { sessionStorage.setItem("c2.histOpen.v1", histOpen ? "1" : "0"); } catch (e) { /* ignore */ }
+  syncHistFold();
+}
+function syncHistFold() {
+  const body = $("report-side");
+  if (body) body.classList.toggle("hidden", !histOpen);
+  const car = $("hist-car");
+  if (car) car.textContent = histOpen ? "▾" : "▸";
 }
 function go(scr) {
   screen = scr;
@@ -588,8 +615,9 @@ function graphReadout(g) {
 // When `focus` is given (그림|표 with a focused node), the table is SCOPED to the
 // focus dependency path — the same selection shown linearly. A scope note above the
 // table tells the user what they're looking at.
-function orderTable(g, focus) {
-  const scopeSet = focus && focus.resourceIds ? new Set(focus.resourceIds) : null;
+// pure order data over a graph: 생성 순서(dedup) · 삭제 rank · node lookup — the
+// SAME table backs ① (dag-tableview) and ② (run 그래프 아래 접힘 순서표).
+function orderRowsData(g, scopeSet) {
   const inScope = id => !scopeSet || scopeSet.has(id);
   const createOrder = [], seen = new Set();
   (g.order || []).forEach(inst => { const b = baseId(inst); if (!seen.has(b) && inScope(b)) { seen.add(b); createOrder.push(b); } });
@@ -597,6 +625,27 @@ function orderTable(g, focus) {
   const delRank = {}; let r = 0;
   (g.teardown || []).forEach(inst => { const b = baseId(inst); if (!(b in delRank) && inScope(b)) delRank[b] = ++r; });
   const nodeById = {}; (g.nodes || []).forEach(n => { nodeById[n.id] = n; });
+  return { createOrder, delRank, nodeById };
+}
+const ORDER_THEAD = "<thead><tr><th>생성#</th><th>리소스</th><th>service</th><th>검증(verify)</th><th>삭제#</th></tr></thead>";
+function orderRowHtml(id, i, data, cls) {
+  const n = data.nodeById[id] || {};
+  const verifyN = (N[id] && N[id].verify_n != null) ? N[id].verify_n : 0;
+  const tgt = n.is_target ? '<span class="bdg run" style="border:none;background:none;color:var(--accent);padding:0">★</span>' : "";
+  const sh = n.shared ? '<span class="tag amber" title="공유(dedup)">공유</span>' : "";
+  return `<tr${cls ? ` class="${cls}"` : ""}>
+    <td class="ordn">${i + 1}</td>
+    <td><b>${esc(id)}</b> ${tgt} ${sh}${n.heavy ? " 🜂" : ""}</td>
+    <td class="muted">${esc(shortName(n.service || (N[id] && N[id].service) || ""))}</td>
+    <td class="ordn">${verifyN}</td>
+    <td class="ordn">${data.delRank[id] || "—"}</td>
+  </tr>`;
+}
+
+function orderTable(g, focus) {
+  const scopeSet = focus && focus.resourceIds ? new Set(focus.resourceIds) : null;
+  const data = orderRowsData(g, scopeSet);
+  const createOrder = data.createOrder;
   // scope note (shown in 표 mode; harmless in 그림 mode where the table is hidden)
   const titleEl = $("dag-table-title");
   if (titleEl) {
@@ -605,21 +654,8 @@ function orderTable(g, focus) {
       : `<div class="tab-scope">전체 선택 · <b>${createOrder.length}</b> 자원</div>`;
     titleEl.innerHTML = `생성 · 검증 · 삭제 순서표${note}`;
   }
-  const rows = createOrder.map((id, i) => {
-    const n = nodeById[id] || {};
-    const verifyN = (N[id] && N[id].verify_n != null) ? N[id].verify_n : 0;
-    const tgt = n.is_target ? '<span class="bdg run" style="border:none;background:none;color:var(--accent);padding:0">★</span>' : "";
-    const sh = n.shared ? '<span class="tag amber" title="공유(dedup)">공유</span>' : "";
-    return `<tr>
-      <td class="ordn">${i + 1}</td>
-      <td><b>${esc(id)}</b> ${tgt} ${sh}${n.heavy ? " 🜂" : ""}</td>
-      <td class="muted">${esc(shortName(n.service || (N[id] && N[id].service) || ""))}</td>
-      <td class="ordn">${verifyN}</td>
-      <td class="ordn">${delRank[id] || "—"}</td>
-    </tr>`;
-  }).join("");
-  $("order-tbl").innerHTML =
-    `<thead><tr><th>생성#</th><th>리소스</th><th>service</th><th>검증(verify)</th><th>삭제#</th></tr></thead>` +
+  const rows = createOrder.map((id, i) => orderRowHtml(id, i, data, "")).join("");
+  $("order-tbl").innerHTML = ORDER_THEAD +
     `<tbody>${rows || '<tr><td colspan="5" class="empty">없음</td></tr>'}</tbody>`;
 }
 
@@ -1543,7 +1579,7 @@ function pfRender(plan, capacity, sel, opts) {
         "<p><b>" + (queued ? "⌛ 대기 큐에 등록됨" : "✅ LIVE 실행 시작") + "</b> — run <code>" + esc(j.id) + "</code></p>" +
         '<p class="muted small">진행은 아래 리포트에서, 실제 자원 토폴로지는 활동 흐름에서 확인하세요.</p>';
       $("pf-foot").innerHTML =
-        '<a class="btn ghost" href="/runtime?scope=mine" target="_blank">🌐 활동 흐름 → /runtime?scope=mine</a>' +
+        '<a class="btn ghost" href="' + esc(runtimeUrl()) + '" target="_blank">🌐 활동 흐름 (런타임 뷰)</a>' +
         '<button class="btn" id="pf-done">리포트 보기</button>';
       $("pf-done").onclick = pfClose;
     });
@@ -1630,6 +1666,12 @@ function postRun(sel, cb) {
       }
       pollEvents();
       drawCapBar();   // reflect the new run in the capacity bar (refreshes on next poll)
+      // 실행 admit → ② 히어로(현재 실행)로 자동 포커스: go("run") 은 위에서 보장,
+      // 화면이 길 때 히어로가 뷰포트에 들어오게 스크롤까지 (CX 재배치 4).
+      try {
+        const hero = $("md-report");
+        if (hero && hero.scrollIntoView) hero.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (e) { /* older browsers — non-fatal */ }
       if (cb) cb(null, j);
     }).catch(e => { $("report-main").innerHTML = '<p class="empty">실행 연결 실패: ' + esc(e.message) + "</p>"; if (cb) cb(e.message, null); });
 }
@@ -2009,8 +2051,24 @@ function renderDetailBody() {
   keepDetailScroll(() => {
     if (detailTab === "res") reportR2();
     else if (detailTab === "api") reportR3();
+    else if (detailTab === "rt") reportRT();
     else reportR4();
   });
+}
+
+// 런타임(계정 실측) — DETAIL 4번째 탭 (CX 재배치): 기존 /runtime 페이지(scope=mine
+// 기본 · 페이지 자체 주기 자동 갱신, 6fa9ec12)를 iframe 으로 그대로 임베드. 단일
+// 소스 원칙 — 런타임 로직을 콘솔에 복제하지 않는다. 셸은 1회만 구축: 폴마다
+// drawReport→renderDetailBody 가 다시 불려도 iframe 을 리로드하지 않는다.
+function reportRT() {
+  if ($("rt-frame")) return;                 // already embedded — keep it alive
+  const url = runtimeUrl();
+  $("detail-body").innerHTML =
+    `<h3 class="detail-h">런타임 <span class="muted small">· 계정 실측 — 지금 실제 떠 있는 자원 토폴로지 (내 실행 우선 · 자동 갱신)</span>
+       <button class="minibtn" id="rt-popout" title="런타임 뷰를 별도 창으로 크게">↗ 새 창</button></h3>
+     <iframe id="rt-frame" class="rt-frame" src="${esc(url)}" title="런타임 뷰 — 계정 실측 토폴로지"></iframe>`;
+  $("rt-popout").onclick = () =>
+    window.open(url, "scp-runtime", "width=1320,height=900,scrollbars=yes,resizable=yes");
 }
 
 // Preserve the detail list's scroll position across a re-render. The live poll
@@ -2147,6 +2205,36 @@ function graphModeChip(mode) {
   return `<div class="modechip mode-${esc(mode)}">${cur} ${other}</div>`;
 }
 
+// 계획↔실행 연속성 칩 (CX 재배치): run 그래프가 바인딩되면 "① 에서 계획한
+// 폐쇄집합 그대로" 임을 명시 — 같은 composer.graph_view 합성, 같은 생성 순서.
+function planContinuityHtml(choice, g) {
+  if (!choice || choice.mode !== "run" || !g || !g.nodes) return "";
+  const live = runStatus === "running" || runStatus === "queued";
+  return `<div class="plan-cont" title="run 그래프는 ① Test Planning 과 동일한 composer.graph_view 합성 — 같은 폐쇄집합, 레벨 = 같은 생성 순서. 실 ID·연관은 그래프 노드와 자원 탭에서">` +
+    `①→② ① 에서 계획한 폐쇄집합 그대로 ${live ? "실행 중" : "실행"} — <b>${g.nodes.length}</b> 리소스 · 생성 순서 동일</div>`;
+}
+
+// ② run 순서표 — ① 의 생성·검증·삭제 순서표와 같은 표를 표시 중인 그래프로,
+// 접힘(details) 아래 제공 + 현재 진행 행 하이라이트 (now-playing 의 active
+// lifecycle 에 속한 리소스 행 = .ordnow). 폴마다 tbody 만 다시 그리므로 details
+// 의 열림 상태는 유지된다.
+function renderRunOrderTable(g) {
+  const tbl = $("r1-order-tbl"); if (!tbl) return;
+  if (!g || !g.nodes || !g.nodes.length) {
+    tbl.innerHTML = ORDER_THEAD + '<tbody><tr><td colspan="5" class="empty">없음</td></tr></tbody>';
+    const cnt0 = $("r1-order-n"); if (cnt0) cnt0.textContent = 0;
+    return;
+  }
+  const data = orderRowsData(g, null);
+  const prog = liveProgress();
+  const activeLc = prog.running ? prog.activeLifecycle : null;
+  const rows = data.createOrder.map((id, i) => orderRowHtml(id, i, data,
+    activeLc && N[id] && N[id].lifecycle === activeLc ? "ordnow" : "")).join("");
+  tbl.innerHTML = ORDER_THEAD +
+    `<tbody>${rows || '<tr><td colspan="5" class="empty">없음</td></tr>'}</tbody>`;
+  const cnt = $("r1-order-n"); if (cnt) cnt.textContent = data.createOrder.length;
+}
+
 function reportR1() {
   const prog = liveProgress();
   const activeLc = prog.activeLifecycle;
@@ -2166,6 +2254,7 @@ function reportR1() {
     if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
     $("report-main").innerHTML = `<div id="r1-banner">${banner}</div>
       ${graphModeChip(choice.mode)}
+      <div id="r1-plan-cont">${planContinuityHtml(choice, g)}</div>
       <div class="legend">${legend([["#ffffff", "대기"], ["#e8f0fd", "진행 중"], ["#eaf7ee", "완료"], ["#fdeaea", "실패"]])}
         <span>접힌 그룹 = done/total · 그룹 클릭=펼치기 · <b>노드 클릭 = focus + 그 라이프사이클 상세 열기</b> · 🗑 = 자원 삭제됨</span></div>
       <div class="dag-toolbar">
@@ -2181,7 +2270,11 @@ function reportR1() {
           <div class="zoomctl"><button id="r1-zin">+</button><button id="r1-zout">−</button><button id="r1-zfit" class="fit">맞춤</button></div>
         </div>
       </div>
-      <div id="r1-prog" style="margin-top:8px"></div>`;
+      <div id="r1-prog" style="margin-top:8px"></div>
+      <details class="r1-order" id="r1-order">
+        <summary>생성 · 검증 · 삭제 순서표 <span class="muted small">— ① 과 동일한 표 · <b id="r1-order-n">0</b> 자원 · 진행 중 행 하이라이트</span></summary>
+        <div class="scroll r1-order-scroll"><table class="tbl" id="r1-order-tbl"></table></div>
+      </details>`;
     $("r1-stage-wrap").dataset.run = shellKey;
     const mt = $("r1-mode-toggle");
     if (mt) mt.onclick = () => {
@@ -2225,6 +2318,8 @@ function reportR1() {
   } else {
     // same run, subsequent poll: refresh the banner + overlay in place (no rebuild)
     $("r1-banner").innerHTML = banner;
+    const pc = $("r1-plan-cont");
+    if (pc) pc.innerHTML = planContinuityHtml(choice, g);   // 실행 중 → 실행 (종료 시)
     if (r1Scene) r1Scene.refresh();
   }
   const st = lifecycleStates();
@@ -2270,6 +2365,7 @@ function reportR1() {
     <h3>${waveHdr}</h3>${waveLines || (runEvents.length
       ? '<p class="muted small">진행 정보 집계 중…</p>'
       : '<p class="muted small">실행 시작을 기다리는 중…</p>')}`;
+  renderRunOrderTable(g);   // ① 과 같은 순서표 — 진행 중 행 하이라이트 동기 (폴마다)
 }
 
 // 자원 (DETAIL · scoped) — per-resource rows (생성·테스트·삭제 + id) for the current
@@ -2617,12 +2713,60 @@ function rescanChipLabel(e) {
   if (e.skipped) return t + " 스킵";
   return t + " 실패";
 }
+// one run-record row (shared by the folded list AND the always-visible 최근 종료
+// summary row above the fold).
+function runRowHtml(r) {
+  const KIND = { simulate: "▶sim", lifecycle: "▶live", cleanup: "🧹", verify: "🔍", owned: "🔍" };
+  const icon = r.status === "queued" ? "⌛" : r.status === "running" ? "⏳"
+    : r.status === "aborted" ? "⏹"
+    : r.status === "done" ? (r.rc === 0 ? "✅" : "⚠️")
+    : r.status === "unknown" ? "▪" : "❌";
+  const dur = (r.ended && r.started) ? Math.round(r.ended - r.started) + "s"
+    : (r.status === "running" ? "실행중…" : r.status === "queued" ? "대기 중…" : "");
+  const on = runId === r.id;
+  const tag = KIND[r.kind] || esc(r.kind || "");
+  // 복원됨 = a rec rehydrated from disk after a server restart (신규2)
+  const rehy = r.rehydrated
+    ? ' <span class="kindtag rehy" title="서버 재시작 후 디스크 기록에서 복원됨">복원됨</span>' : "";
+  // 종료 후 재스캔 상태: 각 라운드를 0건/스킵/실패로 구분해 표기 + 남은 라운드
+  const scans = r.rescans || [];
+  const planned = (r.rescan_offsets && r.rescan_offsets.length) || (scans.length ? scans.length : 0);
+  const scanFull = scans.map(e => rescanChipLabel(e)
+    + (e.skipped ? " (" + e.skipped + ")" : e.error ? " (" + e.error + ")" : "")).join(" · ");
+  let late = "";
+  if (r.late_alert) {
+    late = ` <span class="latealert" title="${esc(r.late_alert.msg || "")}">⚠ 종료 후 자원 늦출현 ${r.late_alert.delta}건</span>`;
+  } else if (r.kind === "lifecycle" && scans.length) {
+    const pend = planned > scans.length ? " · 예정 " + (planned - scans.length) : "";
+    late = ` <span class="muted small" title="${esc("종료 후 실측 재스캔 (+0·+5m·+15m): " + scanFull)}">재스캔 ${scans.map(rescanChipLabel).join(" · ")}${pend}</span>`;
+  }
+  return `<div class="runrow ${on ? "on" : ""}" data-id="${esc(r.id)}">
+    <span><span class="kindtag">${tag}</span>${rehy} <b class="small">${icon} ${esc(r.id)}</b>
+      <span class="muted small">${esc((r.lifecycle_ids || []).slice(0, 2).join(", "))}${(r.lifecycle_ids || []).length > 2 ? " …" : ""}</span>${late}</span>
+    <span class="muted small">${esc(r.summary || r.status)} · ${dur}</span></div>`;
+}
+
+// the fold header (count) + the always-visible row: 실행 중이면 히어로가 전면이라
+// 생략, 아니면 최근 종료 1건 요약 — 접힌 히스토리 밖에서도 "방금 무엇이 끝났나"는
+// 한 줄로 보인다.
+function renderHistHead(runsOnly) {
+  const hc = $("hist-count");
+  if (hc) hc.textContent = runsOnly.length;
+  const cur = $("hist-current"); if (!cur) return;
+  const inFlight = runId && (runStatus === "running" || runStatus === "queued");
+  const lastDone = runsOnly.find(r => r.status !== "running" && r.status !== "queued");
+  if (inFlight || !lastDone) { cur.innerHTML = ""; return; }
+  cur.innerHTML = `<div class="hist-lastlbl muted small">최근 종료 — 클릭하면 리포트로</div>` + runRowHtml(lastDone);
+  els("#hist-current .runrow").forEach(row => row.onclick = () => loadRunIntoReport(row.dataset.id));
+}
+
 function loadRunRecords() {
   fetch("/api/runs").then(r => r.json()).then(j => {
     const all = j.runs || [];
     handleLateAlerts(all);    // 종료 후 자원 늦출현 (신규1) — 알림 + 패널 재스캔 (필터와 무관)
     const host = $("report-side"); if (!host) return;
     const runsOnly = all.filter(r => r.kind === "lifecycle");
+    renderHistHead(runsOnly);
     const hidden = all.length - runsOnly.length;
     const runs = runHistAll ? all : runsOnly;
     const filterBar = `<div class="histfilter">
@@ -2635,36 +2779,7 @@ function loadRunRecords() {
       wireHistFilter();
       return;
     }
-    const KIND = { simulate: "▶sim", lifecycle: "▶live", cleanup: "🧹", verify: "🔍", owned: "🔍" };
-    host.innerHTML = filterBar + runs.map(r => {
-      const icon = r.status === "queued" ? "⌛" : r.status === "running" ? "⏳"
-        : r.status === "aborted" ? "⏹"
-        : r.status === "done" ? (r.rc === 0 ? "✅" : "⚠️")
-        : r.status === "unknown" ? "▪" : "❌";
-      const dur = (r.ended && r.started) ? Math.round(r.ended - r.started) + "s"
-        : (r.status === "running" ? "실행중…" : r.status === "queued" ? "대기 중…" : "");
-      const on = runId === r.id;
-      const tag = KIND[r.kind] || esc(r.kind || "");
-      // 복원됨 = a rec rehydrated from disk after a server restart (신규2)
-      const rehy = r.rehydrated
-        ? ' <span class="kindtag rehy" title="서버 재시작 후 디스크 기록에서 복원됨">복원됨</span>' : "";
-      // 종료 후 재스캔 상태: 각 라운드를 0건/스킵/실패로 구분해 표기 + 남은 라운드
-      const scans = r.rescans || [];
-      const planned = (r.rescan_offsets && r.rescan_offsets.length) || (scans.length ? scans.length : 0);
-      const scanFull = scans.map(e => rescanChipLabel(e)
-        + (e.skipped ? " (" + e.skipped + ")" : e.error ? " (" + e.error + ")" : "")).join(" · ");
-      let late = "";
-      if (r.late_alert) {
-        late = ` <span class="latealert" title="${esc(r.late_alert.msg || "")}">⚠ 종료 후 자원 늦출현 ${r.late_alert.delta}건</span>`;
-      } else if (r.kind === "lifecycle" && scans.length) {
-        const pend = planned > scans.length ? " · 예정 " + (planned - scans.length) : "";
-        late = ` <span class="muted small" title="${esc("종료 후 실측 재스캔 (+0·+5m·+15m): " + scanFull)}">재스캔 ${scans.map(rescanChipLabel).join(" · ")}${pend}</span>`;
-      }
-      return `<div class="runrow ${on ? "on" : ""}" data-id="${esc(r.id)}">
-        <span><span class="kindtag">${tag}</span>${rehy} <b class="small">${icon} ${esc(r.id)}</b>
-          <span class="muted small">${esc((r.lifecycle_ids || []).slice(0, 2).join(", "))}${(r.lifecycle_ids || []).length > 2 ? " …" : ""}</span>${late}</span>
-        <span class="muted small">${esc(r.summary || r.status)} · ${dur}</span></div>`;
-    }).join("");
+    host.innerHTML = filterBar + runs.map(runRowHtml).join("");
     els("#report-side .runrow").forEach(row => row.onclick = () => loadRunIntoReport(row.dataset.id));
     wireHistFilter();
   }).catch(() => { const host = $("report-side"); if (host) host.innerHTML = '<p class="muted small">서버 연결 실패</p>'; });

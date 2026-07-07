@@ -642,3 +642,28 @@ g.rg-selbox{cursor:pointer}
 /* '포함 API' 재계산 스피너 */
 .spin{display:inline-block;animation:npspin 1s linear infinite;font-weight:700}
 @keyframes npspin{to{transform:rotate(360deg)}}
+
+/* ---- CX 재배치 (2026-07-07): 현재 실행 전면 · 계획↔실행 연속 · 런타임 인라인 ---- */
+/* 실행 기록 — 기본 접힘 섹션 (히어로 아래로 강등; 토글 헤더 + 최근 종료 1건만 상시) */
+.hist-sec{margin-top:14px;border-top:1px solid var(--line);padding-top:6px}
+.hist-toggle{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:transparent;
+  border:none;cursor:pointer;font:inherit;font-weight:800;color:var(--ink);padding:5px 2px;font-size:12.5px}
+.hist-toggle:hover{color:var(--accent)}
+.hist-toggle .hist-car{color:var(--muted);width:12px;display:inline-block}
+.hist-lastlbl{margin:4px 0 2px}
+/* 계획↔실행 연속성 칩 — run 그래프 바인딩 시 "① 그대로" 명시 */
+.plan-cont{display:inline-flex;align-items:center;gap:6px;margin:2px 0 7px;padding:3px 10px;
+  border-radius:14px;background:#eef7f0;border:1px solid #b6dfc2;color:#1a7f37;
+  font-size:11.5px;font-weight:600}
+#r1-plan-cont:empty{display:none}
+/* ② run 순서표 (접힘) — ① 과 동일한 표 + 진행 중 행 하이라이트 */
+.r1-order{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.r1-order>summary{cursor:pointer;padding:8px 12px;font-weight:700;font-size:12.5px;list-style:none}
+.r1-order>summary::-webkit-details-marker{display:none}
+.r1-order>summary:before{content:"▸ ";color:var(--muted)}
+.r1-order[open]>summary:before{content:"▾ "}
+.r1-order .r1-order-scroll{max-height:320px;overflow:auto;padding:0 10px 10px}
+.r1-order tr.ordnow td{background:#e8f0fd}
+.r1-order tr.ordnow td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+/* 런타임 인라인 탭 — 기존 /runtime 페이지 iframe 임베드 (단일 소스) */
+.rt-frame{width:100%;height:620px;border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:6px}
