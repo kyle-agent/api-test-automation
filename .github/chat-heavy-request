@@ -1,13 +1,13 @@
-# HB5 (CAMPAIGN-C3-100, 2026-07-07): untouched networking family — peering +
-# direct-connect routing + private-NAT + private DNS hosted zone.
-# Target: H 13 + W 7. VPC: peering 2 + DC-side 1 + shared = 4/5 cap.
-# This push also fixes the stale-junit defect (pytest --junitxml explicit +
-# tracked reports/junit-crud.xml untracked) — first run with real junit.
-# Lane gates verified: HB4b folded (+24), TGW+VPC leftovers force-swept to
-# baseline (owned==1 muted log-group), no active workflow runs.
+# HB4c (CAMPAIGN-C3-100, 2026-07-07): networking repair-validation round 2.
+# Validates 80ec40da (repair-5, all causes evidence-confirmed): VPN IGW prereq
+# (official phase1/2 tunnel values finally reachable) · TGW post-connection
+# settle + 3 corrected capture keys (connection/routing-rule wrappers) · LB
+# static-NAT publicip prereq. members-add stays 403 (real-VM requirement,
+# documented). Lane gates: HB5 concluded+folded (0 new; peering/DC walls
+# diagnosed -> repair-6), peering+VPC leftovers force-swept, owned==1 muted.
 action=run
 mutations=true
 destructive=true
 heavy=true
-crud_ids=vpc-peering,networking-direct-connect-routing,vpc-private-nat,networking-dns-hosted-zone-private
+crud_ids=networking-loadbalancer-members-nat,networking-vpn-gateway-tunnel,vpc-transit-gateway-children,vpc-endpoint
 parallel=4
