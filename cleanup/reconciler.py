@@ -547,6 +547,64 @@ def _wait_gone(client, service, path, timeout=150, interval=10):
     return False
 
 
+def _reap_lb_static_nat(client, lb_id: str) -> bool:
+    """Delete an owned load balancer's static-NAT BEFORE the LB itself —
+    children-first, same pattern as the TGW vpc-connection reaping above.
+
+    REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see
+    CAMPAIGN-C3-100-repair-log.md §HB4d item 2): live incident chain —
+    static-nat-create (201) fires, then a delete attempted immediately 400s
+    `StaticNatNotDeletableState` (still CREATING) — the scenario's own
+    lifecycle fix is a settle-poll before its explicit static-nat-delete step
+    (see networking__loadbalancer.json wait-static-nat-active), but an
+    INTERRUPTED run (crash / kill between static-nat-create and
+    static-nat-delete) leaks a static-NAT that the lifecycle's own teardown
+    never reaches — only this account-wide sweep sees it, and until now the
+    sweep deleted the LB directly, which 409s ("associated") while the NAT is
+    still attached, stranding the LB + its publicip (ATTACHED, not deletable)
+    + (transitively) the shared VPC.
+
+    GET `/v1/loadbalancers/{id}/static-nats` (networking/loadbalancer/
+    showloadbalancerpublicnatip, response wraps `$.static_nat.state`,
+    CONFIRMED from `data/api_docs.json`) always 200s for a valid LB — an LB
+    with NO static-NAT reports `state: ""` (empty), one WITH a static-NAT
+    reports a real state (e.g. "ACTIVE"/"CREATING"). Only issue the DELETE
+    when a real state is present, so a nat-less LB isn't given a no-op DELETE
+    call. No request body is sent (mirrors the orchestrator's own manual
+    unwind for this exact incident: GET -> confirm ACTIVE -> bare
+    `DELETE .../static-nats` -> 204; the documented DELETE has no path/body
+    parameters other than loadbalancer_id, per
+    networking/loadbalancer/deleteloadbalancerpublicnatip). Retries on 400
+    (CREATING not yet settled) so a nat still mid-create gets a few chances
+    to reach ACTIVE before the LB delete is attempted; a 404/403 (already
+    gone / not entitled) is treated as done. Returns True if a delete was
+    issued (2xx) so the caller can count it as sweep progress.
+    """
+    try:
+        body = client.get(f"/v1/loadbalancers/{lb_id}/static-nats",
+                           service="loadbalancer").body
+    except Exception:
+        return False
+    nat = (body or {}).get("static_nat") if isinstance(body, dict) else None
+    state = (nat or {}).get("state") if isinstance(nat, dict) else None
+    if not state:
+        return False  # no static-NAT attached — nothing to reap
+    for attempt in range(6):
+        st = _delete(client, "loadbalancer",
+                     f"/v1/loadbalancers/{lb_id}/static-nats")
+        if _is_2xx_or_gone(st):
+            print(f"  lb-static-nat {lb_id} (state={state}) delete -> {st}")
+            return True
+        if st != 400:
+            print(f"  lb-static-nat {lb_id} (state={state}) delete -> {st} "
+                  f"(giving up, not a settle-state 400)")
+            return False
+        time.sleep(15)
+    print(f"  lb-static-nat {lb_id} (state={state}) still not deletable "
+          f"after retries — leaving for next sweep round")
+    return False
+
+
 def _purge_vpc_children(client, vid):
     """Delete EVERY child of a known-ours VPC by vpc_id, name-agnostic — for the
     stubborn leaked VPCs whose 409 blocker is NOT a regr/zznet-named resource
@@ -1108,6 +1166,9 @@ def run_sweep(client) -> int:
             for it in items:
                 if (isinstance(it, dict) and it.get("id")
                         and str(it.get("vpc_id")) in regr_vpc_ids):
+                    lb_id = it["id"]
+                    if svc == "loadbalancer":
+                        _reap_lb_static_nat(c, lb_id)
                     if _delete(c, svc, f"{coll}/{it['id']}"):
                         deleted += 1
                         _wait_gone(c, svc, f"{coll}/{it['id']}", 300, 15)

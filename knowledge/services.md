@@ -411,6 +411,31 @@ lifecycle `heavy-asg-full-coverage` in
   `not-in-vpc-connection` showing a literal unresolved `{vpc_connection_id}` placeholder in its
   error body (proof of a missed capture, not a TGW-state issue as first hypothesized). Fixed
   OFFLINE 2026-07-07 (all three capture paths corrected in `networking__vpc.json`).
+- **`createtransitgatewayfirewall` REQUIRES an already-ACTIVE firewall-connection — the
+  create ORDER was backwards (CONFIRMED, HB4d run 28835929967, 2026-07-07):** 400
+  `scp-network.transit-gateway.firewall-connection-active-state` ("Transit Gateway Firewall
+  connection state is not Active: (INACTIVE)") — `createtransitgatewayfirewall` was being called
+  BEFORE `createtransitgatewayfirewallconnection` in `vpc-transit-gateway-children`. Both
+  endpoints' `response_example` (`data/api_docs.json`) wrap as `transit_gateway` and carry a
+  shared `firewall_connection_state` field — this is a TGW-level gate, not a per-firewall
+  resource. ALSO: `createtransitgatewayfirewall`'s response has NO top-level `firewall` key (the
+  `capture_soft` `$.firewall.id` never resolved); the firewall id lives in `transit_gateway.
+  firewall_ids[0]`. Fixed OFFLINE 2026-07-07: `create-tgw-firewall-connection` (+ a new
+  `wait-firewall-connection-active` settle-poll on `$.transit_gateway.firewall_connection_state`)
+  moved to run BEFORE `create-tgw-firewall`; capture fixed to
+  `$.transit_gateway.firewall_ids[0]`; delete order also swapped (firewall before connection,
+  child-first) though that side is inferred, not directly observed. UNVERIFIED LIVE.
+- **`createtransitgatewayrule` destination_cidr must be inside the CONNECTED VPC's own cidr, not
+  this lifecycle's OWN (non-adopted) fallback cidr (CONFIRMED, HB4d run 28835929967,
+  2026-07-07):** 400 `scp-network.routing-rule.destination-cidr-include-vpc-cidr` echoing back our
+  own bad `destination_cidr` (`10.131.0.0/20` — copied from `vpc-transit-gateway-children`'s own
+  local `create-vpc` fallback body, only used in the rare non-xdist path). Under real heavy-dispatch
+  (xdist), `{vpc_id}` instead resolves to the session-shared VPC (`_SHARED_VPC_CIDR =
+  10.124.0.0/20`, same fact as the vpc-endpoint subnet-cidr fix below) — a destination_cidr from
+  the wrong VPC's range. Fixed OFFLINE 2026-07-07: `destination_cidr` → `10.124.0.0/24` (valid
+  sub-range of the shared VPC's `/20`). RESIDUAL: the local (non-adopted) fallback path's own cidr
+  match is still unaddressed (dead code under xdist, same class as the vpc-endpoint gap below).
+  UNVERIFIED LIVE.
 - **VPC Peering: same-account peering NEVER needs approval (CONFIRMED, HB5 run 28831560635,
   2026-07-07):** `PUT /v1/vpc-peerings/{id}/approval` 400s every time with
   `scp-network.vpc-peering.approval-same-account-type` / "Approval is not required for Same
@@ -432,6 +457,22 @@ lifecycle `heavy-asg-full-coverage` in
   `wait-tgw-active-after-connection`). **If a genuine cross-account approver is ever added**
   (a real second account), the approval flow becomes real and transient-400 retry should be
   restored for that variant only. Live re-validation still pending (offline repair pass).
+- **VPC Peering re-repair: the HB5 placement fix did NOT resolve it — same-account peering can
+  stay CREATING for 500+ seconds, NOT a wrong-response-key bug (CONFIRMED/REFUTED, HB4d run
+  28835929967, 2026-07-07):** the SAME run this session investigated shows `wait-peering-active`
+  (already correctly placed right after `create-vpc-peering` per the HB5 fix) STILL returning at
+  create+~309s with the cascade repeating (`set`/`delete`/`create-routing-rule` all 400 CREATING).
+  **Ruled out** the "wrong response-wrapper-key" hypothesis (the TGW-capture-key class of bug):
+  `data/api_docs.json` `showvpcpeering` `response_example` confirms the wrapper genuinely IS
+  `$.vpc_peering.state` — the field was already correct. Timestamp math instead shows the peering
+  never observed ACTIVE across ~540s of cumulative settle/retry budget (300s `wait-peering-active`
+  + 60s `wait-peering-active-before-set` + 120s of `delete-vpc-peering`'s own 8×15s retries, all
+  exhausted) — a genuine timeout-too-short (or possibly a stuck-CREATING product defect), not a
+  field/key mistake. Fixed OFFLINE 2026-07-07 as the evidence-based next step (NOT claimed as a
+  proven fix): `wait-peering-active` timeout 300→900s; `wait-peering-active-before-set`/
+  `-before-delete` timeout 60→300s each. **If 900s still never reaches ACTIVE, reclassify as a
+  genuine backend stuck-CREATING defect** (baseline-worthy) rather than continuing to bump
+  timeouts — this session did not have the live data to make that call. UNVERIFIED LIVE.
 - **VPC Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet, not `GENERAL` (CONFIRMED —
   already VALIDATED via `knowledge/formal/resources/networking__vpc.yaml` endpoint-subnet node,
   live-validated run 27583285457 2026-06-15; re-confirmed by HB4 run 28738115294, 2026-07-05):**
@@ -446,6 +487,15 @@ lifecycle `heavy-asg-full-coverage` in
   this axis remains synthetic/UNPROVEN in `networking__vpc.json` (a disabled composed
   `gen-wave5-vpce` lifecycle in `generated__wave5-net.json` models the real-FS-volume wiring but
   is itself not live-validated).
+- **`endpoint_ip_address` must be inside the ENDPOINT'S OWN dedicated subnet cidr, not a leftover
+  address from a previous cidr scheme (CONFIRMED residual bug, HB4d run 28835929967,
+  2026-07-07):** 400 `scp-network.vpc-endpoint.check-ip-address-overlap` ("The requested IP
+  Address (10.124.0.20) does not overlap with the requested subnet CIDR") — when the HB4c session
+  fixed `create-subnet`'s cidr (`10.129.8.0/24` → `10.124.9.0/24`, see the shared-VPC-cidr note
+  above), it did not also update `create-vpc-endpoint`'s `endpoint_ip_address`, which was still
+  `10.124.0.20` (inside the session-shared GENERAL subnet's `10.124.0.0/24`, not this endpoint's
+  own dedicated `10.124.9.0/24`). Fixed OFFLINE 2026-07-07: `endpoint_ip_address` →
+  `10.124.9.20` (inside the dedicated subnet's own range). UNVERIFIED LIVE.
 
 ## networking / loadbalancer
 
@@ -514,6 +564,20 @@ lifecycle `heavy-asg-full-coverage` in
      re-solving VM creation flakiness a second time inside the LB lifecycle. Not implemented this
      session; `members-add`/`members-set`/`members-remove-single`/`members-remove-bulk` remain a
      reach-only (403/404) soft-coverage gap.
+- **Static-NAT is async — deleting immediately after create 400s `StaticNatNotDeletableState`
+  (CONFIRMED, HB4d run 28835929967, 2026-07-07):** `static-nat-create` (201) followed immediately
+  by `static-nat-delete` 400s `scp-loadbalancer.loadbalancers.StaticNatNotDeletableState` ("...
+  state: CREATING") — same async-create-not-settled class already fixed for VPN gateway/tunnel and
+  TGW. If this leaks (interrupted run), the NAT then 409-blocks the LB delete, which strands the
+  LB's publicip (ATTACHED, not deletable) and transitively the VPC. `GET
+  /v1/loadbalancers/{id}/static-nats` (`showloadbalancerpublicnatip`) wraps `$.static_nat.state` —
+  poll it to `ACTIVE` before deleting. The DELETE itself takes **no request body** (the manual
+  unwind that discovered this used a bare `DELETE .../static-nats` -> 204; the documented endpoint
+  has no body parameters). Fixed OFFLINE 2026-07-07: `wait-static-nat-active` settle-poll added to
+  `networking__loadbalancer.json` + `retry_on_status:[400]` on `static-nat-delete`; a NEW
+  reconciler pass (`cleanup/reconciler.py::_reap_lb_static_nat`) GETs+DELETEs any owned LB's
+  static-NAT before the LB delete itself, for the account-wide-sweep case where a lifecycle's own
+  teardown was interrupted. UNVERIFIED LIVE.
 
 ## networking / firewall
 
@@ -727,6 +791,14 @@ lifecycle `heavy-asg-full-coverage` in
   degrading to a soft-fail of just the `vpn` family on a genuine 409) rather than switching to a
   self-created VPC. UNVERIFIED LIVE — watch for a concurrent-IGW 409 if this lifecycle is
   scheduled in the same batch as the NAT-gateway or LB static-nat lifecycles.
+- **`createvpntunnel` is also async — a `set-vpn-tunnel` fired right after 400s (CONFIRMED,
+  HB4d run 28835929967, 2026-07-07):** `create-vpn-tunnel` (202) immediately followed by
+  `set-vpn-tunnel` 400 `scp-network.vpn-tunnel.invalid-state` ("Unable to modify or delete VPN
+  Tunnel in CREATING state") — same settle-poll gap already fixed for the gateway
+  (`wait-vpn-gateway-active`, HB4c) but not yet applied to the tunnel. `showvpntunnel`
+  response wraps `$.vpn_tunnel.state` (`data/api_docs.json`). Fixed OFFLINE 2026-07-07: added
+  `wait-vpn-tunnel-active` settle-poll right after `create-vpn-tunnel`, mirroring the gateway
+  pattern exactly. UNVERIFIED LIVE.
 
 ## management / cloudcontrol
 

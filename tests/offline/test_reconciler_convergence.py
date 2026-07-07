@@ -62,9 +62,15 @@ class FakeClient:
     for matching but recorded verbatim), records DELETE/PUT, and lets a test
     delete an item from a list to model real teardown across rounds."""
 
-    def __init__(self, lists=None, delete_status=None, region="kr-west1"):
+    def __init__(self, lists=None, delete_status=None, region="kr-west1",
+                 objects=None):
         # lists: {path_without_query: [items]}
         self.lists = lists or {}
+        # objects: {path_without_query: raw_body_dict} — single-object GETs
+        # (e.g. the LB static-nats show endpoint, which returns
+        # {"static_nat": {...}} rather than a collection) take priority over
+        # the items-list wrapping below.
+        self.objects = objects or {}
         # delete_status: {path_prefix: status} — first match wins; default 204
         self.delete_status = delete_status or {}
         self.calls: list[tuple[str, str]] = []   # (METHOD, full_path)
@@ -83,7 +89,10 @@ class FakeClient:
     # -- verbs --------------------------------------------------------------
     def get(self, path, service=None, **kw):
         self.calls.append(("GET", path))
-        return _Resp(200, {"items": list(self.lists.get(self._key(path), []))})
+        key = self._key(path)
+        if key in self.objects:
+            return _Resp(200, self.objects[key])
+        return _Resp(200, {"items": list(self.lists.get(key, []))})
 
     def delete(self, path, service=None, json=None, **kw):
         self.calls.append(("DELETE", path))
@@ -541,6 +550,70 @@ def test_vpc_409_without_holder_keeps_purge_retry():
 # --------------------------------------------------------------------------- #
 # Ownership guard is NOT weakened (lock the invariant alongside the new logic)
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# HB4d item 2 — LB static-NAT reaped BEFORE the load balancer itself. Live
+# incident (run 28835929967): static-nat-create (201) fires, then an
+# immediate delete 400s `StaticNatNotDeletableState` (CREATING) — an
+# interrupted run leaks the NAT, and the account-wide sweep used to delete
+# the LB directly, which 409s "associated" while the NAT is still attached,
+# stranding the LB + its publicip (ATTACHED) + the shared VPC.
+# --------------------------------------------------------------------------- #
+def test_lb_static_nat_deleted_before_loadbalancer():
+    lb = _owned("regrlb-a", id="lb-a", vpc_id="id-regrvpcsh-a")
+    vpc = _owned("regrvpcsh-a", id="id-regrvpcsh-a")
+    client = FakeClient(
+        lists={"/v1/loadbalancers": [lb], "/v1/vpcs": [vpc]},
+        objects={"/v1/loadbalancers/lb-a/static-nats":
+                 {"static_nat": {"state": "ACTIVE", "publicip_id": "pip-1",
+                                 "external_ip_address": "1.2.3.4"}}},
+    )
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    nat_i = next((i for i, p in enumerate(seq)
+                  if p == "/v1/loadbalancers/lb-a/static-nats"), -1)
+    lb_i = next((i for i, p in enumerate(seq)
+                 if p == "/v1/loadbalancers/lb-a"), -1)
+    assert nat_i >= 0, "an attached static-NAT must be reaped"
+    assert lb_i >= 0, "the load balancer delete must still be issued"
+    assert nat_i < lb_i, (
+        f"static-nat delete must precede the LB delete: nat@{nat_i} lb@{lb_i}")
+
+
+def test_lb_static_nat_skipped_when_none_attached():
+    """An LB reporting an empty static_nat state must NOT get a no-op DELETE
+    against the static-nats collection."""
+    lb = _owned("regrlb-b", id="lb-b", vpc_id="id-regrvpcsh-b")
+    vpc = _owned("regrvpcsh-b", id="id-regrvpcsh-b")
+    client = FakeClient(
+        lists={"/v1/loadbalancers": [lb], "/v1/vpcs": [vpc]},
+        objects={"/v1/loadbalancers/lb-b/static-nats":
+                 {"static_nat": {"state": "", "publicip_id": None,
+                                 "external_ip_address": ""}}},
+    )
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    assert not any("static-nats" in p for p in seq), \
+        "no static-NAT attached -> no DELETE against the static-nats endpoint"
+    assert any(p == "/v1/loadbalancers/lb-b" for p in seq), \
+        "the load balancer delete must still be issued"
+
+
+def test_lb_static_nat_retries_on_400_then_gives_up():
+    """A static-NAT stuck CREATING across every retry must not block the sweep
+    forever — after retries are exhausted, reaping gives up (returns False) and
+    the caller still attempts the LB delete this round (next round retries)."""
+    client = FakeClient(
+        objects={"/v1/loadbalancers/lb-c/static-nats":
+                 {"static_nat": {"state": "CREATING"}}},
+        delete_status={"/v1/loadbalancers/lb-c/static-nats": 400},
+    )
+    ok = recon._reap_lb_static_nat(client, "lb-c")
+    assert ok is False
+    dels = [p for (m, p) in client.calls
+            if m == "DELETE" and p == "/v1/loadbalancers/lb-c/static-nats"]
+    assert len(dels) == 6, f"expected the bounded retry budget, got {dels}"
+
+
 def test_unowned_items_never_selected():
     """Items with neither owner tag nor a regr* name must never be selected for
     deletion by any of the new passes."""

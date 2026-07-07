@@ -543,3 +543,83 @@ python -m pytest tests/offline
    그 다음 이어지는 create-vpc-endpoint의 resource_key 관련 4xx로 신호가 이동하는지
    확인. non-xdist 단일 프로세스 경로(self-create fallback)를 쓸 계획이면 create-vpc의
    폴백 cidr도 함께 정리 필요.
+
+---
+
+# §HB4d — VPN tunnel settle · LB static-NAT teardown wedge + reconciler pass · TGW firewall order/CIDR · vpc-endpoint IP · vpc-peering timeout (2026-07-07, OFFLINE)
+
+> 배경: A-repair-8 에이전트. HB4d heavy run 28835929967이 레인 점유 중이라 **라이브
+> SCP 호출 없음** — `reports/results/hb4d/observations-gw{0..5}.jsonl`(note 필드
+> 오류 전문 + `ts` 타임스탬프)만을 원인 증거로 사용. 산출물:
+> `regression/scenarios/lifecycles/networking__vpn.json` (`networking-vpn-gateway-tunnel`
+> — `create-vpn-tunnel` 뒤 `wait-vpn-tunnel-active` settle-poll 신규) ·
+> `regression/scenarios/lifecycles/networking__loadbalancer.json`
+> (`networking-loadbalancer-members-nat` — `static-nat-create` 뒤 `wait-static-nat-active`
+> settle-poll 신규 + `static-nat-delete`에 `retry_on_status:[400]`) ·
+> `cleanup/reconciler.py` (신규 `_reap_lb_static_nat` — LB delete 전에 static-NAT
+> 자식을 GET/DELETE로 선삭제하는 child-first 패스, `run_sweep`의 loadbalancer 루프에
+> 배선) · `tests/offline/test_reconciler_convergence.py` (`FakeClient`에 단일-객체
+> GET을 흉내내는 `objects=` 파라미터 추가 + 신규 오프라인 테스트 3건) ·
+> `regression/scenarios/lifecycles/networking__vpc.json` (`vpc-transit-gateway-children`
+> — create-tgw-firewall-connection을 create-tgw-firewall **앞으로** 재배치 + 신규
+> `wait-firewall-connection-active` settle-poll + create-tgw-firewall의 `capture_soft`
+> 교정 + delete 순서도 대칭 재배치(firewall 먼저, connection 나중); create-tgw-routing-rule
+> destination_cidr 교정; `vpc-endpoint` — create-vpc-endpoint의 `endpoint_ip_address`
+> 교정; `vpc-peering` — wait-peering-active 계열 3건 timeout 상향) · 본 섹션.
+> `python -m regression.scenarios.validate` → **244 lifecycle(s) checked · 0
+> error(s) · 5 warning(s)** (경고 5건은 `git stash` 대조로 이전 세션과 완전히 동일한
+> 무관 항목임을 확인). `python -m pytest tests/offline/test_reconciler_convergence.py`
+> → 29 passed (신규 3건 포함). `python -m pytest tests/offline` → 453 passed, 3
+> failed(전부 이번 변경과 **무관한 기존 실패** — `test_docs_index.py::test_index_is_up_to_date`,
+> `test_validate_dag.py::test_real_graph_is_a_complete_dag`,
+> `test_validate_dag.py::test_main_check_returns_zero_on_complete_graph`, 모두
+> `eventstreams-cluster-subops-full`/`gen-heavy-backup`의 기존 DAG gap — `git stash`로
+> 변경 전 상태에서도 동일하게 실패함을 확인, 이번 세션 파일과 무관).
+
+## 원인확인 + 조치 표
+
+| # | 증상 | 원인(증거) | 조치 |
+|---|---|---|---|
+| 1 | `networking-vpn-gateway-tunnel:set-vpn-tunnel` 400 `scp-network.vpn-tunnel.invalid-state` `"Unable to modify or delete VPN Tunnel in CREATING state."` | `create-vpn-tunnel`(202)이 settle-poll 없이 바로 `get`/`set-vpn-tunnel`로 이어짐 — HB4c에서 이미 CONFIRMED+수리된 `wait-vpn-gateway-active`(게이트웨이 쪽)와 동일 계열의 async-create-후-즉시-후속-write 패턴이 터널 쪽에는 아직 없었음. | `wait-vpn-tunnel-active` settle-poll 신규(`$.vpn_tunnel.state` until `ACTIVE`, field는 `data/api_docs.json` `networking/vpn/showvpntunnel` response_example의 `"state":"ACTIVE"`로 확정, timeout 300s/interval 15s/give_up_status 400·403·404)를 `create-vpn-tunnel` 직후·`get-vpn-tunnel` 이전에 삽입, 게이트웨이 패턴과 완전히 동일. **라이브 미검증.** |
+| 2 | `networking-loadbalancer-members-nat:static-nat-delete` 400 `scp-loadbalancer.loadbalancers.StaticNatNotDeletableState` `"...state: CREATING"` → NAT 생존 → `lb-delete` 409 associated → publicip ATTACHED → 공유 VPC까지 잔존(오케스트레이터가 GET→ACTIVE 확인→bare DELETE로 수동 언와인드) | `static-nat-create`(201) 직후 `static-nat-delete`가 settle-poll 없이 바로 발사 — 동일한 async-create-후-즉시-delete 패턴. 수동 언와인드가 "GET static-nats → ACTIVE 확인 → bare DELETE(바디 없음) → 204"였다는 사실 자체가 실제 동작 방식(바디 불필요)의 증거. | (a) lifecycle: `wait-static-nat-active` 신규(`$.static_nat.state` until `ACTIVE`, field는 `data/api_docs.json` `networking/loadbalancer/showloadbalancerpublicnatip` response_example의 `{"static_nat":{"state":""}}`로 확정)을 `static-nat-create` 직후 삽입 + `static-nat-delete`에 `retry_on_status:[400]`(재발 방지 이중 안전망). (b) **리컨실러 신규 패스** `cleanup/reconciler.py::_reap_lb_static_nat` — LB delete 직전에 `GET /v1/loadbalancers/{id}/static-nats`로 state를 확인, 비어있지 않으면(=NAT 존재) 바디 없는 `DELETE`를 최대 6회(15s 간격, 400 재시도) 실행 후에야 LB delete로 진행 — 인터럽트된 실행이 리컨실러에만 보이는 리크를 남기는 경우까지 커버(자식-우선, TGW vpc-connection 선례와 동일 패턴). `tests/offline/test_reconciler_convergence.py`에 `FakeClient.objects=` (단일-객체 GET 흉내) + 3개 신규 테스트(NAT-먼저-삭제 순서, NAT-없음-스킵, 400-재시도-후-포기) 추가, 29 passed. **라이브 미검증.** |
+| 3 | `vpc-transit-gateway-children:create-tgw-firewall` 400 `scp-network.transit-gateway.firewall-connection-active-state` `"Transit Gateway Firewall connection state is not Active: (INACTIVE)"` | 관측 note 전문이 직접 확정: firewall 생성은 TGW의 `firewall_connection_state`가 이미 ACTIVE여야 함 — 그런데 lifecycle 순서가 `create-tgw-firewall`을 `create-tgw-firewall-connection`보다 **먼저** 실행하고 있었음(역순). `data/api_docs.json`의 `createtransitgatewayfirewall`/`createtransitgatewayfirewallconnection` 둘 다 response_example이 `transit_gateway`로 감싸며 `firewall_connection_state` 필드를 공유 — TGW 레벨의 연결-상태 게이트임을 확인. | `create-tgw-firewall-connection`(+선행 settle-poll)을 `create-tgw-firewall` **앞으로** 재배치, 그 사이에 신규 `wait-firewall-connection-active`(`$.transit_gateway.firewall_connection_state` until `ACTIVE`) 삽입. 부수 수리: `create-tgw-firewall-connection`의 존재하지 않는 바디(`{firewall_id}`, 문서에 body 파라미터 자체가 없음— 이제 위치상 미해결 placeholder라 validator가 하드 에러로 잡음)를 제거; `create-tgw-firewall`의 `capture_soft`를 `$.firewall.id`(존재하지 않는 키)→`$.transit_gateway.firewall_ids[0]`(문서 확인된 실제 필드, 리스트-인덱스 캡처는 기존 `internet_gateways[0].id` 선례와 동일 문법)로 교정. **조사만, 미확정**: delete 순서(`delete-tgw-firewall-connection`→`delete-tgw-firewall`)도 create와 동일한 자식-우선 논리로 대칭 재배치(firewall 먼저, connection 나중)했으나 이 부분은 직접 관측된 오류가 아니라 create-side 의존관계로부터의 추론(reconciler의 TGW vpc-connection child-first 관례와 일치). **라이브 미검증** — 특히 delete 순서는 다음 heavy 디스패치가 실제로 확인해야 함. |
+| 4 | `vpc-transit-gateway-children:create-tgw-routing-rule` 400 `scp-network.routing-rule.destination-cidr-include-vpc-cidr` `"...should be included in vpc cidr blocks: 10.131.0.0/20"` | 에코된 cidr(`10.131.0.0/20`)은 우리가 보낸 `destination_cidr` 자신의 값과 정확히 일치 — 즉 API가 "네가 보낸 값이 연결된 VPC의 cidr 안에 없다"고 되돌려준 것. `10.131.0.0/20`은 이 lifecycle 자신의 로컬 `create-vpc` 폴백 바디(non-xdist 전용, 거의 안 쓰임) cidr에서 그대로 복사되었으나, 실제 heavy-dispatch 경로(xdist)의 `{vpc_id}`는 `adopt:vpc`로 세션-공유 VPC(`_SHARED_VPC_CIDR = 10.124.0.0/20`, `engine.py`, HB4c item 4에서 이미 확정된 사실과 동일)를 가리킴 — 서로 다른 VPC의 cidr을 섞어 쓴 것이 원인. | `destination_cidr`을 `10.131.0.0/20` → `10.124.0.0/24`(공유 VPC `10.124.0.0/20` 안의 유효 서브레인지)로 교정. **잔여, 미해결(정직하게 기록)**: 로컬 폴백 바디(`10.131.0.0/20`)를 실제로 쓰는 극히 드문 non-xdist 경로용 매칭 cidr은 이번에 손대지 않음 — vpc-endpoint의 HB4c item 4와 동일한 클래스의 잔여 갭, 다음 레버로 남김. **라이브 미검증.** |
+| 5 | `vpc-peering`: `wait-peering-active-before-set`/`-before-delete`가 200으로 통과했음에도 바로 뒤의 `set-vpc-peering`/`delete-vpc-peering`이 `invalid-changeable-state`/`invalid-deletable-state`(CREATING) 400 — HB5에서 이미 "수리"했다고 기록된 증상의 재발 | 태스크 지시가 제시한 "응답 래퍼/필드명 오류(TGW 캡처-키 선례)" 가설을 **반증**: `data/api_docs.json` `networking/vpc/showvpcpeering` response_example이 `$.vpc_peering.state`로 감싸는 것을 직접 확인 — 필드는 이미 정확함. 대신 타임스탬프 정밀 대조로 확정: `create-vpc-peering`(202, ts …502.97)부터 `wait-peering-active`(HB5가 이미 create 직후로 옮겨놓은 바로 그 스텝)가 ts …811.75에 200 반환 — 그 차이 **~308.8초**는 이 스텝의 (당시) timeout 300s 예산과 거의 정확히 일치, `engine.py`의 poll이 타임아웃 시 `until` 미충족이어도 마지막 응답을 그대로 반환하는 것(TGW와 동일 계열 버그)과 일치. 그 뒤 `wait-peering-active-before-set`(60s 예산)도 동일하게 타임아웃까지 다 쓰고 리턴(get-peering-routing-rules ts …817.04 → 본 스텝 ts …886.22, 차이 ~69.2s), `delete-vpc-peering`의 자체 8×15s 재시도(120s)도 전부 400 CREATING으로 소진(ts …959.47→…1091.40, 차이 ~131.9s) — 즉 create 후 최소 ~540초가 지나도록 peering이 단 한 번도 ACTIVE를 관측하지 못함. HB5의 "배치 수정"은 근본 원인이 아니었고, same-account peering의 실제 비동기 정착 시간이 300s보다 훨씬 길거나(또는 정말로 정체) 하는 문제로 재분류. | 필드/래퍼 키는 그대로 유지(이미 정확함, 잘못된 가설 반증만 기록). `wait-peering-active`의 timeout을 300→900s로, `wait-peering-active-before-set`/`-before-delete`의 timeout을 60→300s로 상향 — 증거 기반의 차선책(같은 poll-timeout-반환 버그 계열이지만 실제 필요 시간이 훨씬 길다는 가설에 따른 조치). **미해결로 정직하게 분류**: 900s로도 여전히 ACTIVE에 도달하지 못하면 이는 설정 문제가 아니라 same-account VPC peering의 진짜 백엔드 결함(product-bug) 후보로 재분류해야 함 — 이번 세션은 그 판정에 필요한 라이브 데이터가 없어 확정하지 않음. **라이브 미검증, 다음 heavy 디스패치가 900s 이내 ACTIVE 도달 여부를 반드시 관측·기록해야 함.** |
+| 6 | `vpc-endpoint:create-vpc-endpoint` 400 `scp-network.vpc-endpoint.check-ip-address-overlap` `"The requested IP Address (10.124.0.20) does not overlap with the requested subnet CIDR."` | HB4c에서 `create-subnet`의 cidr을 `10.129.8.0/24`→`10.124.9.0/24`로 고쳤을 때(같은 파일, 바로 위 스텝) `create-vpc-endpoint`의 `endpoint_ip_address`(`10.124.0.20`, 구 스킴 — 실제로는 세션-공유 GENERAL 서브넷의 `10.124.0.0/24` 안의 주소이지 이 엔드포인트 전용 서브넷 `10.124.9.0/24` 안이 아님)를 함께 갱신하지 않은 잔여 버그 — 새 백엔드 특이사항이 아니라 단순 주소/서브넷 불일치. | `endpoint_ip_address`를 `10.124.0.20` → `10.124.9.20`(전용 서브넷 `10.124.9.0/24` 안)으로 교정. **라이브 미검증.** |
+
+## 검증 명령 재현
+
+```
+python -m regression.scenarios.validate
+# -> 244 lifecycle(s) checked · 0 error(s) · 5 warning(s)  (5개는 이전 세션과 동일한 무관 경고, diff로 확인됨)
+
+python -m pytest tests/offline/test_reconciler_convergence.py
+# -> 29 passed (신규 3건 포함: test_lb_static_nat_deleted_before_loadbalancer,
+#    test_lb_static_nat_skipped_when_none_attached, test_lb_static_nat_retries_on_400_then_gives_up)
+
+python -m pytest tests/offline
+# -> 453 passed, 3 failed (모두 변경 전에도 동일하게 실패하는 기존 이슈 — git stash로 확인,
+#    eventstreams-cluster-subops-full/gen-heavy-backup의 기존 DAG gap + docs-index count drift,
+#    이번 세션 파일과 무관)
+```
+
+## 남은 작업 (다음 HEAVY 디스패치용)
+
+1. `networking-vpn-gateway-tunnel` 재디스패치 — `wait-vpn-tunnel-active` 추가 후
+   `set-vpn-tunnel`이 2xx로 전환되는지 확인.
+2. `networking-loadbalancer-members-nat` 재디스패치 — `wait-static-nat-active` +
+   `retry_on_status:[400]` 추가 후 `static-nat-delete`가 잔존 없이 2xx로 정리되는지,
+   그리고 **의도적으로 인터럽트한(또는 우연히 실패한) 실행 뒤 리컨실러 스윕**이
+   `_reap_lb_static_nat`으로 실제 leftover NAT를 지우고 LB/publicip/VPC까지
+   정상 회수하는지 라이브로 확인.
+3. `vpc-transit-gateway-children` 재디스패치 — firewall-connection 선행 재배치 +
+   `wait-firewall-connection-active` + capture 교정 후 `create-tgw-firewall`이
+   2xx로 전환되는지, delete 순서(firewall 먼저)가 실제로도 맞는지 확인.
+4. 같은 재디스패치에서 `create-tgw-routing-rule`(cidr 교정)도 함께 확인.
+5. `vpc-peering` 재디스패치 — timeout 상향(300→900s, 60→300s×2) 후 실제로 900s
+   이내에 ACTIVE 도달하는지 관측. **도달하지 못하면 product-bug 후보로 재분류**하고
+   `data/baselines/known_issues.json` 등재를 검토할 것 — 더 이상 "타임아웃 상향"으로
+   넘기지 말 것.
+6. `vpc-endpoint` 재디스패치 — `endpoint_ip_address` 교정 후 create-vpc-endpoint가
+   2xx로 전환되는지, 그 다음 신호가 (HB4b에서 이미 문서화된) `resource_key` 관련
+   4xx로 이동하는지 확인.

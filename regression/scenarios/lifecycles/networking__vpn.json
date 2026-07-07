@@ -193,6 +193,16 @@
           "cleanup": {"method": "DELETE", "path": "/v1/vpn-tunnels/{vpn_tunnel_id}", "service": "vpn"}
         },
         {
+          "name": "wait-vpn-tunnel-active",
+          "method": "GET",
+          "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+          "group": "vpn",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"field": "$.vpn_tunnel.state", "until": ["ACTIVE"], "timeout": 300, "interval": 15, "give_up_status": [400, 403, 404]},
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 1): create-vpn-tunnel (202) was immediately followed by set-vpn-tunnel 400 `scp-network.vpn-tunnel.invalid-state` (\"Unable to modify or delete VPN Tunnel in CREATING state.\") — same async-create-not-settled class as wait-vpn-gateway-active above (HB4c) and wait-tgw-active (HB4b). Fix: settle-poll `$.vpn_tunnel.state` (field confirmed from `data/api_docs.json` networking/vpn/showvpntunnel response_example: `\"state\":\"ACTIVE\"`) until ACTIVE, inserted right after create-vpn-tunnel and before get/set-vpn-tunnel, mirroring the gateway pattern exactly. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm set-vpn-tunnel clears."
+        },
+        {
           "name": "get-vpn-tunnel",
           "method": "GET",
           "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
