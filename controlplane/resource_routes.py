@@ -393,7 +393,7 @@ def graph_demo():
     return RedirectResponse("/planning/dependencies", status_code=301)
 
 
-# --- 모델 지도(② 레시피 저작 — 그래프 얼굴) -------------------------------------------
+# --- 모델 지도(② 테스트 모델 저작 — 그래프 얼굴) -------------------------------------------
 #     같은 graph_view 데이터를 공유 렌더러(resource_graph.js)로 그리고, overlay()만
 #     provenance/완성도 색으로 바꾼다(계약 §1, §4 Modeling). 노드 클릭 → 그 노드의
 #     기존 편집 폼(/{node_id})을 사이드패널로 연다(htmx). map.json / map 둘 다

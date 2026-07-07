@@ -3,8 +3,8 @@
 {% block content %}
 
 <style>
-  /* Modeling — 테스트 '레시피' 저작 뷰. Catalog(읽기전용 엔드포인트 인벤토리)와 달리
-     여기는 노드=레시피(의존·완성도·검증상태) 를 category▸service 로 묶어 저작한다. */
+  /* Modeling — 테스트 모델 저작 뷰. Catalog(읽기전용 엔드포인트 인벤토리)와 달리
+     여기는 노드=테스트 모델(의존·완성도·검증상태) 을 category▸service 로 묶어 저작한다. */
   .toolrow{display:flex;gap:12px;align-items:center;margin:0 0 6px;flex-wrap:wrap}
   .tgroup{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
   .tgroup button{padding:6px 13px;border:0;border-right:1px solid var(--border);background:var(--surface);
@@ -66,9 +66,9 @@
 </style>
 
 <section>
-  <h2 style="display:flex;align-items:center;gap:12px">Modeling · 테스트 레시피
+  <h2 style="display:flex;align-items:center;gap:12px">Modeling · 테스트 모델
     <span class="tgroup" id="view-toggle">
-      <button data-view="table" class="on">표 (레시피 목록)</button>
+      <button data-view="table" class="on">표 (모델 목록)</button>
       <button data-view="graph">그림 (의존 그래프)</button>
     </span>
     <a href="/planning/resources/worklist" style="font-size:13px;font-weight:600;margin-left:auto">작업 큐 →</a>
@@ -76,11 +76,11 @@
        title="모델 공백 서비스의 자원 task 정의를 AI가 초안 — drafts/ 검토용">AI 초안 →</a>
   </h2>
   <div class="vs"><b>Catalog</b>은 "어떤 <b>API 엔드포인트</b>가 있나"(1,372개·읽기 전용)라면,
-    <b>Modeling</b>은 그 자원을 "어떻게 <b>만들고·검증·삭제</b>하는지" 테스트 <b>레시피 노드</b>(273개)로
+    <b>Modeling</b>은 그 자원을 "어떻게 <b>만들고·검증·삭제</b>하는지" 테스트 <b>모델 노드</b>(273개)로
     저작한다 — 의존관계·완성도·검증상태(provenance)를 <b>편집</b>. 행 클릭 = 그 노드 정의 편집.</div>
 
   <div class="cards" style="margin-bottom:12px">
-    <div class="card"><div class="num">{{ total }}</div><div class="lbl">레시피 노드</div></div>
+    <div class="card"><div class="num">{{ total }}</div><div class="lbl">모델 노드</div></div>
     <div class="card"><div class="num">{{ validated }}</div><div class="lbl" style="color:var(--green)">VALIDATED (2xx 검증)</div></div>
     <div class="card"><div class="num">{{ docs }}</div><div class="lbl" style="color:var(--amber)">docs (모델만·미검증)</div></div>
     <div class="card"><div class="num">{{ gated }}</div><div class="lbl" style="color:var(--grey)">게이트 (이 계정에선 불가)</div></div>

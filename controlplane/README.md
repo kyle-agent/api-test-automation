@@ -26,8 +26,9 @@ Reporting`**; 구 `docs/IA.md`는 SUPERSEDED). 두 런타임으로 깔끔히 분
 - **라이브 control plane** (이 서버, 면①) — 4단계 작업 콘솔.
 
 상단 네비게이션은 **`Catalog · Modeling · Testing · Reporting (+ Knowledge)`**
-입니다 — ① 재료(카탈로그 RO) → ② 레시피 저작(모델 지도·노드 편집) → ③ 요리
-(Test Planning · Test Execution = console2) → ④ 평가(커버리지·runs·triage,
+입니다 — ① 엔드포인트 인벤토리(카탈로그 RO) → ② 테스트 모델 저작(모델 지도·
+노드 편집) → ③ 실행(Test Planning · Test Execution = console2) → ④ 평가
+(커버리지·runs·triage,
 면② 링크아웃). 헤더의 장식용 환경/스위트 셀렉트는 제거됐고(ctxbar는 발행
 스냅샷 상태만 표시), 정식 Report가 표준이라 bare `/runs` 리디렉트는 **제거**
 됐습니다(`/runs/{id}` 상세는 유지).
