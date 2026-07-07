@@ -412,3 +412,70 @@ python -m pytest tests/offline
    `_is_tgw_settling` 수정이 충분한지, 아니면 TGW settle 자체가 라운드 예산
    (`SCP_SWEEP_ROUNDS`/`SCP_SWEEP_INPROGRESS_SLEEP_S`)보다 오래 걸리는 케이스가
    있는지(그 경우는 워크플로 파라미터 조정 권고 — `.github/` 승인 필요) 구분.
+
+---
+
+# §HB5 — vpc-peering·direct-connect·private-dns 재수리 (2026-07-07, OFFLINE)
+
+> 배경: A-repair-6 에이전트. HB5 heavy run 28831560635이 레인 점유 중이라
+> **라이브 SCP 호출 없음** — `reports/results/hb5/observations-gw*.jsonl`(note
+> 필드 오류 전문 + `ts`/`elapsed_ms` 타임스탬프)만을 원인 증거로 사용. 파일
+> 경합 회피: 다른 에이전트가 `console2/*` + `tests/offline/test_console2.py`
+> 작업 중이라 손대지 않았고, 커밋도 이 세션이 만진 파일만 명시적으로
+> `git add`한다(`git add -A` 금지).
+>
+> 산출물: `regression/scenarios/lifecycles/networking__vpc.json`
+> (`vpc-peering` — settle-poll 재배치 2건 + 신규 settle-poll 2건 + approve
+> 재시도 제거) · `regression/scenarios/lifecycles/networking__dns.json`
+> (`networking-dns-hosted-zone-private` — disconnect 뒤 settle-poll 1건
+> 신규) · `knowledge/services.md`(networking/vpc·direct-connect·dns 섹션) ·
+> 본 섹션. `direct-connect`의 `not-exist-log-storage`는 조사 결과 조치하지
+> 않음(아래 표 4번 근거). `networking__direct-connect.json` 자체는 수정하지
+> 않음(원인이 그 파일의 body/구조가 아니라 계정 레벨 크로스서비스 선행요건이라
+> 이 파일을 고쳐도 해소되지 않음이 확인됨).
+> `python -m regression.scenarios.validate` → **244 lifecycle(s) checked · 0
+> error(s) · 5 warning(s)** (5개 경고는 `git stash` 대조로 이전 세션과 완전히
+> 동일한 무관 항목임을 확인). `python -m pytest tests/offline` → 450 passed,
+> 3 failed(전부 이번 변경과 **무관한 기존 실패** —
+> `test_docs_index.py::test_index_is_up_to_date`,
+> `test_validate_dag.py::test_real_graph_is_a_complete_dag`,
+> `test_validate_dag.py::test_main_check_returns_zero_on_complete_graph`, 모두
+> `eventstreams-cluster-subops-full`/`gen-heavy-backup`의 기존 DAG gap —
+> `git stash`로 변경 전 상태에서도 동일하게 실패함을 확인, 네트워킹 파일과
+> 무관).
+
+## 원인확인 + 조치 표
+
+| # | 증상 | 원인(증거) | 조치 |
+|---|---|---|---|
+| 1 | `vpc-peering:approve-vpc-peering` 400 `approval-same-account-type` | 관측 note 전문: `"Approval is not required for Same Account VPC peering"` — `create-vpc-peering`이 만드는 두 VPC(requester/approver)가 항상 같은 계정이므로 **영구적** 조건(추측 아님). `data/api_docs.json`의 `showvpcpeering` `response_example` 자체가 `account_type:"SAME"` + `state:"CREATING"`을 베이스 케이스로 문서화 — SAME-계정이 기본 형태임을 재확인. | `approve-vpc-peering`의 `retry_on_status:[400]`(8회×15s=~120s)를 제거 — 영구 오류를 재시도해도 성공할 수 없고, 다음 단계인 `wait-peering-active`의 예산만 갉아먹었음. expect_status의 400은 그대로 유지(엔드포인트 자체는 계속 호출·기록). _note에 크로스어카운트 시나리오가 생기면 재시도를 되살리라고 명시. |
+| 2 | `vpc-peering:wait-peering-active` 타임아웃(300s) 후에도 `create-peering-routing-rule`/`set-vpc-peering`/`delete-vpc-peering`이 전부 400 `not-active-state`/`invalid-changeable-state`/`invalid-deletable-state` `(CREATING)` | 타임스탬프 대조로 확정: `create-vpc-peering` 202(ts …565) 이후 `approve-vpc-peering`이 8×15s 재시도로 ts …698까지 소모(약 130s), 그 뒤 시작된 `wait-peering-active`가 ts …1010(약 311s 후)에 끝남 — poll은 마지막 응답을 그대로 반환하므로 HTTP 200이 곧 상태 ACTIVE 도달을 의미하지 않음(엔진 `poll` 구현, `regression/scenarios/engine.py` L579-632 확인); 다음 스텝이 즉시 CREATING 400을 받은 것이 타임아웃임을 직접 증거. | `wait-peering-active`를 `create-vpc-peering` 직후(list/approve보다 먼저)로 재배치해 항목 1에서 회수한 ~120s를 온전히 이 폴에 쓰도록 함; `give_up_status:[400,403,404]`도 TGW 선례처럼 추가(생성 자체가 실패했으면 풀타임아웃 낭비 방지). |
+| 3 | 상동(2)의 잔여 리스크 — `create-peering-routing-rule`(자식) 생성/삭제가 부모 peering을 다시 전이 상태로 되돌릴 가능성 | `vpc-transit-gateway-children`(같은 파일, HB4b-2 세션)에서 이미 CONFIRMED된 패턴: 자식 리소스(vpc-connection) 생성이 부모(TGW)를 ACTIVE→EDITING으로 재전이시킴(`wait-tgw-active-after-connection` 선례) — 동일 부모/자식 구조(peering/routing-rule)이므로 같은 방어가 근거 있음(추측이 아니라 같은 파일 내 이미 검증된 전례 적용). | `wait-peering-active-before-set`/`wait-peering-active-before-delete` 2건 신규(60s/10s, give_up_status 동일) — `set-vpc-peering` 및 `delete-vpc-peering` 직전에 각각 배치. `delete-vpc-peering`의 기존 `retry_on_status:[400,409]`(TGW 선례, 이미 있었음)는 그대로 유지. |
+| 4 | `direct-connect:create-direct-connect` 400 `not-exist-log-storage` — `"FIREWALL Logging storage does not exists in this account(...)"` | 관측 note 전문이 계정 레벨 선행요건임을 직접 명시. `data/api_docs.json`에 정확히 대응하는 API 존재: `management/network-logging/{create,list,delete}networkloggingstorage`(`POST/GET/DELETE /v1/network-logging/storages`, `resource_type` enum `FIREWALL\|SECURITY_GROUP\|NAT`) — 하지만 `createnetworkloggingstorage`의 유일한 바디 필드 `bucket_name`(required)은 **실 object-storage 버킷**이 필요해 2차 크로스서비스 의존을 만들고, 이 스토리지 등록 자체가 **계정 전역**(DC 단위가 아님)이라 매 lifecycle 실행마다 만들고 지우면 (a) 동시에 도는 다른 DC류 테스트와 충돌하거나 (b) 계정 전역 설정을 다른 소비자가 쓰는 도중 걷어가는 리스크가 있음. | **수리하지 않음 — 조사만, 계정 레벨 공유 인프라(오케스트레이터 대상) 후보로 기록.** `networking__direct-connect.json`은 건드리지 않음(이 파일의 body/구조 문제가 아니므로 고쳐도 해소 안 됨이 확인됨). 권고: 공유 VPC처럼 오케스트레이터가 세션당 한 번 FIREWALL network-logging-storage(+object-storage 버킷)를 프로비저닝하고 세션 내내 유지(DC 실행마다 teardown하지 않음) — `knowledge/services.md` networking/direct-connect 섹션에 기록. |
+| 5 | `vpc-private-nat:create-private-nat` 404 — HB5 오너 가설은 "DC 캐스케이드" | 코드 확인(라이브 재현 아님): `networking__vpc.json`의 `vpc-private-nat`은 `service_resource_id`에 합성 `{unique}` 플레이스홀더를 보내며, `networking-direct-connect-routing`의 실제 DC id를 capture/adopt하지 않음(두 lifecycle이 ctx/state를 공유하지 않음) — 즉 DC가 4번 수정으로 살아나도 이 404는 **변하지 않음**(캐스케이드 가설 반증). | **수정 안 함** — 참조 흐름만 점검 완료. `knowledge/services.md`에 "독립적, 캐스케이드 아님" + 실제 필요한 변경(실 DC id 배선)은 별도 더 큰 작업이라고 기록. |
+| 6 | `networking-dns-hosted-zone-private:delete-private-dns` 400 `invalid-state` `(EDITING)` | 관측 note 전문 — `disconnect-vpc-from-private-dns`(PUT, VPC 연결 해제) 직후 발생. 기존에 이미 CONFIRMED된 "private-dns는 CREATING 중 setter가 400"과 같은 계열의 오류로, 이번엔 최초 생성이 아니라 disconnect PUT이 EDITING을 재유발한 것(에러 코드/문구가 동일 family `scp-network.private-dns.invalid-state`). | `wait-private-dns-stable-after-disconnect` 신규 settle-poll(`$.private_dns.state` until `ACTIVE`, 300s/15s, give_up_status 400/403/404)를 `disconnect-vpc-from-private-dns`와 `delete-private-dns` 사이에 삽입 — 기존 "wait-after-\<mutation\>" 패턴(예: `database__subops-full.json`)과 동일 스타일. |
+
+## 검증 명령 재현
+
+```
+python -m regression.scenarios.validate
+# -> 244 lifecycle(s) checked · 0 error(s) · 5 warning(s)  (5개는 이전 세션과 동일한 무관 경고, diff로 확인됨)
+
+python -m pytest tests/offline
+# -> 450 passed, 3 failed (모두 변경 전에도 동일하게 실패하는 기존 이슈 — git stash로 확인,
+#    eventstreams-cluster-subops-full/gen-heavy-backup의 기존 DAG gap, 네트워킹 파일과 무관)
+```
+
+## 남은 작업 (다음 HEAVY 디스패치용)
+
+1. `vpc-peering` 재디스패치 — `wait-peering-active` 재배치 후 실제로 CREATING→ACTIVE
+   전이가 300s 안에 잡히는지, `create-peering-routing-rule`/`set-vpc-peering`/
+   `delete-vpc-peering`이 2xx로 전환되는지 확인. 만약 여전히 타임아웃되면 실 전이
+   시간이 300s보다 김을 의미하므로 timeout 상향(TGW 계열 300s보다 더 큰 값) 검토.
+2. `networking-dns-hosted-zone-private` 재디스패치 — `wait-private-dns-stable-after-disconnect`
+   추가 후 `delete-private-dns`가 2xx/404로 전환되는지 확인.
+3. `management/network-logging`(+object-storage) 공유 인프라 프로비저닝 여부를
+   오너/오케스트레이터가 결정 — 결정되면 `networking-direct-connect-routing`의
+   `create-direct-connect`가 실제로 2xx 전환되는지 재검증.
+4. `vpc-private-nat`을 실 DC id에 배선할지(오케스트레이터 결정 필요, 크로스-lifecycle
+   capture 확장) — 결정 시 별도 세션에서 처리.

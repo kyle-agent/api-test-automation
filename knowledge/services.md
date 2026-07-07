@@ -411,6 +411,27 @@ lifecycle `heavy-asg-full-coverage` in
   `not-in-vpc-connection` showing a literal unresolved `{vpc_connection_id}` placeholder in its
   error body (proof of a missed capture, not a TGW-state issue as first hypothesized). Fixed
   OFFLINE 2026-07-07 (all three capture paths corrected in `networking__vpc.json`).
+- **VPC Peering: same-account peering NEVER needs approval (CONFIRMED, HB5 run 28831560635,
+  2026-07-07):** `PUT /v1/vpc-peerings/{id}/approval` 400s every time with
+  `scp-network.vpc-peering.approval-same-account-type` / "Approval is not required for Same
+  Account VPC peering" whenever both the requester and approver VPC belong to the same account
+  (our `vpc-peering` lifecycle always creates both VPCs itself, so this is a PERMANENT 400 for
+  it, not a transient CREATING-state error). `data/api_docs.json` `showvpcpeering`
+  `response_example` documents `account_type: SAME` + `state: CREATING` as its own baseline
+  case, confirming SAME-account is the default/expected shape. The peering still auto-progresses
+  CREATING → ACTIVE without any approval call for the SAME-account case; the earlier
+  `retry_on_status:[400]` x8x15s on the approve step (2026-06-11) was wasting ~120s chasing a
+  permanent error, which pushed the downstream `wait-peering-active` settle-poll to start late
+  and time out before the peering actually reached ACTIVE (set/delete/create-routing-rule then
+  400 `invalid-changeable-state`/`invalid-deletable-state`/`not-active-state` all `(CREATING)`).
+  Fixed OFFLINE 2026-07-07 in `networking__vpc.json`: `wait-peering-active` moved to run
+  immediately after `create-vpc-peering` (full fresh 300s budget); `approve-vpc-peering`'s retry
+  removed (kept as a documented-400 coverage probe only); two more short settle-polls added
+  before `set-vpc-peering`/`delete-vpc-peering` (child routing-rule create/delete can flip the
+  parent peering back to a transitional state, same precedent as TGW's
+  `wait-tgw-active-after-connection`). **If a genuine cross-account approver is ever added**
+  (a real second account), the approval flow becomes real and transient-400 retry should be
+  restored for that variant only. Live re-validation still pending (offline repair pass).
 - **VPC Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet, not `GENERAL` (CONFIRMED —
   already VALIDATED via `knowledge/formal/resources/networking__vpc.yaml` endpoint-subnet node,
   live-validated run 27583285457 2026-06-15; re-confirmed by HB4 run 28738115294, 2026-07-05):**
@@ -636,6 +657,32 @@ lifecycle `heavy-asg-full-coverage` in
   (+SCP_ALLOW_DESTRUCTIVE); check circuit-provisioning entitlement first.
 - **Note:** doc_url fetches returned 503 during the 2026-06-19 run (docs server down, transient).
 - **Coverage 2026-06-19:** 0→1/8 (listdirectconnects).
+- **`createdirectconnect` 400 `not-exist-log-storage` is an ACCOUNT-LEVEL cross-service
+  prerequisite, NOT a direct-connect-lifecycle body bug (investigated OFFLINE, HB5 run
+  28831560635, 2026-07-07):** error detail `"FIREWALL Logging storage does not exists in this
+  account(...)"`, triggered because our create body sends `firewall_enabled: true,
+  firewall_loggable: true`. `data/api_docs.json` has the fix-shaped API —
+  `management/network-logging/{create,list,delete}networkloggingstorage`
+  (`POST/GET/DELETE /v1/network-logging/storages`, `resource_type` enum
+  `FIREWALL|SECURITY_GROUP|NAT`) — but `createnetworkloggingstorage`'s ONLY body field besides
+  `resource_type` is `bucket_name` (required), which itself needs a REAL object-storage bucket —
+  i.e. this is a SECOND cross-service dependency (object-storage), and the storage registration
+  is account-global (not scoped to one direct-connect), so create/teardown per-lifecycle-run risks
+  either colliding with another concurrent DC-family test (`vpc-private-nat` also references
+  `service_type: DIRECT_CONNECT`) or, if torn down mid-account, breaking any other consumer of
+  FIREWALL logging that may exist. **Classified as a heavy cross-service prereq, NOT repaired
+  in this (networking-scoped, offline) session** — recommend the orchestrator provision ONE
+  account-wide FIREWALL network-logging-storage (with its own object-storage bucket) as shared
+  session infra (like the shared VPC), never torn down per-DC-run, so `createdirectconnect` can
+  then be re-tried live. Do not attempt a private per-lifecycle rebuild of this (crosses into
+  management/network-logging + object-storage, out of this service's scope).
+- **`vpc-private-nat`'s `create-private-nat` 404 is INDEPENDENT of direct-connect, not a
+  cascade (checked OFFLINE 2026-07-07):** `networking__vpc.json`'s `vpc-private-nat` lifecycle
+  sends a synthetic `{unique}` placeholder as `service_resource_id` (it does not adopt or capture
+  a real direct-connect id from `networking-direct-connect-routing` — the two lifecycles share no
+  ctx/state), so this 404 is unrelated to and unaffected by the log-storage prereq above; it will
+  keep 404ing until `vpc-private-nat` is wired to a REAL direct-connect id (separate, larger
+  cross-lifecycle change, out of scope here — not touched this session).
 
 ## networking / vpn
 
@@ -917,6 +964,15 @@ lifecycle `heavy-asg-full-coverage` in
   capture is `$.private_dns.id`. private-dns must reach `state: ACTIVE` before
   setters work (400 invalid-state while CREATING). All encoded in
   `regression/scenarios/lifecycles/networking__dns.json`.
+- **`disconnect-vpc-from-private-dns` re-triggers the SAME invalid-state pattern as the
+  initial create (CONFIRMED, HB5 run 28831560635, 2026-07-07):** `PUT /v1/private-dns/{id}`
+  (disconnecting the VPC, `connected_vpc_ids: []`) puts private-dns back into a transitional
+  `EDITING` state — the very next `delete-private-dns` 400s `scp-network.private-dns.invalid-state`
+  `"The state is invalid.:(EDITING)"` (same error family as the already-known CREATING→setter-400
+  behaviour, just re-triggered by an edit instead of the initial create). Fixed OFFLINE 2026-07-07
+  in `networking__dns.json`: added `wait-private-dns-stable-after-disconnect` settle-poll
+  (`$.private_dns.state` until `ACTIVE`, 300s/15s, give_up_status 400/403/404) between
+  `disconnect-vpc-from-private-dns` and `delete-private-dns`. Live re-validation still pending.
 - **Coverage 2026-06-19:** 3 → **6 / 22** observed (the 3 list GETs newly live-200;
   the public-domain 500 + 2 record-write probes were already observed). Remaining
   16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind

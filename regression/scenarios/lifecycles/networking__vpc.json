@@ -874,7 +874,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). 2026-06-11 run #4: create 202 but approve/set/DELETE of the peering all 400 in its initial state -> the peering survives and the VPC deletes 409 (now tolerated in expect_status; the own-run sweep reaps the leftovers). STATE MACHINE LEARNED (run #5 notes): create -> CREATING (set/delete/rules all 400 'not Active/changeable/deletable'); approval body is {\"type\": \"CREATE_APPROVE\"} (doc page; our old {action:APPROVE} drew ValidationError Field-required, leaving peerings STUCK in CREATING and their 2 VPCs undeletable -> the cap-poisoning root). Approve retries 400 to ride out CREATING, then wait-peering-active gates the sub-ops; delete retries 400/409. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
+      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). 2026-06-11 run #4: create 202 but approve/set/DELETE of the peering all 400 in its initial state -> the peering survives and the VPC deletes 409 (now tolerated in expect_status; the own-run sweep reaps the leftovers). STATE MACHINE LEARNED (run #5 notes): create -> CREATING (set/delete/rules all 400 'not Active/changeable/deletable'); approval body is {\"type\": \"CREATE_APPROVE\"} (doc page; our old {action:APPROVE} drew ValidationError Field-required, leaving peerings STUCK in CREATING and their 2 VPCs undeletable -> the cap-poisoning root). SAME-ACCOUNT RULE CONFIRMED (HB5 run 28831560635, reports/results/hb5/observations-gw0.jsonl): both VPCs (requester+approver VPC-B) live in OUR account, so `approve-vpc-peering` 400s every time with `scp-network.vpc-peering.approval-same-account-type` / \"Approval is not required for Same Account VPC peering\" -- this is a PERMANENT condition for this lifecycle (account_type will always be SAME per data/api_docs.json showvpcpeering response_example, which itself documents account_type:SAME + state:CREATING as the baseline case), not a transient CREATING-state 400, so retrying it (the old retry_on_status:400 x8x15s=120s) only burns time that the REAL settle-poll (wait-peering-active) needed -- HB5 showed wait-peering-active finishing right at its 300s timeout with the peering still not ACTIVE downstream (create-peering-routing-rule/set-vpc-peering/delete-vpc-peering all then hit 400 'not Active/changeable/deletable state(CREATING)'). Fix: wait-peering-active moved to run IMMEDIATELY after create-vpc-peering (before list/approve) so it gets the full fresh 300s budget instead of starting 120s late; approve-vpc-peering keeps its documented 400 in expect_status (real coverage of the endpoint) but NO LONGER retries on it (retrying a permanent same-account 400 cannot succeed) -- IF a future cross-account approver is ever added (different real account), the retry_on_status:[400] should be restored for THAT variant since a genuine pending-approval 400 during CREATING would then be transient. Two more short settle-polls added before set-vpc-peering and before delete-vpc-peering, mirroring the vpc-transit-gateway-children precedent below (wait-tgw-active-after-connection/wait-tgw-active-before-delete) where a child-resource create (here: create-peering-routing-rule / delete-peering-routing-rule) can flip the parent back to a transitional state right before the next write. delete-vpc-peering already carried retry_on_status:[400,409] (TGW precedent) pre-existing, unchanged. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE} (doc page confirms {type:CREATE_APPROVE} is right); the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback). Live re-validation still pending (this repair is OFFLINE, HB4c heavy run had the lane).",
       "steps": [
         {
           "name": "create-vpc",
@@ -999,6 +999,33 @@
           }
         },
         {
+          "name": "wait-peering-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "_note": "Settle-poll moved to run IMMEDIATELY after create-vpc-peering (was previously after list/approve) so it gets the full fresh 300s budget instead of starting ~120s late behind approve-vpc-peering's now-removed retry loop -- HB5 (reports/results/hb5/observations-gw0.jsonl) showed this poll ending right at its timeout with state still not ACTIVE, and every subsequent write (routing-rule create, set, delete) then 400'd 'not Active/changeable/deletable state(CREATING)'. give_up_status added (TGW precedent) so a failed create (peering id never resolved) doesn't burn the full 300s.",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.vpc_peering.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          }
+        },
+        {
           "name": "list-vpc-peerings",
           "service": "vpc",
           "method": "GET",
@@ -1016,6 +1043,7 @@
           "path": "/v1/vpc-peerings/{vpc_peering_id}/approval",
           "group": "peering",
           "optional": true,
+          "_note": "SAME-ACCOUNT: both requester and approver VPCs are ours, so this call is DOCUMENTED to always 400 with scp-network.vpc-peering.approval-same-account-type (\"Approval is not required for Same Account VPC peering\", confirmed HB5 observations-gw0.jsonl note field). 400 is therefore a PERMANENT/expected outcome here, not a transient CREATING-state error -- the previous retry_on_status:[400] x8 retries x15s (~120s) was chasing a condition that can never resolve and only delayed the real settle-poll (wait-peering-active, now positioned right after create). Retry removed. If a future variant adds a genuine cross-account approver (different real account_id), restore retry_on_status:[400] for THAT variant only -- a pending-approval 400 during CREATING would then be transient and worth riding out.",
           "json": {
             "type": "CREATE_APPROVE"
           },
@@ -1028,33 +1056,7 @@
             404,
             409,
             422
-          ],
-          "retry_on_status": [
-            400
-          ],
-          "retries": 8,
-          "retry_interval": 15
-        },
-        {
-          "name": "wait-peering-active",
-          "service": "vpc",
-          "method": "GET",
-          "path": "/v1/vpc-peerings/{vpc_peering_id}",
-          "group": "peering",
-          "optional": true,
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "poll": {
-            "field": "$.vpc_peering.state",
-            "until": [
-              "ACTIVE"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
+          ]
         },
         {
           "name": "create-peering-routing-rule",
@@ -1099,6 +1101,33 @@
           "params": {}
         },
         {
+          "name": "wait-peering-active-before-set",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "_note": "Second settle-poll, mirroring the vpc-transit-gateway-children precedent (wait-tgw-active-after-connection) where creating a CHILD resource (here: create-peering-routing-rule) can flip the PARENT peering back into a transitional state right before the next parent-level write (set-vpc-peering). Short budget (60s) since this only needs to catch a brief post-child-create reversion, not the original create->ACTIVE settle already covered by wait-peering-active.",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.vpc_peering.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 60,
+            "interval": 10,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          }
+        },
+        {
           "name": "set-vpc-peering",
           "service": "vpc",
           "method": "PUT",
@@ -1141,6 +1170,33 @@
           ],
           "retries": 4,
           "retry_interval": 15
+        },
+        {
+          "name": "wait-peering-active-before-delete",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "_note": "Third settle-poll (same rationale as wait-peering-active-before-set): delete-peering-routing-rule just ran and may have flipped the parent peering back to a transitional state; give it a short window to settle before delete-vpc-peering (which also keeps its pre-existing retry_on_status:[400,409] as a fallback net -- TGW precedent).",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.vpc_peering.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 60,
+            "interval": 10,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          }
         },
         {
           "name": "delete-vpc-peering",
