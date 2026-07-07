@@ -585,15 +585,16 @@
           "method": "POST",
           "path": "/v1/aimlops-platform",
           "json": {
-            "release_name": "regraimlops{ualpha}",
-            "cluster_id": "{cluster_id}",
-            "image_id": "{image_id}",
-            "namespace": "regr-aimlops-{ualpha}",
-            "description": "API regression suite — live provision",
-            "cpu": "2",
-            "memory": "4",
-            "storage_class_name": "",
-            "volume_size": "20"
+            "ai_ml_ops_platform_create_request": {
+              "ai_ml_ops_platform_type": "Enterprise",
+              "cluster_id": "{cluster_id}",
+              "image_id": "{image_id}",
+              "release_name": "regraimlops{ualpha}",
+              "storage_class_name": "",
+              "tags": []
+            },
+            "kubernetes_engine_create_request": null,
+            "node_pool_create_request": null
           },
           "expect_status": [
             200,
@@ -606,9 +607,9 @@
             422
           ],
           "capture_soft": {
-            "release_id": "$.id"
+            "release_id": "$.resource_id"
           },
-          "_note": "UNPROVEN / FIRST-LIVE body. NO data/api_bodies.json entry exists for aimlops-platform. Field set is best-effort from knowledge/formal/resources/ai-ml__aimlops-platform.yaml (release_name/cluster_id/image_id/namespace/description proven-in-model) PLUS resource sizing (cpu/memory/storage_class_name/volume_size) inferred from the validate-resources precondition semantics — UNPROVEN guesses. expect_status is deliberately BROAD ([200,201,202,400,403,404,409,422]) so the first exploratory run RECORDS the real API response (incl. a 4xx that reveals the true required body) WITHOUT hard-failing the lifecycle and abandoning the live cluster. capture_soft (not hard capture) so a 4xx that yields no $.id leaves {release_id} literal -> the PUT/DELETE below 404 harmlessly and teardown still runs."
+          "_note": "CORRECTED offline 2026-07-07 (A-repair-9, HB6 observed 400 ValidationError ['Field required'] on the prior flat body): data/api_docs.json model `aimlopsplatformcreatewithk8senginerequest` proves the real POST /v1/aimlops-platform body is a 3-key WRAPPER — required `ai_ml_ops_platform_create_request` (itself requiring `ai_ml_ops_platform_type`+`image_id`+`release_name`, doc request_example literal is 'Enterprise' casing; `cluster_id` is OPTIONAL inside this sub-object — when present it releases ONTO the existing SKE cluster instead of provisioning a new one) plus two SIBLING optional/nullable keys `kubernetes_engine_create_request`/`node_pool_create_request` (send explicit null since we already created+own a real cluster via the SKE closure above — no new cluster wanted). The previous flat body (release_name/cluster_id/image_id/namespace/description/cpu/memory/storage_class_name/volume_size as top-level siblings) was UNPROVEN and wrong: namespace/description/cpu/memory/volume_size do not exist anywhere in this model. Also corrected the capture: the doc's `asyncresponse` model (used by this 201) has NO `id` field — the resource id comes back as `resource_id` (confirmed field, `$.id` was a guess that always missed, which is why the PUT/DELETE below observed literal-placeholder 'Release ID should be 32-letter UUID format' — a cascade from this capture miss, not an independent bug; expected to resolve once this create captures a real 32-char id). **Live-unverified** — HB6 offline repair, next heavy dispatch must confirm 2xx + real capture."
         },
         {
           "name": "wait-aimlops-release",
@@ -625,8 +626,9 @@
           "optional": true,
           "group": "aimlops-release",
           "poll": {
-            "field": "$.status",
+            "field": "$.release_state",
             "until": [
+              "DEPLOYED",
               "READY",
               "Ready",
               "ready",
@@ -639,7 +641,7 @@
             "timeout": 1800,
             "interval": 30
           },
-          "_note": "poll the release to a ready/running state. UNPROVEN poll: status field path ($.status) and ready enum are best-effort. optional+grouped+broad expect_status so a 404 (release never created on a 4xx POST) or an unexpected status field does not hard-fail before teardown."
+          "_note": "poll the release to a deployed/ready state. CORRECTED offline 2026-07-07 (A-repair-9): data/api_docs.json `getaimlopsplatformv1` response_example proves the real field is top-level `release_state` (example value 'DEPLOYED', not wrapped) — the prior `$.status` guess does not exist on this response at all. Kept the other UNPROVEN enum members as a broad fallback (untested) alongside the CONFIRMED 'DEPLOYED'. optional+grouped+broad expect_status so a 404 (release never created on a 4xx POST) or an unexpected status field does not hard-fail before teardown. **Live-unverified.**"
         },
         {
           "name": "update-aimlops-platform",

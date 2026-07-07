@@ -45,6 +45,15 @@
           "capture_soft": {"ingress_controller_name": "$.contents[0].ingress_controller_name"}
         },
         {
+          "name": "capture-image-version",
+          "method": "GET",
+          "path": "/v1/data-ops/image-versions",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {"dops_image_version": "$.contents[0].version"},
+          "_note": "discovery GET (getdataopsimageversionv1, confirmed data/api_docs.json response schema ImageVersionsResponse -> $.contents[].version) — lead from docs-research §1 (CAMPAIGN-C3-100-docs-research.md): createdataopsservice's service_workload.*.version had no documented enum/example (blank in api_docs), and the live 2026-06-24 attempt with a hardcoded '2.7.3' 400'd 'Input dataOpsServiceWorkload is not valid'. This read-only probe captures the account's REAL available Airflow version so create-data-ops-service can inject it instead of guessing. capture_soft (not hard): per engine.py `_fill`, a step whose expr resolves to nothing leaves the ctx var unset, so the downstream {dops_image_version} placeholder stays LITERAL text in the body (engine substitutes ctx.get(key, <literal-placeholder>)) — the create step's broad expect_status already tolerates the resulting 400 harmlessly, same as before this fix. **Live-unverified**: whether the real version string differs from '2.7.3' (the value already in use) is exactly what this probe is meant to discover."
+        },
+        {
           "name": "validate-resources-create",
           "method": "POST",
           "path": "/v1/data-ops-services/clusters/{cluster_id}/validate-resources",
@@ -116,9 +125,9 @@
               "host_alias_list": []
             },
             "service_workload": {
-              "scheduler": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
-              "web_server": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
-              "worker": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"}
+              "scheduler": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "{dops_image_version}"},
+              "web_server": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "{dops_image_version}"},
+              "worker": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "{dops_image_version}"}
             },
             "storage_class_name": "default",
             "worker_type": "KubernetesExecutor",
@@ -127,7 +136,8 @@
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "do-service"
+          "group": "do-service",
+          "_note": "version now injected from the new capture-image-version probe ({dops_image_version} <- GET /v1/data-ops/image-versions $.contents[0].version) instead of a hardcoded '2.7.3' — the hardcoded value already 400'd 'Input dataOpsServiceWorkload is not valid' live (2026-06-24), so this substitutes the account's REAL reported version per docs-research §1's lead. cpu/memory/replica/worker_type left at the doc-example values verbatim ('2000'/'1024'/'1' cpu-millicores-style strings, worker_type='KubernetesExecutor' guessed from knowledge/formal/services/data-analytics__data-ops.yaml's Kubernetes|Celery userguide enum) — data/api_docs.json's `dataopsservicecreaterequest` model leaves these as untyped/unbounded strings with no enum/min/max documented, so their value-domain remains UNVERIFIED residual uncertainty; if 'Input dataOpsServiceWorkload is not valid' persists even with a real version string, cpu/memory/replica/worker_type become the next suspects. **Live-unverified.**"
         },
         {
           "name": "update-data-ops-service",

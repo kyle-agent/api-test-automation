@@ -623,3 +623,53 @@ python -m pytest tests/offline
 6. `vpc-endpoint` 재디스패치 — `endpoint_ip_address` 교정 후 create-vpc-endpoint가
    2xx로 전환되는지, 그 다음 신호가 (HB4b에서 이미 문서화된) `resource_key` 관련
    4xx로 이동하는지 확인.
+
+# §HB6 — aimlops-platform release body/capture · data-ops image-version discovery · ske list-images required param (2026-07-07, OFFLINE)
+
+> 배경: A-repair-9 에이전트. HB7+HB8 heavy run이 레인 점유 중이라 **라이브 SCP 호출
+> 없음** — `reports/results/hb6/observations-gw{0,1}.jsonl`(HB6, `run:
+> "28845361107"`) + `python -m spec.failures --service container`만을 원인 증거로
+> 사용, 나머지는 `data/api_docs.json`의 endpoint/model 스키마 대조로 확정. 산출물:
+> `regression/scenarios/lifecycles/generated__heavy-aimlops.json`
+> (`gen-heavy-aimlops:release-aimlops-platform` 바디 전면 재구성 + capture 교정,
+> `wait-aimlops-release`의 poll 필드 교정) ·
+> `regression/scenarios/lifecycles/ai-ml__aimlops-platform.json`
+> (`aimlops-platform-release-write-coverage:release-aimlops-platform` 동일 바디
+> 교정, 항상-4xx 커버리지 전용이라 라이브 영향 없음) ·
+> `regression/scenarios/lifecycles/data-analytics__data-ops.json` (신규
+> `capture-image-version` 조회 스텝 + `create-data-ops-service`의
+> `service_workload.*.version` 주입) · `regression/scenarios/scenarios.json`
+> (`container-ske-cluster-nodepool:list-images`에 누락된 필수 쿼리 파라미터 추가) ·
+> 본 섹션. `python -m regression.scenarios.validate` → **244 lifecycle(s) checked
+> · 0 error(s) · 5 warning(s)**(경고 5건은 §HB4d가 이미 "이전 세션과 완전히
+> 동일한 무관 항목"으로 확인해둔 바로 그 5건 — 본 세션에서 손대지 않은 파일들).
+
+## 원인확인 + 조치 표
+
+| # | 증상 | 원인(증거) | 조치 |
+|---|---|---|---|
+| 1 | `gen-heavy-aimlops:release-aimlops-platform`(POST `/v1/aimlops-platform`) 400 `ValidationError ["Field required"]`; 뒤이은 `update-aimlops-platform`/`delete-aimlops-platform` 400 `"Release ID should be 32-letter UUID format"` | `data/api_docs.json`의 `ai-ml/aimlops-platform/aimlopsplatformcreatewithk8senginerequest` 모델을 직접 대조: 실제 POST 바디는 **3-키 래퍼**(필수 `ai_ml_ops_platform_create_request`{필수 `ai_ml_ops_platform_type`/`image_id`/`release_name` + 옵션 `cluster_id`} + 옵션·nullable 형제 키 `kubernetes_engine_create_request`/`node_pool_create_request`) — 기존 바디는 `release_name/cluster_id/image_id/namespace/description/cpu/memory/storage_class_name/volume_size`를 전부 **평평하게(top-level)** 보내고 있었고, 그 중 `namespace`/`description`/`cpu`/`memory`/`volume_size`는 이 모델에 아예 존재하지 않는 필드 — "Field required"는 누락된 `ai_ml_ops_platform_type`(및 래퍼 구조 자체)이 원인. 또한 이 POST의 실제 응답 모델(`asyncresponse`)에는 `id` 필드가 없고 `resource_id`만 존재하는데 기존 `capture_soft`는 `$.id`를 캡처하고 있었음 — capture가 항상 실패해 `{release_id}` 리터럴이 그대로 남았고, 그 리터럴이 PUT/DELETE에 그대로 전달되어 "32-letter UUID format" 오류로 이어짐(태스크 지시대로 확인: 이는 독립 버그가 아니라 #1의 **캐스케이드**이며, release가 실제로 살아 진짜 32자 id를 캡처하면 해소될 것으로 논리상 확정). | 바디를 모델대로 재구성(`ai_ml_ops_platform_type: "Enterprise"`(doc request_example 리터럴 케이싱) + `cluster_id`/`image_id`/`release_name`을 `ai_ml_ops_platform_create_request` 아래로, `kubernetes_engine_create_request`/`node_pool_create_request`는 명시적 `null`— 이미 SKE 클러스터를 만들어 소유하고 있으므로 신규 클러스터를 원치 않음). `capture_soft`를 `$.id`→`$.resource_id`(확인된 `asyncresponse` 필드)로 교정. 부수 발견: `wait-aimlops-release`의 poll 필드도 `$.status`(존재하지 않음)→`$.release_state`(`getaimlopsplatformv1` response_example에서 확인된 실제 필드, 예시값 `"DEPLOYED"`)로 교정, `until` 목록에 확인된 `"DEPLOYED"`를 추가(나머지 미검증 후보는 안전망으로 유지). 동일 바디 버그를 가진 `ai-ml__aimlops-platform.json`(coverage-only, 항상 4xx 목적)의 `release-aimlops-platform`도 동일 구조로 함께 교정(라이브 결과는 어차피 4xx로 변화 없음, 문서 정확성 목적). **라이브 미검증** — 다음 heavy 디스패치가 2xx 전환 및 update/delete 캐스케이드 해소 여부를 확인해야 함. |
+| 2 | `data-ops-service-and-ops-guarded:create-data-ops-service`(POST `/v1/data-ops-services`) 400 `"Input dataOpsServiceWorkload is not valid"` (라이브 2026-06-24 기록, HB6엔 재현 관측 없음 — heavy-prereq라 이번 창에서 미시도) | `docs/working/plans/CAMPAIGN-C3-100-docs-research.md` §1이 이미 조사 완료: `service_workload.*.version`(및 cpu/memory/replica)에 대해 `data/api_docs.json` 모델(`dataopsservicecreaterequest`)이 enum/example을 전혀 문서화하지 않음(빈 문자열) — 하드코딩한 `"2.7.3"`이 라이브로 거부됨. 같은 문서가 리드로 제시한 `GET /v1/data-ops/image-versions`(`getdataopsimageversionv1`)가 계정의 실제 가용 버전을 알려주는 discovery 엔드포인트임을 `data/api_docs.json`으로 재확인(`response_example` → `ImageVersionsResponse.contents[].version`). | `capture-image-version`(GET `/v1/data-ops/image-versions`, `capture_soft: {"dops_image_version": "$.contents[0].version"}`) 신규 삽입, `create-data-ops-service`의 `service_workload.scheduler/web_server/worker.version`을 하드코딩 `"2.7.3"`→`{dops_image_version}`으로 교체(캡처 실패 시 `engine.py::_fill`의 `ctx.get(key, <literal>)` 동작에 따라 리터럴 플레이스홀더가 그대로 들어가 이전과 동일한 4xx로 tolerated — 회귀 없음). cpu/memory/replica/`worker_type`은 문서에 값 도메인이 없어 기존 doc-example 값(`"2000"`/`"1024"`/`"1"`/`"KubernetesExecutor"`) 그대로 유지, `_note`에 잔여 불확실성(값 도메인 미검증, 이번 버전 주입으로도 실패하면 다음 용의자는 cpu/memory/replica/worker_type)을 명시. **라이브 미검증** — HB7/HB8은 heavy-prereq(실제 Airflow 클러스터) 없이는 이 스텝에 도달하지 않으므로, 다음 실제 heavy 디스패치가 확인해야 함. |
+| 3 | `container-ske-cluster-nodepool:list-images`(GET `/v1/images`) 400, HB6 관측 note 빈 문자열(`spec.failures`도 "needs required query params / data"까지만 요약, 전문 없음) | `data/api_docs.json`의 `container/ske/listimages` 엔드포인트 정의를 직접 확인: `scp_original_image_type`(예시 `"k8s"`)가 **required** 쿼리 파라미터인데 이 스텝은 쿼리 없이 호출 중이었음 — 동일 파라미터가 이미 이 저장소 다른 곳(`generated__heavy-aimlops.json`의 `create-ske-image` 스텝, `/v1/images?scp_original_image_type=k8s&size=20&page=0`, HB6 관측상 200)에서 올바르게 쓰이고 있어 값도 함께 확인됨. | `list-images` 스텝에 `"params": {"scp_original_image_type": "k8s"}` 추가. `expect_status`는 `[200,400]` 유지(계정에 k8s 이미지가 전혀 없는 등 다른 사유의 400 가능성은 남아있음 — 이번에 닫은 것은 "필수 파라미터 누락"이라는 원인 하나뿐). **라이브 미검증.** |
+
+## 검증 명령 재현
+
+```
+python -m regression.scenarios.validate
+# -> 244 lifecycle(s) checked · 0 error(s) · 5 warning(s)  (5개는 §HB4d가 이미 확인해둔 것과
+#    동일한 무관 경고 — 본 세션이 건드리지 않은 파일들)
+```
+
+## 남은 작업 (다음 HEAVY 디스패치용)
+
+1. `gen-heavy-aimlops` 재디스패치 — `release-aimlops-platform`이 2xx로 전환되는지,
+   `$.resource_id` 캡처가 실제 32자 id를 얻는지, 그 결과로 `wait-aimlops-release`
+   (`$.release_state` poll)/`update-aimlops-platform`/`delete-aimlops-platform`이
+   더 이상 "32-letter UUID format" 오류 없이 정상 캐스케이드로 넘어가는지 확인.
+2. `data-ops-service-and-ops-guarded` 재디스패치(실 Airflow 클러스터 전제 —
+   heavy-prereq 미해결) — `capture-image-version`이 실제 버전 문자열을 캡처하는지,
+   그 값을 주입한 `create-data-ops-service`가 "Input dataOpsServiceWorkload is not
+   valid"를 벗어나는지 확인. 여전히 거부되면 cpu/memory/replica/worker_type 값
+   도메인을 다음 용의자로 조사할 것.
+3. `container-ske-cluster-nodepool` 재디스패치 — `list-images`가
+   `scp_original_image_type=k8s` 추가 후 2xx로 전환되는지 확인.
