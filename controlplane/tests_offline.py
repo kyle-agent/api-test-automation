@@ -220,6 +220,40 @@ def test_reporting_subtabs_single_include():
             assert label in page, (path, label)
 
 
+def test_ia_catalog_absorbed_into_modeling():
+    """2026-07-07 IA 개정 — Catalog는 네비 단계에서 우측 유틸 링크(📖 카탈로그)로,
+    Modeling이 서비스별 카탈로그 엔드포인트를 인라인(집계 + lazy 드로어)으로 품는다."""
+    home = client.get("/").text
+    assert "📖 카탈로그" in home                       # 유틸 링크
+    assert '<a href="/catalog" class=' in home         # 딥링크 유지
+    assert "3단계 현황" in home                        # 파이프라인 4칸 → 3칸
+    assert 'class="pl">Catalog<' not in home           # Catalog 칸 제거
+    assert "API의 테스트 모델 저작" in home            # Modeling 칸의 흡수 표기
+
+    # /catalog 는 남고(참조용) 머리에 통합 안내 1줄
+    cat = client.get("/catalog")
+    assert cat.status_code == 200 and "Modeling으로 통합됨" in cat.text
+
+    # Modeling 표: 서비스 행 집계 + 표 CX (code/opt 숨김 · 검증상태 헤더 · 범례)
+    r = client.get("/planning/resources/map")
+    assert r.status_code == 200
+    page = r.text
+    assert "모델됨" in page and "미모델" in page and "epdrawer" in page
+    assert ">검증상태</th>" in page and ">code</th>" not in page \
+        and ">opt</th>" not in page
+    assert "범례:" in page and "의존 그래프 (영향 파악)" in page
+
+    # 엔드포인트 드로어 파셜 — 상태 칩 3종 분류 (규칙: resource_routes.py 주석)
+    part = client.get("/planning/resources/map/endpoints",
+                      params={"service": "networking/vpc"})
+    assert part.status_code == 200
+    assert "epchip ok" in part.text          # 모델됨 → 노드 편집 딥링크
+    assert "/planning/resources/" in part.text
+    missing = client.get("/planning/resources/map/endpoints",
+                         params={"service": "no/such"})
+    assert missing.status_code == 200 and "없습니다" in missing.text
+
+
 # --- 4. run comparison ------------------------------------------------------------
 
 _OBS = {
@@ -426,6 +460,7 @@ TESTS = [
     test_empty_inventory_explains_ingest_only,
     test_error_empty_states,
     test_reporting_subtabs_single_include,
+    test_ia_catalog_absorbed_into_modeling,
     test_compare_diff_buckets,
     test_compare_view_with_stubbed_snapshots,
     test_editor_pages_render,
