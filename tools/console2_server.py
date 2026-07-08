@@ -1949,7 +1949,7 @@ def _run_worker(rec: dict) -> None:
     # 워커 캡 10 (owner 2026-07-08 "동시 워커도 늘려줘 10으로" — 폴링 IO-대기
     # 위주라 로컬 부담 낮음). 계정 VPC 5-슬롯 캡은 cross-process budget이
     # 그대로 조율하므로(초과분은 skip-not-fail) 상향과 무관하게 안전.
-    n = str(max(1, min(10, len(rec["lifecycle_ids"]) or 2)))
+    n = str(max(1, min(18, len(rec["lifecycle_ids"]) or 2)))
     try:
         with open(logp, "w", encoding="utf-8") as f:
             f.write(f"# console2 run {rec['id']}  lifecycle_ids={rec['lifecycle_ids']}\n"
