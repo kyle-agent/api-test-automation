@@ -93,17 +93,33 @@ def findings_to_conf(findings: list[dict]) -> dict:
 
     by_endpoint: dict[str, dict] = {}
     severity_order = {"red": 2, "yellow": 1, "green": 0}
+    # Per-endpoint dedup index: (rule_id, detail) -> position in rec["items"].
+    # The findings store is append-only and re-records the same defect on every
+    # conformance run, and static + runtime independently report the same defect
+    # (differing only in issue-ref / source) — without this the dashboard shows
+    # the identical improvement line 2-3× per API.
+    seen: dict[str, dict] = {}
 
     for f in findings:
         key = f.get("endpoint_key", "")
         sev = f.get("severity", "green")
         rec = by_endpoint.setdefault(key, {"status": "green", "items": []})
-        rec["items"].append({
+        item = {
             "type": f.get("rule_id", ""),
             "src": f.get("source", "static"),
             "issue": f.get("issue", ""),
             "detail": f.get("detail", ""),
-        })
+        }
+        dkey = (key, item["type"], item["detail"])
+        prev = seen.get(dkey)
+        if prev is None:
+            seen[dkey] = item
+            rec["items"].append(item)
+        elif not prev["issue"] and item["issue"]:
+            # Keep the more informative variant: prefer the one carrying an
+            # issue reference (typically the static finding) over a bare runtime
+            # duplicate of the same defect.
+            prev.update(issue=item["issue"], src=item["src"])
         if severity_order.get(sev, 0) > severity_order.get(rec["status"], 0):
             rec["status"] = sev
 
