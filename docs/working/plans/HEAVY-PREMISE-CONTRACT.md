@@ -31,11 +31,12 @@ light/heavy 어휘는 UI에서 사라지고, 도달 프로브는 CI 스윕 전�
 *-subops-guarded 계열 · idc-delete-policies-probe / `verify` = compute-virtualserver-full ·
 virtualserver-keypair · vs-autoscaling-coverage · *-read-coverage · *-light-reads · gen-* reads.
 예외가 필요하면 **override 상수 dict** `ROLE_OVERRIDES: dict[lifecycle_id, role]` 를 loader에
-두고 여기(계약)에 사유와 함께 기록한다. 현재 등록분:
-- `vs-autoscaling-coverage → verify` (WP1, 2026-07-08): 스텝 모양이 쓰기-프로브와 기계적으로
-  동일(전부 tolerant mutating)하지만, keypair·launch-configuration create가 **라이브 2xx로
-  증명된**(2026-06-18) 무과금 실자원 + 자체 teardown — 규칙만으로는 vs-image-write류와 분리
-  불가하여 override. (사유 주석: `regression/scenarios/loader.py` ROLE_OVERRIDES.)
+두고 여기(계약)에 사유와 함께 기록한다. 현재 등록분: **없음.**
+- (철회) `vs-autoscaling-coverage → verify` (WP1 등록, **2026-07-08 owner 판정으로 철회**):
+  ASG-쓰기 꼬리 7스텝이 자기 인프라(서브넷/ASG)를 만들지 않아 구조적으로 2xx 불가
+  (라이브: POST asg 400 → 이하 placeholder 404). keypair/LC 포함 전체 ASG 표면은
+  `heavy-asg-full-coverage`가 실자원 2xx로 검증하므로 파생 규칙대로 **probe**(CI 전용)가
+  올바름. 검산 목록에서 verify 예시에서 제외.
 
 노출: `loader.load_lifecycles()`가 각 lifecycle dict에 `"role"` 키를 추가. `_model()`의
 lifecycles에도 그대로 실린다 (UI/선택/CI가 공통 소비).
@@ -97,6 +98,16 @@ classify(observations: list[dict], *, verified: dict, waivers: list[dict],
 - **gap**: 위 둘 다 아님 = 어떤 verify-role lifecycle에도 이 endpoint를 2xx로 딸 스텝이
   아직 없음 (레시피 숙제).
 - 정규화: `derive_verified.norm_path` 재사용 (경로 파라미터 `*` 접기). 새 정규화 만들지 말 것.
+
+**§4 보강 (2026-07-08 owner — enrichment 층, `console2_server._enrich_soft_classes`):**
+classify()의 3분류는 순수/스토어 수준 그대로 두고, 런 이벤트 순서를 아는 enrichment가
+두 가지를 후처리한다 (UI가 소비하는 최종 `soft_class` 어휘):
+- **confirm(삭제확인)**: 같은 lifecycle에서 **앞선 DELETE 2xx가 지운 경로**의 404 읽기 —
+  teardown 검증 성공 신호(과금 누수 방지 폴링)이지 miss가 아님. policy보다 우선.
+- **duplicate 2분할**: `dup_run`(이번 런에서 같은 endpoint가 실제 2xx — 무시 가능·기본 접힘)
+  vs `dup_store`(**과거 기록만 — 이번 런에서는 직접 확인 안 됨**, 회귀 관점 미검증으로
+  눈에 띄게 표기). "이번 런에 200 확인" 요구(owner)의 구조적 답. 최종 어휘:
+  `confirm | dup_run | dup_store | gap | policy`.
 
 ## 5. UI 어휘 (lead 통합)
 

@@ -47,14 +47,11 @@ FRAGMENTS_DIR = _HERE / "lifecycles"
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 ROLE_OVERRIDES: dict[str, str] = {
-    # Shape-wise identical to the vs write-reachability probes (every mutating
-    # step optional + broad 4xx-tolerant expect_status, so the derived rule
-    # alone says "probe"), but its keypair + launch-configuration creates are
-    # live-PROVEN 2xx (2026-06-18) — real zero-cost resources created and torn
-    # down in-lifecycle. It VERIFIES the free ASG/LC write surface; the broad
-    # tolerance is quota/permission armor, not "expected to fail". Pinned
-    # verify by the contract §1 sanity list.
-    "vs-autoscaling-coverage": "verify",
+    # (비어 있음) vs-autoscaling-coverage 의 verify override 는 2026-07-08 owner
+    # 판정으로 철회 — 그 ASG-쓰기 꼬리(7 스텝)는 자기 인프라(서브넷/ASG)를 만들지
+    # 않아 구조적으로 2xx 불가(라이브 관찰: POST asg 400 → 이하 전부 placeholder
+    # 404)이고, keypair/LC create 포함 전체 표면을 heavy-asg-full-coverage 가
+    # 실자원 2xx 로 검증한다. 파생 규칙대로 probe(CI 스윕 전용)가 올바른 분류.
 }
 
 

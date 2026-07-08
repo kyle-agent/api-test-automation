@@ -972,8 +972,34 @@ def _enrich_soft_classes(events: list[dict]) -> list[dict]:
                 obs.append({"endpoint_key": f"{e.get('lifecycle', '?')}:{e.get('step', '?')}",
                             "method": e.get("method"), "path": e.get("path"),
                             "status": e.get("status"), "category": e.get("category")})
+        run2xx = sc.build_run_2xx(obs)
         cmap = sc.classify(obs, verified=d["verified"], waivers=d["waivers"],
-                           run_endpoint_2xx=sc.build_run_2xx(obs), catalog=d["catalog"])
+                           run_endpoint_2xx=run2xx, catalog=d["catalog"])
+        # 후처리 (계약 §4 보강, 2026-07-08 owner):
+        #  · confirm(삭제확인): 같은 lifecycle에서 앞선 DELETE 2xx가 지운 경로의 404
+        #    읽기 = teardown 검증 성공 신호이지 miss가 아님. policy보다 우선.
+        #  · duplicate 2분할: dup_run(이번 런에서 같은 endpoint 2xx 이미 땀) vs
+        #    dup_store(과거 기록만 — 이번 런에서는 직접 확인 안 됨). 회귀 관점의
+        #    "오늘 검증 안 된 것"이 dup_store로 드러난다.
+        # confirm 매칭 키 = (lifecycle, 원시 경로 템플릿). norm_path(*) 로 접으면
+        # 같은 컬렉션의 다른 인스턴스({vol2_id})까지 confirm 으로 오인한다 — 레시피는
+        # 인스턴스를 placeholder 이름으로 구분하므로 원시 템플릿이 정확한 identity.
+        deleted: set = set()
+        for oi, o in enumerate(obs):
+            rpath = o.get("path") or ""
+            lc = (o.get("endpoint_key") or ":").split(":", 1)[0]
+            st = o.get("status")
+            if oi in cmap:
+                if st == 404 and (lc, rpath) in deleted:
+                    cmap[oi] = "confirm"
+                elif cmap[oi] == "duplicate":
+                    tok = sc.endpoint_token(o.get("method"), o.get("path"))
+                    raw = o.get("endpoint_key")
+                    cmap[oi] = ("dup_run" if (tok in run2xx or raw in run2xx)
+                                else "dup_store")
+            if (isinstance(st, int) and 200 <= st < 300
+                    and (o.get("method") or "").upper() == "DELETE"):
+                deleted.add((lc, rpath))
         for oi, cls in cmap.items():
             events[idxs[oi]]["soft_class"] = cls
     except Exception:  # noqa: BLE001

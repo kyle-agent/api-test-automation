@@ -1931,9 +1931,13 @@ function groupEventsByLifecycle(events) {
       const c = { key: k, lifecycle: id, step: k, method: e.method, path: e.path,
         status: null, category: "run", ms: null, params: null, req_body: null, resp_snippet: null };
       b._apiByKey[k] = c; b.api.push(c); }
+    else if (e.kind === "poll-progress") { const b = ensure(id); const c = b._apiByKey[e.step];
+      // 진행 중 폴링의 생존 신호: ⏳ 행에 "N회차 · 상태 · 경과"를 실어준다.
+      if (c) c.poll = { attempt: e.attempt, state: e.state, elapsed_s: e.elapsed_s, timeout_s: e.timeout_s }; }
     else if (e.kind === "step-end") { const b = ensure(id); const k = e.step;
       let c = b._apiByKey[k];
       if (!c) { c = { key: k, lifecycle: id, step: k, method: e.method, path: e.path }; b._apiByKey[k] = c; b.api.push(c); }
+      c.poll = null;   // 폴 종료 — 생존 신호 제거
       c.status = e.status; c.category = e.category;
       c.ms = e.elapsed_ms != null ? Math.round(e.elapsed_ms) : null;   // integer ms (drop the long float)
       if (e.params != null) c.params = e.params;
@@ -2486,18 +2490,24 @@ function reportR3() {
   const okN = calls.filter(c => c.category === "ok").length;
   const softN = calls.filter(c => c.category === "soft").length;
   const failN = calls.filter(c => c.category === "fail").length;
-  // §4/§5 soft 3분류 — 서버가 step-end에 soft_class를 실어주면 chip + 분해 표시.
-  const sc = { duplicate: 0, gap: 0, policy: 0 };
+  // §4/§5 soft 분류 — 서버가 step-end에 soft_class를 실어주면 chip + 분해 표시.
+  // confirm=삭제확인(teardown 검증 성공) · dup_run=이번 런에서 이미 2xx ·
+  // dup_store=과거 기록만(이번 런 미확인 — 회귀 관점에서 눈에 띄어야 함) · gap · policy.
+  const sc = { confirm: 0, dup_run: 0, dup_store: 0, duplicate: 0, gap: 0, policy: 0 };
   calls.forEach(c => { if (c.category === "soft" && sc[c.soft_class] != null) sc[c.soft_class]++; });
-  const hasSC = sc.duplicate + sc.gap + sc.policy > 0;
+  const hasSC = Object.values(sc).some(n => n > 0);
   const softChip = cls => {
-    const m = { duplicate: ["중복", "dup", "같은 런/스토어에서 이미 2xx 검증된 엔드포인트 — 무시 가능"],
+    const m = { confirm: ["삭제확인", "cfm", "DELETE 후 404 = 자원이 정말 지워졌다는 증명 (teardown 검증 성공)"],
+                dup_run: ["중복(이번 런)", "dup", "같은 endpoint가 이번 런에서 이미 진짜 2xx를 땄음 — 무시 가능"],
+                duplicate: ["중복(이번 런)", "dup", "같은 endpoint가 이번 런에서 이미 진짜 2xx를 땄음 — 무시 가능"],
+                dup_store: ["과거 기록", "dups", "과거 런의 2xx 기록만 있음 — 이번 런에서는 직접 확인되지 않음 (회귀 미검증)"],
                 gap: ["갭", "gapc", "어떤 검증 레시피에도 2xx 스텝이 없음 — 레시피 숙제"],
                 policy: ["정책", "pol", "reachability waiver — 만점=도달(4xx=접근 증거)"] };
     const x = m[cls]; return x ? ` <span class="schip ${x[1]}" title="${x[2]}">${x[0]}</span>` : "";
   };
   const visCalls = hasSC && hideDupSoft
-    ? calls.filter(c => !(c.category === "soft" && c.soft_class === "duplicate")) : calls;
+    ? calls.filter(c => !(c.category === "soft" &&
+        (c.soft_class === "dup_run" || c.soft_class === "duplicate"))) : calls;
   const hiddenN = calls.length - visCalls.length;
   const apiRow = c => {
     const k = rowKey(c);
@@ -2505,8 +2515,9 @@ function reportR3() {
     const row = `<tr class="apirow ${isOpen ? "open" : ""}" data-apik="${esc(k)}">
       <td><span class="caret">${isOpen ? "▾" : "▸"}</span> <span class="mtag ${esc(c.method || "")}">${esc(c.method || "")}</span> <code>${esc(c.path || "")}</code></td>
       <td>${badge(c.category)}${c.category === "soft" ? softChip(c.soft_class) : ""}${c.failNote ? ` <span class="muted small">(${esc(c.failNote)})</span>` : ""}</td>
-      <td class="muted">${c.status != null ? esc(c.status) : "—"}</td>
-      <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run" ? "⏳" : "—")}</td>
+      <td class="muted">${c.category === "run" && c.poll ? `<span title="폴링 중 — ACTIVE 등 목표 상태 대기">${esc(c.poll.state)}</span>` : (c.status != null ? esc(c.status) : "—")}</td>
+      <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run"
+        ? (c.poll ? `⏳ ${c.poll.attempt}회차 · ${fmtDur(c.poll.elapsed_s)}${c.poll.timeout_s ? ` / ${fmtDur(c.poll.timeout_s)}` : ""}` : "⏳") : "—")}</td>
     </tr>`;
     const detail = isOpen ? `<tr class="apidetail"><td colspan="4">${apiDetailHtml(c)}</td></tr>` : "";
     return row + detail;
@@ -2535,11 +2546,14 @@ function reportR3() {
       <div class="s" title="${esc(CAT_TIP.fail)}"><b style="color:var(--fail)">${failN}</b><span>fail</span></div>
     </div>
     ${hasSC ? `<div class="softbrk small">soft 분류:
-        <span class="schip dup">중복 ${sc.duplicate}</span>
-        <span class="schip gapc">갭 ${sc.gap}</span>
-        <span class="schip pol">정책 ${sc.policy}</span>
+        ${sc.confirm ? `<span class="schip cfm">삭제확인 ${sc.confirm}</span>` : ""}
+        ${(sc.dup_run + sc.duplicate) ? `<span class="schip dup">중복(이번 런) ${sc.dup_run + sc.duplicate}</span>` : ""}
+        ${sc.dup_store ? `<span class="schip dups">과거 기록 ${sc.dup_store}</span>` : ""}
+        ${sc.gap ? `<span class="schip gapc">갭 ${sc.gap}</span>` : ""}
+        ${sc.policy ? `<span class="schip pol">정책 ${sc.policy}</span>` : ""}
+        <span class="muted" style="margin-left:6px">이번 런 직접 2xx <b>${okN}</b>${sc.dup_store ? ` · 과거 기록 의존 <b>${sc.dup_store}</b>` : ""}</span>
         <label class="muted" style="margin-left:8px;cursor:pointer">
-          <input type="checkbox" id="hidedup-soft" ${hideDupSoft ? "checked" : ""}> 중복 숨기기${hiddenN ? ` (${hiddenN}행 숨김)` : ""}</label>
+          <input type="checkbox" id="hidedup-soft" ${hideDupSoft ? "checked" : ""}> 중복(이번 런) 숨기기${hiddenN ? ` (${hiddenN}행)` : ""}</label>
       </div>` : ""}
     <div class="scroll" style="max-height:560px;margin-top:8px"><table class="tbl apitbl">
       <thead><tr><th>method · path (대상)</th><th>결과</th><th>status</th><th>응답시간</th></tr></thead>

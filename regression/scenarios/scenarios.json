@@ -1538,6 +1538,15 @@
           ]
         },
         {
+          "name": "show-snapshot",
+          "method": "GET",
+          "path": "/v1/snapshots/{snap_id}",
+          "expect_status": [
+            200
+          ],
+          "_note": "strict 단건 조회 — '이번 런에서 지금도 200인가'를 이 레시피가 자급자족으로 증명 (2026-07-08 owner: dup_store/CI read-chain 의존 제거). 뒤의 wait-snapshot-gone(삭제확인 404)과는 목적이 다르다."
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "volume_id": "{vol_id}",
@@ -3034,7 +3043,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 600,
+            "timeout": 1200,
             "interval": 15
           }
         },

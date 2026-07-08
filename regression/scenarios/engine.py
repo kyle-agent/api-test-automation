@@ -596,6 +596,8 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     refire = poll.get("refire")
     refire_left = int(refire.get("max", 3)) if refire else 0
     deadline = time.monotonic() + timeout
+    _poll_t0 = time.monotonic()
+    _poll_n = 0
     while time.monotonic() < deadline:
         if give_up_status is not None and resp.status in give_up_status:
             return resp
@@ -626,6 +628,17 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
             print(f"  step '{step.get('name')}': platform command stop_polling "
                   f"— abandoning wait (handled like a poll timeout)")
             break
+        # 폴링 생존 신호 (console2): attempt/현재 state/경과를 이벤트로 — 리포트의
+        # ⏳ run 행이 "멈춤"이 아니라 "N회차 · CREATING · 7분째"로 읽히게. env-gated
+        # no-op라 headless 런 비용 0.
+        _poll_n += 1
+        if _cev:
+            _val = _jsonpath_get(resp.body, field) if (field and resp.body) else None
+            _cev.emit("poll-progress", lifecycle=lifecycle_id,
+                      step=step.get("name"), attempt=_poll_n,
+                      state=(_val if isinstance(_val, str) else resp.status),
+                      elapsed_s=round(time.monotonic() - _poll_t0, 1),
+                      timeout_s=timeout)
         time.sleep(interval)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
