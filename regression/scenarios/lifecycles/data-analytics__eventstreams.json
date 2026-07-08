@@ -1095,6 +1095,103 @@
           "_note": "size_gb raised from the guarded variant's 20 to 112 (> the 104GB OS volume this lifecycle's own es-create just provisioned) — resize-UP is the documented direction for block storage groups across every other DBaaS engine in this repo (mariadb/mysql/epas/postgresql/cachestore resize-block-storage all use size_gb:112 against a 104 create). 20 would be a shrink, which is never a supported operation for any engine seen so far."
         },
         {
+          "name": "stop-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-stop-start",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (eventstreamsstopcluster, class c): body(none)/expect/settle-poll copied from the postgresql stop-cluster twin in database__subops-full.json. stop→start ordered as the LAST subop window (after es-resize) and BEFORE es-delete; own group 'es-stop-start' so a failure here can never skip teardown (es-delete lives in group es-create — engine group-skip matches exact names only). If the preceding es-resize op is still in flight this may 400 ExistInprogress — an expected status (call evidence), and es-delete's retry armor (400/409 x20 @60s) absorbs any residue. UNVERIFIED LIVE — 라이브가 정정."
+        },
+        {
+          "name": "wait-after-stop-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-stop-start",
+          "_note": "settle-poll copied verbatim from the postgresql wait-after-stop-cluster twin (STOPPED listed first): settles the async stop before start fires, mirroring the wait-after-<op> pattern used by every subop group in this lifecycle."
+        },
+        {
+          "name": "start-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "es-stop-start",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (eventstreamsstartcluster, class c): postgresql twin copy, stop→start order — if stop-cluster failed the group is already skipped, so start never fires against a still-RUNNING cluster. UNVERIFIED LIVE — 라이브가 정정."
+        },
+        {
+          "name": "wait-after-start-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "es-stop-start",
+          "_note": "settle-poll copied verbatim from the postgresql wait-after-start-cluster twin: ensures the cluster settles back to RUNNING before es-delete fires."
+        },
+        {
           "name": "es-delete",
           "service": "eventstreams",
           "group": "es-create",

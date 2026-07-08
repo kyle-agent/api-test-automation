@@ -913,6 +913,73 @@
           "group": "patch"
         },
         {
+          "name": "capture-server-type",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "server_type_name": "$.contents[1].name"
+          },
+          "_note": "completeness-audit 2026-07-08 (supports the mysqlsetservertype 편입 below): captures the SECOND server-types entry as the resize target — resizing to the SAME type used at create is an intentional hard 400 (see the epas/mariadb capture-server-type / resize notes in this file, HB1 repair 2026-07-04). Separate optional capture_soft step (epas pattern) so a single-entry server-types list can never fail mysql's strict find-server-type."
+        },
+        {
+          "name": "resize-instance-group",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/resize",
+          "json": {
+            "server_type_name": "{server_type_name}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "resize",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (mysqlsetservertype, class c — mysql was the only subops-full engine missing it): body/expect copied from the postgresql/epas twins in this same file (HB1-repaired form: target a DIFFERENT server type via $.contents[1].name; same-type resize 400s by design). instance_group_id comes from this lifecycle's existing capture-subop-ids. optional + own group 'resize' (previously unused by mysql; add-block-storages keeps its separate 'block-storage' group) so a failure here can never skip teardown (delete-cluster onward is group-less). UNVERIFIED LIVE — 라이브가 정정."
+        },
+        {
+          "name": "wait-after-resize-instance-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "resize",
+          "_note": "settle-poll copied verbatim from the postgresql twin (HB1 repair 2026-07-04): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without this wait the next call races the in-flight resize and gets 400 Dbaas.ValidationError.ExistInprogress."
+        },
+        {
           "name": "add-block-storages",
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
@@ -1350,6 +1417,17 @@
           "_note": "repointed to $.contents[1].name 2026-07-04 (HB1 repair, mariadb-analogous fix): this step previously re-captured index[0] — the SAME server type epas-create already used for the instance group, so resize-instance-group's same-type request is expected to hard-fail (see mariadb's identical note; same InstanceGroupResizeRequest DTO). index[1] gives a genuinely different target type. UNVERIFIED LIVE — apply + observe in HB1b/HB2b."
         },
         {
+          "name": "show-request",
+          "method": "GET",
+          "path": "/v1/requests/{request_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "show-request",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (epasshowrequest, class b): explicit strict-200 read — probe_reads may auto-seed this at runtime but that is non-guaranteed. request_id is soft-captured from epas-create's 202 AsyncResponse (same request_id-capture pattern as the database-mysql-cluster twin's show-request step in scenarios.json); if the capture missed, the literal token 4xxs and this optional own-group step fails alone (no cascade, teardown unaffected). Semantics UNVERIFIED live (no cluster up outside heavy runs) — 라이브가 정정."
+        },
+        {
           "name": "set-maintenance",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
@@ -1498,6 +1576,17 @@
             ]
           },
           "group": "backup"
+        },
+        {
+          "name": "list-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "backup-read",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (epaslistbackuphistories, class b): explicit strict-200 read on the cluster this lifecycle creates (probe_reads auto-seed is non-guaranteed). Placed after wait-after-create-backup so a fresh manual backup is visible when the backup group succeeded; an empty histories list is still 200. optional + own group; semantics UNVERIFIED live — 라이브가 정정."
         },
         {
           "name": "remove-backup-histories",
@@ -1796,6 +1885,17 @@
             ]
           },
           "group": "archive"
+        },
+        {
+          "name": "show-archive-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "archive-read",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (epasshowarchiveconfig, class b): explicit strict-200 read, deliberately placed AFTER the archive set/sync window and BEFORE delete-archive (once deleted the config read could 404). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
         },
         {
           "name": "delete-archive",
@@ -2959,6 +3059,28 @@
           }
         },
         {
+          "name": "list-parameter-values",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "param-read",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — mysql/epas/postgresql cover this path via their capture-param-id step but mariadb never had one (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
+        },
+        {
+          "name": "show-request",
+          "method": "GET",
+          "path": "/v1/requests/{request_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "show-request",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadbshowrequest, class b): explicit strict-200 read — probe_reads may auto-seed this at runtime but that is non-guaranteed. request_id is soft-captured from maria-create's 202 AsyncResponse (same request_id-capture pattern as the database-mysql-cluster twin's show-request step in scenarios.json); if the capture missed, the literal token 4xxs and this optional own-group step fails alone (no cascade, teardown unaffected). Semantics UNVERIFIED live — 라이브가 정정."
+        },
+        {
           "name": "set-maintenance",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
@@ -3107,6 +3229,17 @@
             ]
           },
           "group": "backup"
+        },
+        {
+          "name": "list-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "backup-read",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistbackuphistories, class b): explicit strict-200 read on the cluster this lifecycle creates (probe_reads auto-seed is non-guaranteed). Placed after wait-after-create-backup so a fresh manual backup is visible when the backup group succeeded; an empty histories list is still 200. optional + own group; semantics UNVERIFIED live — 라이브가 정정."
         },
         {
           "name": "remove-backup-histories",
@@ -3405,6 +3538,17 @@
             ]
           },
           "group": "archive"
+        },
+        {
+          "name": "show-archive-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "archive-read",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadbshowarchiveconfig, class b): explicit strict-200 read placed right after the archive set/sync window (mariadb has no delete-archive step, unlike epas/postgresql). The create body enables archive backup (init_config_option.backup_option) so a 200 is plausible even when the archive group was skipped. optional + own group; semantics UNVERIFIED live — 라이브가 정정."
         },
         {
           "name": "set-audit-log",
@@ -4502,6 +4646,28 @@
           }
         },
         {
+          "name": "list-parameter-values",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "param-read",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestorelistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — cachestore has set-parameters/sync-parameters but never read the values back (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
+        },
+        {
+          "name": "show-request",
+          "method": "GET",
+          "path": "/v1/requests/{request_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "show-request",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestoreshowrequest, class b): explicit strict-200 read — probe_reads may auto-seed this at runtime but that is non-guaranteed. request_id is soft-captured from cache-create's 202 AsyncResponse (same request_id-capture pattern as the database-mysql-cluster twin's show-request step in scenarios.json); if the capture missed, the literal token 4xxs and this optional own-group step fails alone (no cascade, teardown unaffected). Semantics UNVERIFIED live — 라이브가 정정."
+        },
+        {
           "name": "set-maintenance",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
@@ -4649,6 +4815,17 @@
             ]
           },
           "group": "backup"
+        },
+        {
+          "name": "list-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "backup-read",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestorelistbackuphistories, class b): explicit strict-200 read on the cluster this lifecycle creates (probe_reads auto-seed is non-guaranteed). Placed after wait-after-create-backup so a fresh manual backup is visible when the backup group succeeded; an empty histories list is still 200. optional + own group; semantics UNVERIFIED live — 라이브가 정정."
         },
         {
           "name": "remove-backup-histories",
