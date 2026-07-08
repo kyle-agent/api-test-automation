@@ -280,3 +280,9 @@ waiver의 분모/분자 효과 자체는 분자 드리프트와 독립적으로 
 4. **eventstreams create body "ZK-quorum" 가설** (repair-log §HB1 작업 2):
    미검증 가설로 저작된 상태 — 실패해도 waiver가 아니라 body 조사 계속
    (H 분류 유지).
+
+> **주(2026-07-08 rebase 후)**: 본 문서의 분자/하한 수치는 A0 공식 + 07-07 시점
+> store(2344) 기준이다. 이후 main의 Model B 라인(+134 검증, GAP 편입 5배치,
+> 시나리오 합집합 99.8%)이 병합되어 현재 store는 2366+ — 클래스 분류와 승인
+> 절차(§3)는 그대로 유효하나, 승인 시 정확한 C3는 `python -m dashboard.build`
+> 재계산이 정본이다.
