@@ -33,7 +33,7 @@ _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 
 LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps", "credentials",
                   "needs_cert_material", "requires_env",
-                  "_note", "_comment", "_disabled_reason",
+                  "_note", "_comment", "_disabled_reason", "_replaced_by",
                   "_status",
                   # loader가 로드 시점에 주입하는 파생 필드 (파일에는 없음) —
                   # HEAVY-PREMISE-CONTRACT §1 role(verify/probe).

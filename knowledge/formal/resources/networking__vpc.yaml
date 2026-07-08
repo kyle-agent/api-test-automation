@@ -136,8 +136,8 @@ resources:
     delete: {endpoint: "DELETE /v1/internet-gateways/{internet_gateway_id}",
              destructive: true}
     provenance: VALIDATED
-    source: {lifecycle: networking-vpc-internet-gateway,
-             steps: [create-igw, wait-igw-active, delete-igw]}
+    source: {lifecycle: gen-pilot-net-basics,
+             steps: [create-internet-gateway, wait-internet-gateway, delete-internet-gateway]}
     notes: "firewall_enabled: true로 만들면 firewall이 암묵 생성된다 (firewall 노드 참조) — 옵션 기본 false는 VALIDATED body와 동일형. IGW 삭제가 암묵 firewall도 함께 제거한다 (firewall 노드는 delete 없음)."
 
   nat-gateway:

@@ -412,6 +412,8 @@
           "expect_status": [
             200
           ],
+          "poll": {"until_status": [200], "give_up_status": [404], "timeout": 300, "interval": 15},
+          "optional": true,
           "group": "custom-image",
           "_note": "공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)"
         },

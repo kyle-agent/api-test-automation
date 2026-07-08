@@ -28,6 +28,13 @@
           }
         },
         {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/kms/transit",
+          "expect_status": [200],
+          "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): security-kms-key 은퇴분 (listkeys)."
+        },
+        {
           "name": "create-sym",
           "method": "POST",
           "path": "/v1/kms/transit",

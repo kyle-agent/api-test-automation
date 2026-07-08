@@ -4,7 +4,10 @@
     {
       "id": "gen-wave2-queue",
       "service": "application-service/queueservice",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "application-queueservice-queue",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): SUBSUMED 3⊂11 — standard 큐 왕복 순증분. 표면이 application-queueservice-queue 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
@@ -186,7 +189,10 @@
     {
       "id": "gen-wave2-rg",
       "service": "management/resourcemanager",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "resourcemanager-tag-lifecycle",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): SUBSUMED 3⊂15/23. 표면이 resourcemanager-tag-lifecycle 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/working/plans/COVERAGE-GETID-PLAN.md); targets: resource-group",
       "steps": [
         {
@@ -238,7 +244,10 @@
     {
       "id": "gen-wave2-iam",
       "service": "management/iam",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-wave5-iam-bindings",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 listiamgroupmembers 이관 완료.",
       "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/working/plans/COVERAGE-GETID-PLAN.md); targets: iam-group, iam-policy",
       "steps": [
         {

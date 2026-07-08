@@ -1321,6 +1321,17 @@
           ]
         },
         {
+          "name": "set-sg",
+          "method": "PUT",
+          "path": "/v1/security-groups/{sg_id}",
+          "json": {
+            "description": "API regression suite — updated description",
+            "loggable": false
+          },
+          "expect_status": [200, 202],
+          "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): networking-security-group-update 은퇴분. setsecuritygroup VALIDATED 2026-06-23 (200 live). Body: {description, loggable} ONLY — 'name' 은 유효 필드 아님 (docs 확인; 포함 시 400)."
+        },
+        {
           "name": "create-rule",
           "method": "POST",
           "path": "/v1/security-group-rules",
@@ -1717,7 +1728,10 @@
     {
       "id": "networking-vpc-internet-gateway",
       "service": "networking/vpc",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-pilot-net-basics",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED 유일 0 (4중 커버); node internet-gateway 재지정.",
       "_note": "Light, self-contained: create a VPC inline, attach an internet gateway, read both, probe, tear down in reverse. Best-effort create body from docs (createinternetgateway 1.2); $.internet_gateway.id.",
       "steps": [
         {
@@ -3204,10 +3218,10 @@
           "method": "POST",
           "path": "/v1/servers/{server_id}/interfaces",
           "json": {
-            "port_id": "{std_port_id}",
-            "subnet_id": "{port_subnet_id}"
+            "port_id": "{std_port_id}"
           },
-          "_note": "HB3b-2 (2026-07-06, run 28766151214): CONFIRMED live 400 `VirtualServer.CreateInterface.Duplicated` when this sent `subnet_id: {subnet_id}` — that's the server's OWN boot subnet, and it already has an interface there (create-server). Switched to `{port_subnet_id}` (the dedicated vs-port-group subnet created by create-port-subnet, matching create-port's own subnet_id) so the new interface lands on a subnet the server has no prior interface on. Not re-verified live this session (offline-only).",
+
+          "_note": "2026-07-08(3) owner run: port_id+subnet_id 동시 전송 400 — 같은 런 netops attach(port_id 단독) 200 라이브 증명 → subnet_id 제거. | HB3b-2 (2026-07-06, run 28766151214): CONFIRMED live 400 `VirtualServer.CreateInterface.Duplicated` when this sent `subnet_id: {subnet_id}` — that's the server's OWN boot subnet, and it already has an interface there (create-server). Switched to `{port_subnet_id}` (the dedicated vs-port-group subnet created by create-port-subnet, matching create-port's own subnet_id) so the new interface lands on a subnet the server has no prior interface on. Not re-verified live this session (offline-only).",
           "expect_status": [
             200,
             201,
@@ -6310,7 +6324,10 @@
     {
       "id": "security-kms-key",
       "service": "security/kms",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "security-kms-transit-crypto",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 listkeys 이관 완료; node kms-key 재지정.",
       "_note": "Real body from API ref (security/kms/createkey, see framework/api_bodies.json). Self-contained: create transit key -> get -> list -> probe path-param GETs -> delete (schedule deletion). Response envelope $.key.id confirmed from the doc response example.",
       "steps": [
         {
@@ -6391,7 +6408,10 @@
     {
       "id": "security-secretsmanager-secret",
       "service": "security/secretsmanager",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "security-secretsmanager-writes",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 listsecrets 이관 완료; KMS+secret 이중 프로비저닝 제거; node secret 재지정.",
       "_note": "Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down last. secret_value must be a JSON STRING; private_acl_enabled is a string 'false'. Captures $.secret.id / $.key.id confirmed from doc response examples. Secret DELETE requires a body {waiting_time_ndays} (recovery window) — sent on both the delete step and the cleanup.",
       "steps": [
         {
@@ -6600,7 +6620,10 @@
     {
       "id": "application-apigateway-api-resource",
       "service": "application-service/apigateway",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "apigateway-api-write-coverage",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 listapis 이관 완료; API 3중 생성 감축; nodes apigw-api/root-resource/resource 재지정.",
       "_note": "Light, VPC-FREE, self-contained. Creates an API (REGION endpoint), reads root resource id, creates a child resource, creates a deployment, probe-reads every {api_id} GET, tears down. Create body grounded from docs createapi 1.3 ({name,description,endpoint_type:REGION,tags:[{key,value}],id:''}; 202 -> $.id). A new API auto-creates a root resource, recovered via listresources (200 -> $.resources[0].id) and used as createresource parent_id. createresource path is /v1/apis/{api_id}/resources/{parent_id} with body {path_part} (200 -> $.id). createapideployment POST /v1/apis/{api_id}/deployments (200 -> $.deployment_id) exercises listapideployments. regrapi{unique} is lowercase-alnum (safe). create-deployment removed: deploying requires >=1 API method (NoMethodsExist); not needed for the api/resource GETs, and listapideployments is already covered via api_id.",
       "steps": [
         {

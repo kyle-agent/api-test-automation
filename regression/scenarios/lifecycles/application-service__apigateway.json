@@ -21,6 +21,13 @@
           "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}", "service": "apigateway"}
         },
         {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/apis",
+          "expect_status": [200],
+          "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): application-apigateway-api-resource 은퇴분 (listapis)."
+        },
+        {
           "name": "set-api-description",
           "method": "PUT",
           "path": "/v1/apis/{api_id}/description",

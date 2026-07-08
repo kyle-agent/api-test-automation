@@ -66,6 +66,18 @@
           "_note": "수작업 vpc-cidr-secondary 은퇴 갭: addvpccidr. 수작업은 [200..422] 관용이라 UNPROVEN이었음 — 하드 기대. 보조 CIDR은 표준 DELETE가 없어 VPC 삭제로 함께 제거"
         },
         {
+          "name": "verify-vpc-set",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/vpcs/{vpc_id}",
+          "optional": true,
+          "json": {
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): vpc-cidr-secondary 은퇴분 (setvpc). optional+관용 — VPC 상태에 따른 4xx 도 기록은 남긴다 (원 스텝 노트 승계)."
+        },
+        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -185,6 +197,19 @@
             200
           ],
           "group": "port"
+        },
+        {
+          "name": "verify-port-set",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/ports/{port_id}",
+          "optional": true,
+          "json": {
+            "description": "updated by API regression suite",
+            "security_groups": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): vpc-port 은퇴분 (setport)."
         },
         {
           "name": "create-internet-gateway",

@@ -3,7 +3,10 @@
     {
       "id": "vpc-cidr-secondary",
       "service": "networking/vpc",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-pilot-net-basics",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 setvpc 이관 완료(verify-vpc-set); pilot 노트의 기존 은퇴 계획 실행.",
       "heavy": true,
       "_note": "Closes POST /v1/vpcs/{vpc_id}/cidrs (secondary CIDR block). Adopts the session-shared VPC ({\"adopt\":\"vpc\"}) so it does not consume the 5-VPC cap; falls back to self-create when no shared VPC exists (mutations off / provisioning failed). heavy:true because the fallback self-creates a real VPC. The secondary-CIDR body is docs-derived (data/api_docs.json: AddVpcCidr) and UNPROVEN: SCP requires a non-overlapping RFC1918 block; we send 10.200.0.0/20 (outside the shared 10.124.0.0/20). optional+broad expect_status so a reject still records coverage without failing. The added CIDR has no documented standalone DELETE endpoint (removed with the VPC), so this step has no cleanup of its own; the shared VPC is retained for the fixture to tear down.",
       "steps": [
@@ -2621,7 +2624,10 @@
     {
       "id": "vpc-internet-gateway",
       "service": "networking/vpc",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-pilot-net-basics",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): 4중 커버 — pilot 노트의 기존 은퇴 계획 실행분. 표면이 gen-pilot-net-basics 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "heavy": true,
       "_note": "Closes internet-gateways: POST /v1/internet-gateways, GET show, PUT set, DELETE. Body from docs request_example: {description, firewall_enabled, firewall_loggable, tags, type, vpc_id} where type=IGW. Adopts the session-shared VPC so it does not consume the 5-VPC cap; falls back to self-create. capture envelope $.internet_gateway.id (from docs response_example). heavy:true. All igw steps optional+grouped+broad expect_status.",
       "steps": [
@@ -2811,7 +2817,10 @@
     {
       "id": "vpc-port",
       "service": "networking/vpc",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-pilot-net-basics",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 setport 이관 완료(verify-port-set).",
       "heavy": true,
       "_note": "Closes ports: POST /v1/ports, GET /v1/ports/{port_id}, PUT /v1/ports/{port_id}, DELETE /v1/ports/{port_id}. Body from docs: {description, name, security_groups, subnet_id, tags}. fixed_ip_address OMITTED — if provided it must be a valid IP; empty string causes scp-network.port.fixed_ip.format-error 400 (CONFIRMED 2026-06-23). Creates own VPC+subnet (cidr 10.134.0.0/20) for the required subnet_id. Adopts shared VPC when available. capture envelope $.port.id (from docs response_example). heavy:true. All port steps optional+grouped+broad expect_status.",
       "steps": [
@@ -3362,7 +3371,10 @@
     {
       "id": "vpc-nat-gateway",
       "service": "networking/vpc",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "heavy-shared-networking",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): 유일이던 PUT internet-gateways 는 gen-pilot-net-basics verify-internet-gateway-set 이 이미 커버 — 이관 불요.",
       "heavy": true,
       "_note": "Closes nat-gateways: POST /v1/nat-gateways, GET /v1/nat-gateways/{id}, PUT /v1/nat-gateways/{id}, DELETE /v1/nat-gateways/{id}. Body from docs: {description, publicip_id, subnet_id, tags}. Needs a real publicip_id (uses {unique} placeholder -> create will 4xx) and subnet_id (creates own VPC+subnet). All natgw steps optional+grouped+broad expect_status so 4xx from missing publicip still records endpoint coverage. capture envelope $.nat_gateway.id (from docs response_example). heavy:true.",
       "steps": [
