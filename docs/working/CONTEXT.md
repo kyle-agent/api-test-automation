@@ -113,7 +113,29 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-07-08, heavy-전제(Model B) Testing 재설계 — 구현·라이브 인수 완료, branch
+- **LATEST (2026-07-08 오후, owner 라이브 검수 후속 배치 — main FF까지 완료):** owner가
+  Model B 첫 실사용 런을 보며 잡아준 결함들을 당일 수리. ① 런 시작 지연 — provision
+  서브프로세스 출력 스트리밍 + poll 하트비트(간격 5s) + 서브넷 2개 선생성-후대기 +
+  라이브뷰 "공유 인프라 준비 중" (provision-start/-end 이벤트) ② 유령 빈 lifecycle 카드
+  — lifecycle:"" 이벤트 fold 가드 ③ pre-flight 모달 virtualserver 2행 — service 태그
+  표기 정규화(`compute/virtualserver`) + shortName 그룹핑 + union 표기-무관 매칭
+  ④ keypair private key가 RESOURCE_ID로 노출 — engine rid 가드(여러줄/초장문 캡처 제외,
+  body name 폴백) + UI `.resid` clamp ⑤ 대시보드 per-API 컨포먼스 "전부 정상" 거짓 —
+  근거 없으면 **미평가** + known_issues Product Bug를 결함으로 병합 ⑥ **password 재조사
+  (owner가 Windows-only 주장 반박 → 사실로 확인)**: 문서에 OS 전제 없음 + E2E 서버가
+  실은 Windows 2016(images[0])이었음 → PF-17 정정(undocumented-precondition +
+  misleading error). **owner 결정: 이미지 ubuntu 고정**(`os_distro=ubuntu`, 5개 픽커) +
+  password 실키 단발 유지(400=예상 종착; waiver는 owner 결정 대기) ⑦ **vs-port 400/404
+  진짜 뿌리**: create-port-subnet CIDR 10.135.3.0/24가 **adopt된 공유 VPC(10.124.0.0/20)
+  대역 밖** → 10.124.8.0/24 + fixed_ip 10.124.8.10/.11 재배정, **happy-path
+  delete-port-subnet 신설**(없어서 PASSED 런마다 포트 서브넷 잔존 → 공유 VPC teardown
+  409 — 07-07 VPC 2개 잔존 사건의 유력 원인) ⑧ PF-24(createport 문서 기본값 unrunnable)
+  · PF-25(sts regional HTML) · PF-26(cloudmonitoring 이중 버전 경로) 기록. **백로그
+  (owner 2026-07-08): 이미지 선택 파라미터화 — 레시피/런 단위로 '특정 이미지' 지정
+  테스트(예: Test Plan에서 이미지 pick, 배포판별 매트릭스). 다음 heavy VS 런 인수 기준:
+  vs-port 6체인+updateserverinterface+show-snapshot run-2xx · 포트 서브넷 잔존 0 ·
+  공유 VPC teardown 성공 · ubuntu 부팅으로 wall 단축.**
+- **(2026-07-08, heavy-전제(Model B) Testing 재설계 — 구현·라이브 인수 완료, branch
   `claude/ecstatic-tesla-fo1g3b`):** owner 확정 방향(§핸드오프 백로그의 'Testing 단순화')을
   4-agent 병렬 웨이브 + lead 통합으로 **당일 완주**. 계약: `docs/working/plans/
   HEAVY-PREMISE-CONTRACT.md` (LOCKED). 랜딩: ① loader가 로드시 **role(verify/probe) 파생**

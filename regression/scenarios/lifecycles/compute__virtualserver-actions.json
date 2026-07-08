@@ -130,6 +130,7 @@
             "status": "active",
             "scp_original_image_type": "standard",
             "visibility": "public",
+            "os_distro": "ubuntu",
             "limit": 50
           },
           "capture": {
@@ -214,13 +215,7 @@
             "private_key": "{private_key}"
           },
           "expect_status": [200, 400],
-          "poll": {
-            "until_status": [200],
-            "give_up_status": [401, 403, 404, 409],
-            "timeout": 600,
-            "interval": 20
-          },
-          "_note": "showvirtualserverpassword with the REAL keypair private_key (read-only effect; safe to re-POST). 2026-07-08 re-investigation (owner: 'is this really Windows-only?'): the docs state NO OS precondition, and E2E 20260708-010208 proved this server WAS Windows 2016 (images[0]=00799e76) with the keypair bound — yet 400 'Failed to decrypt' fired 2.8s after ACTIVE (req-714ca840). The old 'Linux has no admin password (Windows-only)' explanation contradicts that data; likely cause = publish LATENCY (the guest posts the encrypted password minutes after first boot; querying before publish fails). Poll until_status 200 (max 10min; 400 keeps polling, other 4xx gives up), tolerant [200,400] so a never-published password stays soft — PF-17 amended."
+          "_note": "showvirtualserverpassword with the REAL keypair private_key (read-only effect). OWNER DECISION 2026-07-08: fleet pinned to ubuntu (find-image os_distro=ubuntu — fast boot, no Windows-license rate) and the call keeps passing the real key, single-shot. On ubuntu the guest never publishes an encrypted admin password (the publish flow is the Windows/cloudbase-init mechanism), so live 400 'Failed to decrypt' is the EXPECTED terminal state — the 10-min until-200 poll added earlier the same day (Windows-latency hypothesis, PF-17 corrected) was removed as pure wall-time waste on ubuntu. Reachability-waiver decision pending with owner; PF-17 has the full history."
         },
         {
           "name": "dump-server",

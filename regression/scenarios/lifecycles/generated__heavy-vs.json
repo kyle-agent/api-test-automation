@@ -34,7 +34,7 @@
           "name": "create-image",
           "service": "virtualserver",
           "method": "GET",
-          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50",
+          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&os_distro=ubuntu&limit=50",
           "expect_status": [
             200,
             201,
@@ -375,14 +375,8 @@
             200,
             400
           ],
-          "poll": {
-            "until_status": [200],
-            "give_up_status": [401, 403, 404, 409],
-            "timeout": 600,
-            "interval": 20
-          },
           "group": "server",
-          "_note": "2026-07-08 재조사(owner: 'Windows에만 해당?'): 문서에 OS 전제 없음 + E2E 20260708-010208 실측 — 이 서버는 images[0]=Windows 2016(00799e76)로 생성·keypair 바인딩 상태였는데 ACTIVE 20.6초 뒤 호출이 400(req-80845d28). 'Linux라 불가(Windows 전용 추정)'는 그 데이터와 모순 — 유력 원인은 게스트가 부팅 후 암호화 password를 게시하기까지 수 분 걸리는 지연(게시 전 조회='Failed to decrypt'). until_status 200 poll(최대 10분; 400은 계속 재시도, 나머지 4xx는 중단; 복호화는 read-only라 re-POST 안전)로 게시를 기다린다. [200,400] 관용 유지 + PF-17(정정됨)"
+          "_note": "OWNER DECISION 2026-07-08: ubuntu 고정(create-image os_distro=ubuntu) + 실키 단발 전달 유지. ubuntu 게스트는 암호화 admin password 를 게시하지 않으므로(게시 흐름은 Windows/cloudbase-init 기전) 400 'Failed to decrypt' 가 예상 종착 상태 — 같은 날 넣었던 10분 until-200 poll(Windows 지연 가설, PF-17 정정 참고)은 ubuntu 에선 순수 낭비라 제거. waiver 여부는 owner 결정 대기."
         },
         {
           "name": "create-volume-attachment",
