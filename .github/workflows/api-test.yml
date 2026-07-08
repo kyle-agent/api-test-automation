@@ -584,6 +584,19 @@ jobs:
         # separately guarded by IB-049's xdist-gated adopter skip, and adopters
         # adopt the SAME VPC so more workers do NOT consume more VPC cap. Billable
         # DBaaS quota stays protected by core.budgets (reserve-or-skip).
+        #
+        # HEAVY-PREMISE SPLIT (2026-07-08, docs/working/plans/HEAVY-PREMISE-CONTRACT.md):
+        # interactive console2 runs are VERIFY-role only — the loader derives
+        # role ∈ {verify, probe} per lifecycle (contract §1) and scope selection
+        # excludes write-reachability probes (vs-server-action-coverage,
+        # vs-image-write-coverage, *-subops-guarded, ...) unless one is explicitly
+        # picked. THIS CI sweep lane stays the home of those reachability probes
+        # (the error-contract watch): it selects by the `enabled` flag alone
+        # (engine.active_lifecycles(), regardless of derived role), so probes keep
+        # running here every sweep even though the console no longer offers them.
+        # Coverage semantics for probe-hit endpoints under a class:"reachability"
+        # waiver (data/baselines/coverage_waivers.json): REACHED (a 4xx is the
+        # access evidence) counts as covered — never folded into verified-2xx.
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}

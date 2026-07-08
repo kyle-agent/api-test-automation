@@ -177,6 +177,20 @@
       "added": "2026-06-10"
     },
     {
+      "key": "compute/virtualserver/lockvirtualserver",
+      "class": "reachability",
+      "reason": "REACHABILITY-ONLY (owner 2026-07-08). lock/unlock waived as a PAIR: locking a real billable VM risks stranding it undeletable if the paired unlock fails — the same un-teardownable deadlock class as the 2 stranded SCF functions in known_issues (scp-cloud-function.function-not-deletable-error, live-confirmed 2026-06-24). Definition-of-done = REACHED (any response incl. 4xx = access evidence), exercised by the CI-lane probe vs-server-action-coverage (placeholder server_id -> guaranteed 404, never a real VM). Stays in the C3 target as reachability-covered-when-reached; never folded into verified-2xx. Deliberately excluded from the verify recipe vs-server-actions-verify.",
+      "provenance": "docs",
+      "added": "2026-07-08"
+    },
+    {
+      "key": "compute/virtualserver/unlockvirtualserver",
+      "class": "reachability",
+      "reason": "REACHABILITY-ONLY (owner 2026-07-08). lock/unlock waived as a PAIR: locking a real billable VM risks stranding it undeletable if the paired unlock fails — the same un-teardownable deadlock class as the 2 stranded SCF functions in known_issues (scp-cloud-function.function-not-deletable-error, live-confirmed 2026-06-24). Definition-of-done = REACHED (any response incl. 4xx = access evidence), exercised by the CI-lane probe vs-server-action-coverage (placeholder server_id -> guaranteed 404, never a real VM). Stays in the C3 target as reachability-covered-when-reached; never folded into verified-2xx. Deliberately excluded from the verify recipe vs-server-actions-verify.",
+      "provenance": "docs",
+      "added": "2026-07-08"
+    },
+    {
       "key": "data-analytics/searchengine/searchengineaddblockstorages",
       "class": "reachability",
       "reason": "REACHABILITY-ONLY (owner 2026-06-16). Search Engine is a license-gated engine — access-check only, no license consumed, no billable-persistent cluster. Called with tolerant expect; license/4xx/5xx tolerated as access evidence. Reachability IS the definition-of-done; stays in the C3 target as reachability-covered-when-reached, honestly distinct from verified-2xx. No functional validation.",

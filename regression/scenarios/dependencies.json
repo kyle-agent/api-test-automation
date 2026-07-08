@@ -95,7 +95,8 @@
     "vpc-port": ["subnet", "vpc"],
     "vpc-privatelink-endpoint": ["subnet", "vpc"],
     "vpc-privatelink-service": ["subnet", "vpc"],
-    "vpc-transit-gateway-children": ["vpc"]
+    "vpc-transit-gateway-children": ["vpc"],
+    "vs-server-actions-verify": ["subnet", "vpc"]
   },
   "vpc_schedule": {
     "_comment": "Strategy to keep runs from colliding on the account VPC cap (=5, VALIDATED live: 'The number(5) of VPCs ... exceeded', run 27306490231; per-run cap 4 leaves 1 slot of headroom for leftovers / the A-parallel-B overlap). See knowledge/domain-constraints.md + knowledge/vpc-scheduling-strategy.md. VPCs must NOT overlap CIDRs and a subnet's CIDR must be a sub-range of its VPC's CIDR (see knowledge/domain-constraints.md allocation table). 'per_run_vpc_cap' is the max concurrent live VPCs a single run should hold. In the shared-infra parallel design the shared VPC (1) is torn down BEFORE the serial VPC-CRUD pass, so that pass gets the full cap (e.g. vpc-peering needs 2 at once). 'cross_run_policy' = how to stop concurrent runs from competing for VPCs.",
