@@ -23,6 +23,28 @@ from regression.scenarios import engine
 _active = engine.active_lifecycles()
 
 
+def _longest_first(lifecycles: list[dict]) -> list[dict]:
+    """수집 순서 = 실행 큐 순서(xdist dist=load): 예상 소요 p50 내림차순으로 정렬해
+    가장 긴 lifecycle이 먼저 워커를 잡게 한다 — wall ≈ 임계경로 보장 (2026-07-08
+    실측 갠트: duration-blind 큐가 20분짜리를 19분 대기시킬 수 있는 구조였음).
+    duration_stats(실측 events 폴딩 + 클래스 기본값)가 어떤 이유로든 불가하면
+    원래 순서 그대로 — 스케줄 최적화는 절대 수집 실패의 원인이 되면 안 된다."""
+    try:
+        from tools import duration_stats
+        est = duration_stats.estimate([lc["id"] for lc in lifecycles])
+        per = est.get("per_lifecycle") or {}
+        # tiebreak=id: xdist 워커들이 각자 수집하므로 동률(p50 같은 default군)
+        # 순서까지 결정적이어야 한다 ("different tests collected" 방지).
+        return sorted(lifecycles,
+                      key=lambda lc: (-(per.get(lc["id"], {}).get("p50_s") or 0),
+                                      lc["id"]))
+    except Exception:  # noqa: BLE001 — 정렬은 보너스, 수집은 필수
+        return lifecycles
+
+
+_active = _longest_first(_active)
+
+
 @pytest.mark.crud
 @pytest.mark.parametrize("lifecycle", _active or [pytest.param(None, marks=pytest.mark.skip(
     reason="no enabled lifecycles in scenarios.json"))],
