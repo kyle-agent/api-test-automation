@@ -51,6 +51,25 @@ def test_render_flow_pins_survivors():
     assert "실측 잔존 2" in html_out
 
 
+def test_render_flow_known_stuck_survivor_is_amber_not_red():
+    """기지(known-stuck, 예: IAM-gated log-group)는 표시하되 앰버 — 경보 아님."""
+    now = datetime.now(timezone.utc)
+    spans = {
+        ("log-groups", "regr-survivor", "(기지 잔존) 9fb6407"): {
+            "rtype": "log-groups", "tag": "regr-survivor",
+            "name": "(기지 잔존) 9fb6407",
+            "start": _ts(now), "end": None,
+            "ops": [(_ts(now), "SurvivorScan")],
+            "res_id": "9fb6407", "survivor": True, "scan_hhmm": "20:10",
+            "known_stuck": "IAM-gated child log-stream"},
+    }
+    html_out = lv.render_flow(spans, now, {"start": "t0", "end": "t1"})
+    assert 'stroke="#d99413"' in html_out          # 앰버 테두리
+    assert "기지 잔존(문서화된 stuck)" in html_out   # 툴팁 라벨
+    assert "IAM-gated child log-stream" in html_out
+    assert "실측 잔존 1" in html_out                # 범례 칩엔 합산
+
+
 def test_render_flow_without_survivors_has_no_chip():
     now = datetime.now(timezone.utc)
     spans = {k: v for k, v in _spans(now).items() if not v.get("survivor")}

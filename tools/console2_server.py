@@ -698,20 +698,27 @@ def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"
                         break
             if not rids and segs:
                 rids, rtype = [segs[-1]], (segs[-2] if len(segs) >= 2 else segs[-1])
+            known = (it.get("known_stuck")
+                     if isinstance(it.get("known_stuck"), dict) else None)
             for rid in rids:
                 if not rid or rid in seen:
                     continue
                 seen.add(rid)
-                disp = f"(잔존) {rid[:24]}"
-                shown[(rtype, "regr-survivor", disp)] = {
-                    "rtype": rtype, "tag": "regr-survivor", "name": disp,
-                    "start": scan_iso, "end": None,
-                    "ops": [(scan_iso, "SurvivorScan")],
-                    "res_id": rid, "survivor": True, "scan_hhmm": hhmm}
+                # 기지(known-stuck, 예: IAM-gated log-group)는 라벨·색을 구분해
+                # 경보가 아닌 정보로 읽히게 한다 (owner 2026-07-08: "log 그룹
+                # 등도 live 에는 표시해줘" — 표시하되 신규 잔존과 혼동 금지).
+                disp = f"({'기지 잔존' if known else '잔존'}) {rid[:24]}"
+                sp = {"rtype": rtype, "tag": "regr-survivor", "name": disp,
+                      "start": scan_iso, "end": None,
+                      "ops": [(scan_iso, "SurvivorScan")],
+                      "res_id": rid, "survivor": True, "scan_hhmm": hhmm}
+                if known:
+                    sp["known_stuck"] = str(known.get("reason", "") or "기지 항목")
+                shown[(rtype, "regr-survivor", disp)] = sp
                 n_surv += 1
         if n_surv:
             extra = (f"⚠ 실측 잔존 {n_surv}건 핀 고정 — owned 스캔({hhmm}) 확인분, "
-                     f"이벤트 창 밖 포함 (붉은 점선 박스)")
+                     f"이벤트 창 밖 포함 (신규=붉은 점선 · 기지 stuck=앰버 점선)")
             note = (note + " · " + extra) if note else extra
     chrome = {"scope": scope, "hours": int(hours), "deleted": deleted,
               "banner": banner, "note": note}

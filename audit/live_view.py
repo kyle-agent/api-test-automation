@@ -1005,11 +1005,18 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0,
         if d.get("survivor"):
             # 실측 잔존 (owned 스캔 오버레이): SurvivorScan ops 뿐이라 _state_of가
             # 'creating'으로 오분류·펄스하므로 여기서 선처리 — 붉은 점선, 펄스 없음.
+            # 기지(known-stuck) 항목은 앰버 — 문서화된 stuck(예: IAM-gated
+            # log-group)이라 경보가 아닌 정보로 읽혀야 한다.
             fill, bd, run, dash = "#fff1f1", "#cf222e", "", ' stroke-dasharray="5 3"'
+            ks = d.get("known_stuck")
+            if ks is not None:
+                fill, bd = "#fff8e6", "#d99413"
             rtext = f'스캔 {d.get("scan_hhmm", "")}'
-            tip = (f'{rt} · {html.escape(d["name"] or tag)} · 실측 잔존 — owned 스캔 '
-                   f'{d.get("scan_hhmm", "")} 확인분 (이벤트 창 밖, 라이브 LIST 실측) '
-                   f'· id {html.escape(str(d.get("res_id", "")))}')
+            tip = (f'{rt} · {html.escape(d["name"] or tag)} · '
+                   f'{"기지 잔존(문서화된 stuck)" if ks is not None else "실측 잔존"}'
+                   f' — owned 스캔 {d.get("scan_hhmm", "")} 확인분 (이벤트 창 밖, '
+                   f'라이브 LIST 실측) · id {html.escape(str(d.get("res_id", "")))}'
+                   + (f' · {html.escape(str(ks))}' if ks else ''))
         P.append(f'<g class="n{run}" id="{myid}" onclick="hi(\'{myid}\')"><title>{html.escape(tip)}</title>'
                  f'<rect x="{x}" y="{y}" width="{BW}" height="{BH}" rx="6" fill="{fill}" stroke="{bd}" stroke-width="1.4"{dash}/>'
                  f'<circle cx="{x+10}" cy="{y+BH/2}" r="3.5" fill="{bd}"/>'
