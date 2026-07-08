@@ -108,7 +108,24 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **▶ SESSION HANDOFF / RESUME HERE (2026-06-29 close, branch `claude/ecstatic-tesla-fo1g3b`).**
+- **LATEST (2026-07-08, heavy-전제(Model B) Testing 재설계 — 구현·라이브 인수 완료, branch
+  `claude/ecstatic-tesla-fo1g3b`):** owner 확정 방향(§핸드오프 백로그의 'Testing 단순화')을
+  4-agent 병렬 웨이브 + lead 통합으로 **당일 완주**. 계약: `docs/working/plans/
+  HEAVY-PREMISE-CONTRACT.md` (LOCKED). 랜딩: ① loader가 로드시 **role(verify/probe) 파생**
+  (168/65, 파일 무수정; ROLE_OVERRIDES 1건) ② 선택 의미론 — 서비스/카테고리 scope는
+  `enabled+verify`만 (프로브는 CI 스윕 전용; 명시 선택은 role 무관), 서비스-태그 lifecycle
+  합집합 포함 ③ **`/api/preflight`** (자원·과금·예상시간; `tools/duration_stats.py`가 9개
+  라이브 런 events.jsonl 폴딩 — observations elapsed_ms는 콜 지연이라 불사용) ④ soft 3분류
+  `regression/soft_classify.py` (**정책>중복>갭**) — 이벤트에 soft_class 부착, UI chip +
+  중복 숨기기 기본 on ⑤ UI에서 light/heavy 어휘 제거(비용은 pre-flight에만 '과금'으로)
+  ⑥ VS lock/unlock reachability waiver(263) + **신규 `vs-server-actions-verify`**(27步 heavy
+  verify). **과금 인수테스트(owner 사전승인) 통과**: VS 서비스 선택 → preflight(11 lifecycle
+  · 과금 3 · ~31분 견적) → 48분 풀 런 → **2xx 181 · 자원 44 생성→teardown** · soft=중복19/갭7 ·
+  **4-action 중 dump/resize/rebuild 202 승격**(password 400=PF-17 예상대로) · 공유 VPC 정밀
+  삭제. verified_endpoints **1250 → 1384 (+134)**. rc=1 원인은 기존 `gen-heavy-vs-netops`
+  1건 실패(레시피/백엔드 — B와 무관, 추적 필요). 오프라인: validate 234/0, DAG 완전,
+  console2 28 + soft 14 + duration 16 + loader/dag 92 green.
+- **PRIOR — ▶ SESSION HANDOFF (2026-06-29 close, branch `claude/ecstatic-tesla-fo1g3b`).**
   Everything is committed, pushed, and FF-merged — **`main` = feature = `origin` = `101e08c2`,
   working tree CLEAN, live owned == 0** (last verify post-D1 cleanup; re-run `POST /api/cleanup`
   on resume to reconfirm). Nothing is mid-execution.
