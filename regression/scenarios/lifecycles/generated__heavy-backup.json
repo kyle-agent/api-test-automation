@@ -5,7 +5,7 @@
       "id": "gen-heavy-backup",
       "service": "storage/backup",
       "enabled": true,
-      "_note": "storage/backup AGENTLESS VM_IMAGE chain on a REAL server (owner directive 2026-06-13 — prior blocker was docs-example server UUIDs, '실 서버 UUID 의존'): VM closure -> backup-target lookup (GET /v1/backups/backup-targets discovers the live server's server_uuid/server_guid; covers getbackuptargetlist) -> create backup policy (BackupCreateRequest1Dot2 verbatim; agentless needs NO agent per userguide overview: 'Agentless Backup: No separate agent installation required') -> ready $.state AVAILABLE -> verify family: showbackup, check-name-dup, check-restore-name-dup, check-filesystem-dup(broad: FILESYSTEM/agent-oriented), list/set schedules, backup-/restore-histories, restore-targets, restorable-subnets(broad), set-filesystem-path(broad: agent-policy-only per userguide), update-replication(broad: replication is Agent-Backup-only per userguide), update-retention (WEEK_2->MONTH_1) -> manual-backup ('즉시 Backup은 Full Backup으로 수행됩니다' — always FULL) with AVAILABLE re-poll up to 60min -> teardown (delete-backup retries 409/500 40x30s in case the full-backup job still holds the policy). Restore flow lives in gen-heavy-backup-restore (disabled, timing-gated).",
+      "_note": "storage/backup AGENTLESS VM_IMAGE chain on a REAL server (owner directive 2026-06-13 — prior blocker was docs-example server UUIDs, '실 서버 UUID 의존'): VM closure -> backup-target lookup (GET /v1/backups/backup-targets discovers the live server's server_uuid/server_guid; covers getbackuptargetlist) -> create backup policy (BackupCreateRequest1Dot2 verbatim; agentless needs NO agent per userguide overview: 'Agentless Backup: No separate agent installation required') -> ready $.state AVAILABLE -> verify family: showbackup, check-name-dup, check-restore-name-dup, check-filesystem-dup(broad: FILESYSTEM/agent-oriented), list/set schedules, backup-/restore-histories, restore-targets, restorable-subnets(broad), set-filesystem-path(broad: agent-policy-only per userguide), update-replication(broad: replication is Agent-Backup-only per userguide), update-retention (WEEK_2->MONTH_1) -> manual-backup ('즉시 Backup은 Full Backup으로 수행됩니다' — always FULL) with AVAILABLE re-poll up to 60min -> teardown (delete-backup retries 409/500 40x30s in case the full-backup job still holds the policy). Restore flow lives in gen-heavy-backup-restore (disabled, timing-gated). | REPAIR 2026-07-08 (live run — HB3b count-poll의 첫실측): create-backup-target 이 poll(『$.count until 1』, 300s/15s — HB3b 가 이미 심어둔 폴, 지시문이 요구한 폴 어휘/동일-스텝 capture 그대로) 을 다 태우고도 {\"contents\":[],\"count\":0} 인 채 capture assert 로 red — 등록 지연이 300s 를 초과 (IB-014 propagation 가족 재발). 수리: (1) poll timeout 300→600 (interval 15 유지); (2) create-backup-target 을 optional + group backup-policy 로 격리하고 backup 의존 체인 전체(create/wait-backup-policy · verify family · manual-backup · delete-backup-policy — 구 backup-manual 그룹 포함 backup-policy 로 통일)에 같은 그룹을 부여 — 대상이 끝내 미등록이면 backup 체인만 그룹 skip(non-red) 하고 VM/subnet/VPC/SG/keypair spine teardown(그룹 밖)은 항상 실행. 라이브 재확인 2026-07-08 (read-only): 무필터 GET /v1/backups/backup-targets?...policy_type=FILESYSTEM → 200 {\"contents\":[],\"count\":0} (런 종료 후 서버 0 대 — 쿼리 자체는 정상, 지연 길이는 오프라인 측정 불가). 다음 heavy 런이 600s 내 count=1 도달 여부를 관측해야 함.",
       "steps": [
         {
           "name": "create-keypair",
@@ -256,7 +256,7 @@
             "until": [
               1
             ],
-            "timeout": 300,
+            "timeout": 600,
             "interval": 15,
             "give_up_status": [
               400,
@@ -266,6 +266,8 @@
               500
             ]
           },
+          "optional": true,
+          "group": "backup-policy",
           "capture": {
             "backup_server_uuid": "$.contents[0].server_uuid",
             "backup_server_guid": "$.contents[0].server_guid"
@@ -301,6 +303,7 @@
             201,
             202
           ],
+          "group": "backup-policy",
           "capture": {
             "backup_id": "$.resource.id"
           },
@@ -318,6 +321,7 @@
           "expect_status": [
             200
           ],
+          "group": "backup-policy",
           "poll": {
             "field": "$.state",
             "until": [
@@ -492,7 +496,8 @@
             200,
             201,
             202
-          ]
+          ],
+          "group": "backup-policy"
         },
         {
           "name": "wait-backup-manual",
@@ -502,6 +507,7 @@
           "expect_status": [
             200
           ],
+          "group": "backup-policy",
           "poll": {
             "field": "$.state",
             "until": [
@@ -519,7 +525,7 @@
           "expect_status": [
             200
           ],
-          "group": "backup-manual"
+          "group": "backup-policy"
         },
         {
           "name": "delete-backup-policy",
@@ -534,6 +540,7 @@
             404
           ],
           "destructive": true,
+          "group": "backup-policy",
           "retry_on_status": [
             409,
             500

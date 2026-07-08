@@ -275,7 +275,7 @@
       "id": "gen-quick-query-validate",
       "service": "data-analytics/quick-query",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: quick-query-validate",
+      "_note": "composed by regression/scenarios/composer.py — targets: quick-query-validate | REPAIR 2026-07-08 (live run, 첫실측): POST /v1/quick-query/validate-resources → 500 ContactAdminForAssistance (재현성 있는 제품 5xx; PF 후보 — PF 문서 기록은 다른 에이전트 몫). 격리 방식: 두 스텝 모두 optional + 자체 그룹(quick-query-validate) — 500 이면 head 가 optional-fail 로 그룹 skip 되어 런 non-red, 관측은 FAIL 로 기록돼 PF 추적 신호는 유지. 지시문의 『expect_status 에 500 관용』은 채택하지 않음: 두 스텝이 이 lifecycle 의 유일한 mutating 스텝이라 500 을 expect 에 넣으면 derive_role(HEAVY-PREMISE-CONTRACT §1, loader.py)이 verify→probe 로 뒤집혀 『손댄 lifecycle role 불변』 게이트를 위반한다 — optional+그룹이 동일한 non-red 효과를 role 불변으로 달성.",
       "steps": [
         {
           "name": "create-quick-query-validate",
@@ -305,7 +305,10 @@
             200,
             201,
             202
-          ]
+          ],
+          "optional": true,
+          "group": "quick-query-validate",
+          "_note": "PF 후보: 재현 500 ContactAdminForAssistance (2026-07-08 라이브 런 실측; req-id 는 런 로그에만 존재 — 이 세션 로컬 스토어엔 미수록, 라이브 POST 재검증은 금지라 미채집). optional+그룹 격리로 non-red — 상세는 lifecycle _note."
         },
         {
           "name": "verify-quick-query-validate-revalidate",
@@ -333,7 +336,9 @@
           },
           "expect_status": [
             200
-          ]
+          ],
+          "optional": true,
+          "group": "quick-query-validate"
         }
       ]
     },

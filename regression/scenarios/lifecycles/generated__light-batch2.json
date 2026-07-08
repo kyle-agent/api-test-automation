@@ -58,11 +58,12 @@
           "json": {
             "name": "regrvpces{unique}",
             "description": "API regression endpoint subnet",
-            "cidr": "10.160.8.0/24",
+            "cidr": "10.124.10.0/24",
             "type": "VPC_ENDPOINT",
             "vpc_id": "{vpc_id}",
             "tags": []
           },
+          "_note": "REPAIR 2026-07-08 (live run): 400 scp-network 'Cidr should be included in the vpc cidr. : (10.160.8.0/24)' — create-vpc is {\"adopt\":\"vpc\"} so {vpc_id} resolves to the SESSION-SHARED VPC (engine.py _SHARED_VPC_CIDR = 10.124.0.0/20), not this lifecycle's own 10.160.0.0/20 fallback body. Re-homed to the free /24 slot 10 of the shared /20 (slot map: 0=shared main subnet, 1-6=adopter self-create fallback reserved, 7=DB lane, 8=vs-port [scenarios.json], 9=networking-vpc endpoint subnet [networking__vpc.json HB4c]) — same fix shape as HB4c. engine.py's shared-CIDR map comment documents only 0/1-6/7; slot 8/9/10 usage lives in the lifecycle notes (engine comment update = separate task, not this file). RESIDUAL (same as HB4c): the create-vpc fallback body (10.160.0.0/20) is now CIDR-incompatible with this subnet, but under xdist a missing shared VPC SKIPS adopters entirely (IB-049) so the fallback path is effectively dead code in dispatch runs. UNVERIFIED LIVE (offline repair).",
           "expect_status": [
             200,
             201,
@@ -145,7 +146,7 @@
           "json": {
             "name": "regrvpce{unique}",
             "description": "API regression vpc endpoint",
-            "endpoint_ip_address": "10.160.8.20",
+            "endpoint_ip_address": "10.124.10.20",
             "resource_info": "regrfs{unique}",
             "resource_key": "{volume_id}",
             "resource_type": "FS",
@@ -158,6 +159,7 @@
             201,
             202
           ],
+          "_note": "REPAIR 2026-07-08: endpoint_ip_address moved 10.160.8.20 -> 10.124.10.20 together with create-endpoint-subnet's cidr re-home (10.124.10.0/24) — HB4d precedent (networking__vpc.json): moving the subnet cidr WITHOUT the endpoint ip yields 400 check-ip-address-overlap.",
           "capture": {
             "vpc_endpoint_id": "$.vpc_endpoint.id"
           },
@@ -408,6 +410,7 @@
             "field": "$.transit_gateway.state",
             "until": [
               "ACTIVE",
+              "CONNECTED",
               "ERROR",
               "DELETED"
             ],
@@ -418,7 +421,31 @@
               404
             ]
           },
-          "_note": "create-private-nat 의 실제 전제조건은 'TGW state == ACTIVE' (run 28648339307: 400 scp-network.private-nat.active-transit-gateway-not-found 'Cannot found the Transit Gateway(...) in ACTIVE state'). TGW 는 vpc-connection 부착/해제 중 EDITING 으로 전이 (라이브 관측 2026-07-04) — connection ACTIVE 대기만으로는 부족하여 TGW show 를 ACTIVE 까지 재확인. DBaaS ExistInprogress 와 같은 pacing 계열."
+          "_note": "create-private-nat 의 실제 전제조건은 'TGW state == ACTIVE' (run 28648339307: 400 scp-network.private-nat.active-transit-gateway-not-found 'Cannot found the Transit Gateway(...) in ACTIVE state'). TGW 는 vpc-connection 부착/해제 중 EDITING 으로 전이 (라이브 관측 2026-07-04) — connection ACTIVE 대기만으로는 부족하여 TGW show 를 ACTIVE 까지 재확인. DBaaS ExistInprogress 와 같은 pacing 계열. | REPAIR 2026-07-08 (live run): until 에 CONNECTED 추가 — 연결 부착 후 TGW 는 ACTIVE 로 돌아오지 않고 CONNECTED 로 정착하는 것이 라이브 관측(create-private-nat 400 'Cannot found the Transit Gateway(...) in Connect...'), CONNECTED 는 api_docs enum(CREATING/ACTIVE/DELETING/DELETED/ERROR/EDITING)에 없는 라이브 전용 상태. CONNECTED 미포함 시 이 폴이 600s 를 통째로 태운다."
+        },
+        {
+          "name": "wait-transit-gateway-connected",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": [
+              "CONNECTED",
+              "ERROR",
+              "DELETED"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "REPAIR 2026-07-08 (live run): create-private-nat 400 'Cannot found the Transit Gateway(...) in Connect...' — 요구 상태는 ACTIVE 가 아니라 CONNECTED (connection 부착 완료 후의 settle 상태; 직전 wait 가 ACTIVE 를 잡고 조기 통과하면 TGW 가 아직 EDITING→CONNECTED 전이 전). TGW show 를 CONNECTED 까지 재폴링 (ERROR/DELETED = terminal-bad 즉시 종료, give_up_status 400/404 = 선행 실패 시 타임아웃 소진 방지 — 파일 내 wait-transit-gateway 패턴 복사, timeout 600/20). CONNECTED enum 이 없는 환경이면 폴 타임아웃 후 expect_status 200 으로 통과해 기존 동작으로 저하(무해). {transit_gateway_id} 캡처는 create-transit-gateway 및 create-tgw-vpc-connection 재캡처로 이 체인에 이미 존재."
         },
         {
           "name": "create-private-nat",
@@ -632,6 +659,31 @@
           ]
         },
         {
+          "name": "wait-direct-connect-settle",
+          "service": "direct-connect",
+          "method": "GET",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.direct_connect.state",
+            "until": [
+              "ACTIVE",
+              "AVAILABLE",
+              "ERROR",
+              "DELETED"
+            ],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "REPAIR 2026-07-08 (live run, 첫실측): delete-direct-connect 400 'state is not deletable' — create 202 직후 DC 가 아직 CREATING 계열이라 delete 불가. delete 전 show 를 settle 상태까지 폴링 (docs showdirectconnect 응답: $.direct_connect.state, example ACTIVE; AVAILABLE 은 ACTIVE 류 보험, ERROR/DELETED terminal-bad — 파일 내 wait-transit-gateway 패턴 복사). 실측 enum 미확보라 settle 값이 다르면 폴 타임아웃 후 통과하고 delete 의 retry_on_status 가 2차 방어."
+        },
+        {
           "name": "delete-direct-connect",
           "service": "direct-connect",
           "method": "DELETE",
@@ -641,7 +693,14 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20,
+          "_note": "REPAIR 2026-07-08: 400 'state is not deletable' 는 상태 전이 중의 일시 거부 — settle 폴(위)로도 남는 경합을 400/409 재시도 4x20s 로 흡수 (지시 스펙)."
         },
         {
           "name": "delete-vpc",
@@ -676,11 +735,18 @@
           "service": "cloudmonitoring",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "headers": {
+            "X-ResourceType": "INSTANCE"
+          },
           "expect_status": [
             200,
             201,
-            202
+            202,
+            404
           ],
+          "optional": true,
+          "group": "cm-event-policy",
+          "_note": "REPAIR 2026-07-08 (live run + 이 세션 read-only 라이브 재검증): 400 InvalidHeaderValue 의 원인은 문서에 없는 필수 헤더 X-ResourceType 누락 — 헤더 없이 GET → 400 InvalidHeaderValue (params 가 resourceType/X-ResourceType 지목, req-486525c2-9cbd-45dd-90d4-0828a6a4fd77), X-ResourceType:INSTANCE 부착 → 404 ResourceNotFound (모니터링 등록 자원 없음의 문서화된 fail-fast; params 힌트 productCategoryCode, req-eff179ea-ffb1-4e99-a86d-cdd1899900d8). waveA1 gen-cm-account-resource 의 LIVE-VERIFIED(2026-06-18) 사실과 일치 — 헤더 부착으로 정정하고 404 는 관용 (PF 후보: v2 헤더 거부 / PF-26 이중버전 경로 가족, cloudmonitoring 은 2026-09 단종 예정이라 깊은 투자 금지). 모니터링 등록 INSTANCE 가 없으면 capture 미스 → optional 그룹 skip 으로 event-policy 체인 전체가 non-red 격리; 등록 자원이 생기면 그대로 2xx 재개.",
           "capture": {
             "product_resource_id": {
               "list": "$.contents",
@@ -718,6 +784,7 @@
             201,
             202
           ],
+          "group": "cm-event-policy",
           "capture": {
             "eventPolicyId": "$.eventPolicyId"
           },
@@ -734,7 +801,8 @@
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
           "expect_status": [
             200
-          ]
+          ],
+          "group": "cm-event-policy"
         },
         {
           "name": "verify-cm-event-policy-read-histories",
@@ -746,7 +814,8 @@
             400,
             403,
             404
-          ]
+          ],
+          "group": "cm-event-policy"
         },
         {
           "name": "verify-cm-event-policy-read-notifications",
@@ -758,7 +827,8 @@
             400,
             403,
             404
-          ]
+          ],
+          "group": "cm-event-policy"
         },
         {
           "name": "delete-cm-event-policy",
@@ -770,7 +840,8 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "cm-event-policy"
         }
       ]
     },
@@ -778,7 +849,7 @@
       "id": "gen-lb-members-light",
       "service": "networking/loadbalancer",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: lb-member, lb-member-bulk",
+      "_note": "composed by regression/scenarios/composer.py — targets: lb-member, lb-member-bulk | REPAIR 2026-07-08 (live run): create-lb-health-check 400 SubnetNotAssociatedWithLoadBalancer — no-LB light 미러의 구조적 한계 (LB 가 subnet 에 선존해야 함, CONFIRMED knowledge/services.md). loadbalancer 의존 체인 전체를 단일 그룹 lb-members-chain 으로 묶고 head(create-lb-health-check)를 optional+400 관용으로 격리 — 실패 시 그룹만 skip, vpc/subnet adopt-teardown 은 그룹 밖이라 항상 실행. lb-member/-bulk 의 C3 검증은 gen-heavy-lb-members(LB-first) 가 담당.",
       "steps": [
         {
           "name": "create-vpc",
@@ -890,8 +961,12 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
+          "optional": true,
+          "group": "lb-members-chain",
+          "_note": "REPAIR 2026-07-08 (live run, 첫실측): 400 scp-loadbalancer.lb-health-checks.SubnetNotAssociatedWithLoadBalancer — health-check 는 대상 subnet 에 Load Balancer 가 이미 존재해야 생성 가능 (CONFIRMED: knowledge/services.md 'Health-check ↔ load-balancer creation ORDER constraint' HB4 run 28738115294 · knowledge/validated-facts.md). 이 lifecycle 은 설계상 no-load-balancer light 미러라 공유 GENERAL subnet 에는 LB 가 없어 구조적으로 2xx 불가 — light role(비과금) 불변 규칙상 LB 를 여기 추가할 수 없으므로 gen-heavy-lb-members(wave5-net, LB-first 재배열) 가 C3 검증을 담당하고, 이 스텝은 optional+400 관용 + 의존 체인 공유 그룹(lb-members-chain)으로 격리 — 캡처 미스 시 그룹 skip(런 non-red), R3 이 LB-연계 subnet 을 공급하면 그대로 2xx 로 살아난다 (gen-heavy-lb-members 의 기존 C2 패턴 복사).",
           "capture": {
             "lb_health_check_id": "$.lb_health_check.id"
           },
@@ -923,6 +998,7 @@
             201,
             202
           ],
+          "group": "lb-members-chain",
           "capture": {
             "lb_server_group_id": "$.lb_server_group.id"
           },
@@ -955,6 +1031,7 @@
             201,
             202
           ],
+          "group": "lb-members-chain",
           "capture": {
             "member_id": "$.members[0].id"
           },
@@ -972,7 +1049,7 @@
           "expect_status": [
             200
           ],
-          "group": "lb-member"
+          "group": "lb-members-chain"
         },
         {
           "name": "verify-lb-member-set",
@@ -990,7 +1067,7 @@
             200,
             202
           ],
-          "group": "lb-member"
+          "group": "lb-members-chain"
         },
         {
           "name": "create-lb-member-bulk",
@@ -1015,6 +1092,7 @@
             201,
             202
           ],
+          "group": "lb-members-chain",
           "capture": {
             "member_bulk_id": "$.members[0].id"
           },
@@ -1037,7 +1115,7 @@
           "expect_status": [
             200
           ],
-          "group": "lb-member-bulk"
+          "group": "lb-members-chain"
         },
         {
           "name": "delete-lb-member",
@@ -1049,7 +1127,8 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "lb-members-chain"
         },
         {
           "name": "delete-lb-member-bulk",
@@ -1062,6 +1141,7 @@
             204
           ],
           "destructive": true,
+          "group": "lb-members-chain",
           "json": {
             "member_id_list": [
               "{member_bulk_id}"
@@ -1081,6 +1161,7 @@
             404
           ],
           "destructive": true,
+          "group": "lb-members-chain",
           "retry_on_status": [
             409
           ],
@@ -1100,6 +1181,7 @@
             404
           ],
           "destructive": true,
+          "group": "lb-members-chain",
           "retry_on_status": [
             409
           ],

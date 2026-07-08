@@ -144,6 +144,11 @@ _SHARED_SUBNET_CIDR = "10.124.0.0/24"
 # DB-lane shared subnet — 10.124.1-6.0/24 are reserved by the adopters'
 # self-create FALLBACK subnets (knowledge/domain-constraints.md), so the DB
 # lane takes the next free /24 of the shared /20.
+# Claimed child-/24 slots of the shared /20 beyond DB (7): 8=vs-port
+# (scenarios.json compute-virtualserver-full), 9=networking-vpc-subnet,
+# 10=gen-vpc-endpoint endpoint-subnet (light-batch2, 2026-07-08 재호밍).
+# New fixed host IPs inside the SHARED subnet(.0/24) go in dependencies.json
+# fixed_ip_map (.5/.6 pls, .7/.8 apigw-pls, .20 vpce, .30/.31 lb).
 _SHARED_DB_SUBNET_CIDR = "10.124.7.0/24"
 _SUBNET_CREATE_PATH = "/v1/subnets"
 # Env keys for cross-process (xdist) adoption of an already-live shared VPC/subnet
