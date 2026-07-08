@@ -382,8 +382,44 @@
       "id": "gen-wave2-scf",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
+      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred) | 2026-07-08 완전성 GAP 편입 (COMPLETENESS-AUDIT-2026-07-08): scf의 마지막 3개 (a)-class 전역 GET(listruntimes, listsamplecodes, checkfunctionnameduplication)을 create 앞 lookup/pre-check 스텝으로 흡수 — scf catalog 36/36 시나리오 커버.",
       "steps": [
+        {
+          "name": "list-scf-runtimes",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/runtimes",
+          "expect_status": [
+            200
+          ],
+          "group": "scf-lookups",
+          "_note": "GAP 편입 2026-07-08 (compute/scf/listruntimes, 전역 read). 쿼리 파라미터 없음(docs). live 200 2026-07-08 ({count:15, runtimes:[...Go 1.25 등]}). create가 쓰는 runtime Node.js:20의 자연스러운 선행 lookup."
+        },
+        {
+          "name": "list-scf-sample-codes",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/sample-codes",
+          "expect_status": [
+            200
+          ],
+          "group": "scf-lookups",
+          "_note": "GAP 편입 2026-07-08 (compute/scf/listsamplecodes, 전역 read). 쿼리 파라미터 없음(docs). live 200 2026-07-08 ({count:64, sample_codes:[...]})."
+        },
+        {
+          "name": "check-scf-function-name-duplication",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/check-duplication",
+          "params": {
+            "name": "regrscf{unique}"
+          },
+          "expect_status": [
+            200
+          ],
+          "group": "scf-lookups",
+          "_note": "GAP 편입 2026-07-08 (compute/scf/checkfunctionnameduplication). create-scf-function 직전 pre-check — create가 쓸 이름 그대로(name=regrscf{unique}, 동일 {unique} ctx) 중복 조회. 필수 쿼리 name (catalog/docs required:true, 누락 시 400). live 200 2026-07-08 ({result:false})."
+        },
         {
           "name": "create-scf-function",
           "service": "scf",

@@ -138,7 +138,16 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   cluster/subops-full 2체인이 각자 클러스터를 만들어 병렬로 도는 현행이 벽시계에
   유리(통합 시 임계 경로 66→90분대 위험); 통합은 과금 절감이 우선될 때 재검토.
   같은 맥락: 실행 워커 캡 6→10 (콘솔·local_run), duration_stats 병렬 가정 4→6.
-  **다음: GAP-62 편입 검증 → 전체 suite 런 (로컬 pull + 콘솔 재시작 후).**
+  ⑦ **GAP-62 편입 완주 (에이전트 5기)**: 시나리오 합집합 94.2%→**99.6%**
+  (1,366/1,372; verify-전용 953→1,031). 잔여 3 = 의도된 waiver 제외
+  (iam deletepolicies·gpu listnodepools·bm-blockstorage setvolumeqos).
+  신설: networking-gslb-reads·networking-cdn-reads·org-assignment-reads·
+  baremetal-catalog-reads·budget-account-budget-full(verify)·pfs-c2 probe.
+  C2 waiver 이행 규약은 `0000{unique}` 토큰으로 통일(정적 자가검증).
+  **백로그**: budget-full의 start_month "2026-07" 하드코드 — 매월 rot(과거월
+  create 400); 엔진 {yyyymm} 빌트인 토큰 검토. cloud-ml check-duplication은
+  SCR credential-gate 404 → 관용, SCR 활성화 후 strict 승급.
+  **다음: 전체 suite 런 (로컬 pull + 콘솔 재시작 후, 워커 10).**
 - **(2026-07-08 오후, owner 라이브 검수 후속 배치 — main FF까지 완료):** owner가
   Model B 첫 실사용 런을 보며 잡아준 결함들을 당일 수리. ① 런 시작 지연 — provision
   서브프로세스 출력 스트리밍 + poll 하트비트(간격 5s) + 서브넷 2개 선생성-후대기 +

@@ -718,6 +718,17 @@
           "group": "apigw-ple"
         },
         {
+          "name": "list-apigw-privatelink-endpoints",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/privatelink-endpoints",
+          "expect_status": [
+            200
+          ],
+          "group": "apigw-ple",
+          "_note": "GAP 편입 2026-07-08 (application-service/apigateway/listprivatelinkendpoints, 마지막 apigateway gap — COMPLETENESS-AUDIT-2026-07-08). vpc의 동일 path GET /v1/privatelink-endpoints와 catalog key가 다르므로(step service=apigateway 명시, apigw 호스트로 라우팅) 여기서만 apigateway key로 기록됨. 쿼리 전부 optional(size/page/sort/name). live 200 2026-07-08 ({count:0, privatelink_endpoints:[]} — 빈 목록 200으로 충분; 체인 내에선 방금 만든 endpoint가 보이는 위치)."
+        },
+        {
           "name": "set-apigw-privatelink-endpoint",
           "service": "apigateway",
           "method": "PUT",

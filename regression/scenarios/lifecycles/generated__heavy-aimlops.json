@@ -568,6 +568,19 @@
           }
         },
         {
+          "name": "aimlops-check-name-duplication",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/check-duplication",
+          "params": {
+            "release_name": "regraimlops{ualpha}"
+          },
+          "expect_status": [
+            200
+          ],
+          "group": "aimlops-lookups",
+          "_note": "GAP 편입 2026-07-08 (ai-ml/aimlops-platform/checkduplicationaimlopsplatformnamev1, 마지막 aimlops-platform gap — COMPLETENESS-AUDIT-2026-07-08). release create 직전 pre-check: release-aimlops-platform이 쓸 이름 그대로(release_name=regraimlops{ualpha}, 동일 ctx) 중복 조회. 필수 쿼리 release_name (catalog/docs required:true). live 200 2026-07-08 ({result:false}) — 클러스터 없이도 전역 GET 200이므로 strict."
+        },
+        {
           "name": "release-aimlops-platform",
           "method": "POST",
           "path": "/v1/aimlops-platform",

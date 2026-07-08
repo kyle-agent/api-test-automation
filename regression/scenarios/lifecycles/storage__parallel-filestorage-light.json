@@ -5,14 +5,43 @@
       "service": "storage/parallel-filestorage",
       "enabled": true,
       "heavy": false,
-      "_note": "LIGHT read coverage for storage/parallel-filestorage. GET /v1/volumes (routed to the parallel-filestorage host via the lifecycle service, same routing the existing parallel-filestorage-capacity-restore lifecycle uses) returns 200 {count:0, parallel_filestorages:[]} with no params/resources — confirmed live 2026-06-29 by the storage coverage agent. listsnapshots needs ?volume_id (REQUIRED), id-bound GETs and 7 write ops need a real PFS volume (1 TB min, billable, MNGC-attached) — those stay in the heavy lifecycle parallel-filestorage-capacity-restore. This fragment provides the read-only floor.",
+      "_note": "LIGHT read coverage for storage/parallel-filestorage. GET /v1/volumes (routed to the parallel-filestorage host via the lifecycle service, same routing the existing parallel-filestorage-capacity-restore lifecycle uses) returns 200 {count:0, parallel_filestorages:[]} with no params/resources — confirmed live 2026-06-29 by the storage coverage agent. listsnapshots needs ?volume_id (REQUIRED), id-bound GETs and 7 write ops need a real PFS volume (1 TB min, billable, MNGC-attached) — those stay in the heavy lifecycle parallel-filestorage-capacity-restore. This fragment provides the read-only floor. | 2026-07-08 완전성 GAP 편입 (COMPLETENESS-AUDIT-2026-07-08): listaccessrule(b-class) 추가 — 기존 볼륨 soft-capture 기반. 주의: setaccessrule C2 waiver 스텝은 여기 넣으면 §1 role 파생이 probe로 뒤집혀(관용 mutating 1개 + tolerant ratio ≥0.5) listvolumes가 verify 합집합에서 이탈하므로, 별도 probe lifecycle(parallel-filestorage-c2-setaccessrule)로 분리 — 이 lifecycle은 mutating 스텝 0개 = 항상 verify.",
       "steps": [
         {
           "name": "list-volumes",
           "method": "GET",
           "path": "/v1/volumes",
           "expect_status": [200],
-          "_note": "LIVE 200 2026-06-29. Routed to parallel-filestorage host via lifecycle service (storage/parallel-filestorage). Response {count:0, parallel_filestorages:[]}."
+          "capture_soft": {"volume_id": "$.parallel_filestorages[0].id"},
+          "_note": "LIVE 200 2026-06-29 (재확인 2026-07-08: {count:0, parallel_filestorages:[]}). Routed to parallel-filestorage host via lifecycle service (storage/parallel-filestorage). capture_soft volume_id 추가(2026-07-08): 계정에 PFS 볼륨이 존재하면 아래 list-access-rules가 실ID로 200을 얻도록 공급."
+        },
+        {
+          "name": "list-access-rules",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}/access-rules",
+          "expect_status": [200, 404],
+          "optional": true,
+          "group": "pfs-read",
+          "_note": "GAP 편입 2026-07-08 (storage/parallel-filestorage/listaccessrule, b-class id-bound read). pfs는 verify 생성 체인 부재(쓰기 전부 probe 레인) — 실ID 공급원 없음: 기존 볼륨이 있을 때만 200, 계정 볼륨 0개(live 2026-07-08)면 {volume_id} 미해석 → 리터럴 세그먼트로 호출되어 404 (live 캘리브레이션 2026-07-08: 가짜 uuid·리터럴 {volume_id} 모두 404 parallel-filestorage.Notfound.volume). expect [200,404]+optional로 어느 쪽이든 기록만 하고 런은 안 깨짐. 상시 200 전환은 PFS 볼륨(1TB+, billable) verify 체인 신설이 전제 — C4 과제."
+        }
+      ]
+    },
+    {
+      "id": "parallel-filestorage-c2-setaccessrule",
+      "service": "storage/parallel-filestorage",
+      "enabled": true,
+      "heavy": false,
+      "_note": "C2 waiver 이행 전용 probe lifecycle (2026-07-08, COMPLETENESS-AUDIT-2026-07-08 §C2 debt): storage/parallel-filestorage/setaccessrule은 coverage_waivers.json class=reachability인데 어느 시나리오도 호출하지 않던 키 — waiver 계약(waived여도 반드시 호출은 되어야 함, 4xx가 증거)을 이행한다. 존재하지 않는 uuid(토큰화 세그먼트라 카탈로그 * 키로 정상 매핑·기록) + body {} → 4xx 보장, 실볼륨 접근제어에 어떤 영향도 없음(동일 path GET을 가짜 uuid로 live 캘리브레이션 2026-07-08: 404 parallel-filestorage.Notfound.volume). parallel-filestorage-light-reads(verify)에 넣지 않은 이유: 관용 mutating 스텝이 §1 파생을 probe로 뒤집어 listvolumes가 verify 합집합에서 이탈 — 그래서 의도적으로 role=probe인 이 1-스텝 lifecycle로 분리(CI-sweep 레인, 신설이므로 기존 lifecycle role 뒤집기 아님).",
+      "steps": [
+        {
+          "name": "set-access-rules-waiver",
+          "method": "PUT",
+          "path": "/v1/volumes/00000000-0000-0000-0000-0000{unique}/access-rules",
+          "json": {},
+          "expect_status": [400, 401, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pfs-c2-waiver",
+          "_note": "waiver 이행: 호출 증거(4xx). PUT /v1/volumes/{volume_id}/access-rules (setaccessrule) — {unique}(8-hex 빌트인)로 끝나는 존재하지 않는 uuid + body {} → 404 기대(같은 path GET 가짜 uuid live 404 2026-07-08). expect에 2xx 불포함: 만에 하나 2xx면 시끄럽게 실패해야 함(가짜 id라 구조적으로 불가)."
         }
       ]
     }

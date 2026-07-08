@@ -186,6 +186,13 @@
           "capture_soft": {"data_ops_service_id": "$.contents[0].id"}
         },
         {
+          "name": "get-image-versions",
+          "method": "GET",
+          "path": "/v1/data-ops/image-versions",
+          "expect_status": [200],
+          "_note": "GAP 편입 2026-07-08 (data-analytics/data-ops/getdataopsimageversionv1, 마지막 data-ops 전역-read gap — COMPLETENESS-AUDIT-2026-07-08). 파라미터 없는 전역 read → strict [200]. live 200 2026-07-08 ({contents:[{image_id:IMAGE-ef7a8ad7-..., image_name:'Data Ops 4.1.1', version:'4.1.1'}], total_count:1}) — guarded lifecycle의 create-data-ops가 쓰는 image_id의 원천 lookup."
+        },
+        {
           "name": "get-data-ops",
           "method": "GET",
           "path": "/v1/data-ops/{data_ops_id}",
