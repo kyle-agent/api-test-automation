@@ -576,6 +576,28 @@
           }
         },
         {
+          "name": "verify-scr-repository-read",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/repositories/{repo_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "scr-repository",
+          "_note": "showrepository — repo 생존 구간 단건 조회(자기 생성 repo_id 재사용), wave2에서 LIVE-proven strict 200 무위험 리드. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-scr)."
+        },
+        {
+          "name": "verify-scr-repository-images-empty",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/repositories/{repo_id}/images",
+          "expect_status": [
+            200
+          ],
+          "group": "scr-repository",
+          "_note": "listimages — 빈 repo의 이미지 목록(도커 push 없이도 200), wave2에서 LIVE-proven strict 200 무위험 리드. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-scr)."
+        },
+        {
           "name": "repo-update-description",
           "method": "PUT",
           "path": "/v1/repositories/{repo_id}/description",
@@ -1561,6 +1583,16 @@
           }
         },
         {
+          "name": "list-volumes",
+          "method": "GET",
+          "path": "/v1/volumes",
+          "service": "virtualserver",
+          "expect_status": [
+            200
+          ],
+          "_note": "2026-07-08 25-편입(owner GO): listvolumes. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume; 볼륨 생존 구간 무위험 리드 → strict 200)."
+        },
+        {
           "name": "create-snapshot",
           "method": "POST",
           "path": "/v1/snapshots",
@@ -1627,6 +1659,75 @@
           }
         },
         {
+          "name": "create-volume-transfer",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/volume-transfer",
+          "json": {
+            "name": "regrvt{unique}",
+            "volume_id": "{vol_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            500
+          ],
+          "capture_soft": {
+            "transfer_auth_key": "$.auth_key"
+          },
+          "capture": {
+            "transfer_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volume-transfer/{transfer_id}",
+            "service": "virtualserver"
+          },
+          "optional": true,
+          "_note": "PF-21 CONFIRMED product bug (500 InternalServerError, runs 27540589368/27583285457, req-bc27a3b6/req-78aec306) — baselined in known_issues.json (compute/virtualserver/createvolumetransfer); 500 tolerated so the chain survives, still records the 500 in observations. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume, body/캡처/expect verbatim)."
+        },
+        {
+          "name": "verify-volume-transfer-read",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volume-transfer/{transfer_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "volume-transfer",
+          "_note": "downstream of PF-21 create 500 → no transfer_id captured; the optional create is group-skipped so this read runs with the literal {transfer_id} → 404. Tolerate 404 so the cascade is not a TEST FAILURE; run 27593608514. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume)."
+        },
+        {
+          "name": "list-volume-transfers",
+          "method": "GET",
+          "path": "/v1/volume-transfer",
+          "service": "virtualserver",
+          "expect_status": [
+            200
+          ],
+          "_note": "2026-07-08 25-편입(owner GO): listvolumetransfer. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume; 무위험 리드 → strict 200)."
+        },
+        {
+          "name": "accept-volume-transfer",
+          "service": "virtualserver",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/volume-transfer/{transfer_id}/accept",
+          "json": {
+            "auth_key": "{transfer_auth_key}"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            404,
+            409
+          ],
+          "_note": "2026-07-08 25-편입(owner GO): acceptvolumetransfer — create 가 PF-21(500 baselined)이라 auth_key 는 soft 캡처; 미해결 시 관용 도달 기록. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②). §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume)."
+        },
+        {
           "name": "delete-snapshot",
           "method": "DELETE",
           "path": "/v1/snapshots/{snap_id}",
@@ -1658,6 +1759,22 @@
             "timeout": 300,
             "interval": 15
           }
+        },
+        {
+          "name": "delete-volume-transfer",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/volume-transfer/{transfer_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "optional": true,
+          "group": "volume-transfer",
+          "destructive": true,
+          "_note": "404 Volume.TransferNotFound: {transfer_id} stays literal when no transfer was created/soft-captured, so the delete hits a nonexistent id. Coverage-only (C2); deleting a never-created transfer -> 404 is expected. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume; wave2 teardown 순서 유지 — snapshot→transfer→volume)."
         },
         {
           "name": "delete-volume",

@@ -148,6 +148,19 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   create 400); 엔진 {yyyymm} 빌트인 토큰 검토. cloud-ml check-duplication은
   SCR credential-gate 404 → 관용, SCR 활성화 후 strict 승급.
   **다음: 전체 suite 런 (로컬 pull + 콘솔 재시작 후, 워커 10).**
+- **(2026-07-08 밤, §C 통합 오너 결정 집행 + waiver 심사 준비):** 오너 "B는 모두
+  추천 방향으로" → ① postgresql 클러스터 2기 **현행 유지**(병렬·시간 우선, 오너
+  결정) ② LB 스택: members-nat 은퇴 → sole 3키(private-static-nat 쌍·cert show)
+  gen-heavy-lb-members 흡수, 노드 3개 재지정 (IGW/cert-list 3키는 재계산상 이미
+  타 커버) ③ SCR registry quota=1 충돌: gen-wave2-scr 은퇴 → repo 리드 2키
+  container-scr-registry 흡수 ④ 볼륨 3중 생성: gen-wave2-volume 은퇴 → transfer
+  4스텝+listvolumes를 compute-virtualserver-volume-snapshot 흡수, gen-wave-vslight
+  는 server-group 전담화(볼륨 6스텝 제거) ⑤ shared-dbaas vs subops-full **현행
+  유지**. 합집합 1,369/1,372 무손실 재확인. members-nat의 fixed_ip_map(.30/.31)
+  잔존은 disabled라 불활성 — **2단계 물리삭제 커밋에서 제거** (adopt_edges는
+  프룬 완료). **Waiver 심사(CAMPAIGN-C3-100-waivers.md) 오너 결정 대기** — 단
+  클래스 5(mysql/epas cascade 33)는 오늘 콘솔 전체 런 재대조로 **반려 권고 확정**
+  (7키 실2xx·23키 도달-후-실패·3키 미호출 — cascade 전제 불성립).
 - **(2026-07-08 오후, owner 라이브 검수 후속 배치 — main FF까지 완료):** owner가
   Model B 첫 실사용 런을 보며 잡아준 결함들을 당일 수리. ① 런 시작 지연 — provision
   서브프로세스 출력 스트리밍 + poll 하트비트(간격 5s) + 서브넷 2개 선생성-후대기 +

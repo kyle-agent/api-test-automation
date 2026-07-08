@@ -1,6 +1,8 @@
 # Resource-task model — networking/loadbalancer (nw-lb group, the LB chain).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from heavy-shared-networking
-# (enabled, live-validated bodies/captures) + networking-loadbalancer-members-nat.
+# (enabled, live-validated bodies/captures) + networking-loadbalancer-members-nat
+# (2026-07-08 DEDUP §C 은퇴 — lb-member/lb-member-bulk/lb-static-nat 의 source 는
+# gen-heavy-lb-members 로 재지정, sole 3키는 그쪽에 흡수).
 #
 # requires here follow what each VALIDATED body actually consumes (subnet_id +
 # vpc_id fields), which diverges from cross-service.yaml's coarser edges for
@@ -215,9 +217,10 @@ resources:
     delete: {endpoint: "DELETE /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members/{member_id}",
              destructive: true}
     provenance: docs
-    source: {lifecycle: networking-loadbalancer-members-nat,
-             steps: [members-add, members-set, members-remove-single]}
-    notes: "capture는 소스에서 capture_soft($.members[0].id, envelope UNPROVEN) — docs 유지. delete = removelbservergroupmember(단건); bulk 삭제는 lb-member-bulk 노드가 커버.
+    source: {lifecycle: gen-heavy-lb-members,
+             steps: [create-lb-member, verify-lb-member-show,
+                     verify-lb-member-set, delete-lb-member]}
+    notes: "source 재지정 2026-07-08 (DEDUP §C — members-nat 은퇴): 구소스(members-nat)는 capture_soft($.members[0].id, envelope UNPROVEN)였고 현 source(gen-heavy-lb-members)는 동일 envelope 을 strict capture — live 2xx 전까지 provenance docs 유지. delete = removelbservergroupmember(단건); bulk 삭제는 lb-member-bulk 노드가 커버.
       userguide(load_balancer/overview, UNPROVEN): member의 object_type은
       VM(Virtual Server)/BM(Bare Metal, 동일 VPC) 또는 직접 입력 IP 중 선택 —
       직접 입력 IP는 백엔드 서버 불필요 (수작업 _note 'no backend VM required'와
@@ -253,9 +256,9 @@ resources:
              json: {member_id_list: ["{member_bulk_id}"]},
              destructive: true}
     provenance: docs
-    source: {lifecycle: networking-loadbalancer-members-nat,
-             steps: [members-add, members-remove-bulk]}
-    notes: "removelbservergroupmembers(벌크) 커버 전용 노드 — capture envelope $.members[0].id UNPROVEN(docs)"
+    source: {lifecycle: gen-heavy-lb-members,
+             steps: [create-lb-member-bulk, delete-lb-member-bulk]}
+    notes: "removelbservergroupmembers(벌크) 커버 전용 노드 — capture envelope $.members[0].id UNPROVEN(docs). source 재지정 2026-07-08 (DEDUP §C — members-nat 은퇴)"
 
   # public static-NAT — PF-13 교훈: LB에 Public NAT IP를 붙이려면 그 VPC에
   # IGW가 있어야 한다 (수작업 members-nat _note: "attaching a Public NAT IP
@@ -281,10 +284,11 @@ resources:
     delete: {endpoint: "DELETE /v1/loadbalancers/{load-balancer.loadbalancer_id}/static-nats",
              json: {static_nat_id_list: ["{static_nat_id}"]},
              destructive: true}
-    provenance: VALIDATED  # evidence: networking/loadbalancer/createloadbalancerpublicnatip (run 28835929967)
-    source: {lifecycle: networking-loadbalancer-members-nat,
-             steps: [static-nat-create, static-nat-delete]}
-    notes: "createloadbalancerpublicnatip/deleteloadbalancerpublicnatip 커버. capture envelope $.static_nat.id는 api_docs response_example 기반 UNPROVEN. private-static-nats(createloadbalancerprivatenatip)는 private_nat_id + private_nat_ip_id가 필요 — private-nat IP 하위자원 모델이 없어 미배선 (owner 질문: private NAT IP 발급 경로).
+    provenance: VALIDATED  # evidence: networking/loadbalancer/createloadbalancerpublicnatip (run 28835929967, 당시 소스 members-nat)
+    source: {lifecycle: gen-heavy-lb-members,
+             steps: [create-lb-static-nat, verify-lb-static-nat-read,
+                     delete-lb-static-nat]}
+    notes: "createloadbalancerpublicnatip/deleteloadbalancerpublicnatip 커버. capture envelope $.static_nat.id는 api_docs response_example 기반 UNPROVEN. private-static-nats(createloadbalancerprivatenatip)는 private_nat_id + private_nat_ip_id가 필요 — private-nat IP 하위자원 모델이 없어 노드로는 미배선 (owner 질문: private NAT IP 발급 경로; lifecycle reach-coverage 는 gen-heavy-lb-members 의 lb-private-static-nat 그룹이 유지 — HB4 entitlement-403 waiver 후보).
       userguide(load_balancer/how_to_guides, UNPROVEN)가 IGW precondition을
       문서로 확증: Public NAT IP는 '선택한 VPC에 Internet Gateway가 연결된 경우'
       에만 구성 가능 — PF-13 lifecycle 교훈(IGW 없는 VPC에서 4xx)과 일치하므로

@@ -649,7 +649,10 @@
     {
       "id": "gen-wave2-volume",
       "service": "compute/virtualserver",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "compute-virtualserver-volume-snapshot",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §C): compute/virtualserver 볼륨 3중 생성 제거 — 서비스 선택 시 volume create 3회(본 lifecycle·gen-wave-vslight·volume-snapshot) 중 1회분. 유일분(createvolumetransfer/showvolumetransfer/listvolumetransfer/acceptvolumetransfer/deletevolumetransfer + listvolumes)은 compute-virtualserver-volume-snapshot에 흡수 — 병렬 에이전트가 scenarios.json에서 수행 중(2026-07-08, 스텝 원명 유지 예정). 재활성화 시 감사 문서 참조",
       "_note": "recomposed 2026-06-13 — snapshot list verify (retirement gap) + transfer read",
       "steps": [
         {
@@ -869,7 +872,10 @@
     {
       "id": "gen-wave2-scr",
       "service": "container/scr",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "container-scr-registry",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §C): registry quota=1 충돌 — 본 lifecycle과 container-scr-registry 둘 다 registry+repo를 생성해 서비스 선택 시 2번째 registry create가 충돌/실패 소지. 유일 GET 2건(showrepository·listimages)은 container-scr-registry에 흡수 — 병렬 에이전트가 scenarios.json에서 수행 중(2026-07-08, 스텝 원명 유지 예정; scr-read-coverage도 동일 2키 보유). 재활성화 시 감사 문서 참조",
       "_note": "recomposed after run 27447899572 — lifecycle-policy PUT body uses untagged_rule_duration (untagged_rule_count -> 400 Field required)",
       "steps": [
         {

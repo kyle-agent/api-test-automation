@@ -5,7 +5,7 @@
       "id": "gen-wave-vslight",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "composed verification wave 2 — re-composed with the id-bound GET verify additions (gap_getid lever); targets: server-group, volume-transfer",
+      "_note": "composed verification wave 2 — re-composed with the id-bound GET verify additions (gap_getid lever); targets: server-group | 2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §C) server-group 전담화: volume 계열 6스텝(create/wait/delete-block-volume · create/verify/delete-volume-transfer) 제거 — createvolume/showvolume/deletevolume 키는 compute-virtualserver-full·compute-virtualserver-volume-snapshot·gen-heavy-vs-netops 보유(ops_of 재계산 2026-07-08), volume-transfer 계열 키는 gen-wave2-volume 유일분으로서 compute-virtualserver-volume-snapshot 흡수분(병렬 에이전트, scenarios.json)이 커버",
       "steps": [
         {
           "name": "create-server-group",
@@ -42,89 +42,6 @@
           "group": "server-group"
         },
         {
-          "name": "create-block-volume",
-          "service": "virtualserver",
-          "method": "POST",
-          "path": "/v1/volumes",
-          "json": {
-            "name": "regrvol{unique}",
-            "description": "API regression suite",
-            "size": 104,
-            "volume_type": "SSD_Provisioned",
-            "max_iops": 10000,
-            "max_throughput": 500,
-            "tags": []
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "vol_id": "$.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/volumes/{vol_id}",
-            "service": "virtualserver"
-          }
-        },
-        {
-          "name": "wait-block-volume",
-          "service": "virtualserver",
-          "method": "GET",
-          "path": "/v1/volumes/{vol_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.state",
-            "until": [
-              "available",
-              "AVAILABLE",
-              "ACTIVE"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
-        },
-        {
-          "name": "create-volume-transfer",
-          "service": "virtualserver",
-          "method": "POST",
-          "path": "/v1/volume-transfer",
-          "json": {
-            "name": "regrvt{unique}",
-            "volume_id": "{vol_id}"
-          },
-          "expect_status": [
-            200,
-            201,
-            202,
-            500
-          ],
-          "capture": {
-            "transfer_id": "$.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/volume-transfer/{transfer_id}",
-            "service": "virtualserver"
-          },
-          "optional": true,
-          "_note": "PF-21 CONFIRMED product bug (500 InternalServerError, runs 27540589368/27583285457, req-bc27a3b6/req-78aec306) — baselined in known_issues.json (compute/virtualserver/createvolumetransfer); 500 tolerated so the chain survives, still records the 500 in observations"
-        },
-        {
-          "name": "verify-volume-transfer",
-          "service": "virtualserver",
-          "method": "GET",
-          "path": "/v1/volume-transfer/{transfer_id}",
-          "expect_status": [
-            200
-          ],
-          "group": "volume-transfer"
-        },
-        {
           "name": "delete-server-group",
           "service": "virtualserver",
           "method": "DELETE",
@@ -135,37 +52,6 @@
             204
           ],
           "destructive": true
-        },
-        {
-          "name": "delete-volume-transfer",
-          "service": "virtualserver",
-          "method": "DELETE",
-          "path": "/v1/volume-transfer/{transfer_id}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
-          "name": "delete-block-volume",
-          "service": "virtualserver",
-          "method": "DELETE",
-          "path": "/v1/volumes/{vol_id}",
-          "expect_status": [
-            200,
-            202,
-            204,
-            409,
-            404
-          ],
-          "destructive": true,
-          "retry_on_status": [
-            409
-          ],
-          "retries": 40,
-          "retry_interval": 30
         }
       ]
     },

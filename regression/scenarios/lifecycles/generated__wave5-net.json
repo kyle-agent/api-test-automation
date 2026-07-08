@@ -841,7 +841,7 @@
       "id": "gen-heavy-lb-members",
       "service": "networking/loadbalancer",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: lb-health-check, lb-listener, lb-member, lb-member-bulk, lb-server-group, lb-static-nat, load-balancer | heavy: the loadbalancer itself is billable/slow; NO backend VM needed — members register direct in-subnet IPs (10.124.0.101/.102, shared-subnet re-homing rule).",
+      "_note": "composed by regression/scenarios/composer.py — targets: lb-health-check, lb-listener, lb-member, lb-member-bulk, lb-server-group, lb-static-nat, load-balancer | heavy: the loadbalancer itself is billable/slow; NO backend VM needed — members register direct in-subnet IPs (10.124.0.101/.102, shared-subnet re-homing rule). | DEDUP-AUDIT-2026-07-08 §C (owner GO): networking-loadbalancer-members-nat 은퇴에 따라 그 sole 3키를 흡수 — private-static-nats POST/DELETE(entitlement-403 waiver 후보, optional 자체그룹 lb-private-static-nat) + certificates show(+배선용 list, 그룹 lb-certificate). verify-lb-static-nat-read 뒤 teardown 앞에 삽입(기존 스텝 순서 무변경) — 해당 스텝 _note 참조. 재합성 시 이 흡수 스텝들을 보존할 것.",
       "steps": [
         {
           "name": "create-vpc",
@@ -1457,6 +1457,129 @@
             200
           ],
           "group": "lb-static-nat"
+        },
+        {
+          "name": "create-lb-private-static-nat",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+          "json": {
+            "static_nat": {
+              "private_nat_id": "",
+              "private_nat_ip_id": ""
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lb-private-static-nat",
+          "capture_soft": {
+            "private_static_nat_id": "$.static_nat.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+            "json": {
+              "static_nat_id_list": [
+                "{private_static_nat_id}"
+              ]
+            },
+            "service": "loadbalancer"
+          },
+          "_note": "DEDUP-AUDIT-2026-07-08 §C (owner GO): networking-loadbalancer-members-nat 은퇴로 흡수한 sole 3키 중 1 (createloadbalancerprivatenatip). body/캡처는 members-nat private-static-nat-create 에서 그대로 이식, {loadbalancer_id} 는 이 lifecycle 의 실 LB strict 캡처(create-load-balancer)에 배선 — LB ACTIVE(wait-load-balancer) + public static-nat 가족 뒤에 위치. HB4 (run 28738115294, 2026-07-05) live 403 scp-loadbalancer.loadbalancers.PrivateNatIpForbidden — WAIVER CANDIDATE (entitlement): 이 계정은 private-NAT-IP 자원 권한이 없어 body 내용과 무관하게 403 (private_nat_id/private_nat_ip_id 실값 확보 경로도 없음 — 빈 문자열 by design, members-nat 관례 승계). 403 이 expect_status 에 있어 reach-coverage 는 기록. 미검증(un-2xx'd) → optional + 자체 그룹(lb-private-static-nat)로 격리."
+        },
+        {
+          "name": "verify-lb-private-static-nat-read",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "lb-private-static-nat",
+          "poll": {
+            "field": "$.static_nat.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          },
+          "_note": "쌍(생성→검증→삭제)의 검증 스텝. 현행 entitlement-403 경로에선 create 가 아무것도 만들지 않으므로 이 GET 은 empty-collection 404 로 즉시 give_up (verify-load-balancer-read-private-static-nats 가 관측한 시그니처와 동일 — 빈 컬렉션이 200+[] 아닌 404). entitlement 가 열려 create 가 실제 2xx 되는 날엔 HB4d 교훈(run 28835929967 StaticNatNotDeletableState: CREATING 상태 삭제 400 → lb-delete 409 연쇄)대로 $.static_nat.state ACTIVE settle 후에야 delete 가 나간다 (field 는 showloadbalancerprivatenatip response_example {static_nat:{state}} 기반)."
+        },
+        {
+          "name": "delete-lb-private-static-nat",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+          "json": {
+            "static_nat_id_list": [
+              "{private_static_nat_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "lb-private-static-nat",
+          "_note": "sole 3키 중 2 (deleteloadbalancerprivatenatip) — members-nat private-static-nat-delete 그대로 (static_nat_id_list body). create 403 시 {private_static_nat_id} soft-capture 미해소 → 리터럴 body 로 4xx 관용, norm '*' 매치로 reach-coverage 는 기록 (members-nat 확립 관례)."
+        },
+        {
+          "name": "list-lb-certificates",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/loadbalancers/certificates",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "lb-certificate",
+          "capture_soft": {
+            "lb_certificate_id": "$.certificates[0].id"
+          },
+          "_note": "sole 아님(listloadbalancercertificates 는 networking-loadbalancer-reads 가 계속 커버) — showloadbalancercertificate 의 유일한 정직한 id 소스라 배선용으로만 동반 이식 (LB 쪽 certificate CREATE 엔드포인트 없음: cert 는 security/certificatemanager 가 발급, 여기선 list/show 만). members-nat list-lb-certificates 그대로: 계정에 cert 가 있으면 $.certificates[0].id soft-capture, 없으면 미해소로 아래 show 가 placeholder 4xx."
+        },
+        {
+          "name": "verify-lb-certificate-show",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/loadbalancers/certificates/{lb_certificate_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "lb-certificate",
+          "_note": "DEDUP §C 흡수 sole 3키 중 3 (showloadbalancercertificate) — members-nat show-lb-certificate 그대로. 계정에 certificatemanager 발급 LB cert 가 있으면 실 2xx, 없으면 placeholder 가 norm '*' 매치로 reach-coverage 만 기록. Tolerant [200,400,403,404]."
         },
         {
           "name": "delete-lb-listener",
