@@ -5,6 +5,7 @@
       "id": "gen-heavy-aimlops",
       "service": "ai-ml/aimlops-platform",
       "enabled": true,
+      "_scope_exclude": "owner 2026-07-08 (C-6): 'aimlops는 추후 테스트로 빼놓자 테스트 대상 제외로' — 최장 체인(~55분, 자체 SKE 클러스터 포함)이라 전체/서비스 선택의 벽시계를 지배. scope 확장(전체/카테고리/서비스 선택)에서 자동 제외되며, 명시 lifecycle_ids 선택으로는 언제든 단독 실행 가능. 커버리지 합집합·모델 지위는 유지(은퇴 아님, 운영 유예). 재포함 = 이 키 삭제 한 줄.",
       "_note": "owner-approved live aimlops provision (2026-06-14): branch (1) adopt/create real SKE cluster then release aimlops on it. The SKE-create closure (keypair -> server-type/k8s-version/ske-image lookups -> security-group -> vpc -> subnet -> filestorage volume -> POST /v1/clusters -> POST /v1/nodepools) is copied FAITHFULLY from gen-heavy-ske-upgrade (same paths/bodies/captures/polling/expect_status/groups); the upgrade steps are intentionally omitted. After RUNNING, the 5 aimlops precondition GETs run against the REAL cluster_id (expect 200, tolerate 4xx), then GET images -> image_id, then POST /v1/aimlops-platform (UNPROVEN body — first live attempt) -> capture release_id -> poll ready -> PUT update -> DELETE. FULL teardown in reverse mirrors gen-heavy-ske so nothing leaks. || POST /v1/aimlops-platform body is UNPROVEN/first-live: NO data/api_bodies.json entry exists; field set (release_name/cluster_id/image_id/namespace/description + resource sizing) is best-effort from knowledge/formal/resources+services/ai-ml__aimlops-platform.yaml semantics. expect_status is broad so the first exploratory run RECORDS the real response without hard-failing.",
       "steps": [
         {
