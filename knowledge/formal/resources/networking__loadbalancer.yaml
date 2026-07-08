@@ -281,7 +281,7 @@ resources:
     delete: {endpoint: "DELETE /v1/loadbalancers/{load-balancer.loadbalancer_id}/static-nats",
              json: {static_nat_id_list: ["{static_nat_id}"]},
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/loadbalancer/createloadbalancerpublicnatip (run 28835929967)
     source: {lifecycle: networking-loadbalancer-members-nat,
              steps: [static-nat-create, static-nat-delete]}
     notes: "createloadbalancerpublicnatip/deleteloadbalancerpublicnatip 커버. capture envelope $.static_nat.id는 api_docs response_example 기반 UNPROVEN. private-static-nats(createloadbalancerprivatenatip)는 private_nat_id + private_nat_ip_id가 필요 — private-nat IP 하위자원 모델이 없어 미배선 (owner 질문: private NAT IP 발급 경로).

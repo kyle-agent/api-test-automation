@@ -531,20 +531,19 @@
           "path": "/v1/resources",
           "service": "resourcemanager",
           "optional": true,
-          "params": {"resource_type": "kms", "page": 1, "page_size": 10},
+          "params": {"resource_type": "kms", "page": 0, "size": 10},
           "expect_status": [200, 400, 403, 404],
           "capture_soft": {
             "iam_srn": "$.resources[0].srn"
           },
-          "_note": "Soft-capture a KMS SRN (resource_type=kms filter confirmed 200 with 20 kms resources 2026-06-23). KMS SRN required because resource-based policy Action must match service — kms:* is confirmed valid. Without KMS filter, first resource might be vpc/secretsmanager/etc. which caused 400 UnSupportedActionInPolicy on prior runs. If 403 or empty, iam_srn stays unresolved -> b64-encode skipped -> placeholder SRN (catalog '*' key still covered)."
+          "_note": "Soft-capture a KMS SRN. FIXED 2026-07-08 (0x89 수사): resourcemanager 페이지네이션은 0-인덱스이고 크기 파라미터는 'size'다 — 종전 {page:1, page_size:10}은 (a) page_size가 무시되고(응답 echo size:20) (b) page=1이 '두 번째 페이지'라, 계정 kms 자원이 5개뿐인 현재 resources:[] 빈 페이지를 받아 캡처가 미스났다 (라이브 실측 2026-07-08: page=1 → count:5, n_items:0 / page=0 → 5건 + 실 srn). 2026-06-23의 '20 kms resources' 시절엔 21번째 이후 항목이 page=1에 있어 우연히 동작. KMS SRN 필수 이유: resource-based policy Action이 service와 일치해야 함 — kms:* 확정. 403/빈 페이지면 iam_srn 미해결 → 아래 b64 게이트가 lifecycle을 환경 스킵."
         },
         {
           "name": "b64-encode-iam-srn",
           "action": "b64_encode",
           "input": "{iam_srn}",
           "output": "iam_srn_b64",
-          "optional": true,
-          "_note": "Base64-encode the captured KMS SRN for use in /v1/resource-policies/{srn} path segments. REQUIRED: the iam gateway decodes {srn} path segments as base64. Mirrors b64-encode-srn in management__resourcemanager.json."
+          "_note": "Base64-encode the captured KMS SRN for /v1/resource-policies/{srn} path segments (iam gateway가 {srn} 세그먼트를 base64로 디코드; management__resourcemanager.json b64-encode-srn과 동일). NON-OPTIONAL GATE (FIXED 2026-07-08): optional이던 시절엔 iam_srn 캡처 미스 시 이 스텝이 조용히 continue → iam_srn_b64 미설정 → 경로에 리터럴 '{iam_srn_b64}' 송신 → 게이트웨이가 그 리터럴을 base64url 디코드(중괄호는 비알파벳으로 skip, 'iam_srn_b64' → 0x89 a9 bf b2 …) → 400 \"SRN decoding error: 'utf-8' codec can't decode byte 0x89 in position 0\" 가짜 실패 발생 (2026-07-08 라이브 런 실측; 산술 재현 검증됨). 이제 미해결 입력이면 엔진이 LifecycleSkip(깨끗한 환경 스킵, 선행 생성 자원 없음)으로 바꾼다 — 쓰레기 경로 호출 자체가 나가지 않는다."
         },
         {
           "name": "set-resource-policy",
@@ -565,7 +564,15 @@
           },
           "expect_status": [200, 201, 202],
           "cleanup": {"method": "DELETE", "path": "/v1/resource-policies/{iam_srn_b64}", "service": "iam"},
-          "_note": "setresourcepolicy — PUT /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23: kms:* action is valid for a KMS SRN. Creates a resource policy (group 'rp-real'; cleanup deletes it). Action changed from iam:* (400 UnSupportedActionInPolicy) to kms:* (200). Expect_status narrowed to [200,201,202]: we now have confirmed 2xx."
+          "_note": "setresourcepolicy — PUT /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23: kms:* action is valid for a KMS SRN. Creates a resource policy (group 'rp-real'; cleanup deletes it). Action changed from iam:* (400 UnSupportedActionInPolicy) to kms:* (200). Expect_status narrowed to [200,201,202]: we now have confirmed 2xx (strict 유지 = role verify 불변). 2026-07-08 런의 400 \"SRN decoding error … 0x89 in position 0\"는 제품결함도 b64 인코딩 누락도 아님 — list 캡처 미스(페이지네이션 버그)로 리터럴 플레이스홀더가 송신된 가짜 실패 (근본수리: list-kms-resources page=0/size + b64 스텝 non-optional 게이트; 각 스텝 note 참조). b64 경로 역학은 실 SRN으로 라이브 재검증됨 2026-07-08 (GET show가 b64 세그먼트를 원문 SRN으로 정확 복호, req-a3b1dd4b)."
+        },
+        {
+          "name": "show-resource-policy",
+          "method": "GET",
+          "path": "/v1/resource-policies/{iam_srn_b64}",
+          "group": "rp-real",
+          "expect_status": [200],
+          "_note": "showresourcepolicy — EXPLICIT GET /v1/resource-policies/{srn} on the REAL b64-encoded KMS SRN (iam_srn_b64) right after set-resource-policy created the policy. The probe-resource-policy-reads auto-seed below already fires this GET at runtime, but probe_reads steps are invisible to the static step->catalog union — this explicit strict-200 step closes that gap (COMPLETENESS-AUDIT-2026-07-08). CONFIRMED 200 2026-06-23 (same GET via the probe, policy present). Group rp-real gates it on setresourcepolicy success, so strict [200] never fires without the policy. (정정 2026-07-08: 종전 note의 '0 kms resources' 진단은 오진 — 실제로는 kms 자원 5개 존재, list의 page=1이 빈 두 번째 페이지였음. 수리 후 캡처 미스 시나리오는 b64 게이트의 LifecycleSkip으로 lifecycle 전체가 깨끗이 환경 스킵되므로 이 스텝은 placeholder로 발화하지 않는다. b64 경로 자체는 실 SRN GET으로 라이브 확인 — 404 'No Policy found with ID srn:e::…' = 세그먼트 복호 정상, req-a3b1dd4b.)"
         },
         {
           "name": "probe-resource-policy-reads",
@@ -774,7 +781,7 @@
       "id": "iam-readonly-shows",
       "service": "management/iam",
       "enabled": true,
-      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes 4 static id-bound GET gaps for read-only / list-discoverable IAM resources by the list->soft-capture->show idiom (the same pattern cloudcontrol uses for its list-discovered ids). access-keys and service-accounts have only list+show in the catalog (no create), so a synthetic id would be a guaranteed-404 dead read — instead we soft-capture a REAL id from the caller's own list and show it. account-users is shown via the account_id soft-captured from the caller's access-keys list (access_key.account_id) + a user id from the account-users list itself. Every step is optional with tolerant [200,400,403,404]: on an account with no access keys / service accounts the list is empty/403 and the dependent id segment stays a {placeholder} (normalizes to the catalog '*' key) so the show is still CALLED and the endpoint statically reachable. Envelopes grounded in data/api_docs.json response examples: accesskeylist $.access_keys[].{id,account_id}; listserviceaccount $.service_accounts[].id; listiamuser $.users[].id.",
+      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes 4 static id-bound GET gaps for read-only / list-discoverable IAM resources by the list->soft-capture->show idiom (the same pattern cloudcontrol uses for its list-discovered ids). +2 strict-200 bare global lists appended 2026-07-08 (listendpoints, listsamlprovider — COMPLETENESS-AUDIT-2026-07-08). access-keys and service-accounts have only list+show in the catalog (no create), so a synthetic id would be a guaranteed-404 dead read — instead we soft-capture a REAL id from the caller's own list and show it. account-users is shown via the account_id soft-captured from the caller's access-keys list (access_key.account_id) + a user id from the account-users list itself. Every step is optional with tolerant [200,400,403,404]: on an account with no access keys / service accounts the list is empty/403 and the dependent id segment stays a {placeholder} (normalizes to the catalog '*' key) so the show is still CALLED and the endpoint statically reachable. Envelopes grounded in data/api_docs.json response examples: accesskeylist $.access_keys[].{id,account_id}; listserviceaccount $.service_accounts[].id; listiamuser $.users[].id.",
       "steps": [
         {
           "name": "list-access-keys",
@@ -836,6 +843,20 @@
           "_note": "deletebulkiamuser (DELETE /v1/accounts/{account_id}/users/bulk). CONFIRMED 2026-06-24: empty user_ids array [] returns 204 (idempotent, no users deleted). account_id is soft-captured from list-access-keys (the caller's own real account id). This is NON-HEAVY because no IAM users are created or deleted — the empty array is a no-op. Covers the catalog key management/iam/deletebulkiamuser.",
           "json": {"user_ids": []},
           "expect_status": [200, 202, 204]
+        },
+        {
+          "name": "list-endpoints",
+          "method": "GET",
+          "path": "/v1/endpoints",
+          "expect_status": [200],
+          "_note": "listendpoints — GET /v1/endpoints (zero-param global read: the per-region service endpoint directory; docs declare no parameters at all). LIVE-CONFIRMED 200 2026-07-08 (returns $.endpoints[] with region/service_name/url entries). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
+        },
+        {
+          "name": "list-saml-providers",
+          "method": "GET",
+          "path": "/v1/saml-providers",
+          "expect_status": [200],
+          "_note": "listsamlprovider — GET /v1/saml-providers (zero-required-param global list; size/page/sort/federation_type/saml_provider_name all optional). SAML WRITES stay in the heavy probe lane (iam-credentials-heavy) — this is the bare list only. LIVE-CONFIRMED 200 2026-07-08 (count 0, empty saml_providers[] — empty-list 200 is the expected steady state on this account). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         }
       ]
     }

@@ -62,9 +62,15 @@ class FakeClient:
     for matching but recorded verbatim), records DELETE/PUT, and lets a test
     delete an item from a list to model real teardown across rounds."""
 
-    def __init__(self, lists=None, delete_status=None, region="kr-west1"):
+    def __init__(self, lists=None, delete_status=None, region="kr-west1",
+                 objects=None):
         # lists: {path_without_query: [items]}
         self.lists = lists or {}
+        # objects: {path_without_query: raw_body_dict} — single-object GETs
+        # (e.g. the LB static-nats show endpoint, which returns
+        # {"static_nat": {...}} rather than a collection) take priority over
+        # the items-list wrapping below.
+        self.objects = objects or {}
         # delete_status: {path_prefix: status} — first match wins; default 204
         self.delete_status = delete_status or {}
         self.calls: list[tuple[str, str]] = []   # (METHOD, full_path)
@@ -83,7 +89,10 @@ class FakeClient:
     # -- verbs --------------------------------------------------------------
     def get(self, path, service=None, **kw):
         self.calls.append(("GET", path))
-        return _Resp(200, {"items": list(self.lists.get(self._key(path), []))})
+        key = self._key(path)
+        if key in self.objects:
+            return _Resp(200, self.objects[key])
+        return _Resp(200, {"items": list(self.lists.get(key, []))})
 
     def delete(self, path, service=None, json=None, **kw):
         self.calls.append(("DELETE", path))
@@ -380,8 +389,231 @@ def test_no_progress_predicate_drives_convergence():
 
 
 # --------------------------------------------------------------------------- #
+# Async-deletion in-progress handling (2026-07-03 TGW incident, run 28648339307)
+# — a 202-accepted transit-gateway lists as DELETING for minutes and 409-blocks
+# its VPC; the sweep must GRANT another bounded round, not converge. The PF-09
+# scheduled-deletion behaviour (KMS/secrets pending their waiting window still
+# converge) is locked alongside.
+# --------------------------------------------------------------------------- #
+def test_async_deleting_item_counts_in_progress_and_blocks_converge_cache():
+    tgw = _owned("regrtgw-drain", id="tgw-1", state="DELETING")
+    client = FakeClient(lists={"/v1/transit-gateways": [tgw]})
+    recon._INPROGRESS_THIS_ROUND[0] = 0
+    picked = recon._select(client, "vpc", "/v1/transit-gateways",
+                           name_prefixes=("regrtgw",))
+    assert picked, "the DELETING TGW is still owned + listed"
+    assert recon._INPROGRESS_THIS_ROUND[0] == 1, \
+        "a transitional DELETING item must count as in-progress"
+    assert ("vpc", "/v1/transit-gateways") not in recon._CONVERGED, \
+        "a collection with an async-deleting item must NOT converge-cache " \
+        "(it will change once the delete lands)"
+
+
+def test_scheduled_deletion_still_converges_pf09():
+    """A KMS key pending its scheduled-deletion window must NOT grant rounds —
+    the PF-09 convergence the existing sweep relies on stays intact."""
+    kms = _owned("regrkms-x", id="kms-1", state="To_Be_Terminated")
+    client = FakeClient(lists={"/v1/kms/transit": [kms]})
+    recon._INPROGRESS_THIS_ROUND[0] = 0
+    recon._select(client, "kms", "/v1/kms/transit", name_prefixes=("regr",))
+    assert recon._INPROGRESS_THIS_ROUND[0] == 0, \
+        "scheduled (PF-09) deletion is NOT async-in-progress"
+    assert ("kms", "/v1/kms/transit") in recon._CONVERGED, \
+        "a pending-deletion-only collection still converge-caches"
+
+
+def test_round_verdict_grants_round_for_inprogress_only():
+    """The exact incident shape: genuine=0, reported=1 (inflated by a truthy
+    non-2xx), one item mid-async-deletion → the loop must CONTINUE. Without
+    in-progress items the same shape converges (PF-09 re-delete unaffected)."""
+    assert recon._round_verdict(1, 5, 0) == "continue"
+    assert recon._round_verdict(0, 1, 1) == "grant-inprog"   # the incident
+    assert recon._round_verdict(0, 1, 0) == "stop"           # PF-09 converges
+    assert recon._round_verdict(0, 0, 0) == "stop"
+    assert recon._round_verdict(2, 2, 3) == "continue"       # progress wins
+
+
+def test_tgw_vpc_connections_deleted_before_tgw():
+    """The TGW pass must enumerate the NESTED per-TGW connection list (the flat
+    one is 403 live) and delete connections BEFORE the TGW — a TGW delete does
+    not reliably cascade its connection (live 2026-07-04: connection DELETING
+    for hours while the TGW sat EDITING, pinning the shared VPC)."""
+    tgw = _owned("regrtgw-a", id="tgw-a", state="ACTIVE")
+    conn = {"id": "conn-1", "vpc_id": "vpc-9", "state": "ACTIVE"}
+    client = FakeClient(lists={
+        "/v1/transit-gateways": [tgw],
+        "/v1/transit-gateways/tgw-a/vpc-connections": [conn],
+    })
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    ci = next((i for i, p in enumerate(seq)
+               if p == "/v1/transit-gateways/tgw-a/vpc-connections/conn-1"), -1)
+    ti = next((i for i, p in enumerate(seq)
+               if p == "/v1/transit-gateways/tgw-a"), -1)
+    assert ci >= 0, "the TGW's vpc-connection must be deleted"
+    assert ti >= 0, "the TGW itself must still be deleted"
+    assert ci < ti, f"connection must go before the TGW: conn@{ci} tgw@{ti}"
+
+
+def test_deleting_tgw_not_redeleted_and_counts_in_progress():
+    """A TGW (and its connection) already in DELETING must not be re-DELETEd
+    (no-op noise) and must count as in-progress so the round loop waits."""
+    tgw = _owned("regrtgw-d", id="tgw-d", state="DELETING")
+    conn = {"id": "conn-2", "vpc_id": "vpc-9", "state": "DELETING"}
+    client = FakeClient(lists={
+        "/v1/transit-gateways": [tgw],
+        "/v1/transit-gateways/tgw-d/vpc-connections": [conn],
+    })
+    recon._INPROGRESS_THIS_ROUND[0] = 0
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    assert "/v1/transit-gateways/tgw-d" not in seq, \
+        "a DELETING TGW must not be re-deleted"
+    assert not any("conn-2" in p for p in seq), \
+        "a DELETING connection must not be re-deleted"
+    assert recon._INPROGRESS_THIS_ROUND[0] >= 2, \
+        "both the TGW and its connection count as in-progress"
+
+
+def test_is_tgw_settling_predicate():
+    """CREATING/EDITING are transitional-not-yet-deletable; ACTIVE/ERROR are
+    the only DELETE-acceptable states (live error string: 'Transit Gateway
+    state is not deletable state(Active, Error)'); an already-DELETING item is
+    left to _is_async_deleting, not double-counted here."""
+    assert recon._is_tgw_settling({"state": "EDITING"})
+    assert recon._is_tgw_settling({"state": "CREATING"})
+    assert not recon._is_tgw_settling({"state": "ACTIVE"})
+    assert not recon._is_tgw_settling({"state": "ERROR"})
+    assert not recon._is_tgw_settling({"state": "DELETING"})  # _is_async_deleting's turn
+    assert not recon._is_tgw_settling({})
+
+
+def test_editing_tgw_delete_skipped_and_counts_in_progress():
+    """REPAIR 2026-07-07 (HB4b-2 item 5): a TGW settling in EDITING (e.g. right
+    after its own create, or after a vpc-connection create/delete flips it back
+    from ACTIVE) must NOT have its DELETE attempted this round — it would just
+    400 'not deletable state(Active, Error)', and unlike DELETING that 400 was
+    never counted in-progress, so a sweep whose only remaining owned item was
+    such a TGW converged ('stop') one round before it would have settled
+    (2026-07-06 HB4b run 28827996068: final sweep left the TGW+VPC pair for a
+    human FORCE re-sweep hours later)."""
+    tgw = _owned("regrtgw-e", id="tgw-e", state="EDITING")
+    client = FakeClient(lists={
+        "/v1/transit-gateways": [tgw],
+        "/v1/transit-gateways/tgw-e/vpc-connections": [],
+    })
+    recon._INPROGRESS_THIS_ROUND[0] = 0
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    assert "/v1/transit-gateways/tgw-e" not in seq, \
+        "an EDITING TGW's doomed-to-400 DELETE must not even be attempted"
+    assert recon._INPROGRESS_THIS_ROUND[0] >= 1, \
+        "the settling TGW must count as in-progress so the round loop waits " \
+        "instead of converging early"
+
+
+def test_vpc_409_with_detectable_holder_single_attempt():
+    """A VPC whose delete 409s while an owned TGW's vpc-connection still points
+    at it must be attempted ONCE (with a blocked-by line + in-progress defer),
+    not 6 times — the noisy-409 shape from the 2026-07-03 FORCE cleanup log."""
+    vpc = _owned("regrvpcsh-x", id="vpc-9")
+    tgw = _owned("regrtgw-h", id="tgw-h", state="DELETING")
+    conn = {"id": "conn-3", "vpc_id": "vpc-9", "state": "DELETING"}
+    client = FakeClient(
+        lists={"/v1/vpcs": [vpc], "/v1/transit-gateways": [tgw],
+               "/v1/transit-gateways/tgw-h/vpc-connections": [conn]},
+        delete_status={"/v1/vpcs": 409},
+    )
+    recon._INPROGRESS_THIS_ROUND[0] = 0
+    recon.run_sweep(client)
+    vpc_deletes = [p for p in _delete_paths(client) if p == "/v1/vpcs/vpc-9"]
+    assert len(vpc_deletes) == 1, \
+        f"one attempt then defer when the holder is detectable: {vpc_deletes}"
+    assert recon._INPROGRESS_THIS_ROUND[0] >= 1, \
+        "the deferred VPC must arm the in-progress round grant"
+
+
+def test_vpc_409_without_holder_keeps_purge_retry():
+    """No detectable holder → the existing purge-children + retry loop is kept
+    (un-prefixed child leaks still get reaped the old way)."""
+    vpc = _owned("regrvpc-nh", id="vpc-nh")
+    client = FakeClient(
+        lists={"/v1/vpcs": [vpc]},
+        delete_status={"/v1/vpcs": 409},
+    )
+    recon.run_sweep(client)
+    vpc_deletes = [p for p in _delete_paths(client) if p == "/v1/vpcs/vpc-nh"]
+    assert len(vpc_deletes) > 1, \
+        "without a detectable holder the retry loop must still run"
+
+
+# --------------------------------------------------------------------------- #
 # Ownership guard is NOT weakened (lock the invariant alongside the new logic)
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# HB4d item 2 — LB static-NAT reaped BEFORE the load balancer itself. Live
+# incident (run 28835929967): static-nat-create (201) fires, then an
+# immediate delete 400s `StaticNatNotDeletableState` (CREATING) — an
+# interrupted run leaks the NAT, and the account-wide sweep used to delete
+# the LB directly, which 409s "associated" while the NAT is still attached,
+# stranding the LB + its publicip (ATTACHED) + the shared VPC.
+# --------------------------------------------------------------------------- #
+def test_lb_static_nat_deleted_before_loadbalancer():
+    lb = _owned("regrlb-a", id="lb-a", vpc_id="id-regrvpcsh-a")
+    vpc = _owned("regrvpcsh-a", id="id-regrvpcsh-a")
+    client = FakeClient(
+        lists={"/v1/loadbalancers": [lb], "/v1/vpcs": [vpc]},
+        objects={"/v1/loadbalancers/lb-a/static-nats":
+                 {"static_nat": {"state": "ACTIVE", "publicip_id": "pip-1",
+                                 "external_ip_address": "1.2.3.4"}}},
+    )
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    nat_i = next((i for i, p in enumerate(seq)
+                  if p == "/v1/loadbalancers/lb-a/static-nats"), -1)
+    lb_i = next((i for i, p in enumerate(seq)
+                 if p == "/v1/loadbalancers/lb-a"), -1)
+    assert nat_i >= 0, "an attached static-NAT must be reaped"
+    assert lb_i >= 0, "the load balancer delete must still be issued"
+    assert nat_i < lb_i, (
+        f"static-nat delete must precede the LB delete: nat@{nat_i} lb@{lb_i}")
+
+
+def test_lb_static_nat_skipped_when_none_attached():
+    """An LB reporting an empty static_nat state must NOT get a no-op DELETE
+    against the static-nats collection."""
+    lb = _owned("regrlb-b", id="lb-b", vpc_id="id-regrvpcsh-b")
+    vpc = _owned("regrvpcsh-b", id="id-regrvpcsh-b")
+    client = FakeClient(
+        lists={"/v1/loadbalancers": [lb], "/v1/vpcs": [vpc]},
+        objects={"/v1/loadbalancers/lb-b/static-nats":
+                 {"static_nat": {"state": "", "publicip_id": None,
+                                 "external_ip_address": ""}}},
+    )
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    assert not any("static-nats" in p for p in seq), \
+        "no static-NAT attached -> no DELETE against the static-nats endpoint"
+    assert any(p == "/v1/loadbalancers/lb-b" for p in seq), \
+        "the load balancer delete must still be issued"
+
+
+def test_lb_static_nat_retries_on_400_then_gives_up():
+    """A static-NAT stuck CREATING across every retry must not block the sweep
+    forever — after retries are exhausted, reaping gives up (returns False) and
+    the caller still attempts the LB delete this round (next round retries)."""
+    client = FakeClient(
+        objects={"/v1/loadbalancers/lb-c/static-nats":
+                 {"static_nat": {"state": "CREATING"}}},
+        delete_status={"/v1/loadbalancers/lb-c/static-nats": 400},
+    )
+    ok = recon._reap_lb_static_nat(client, "lb-c")
+    assert ok is False
+    dels = [p for (m, p) in client.calls
+            if m == "DELETE" and p == "/v1/loadbalancers/lb-c/static-nats"]
+    assert len(dels) == 6, f"expected the bounded retry budget, got {dels}"
+
+
 def test_unowned_items_never_selected():
     """Items with neither owner tag nor a regr* name must never be selected for
     deletion by any of the new passes."""

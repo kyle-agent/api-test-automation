@@ -15,11 +15,15 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            404
           ],
+          "optional": true,
+          "group": "cloud-ml",
           "capture": {
             "image_id": "$.images[0].id"
-          }
+          },
+          "_note": "SCR 활성화 게이트 — 활성화 후 strict 승급 (2026-07-08 확정): 이 계정은 cloud-ml 전면 404 (라이브 재확인 2026-07-08 GET /v1/cloud-ml/images → 404 Spring Not Found). 404 허용(optional+관용) + hard capture 유지가 게이트 감지기: 404(또는 빈 images)면 image_id capture miss → group 'cloud-ml' 실패 → 같은 그룹의 create/verify/delete-cloud-ml이 함께 스킵돼 리터럴 {image_id}/{cloud_ml_id} 실행이 없다. mutating 스텝 expect는 그대로(strict) — 관용화는 이 read 1개뿐이라 role=verify 유지(probe 강등 없음)."
         },
         {
           "name": "create-keypair",
@@ -362,6 +366,25 @@
           "_note": "id-bound cluster precondition GET — cost/resource estimate for a cloud-ml stack on this cluster. expect 200; tolerate 4xx (may need query params, UNPROVEN). Closes GAP-get-id GET /v1/cloud-ml/clusters/{cluster_id}/estimate."
         },
         {
+          "name": "cloudml-check-name-and-domain-duplication",
+          "service": "cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml/check-duplication",
+          "params": {
+            "name": "regr-cloudml-{ualpha}",
+            "domain_name": "regr-cloudml-{ualpha}"
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "cloud-ml-precond",
+          "_note": "GAP 편입 2026-07-08 (ai-ml/cloud-ml/checkduplicationnameanddomainname, 마지막 cloud-ml 전역-read gap — COMPLETENESS-AUDIT-2026-07-08). create-cloud-ml 직전 pre-check: create body의 cloud_ml_name/domain_name과 동일 값(regr-cloudml-{ualpha}) 중복 조회. 쿼리는 docs상 name/domain_name 둘 다 optional('Please use either the name or domain_name query parameter' — 최소 1개 사용). live 2026-07-08: name/domain_name/무쿼리 전 조합 404 (Spring 기본 Not Found) — 쿼리 문제 아님: 같은 계정에서 GET /v1/cloud-ml/images도 404 = knowledge/formal/resources/ai-ml__cloud-ml.yaml의 'SCR-credential-gated — GET /v1/cloud-ml/images 404'와 동일 계정/크리덴셜 게이트 클래스. 따라서 strict 불가 → 관용 [200,400,403,404]+optional (owner 규정: 4xx 조사 후 해결 불가 시 관용+_note). SCR 크리덴셜 활성화 후 이 체인 첫 라이브 런에서 200 확인되면 strict 승급."
+        },
+        {
           "name": "create-cloud-ml",
           "service": "cloud-ml",
           "method": "POST",
@@ -402,6 +425,8 @@
             201,
             202
           ],
+          "group": "cloud-ml",
+          "_comment": "SCR 활성화 게이트 (2026-07-08 확정): group 'cloud-ml' 동승 — 감지기(create-cloudml-image)가 404/빈 목록이면 스킵. strict 유지(mutating 관용화 없음 → role=verify 보존); 게이트 해제 후엔 기존과 동일하게 실행.",
           "capture": {
             "cloud_ml_id": "$.id"
           },
@@ -418,7 +443,9 @@
           "path": "/v1/cloud-ml/{cloud_ml_id}",
           "expect_status": [
             200
-          ]
+          ],
+          "group": "cloud-ml",
+          "_note": "SCR 활성화 게이트 (2026-07-08 확정): group 'cloud-ml' 동승 — create 스킵 시 함께 스킵(리터럴 {cloud_ml_id} GET 방지). strict 유지."
         },
         {
           "name": "delete-cloud-ml",
@@ -430,7 +457,9 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "cloud-ml",
+          "_note": "SCR 활성화 게이트 (2026-07-08 확정): group 'cloud-ml' 동승 — create가 스킵되면 지울 것도 없으므로 함께 스킵(리터럴 토큰 DELETE 404로 lifecycle을 죽이던 delete-custom-image 교훈과 동일 패턴). strict 유지."
         },
         {
           "name": "delete-ske-cluster",

@@ -5,9 +5,16 @@
 {% if coverage %}
   {% set fail_new = coverage.get('fail_new') or 0 %}
   {% set fail_known = coverage.get('fail_known') or 0 %}
-  <div class="verdict {{ 'bad' if fail_new else '' }}">
+  {% set snap_is_stale = snap_stale is defined and snap_stale %}
+  {# P2C-12: 48h+ 지난 스냅샷의 빨간 REGRESSIONS 배너가 '지금' 깨진 것처럼 읽혔다
+     (노후 칩만으로 부족). snap_stale(공통 컨텍스트, common.snapshot_age 재사용)이면
+     경고 톤 대신 기존 중립 회색 톤(.verdict.none)으로 낮추고, "N일 전 스냅샷 기준"을
+     배너 본문 맨 앞에 병기한다. 신선한 스냅샷의 빨강/초록 판정은 그대로. #}
+  <div class="verdict {{ 'none' if snap_is_stale else ('bad' if fail_new else '') }}">
     <span class="pip"></span>
     <div>
+      {% if snap_is_stale %}<b>{{ snap_age or '48시간 이상 전' }} 스냅샷 기준 —</b>
+      {% endif %}
       {% if fail_new %}
       <b>REGRESSIONS — 신규 fail {{ fail_new }}건.</b>
       마지막 스냅샷에서 새로 깨진 5xx/auth가 있습니다 — Report › Triage에서 분류를 확인하세요.
@@ -16,35 +23,39 @@
       마지막 스냅샷에서 새로 깨진 5xx/auth 없음, known-red {{ fail_known }}.
       다음 레버: 쓰기 커버리지(cov_op {{ coverage.get('cov_op','-') }}%).
       {% endif %}
+      <span class="muted small">— 스냅샷 {{ coverage.get('ts','') }}{% if snap_age is defined and snap_age %}
+        <b>({{ snap_age }})</b>{% endif %}</span>
+      {% if snap_stale is defined and snap_stale %}<span class="chip s-reached"
+        title="발행 후 48시간 이상 경과 — 이 배너는 현재 상태가 아니라 그 시점의 결과입니다">노후 스냅샷</span>{% endif %}
     </div>
   </div>
 
   <div class="tiles">
-    <div class="card tile">
+    <div class="card tile" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체. 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)">
       <div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
       <div class="k">write-op 커버리지 (cov_op)</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_op',0) }}%;background:var(--amber)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile">
+    <div class="card tile" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율">
       <div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
       <div class="k">GET 커버리지 (cov_get)</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_get',0) }}%;background:var(--green)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile">
+    <div class="card tile" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인(누적, reachability waiver는 도달충족 포함) = covered. 헤드라인 지표">
       <div class="v">{{ coverage.get('cov_c3','-') }}%</div>
       <div class="k">누적 C3 검증</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--blue)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile">
+    <div class="card tile" title="C1 도달가능(Plannable) — enabled 시나리오가 정적으로 도달 가능한 엔드포인트(라이브 호출 없음). 저작 진척 지표">
       <div class="v">{{ coverage.get('reachable_pct','-') }}%</div>
       <div class="k">C1 static reachable</div>
       <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
       <div class="goal">전체 {{ coverage.get('total','-') }} API</div>
     </div>
-    <div class="card tile">
+    <div class="card tile" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보">
       <div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
       <div class="k">신규 fail</div>
       <div class="goal" style="margin-top:8px">{{ '회귀 발생 — Triage 확인' if fail_new else '회귀 없음' }}</div>
@@ -56,24 +67,27 @@
       git 원격 접근을 확인하세요.</div></div>
 {% endif %}
 
-<h2>파이프라인 <span class="hint">단계별 현황 — 클릭하면 해당 영역으로</span></h2>
+{# 2026-07-07 오너 결정: Catalog 칸 제거(4→3칸) — Modeling이 카탈로그를 흡수,
+   부제에 전체 API 분모(catalog_count)로 흡수를 표기. 인벤토리 참조는 상단 📖 카탈로그. #}
+<h2>파이프라인 <span class="hint">3단계 현황 — 클릭하면 해당 영역으로 (상단 네비와 동일)</span></h2>
 <div class="pipe">
-  <a class="pstage" href="/planning">
-    <div class="pl">Plan</div>
-    <div class="pv">{{ scenario_stats.total }}</div>
-    <div class="ps">시나리오 ({{ scenario_stats.enabled }} enabled ·
-      {{ scenario_stats.services }} 서비스)</div>
+  <a class="pstage" href="/planning/resources/map">
+    <div class="pl">Modeling</div>
+    <div class="pv">{{ model_stats.validated }}<span
+      style="font-size:13px;font-weight:600;color:var(--muted)">/{{ model_stats.nodes }}</span></div>
+    <div class="ps">전체 {{ catalog_count }} API의 테스트 모델 저작 — VALIDATED/전체 노드</div>
     <span class="chev">→</span>
   </a>
-  <a class="pstage" href="/testing">
-    <div class="pl">Run</div>
+  <a class="pstage" href="/testing/embed">
+    <div class="pl">Testing</div>
     <div class="pv">{{ running|length }}
       <span style="font-size:12px;font-weight:500;color:var(--muted)">진행 중</span></div>
-    <div class="ps">스케줄 {{ schedules|length }} · 오늘 실행 {{ runs_today }}</div>
+    <div class="ps">스케줄 {{ schedules|length }} · 오늘 실행 {{ runs_today }}{%
+      if stale_running %} · <span title="running/dispatched 상태로 24시간 이상 방치된 기록 — 죽은 워커/미회수 run일 가능성이 높아 '진행 중' 집계에서 제외">오래된 미회수 {{ stale_running|length }}</span>{% endif %}</div>
     <span class="chev">→</span>
   </a>
   <a class="pstage" href="/reporting">
-    <div class="pl">Report</div>
+    <div class="pl">Reporting</div>
     <div class="pv">{{ coverage.get('cov_c3','-') if coverage else '-' }}%</div>
     <div class="ps">C3 검증 · 신규 회귀 {{ (coverage.get('fail_new') or 0) if coverage else '-' }}</div>
   </a>

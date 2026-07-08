@@ -12,10 +12,12 @@
     service에서 유도한 <code>&lt;category&gt;__&lt;service&gt;.yaml</code>{% endif %}에
     저장합니다 (authoring 파이프라인: 검증 통과 시에만 반영 + 로컬 git 커밋).
     {% if not is_new %}고급 사용자용 raw 편집:
-    <a href="/planning/edit?path=knowledge/formal/resources/{{ file }}&find={{ node_id }}">원본 YAML 편집기</a>{% endif %}</p>
+    <a href="/planning/edit?path=knowledge/formal/resources/{{ file }}&find={{ node_id }}">원본 YAML 편집기</a>{% endif %}
+    · <a href="/ai/task-draft" title="이 서비스의 자원 task 정의를 AI가 초안 — drafts/ 검토용">AI 초안 →</a></p>
 </section>
 
 {% if not is_new %}
+<!--IA_STRIP_START-->{# 정적 데모 빌드(build_ia_demo)는 이 블록을 떼어낸다 — graph.js fetch 는 서버 필요 #}
 <section>
   <h2>의존 그래프 <span class="muted" style="font-size:13px;font-weight:400">— 이 노드의 의존(좌) · 피의존(우). 클릭=이동</span></h2>
   <div style="display:flex;gap:14px;font-size:12px;color:#90a4ba;flex-wrap:wrap;margin-bottom:6px">
@@ -33,6 +35,7 @@ ResourceGraph.load(document.getElementById("dep-svg"),
   "/planning/resources/graph.json?focus={{ node_id }}",
   {onClick:function(id){location.href="/planning/resources/"+encodeURIComponent(id);}});
 </script>
+<!--IA_STRIP_END-->
 {% endif %}
 
 <datalist id="node-ids">
@@ -74,6 +77,19 @@ ResourceGraph.load(document.getElementById("dep-svg"),
 
 <section>
   <h2>전제조건 (requires) — 행 추가식</h2>
+  {% if unresolved %}
+  <p style="background:#fff5f5;border:1px solid #ffc9c9;color:#c92a2a;padding:8px 12px;border-radius:8px;font-size:12.5px">
+    ⚠ <b>미해결 참조: {{ unresolved|join(', ') }}</b> — 아래 requires 가 모델에 없는 노드를
+    가리킵니다. 그 대상을 먼저 모델링하거나 id 를 고치세요 (대상 칸은 자동완성 지원). 저장은
+    되지만 지도/그래프에서 이 노드는 <b>불완전</b>으로 표시됩니다.
+  </p>
+  {% endif %}
+  <p class="muted" style="font-size:12px;margin:0 0 8px">
+    ↓ 이 노드를 <b>require 하는 노드 ({{ dependents|length }})</b> —
+    requires 를 바꾸면 이들에 영향:
+    {% if dependents %}{% for d in dependents %}<a href="/planning/resources/{{ d }}">{{ d }}</a>{% if not loop.last %} · {% endif %}{% endfor %}{% else %}<span class="faint">없음</span>{% endif %}
+    <span class="faint">(위 "의존 그래프"에서 좌=상류·우=하류로 시각 확인)</span>
+  </p>
   <p class="muted">type: <b>ref</b>(단일 의존) · <b>count</b>(다중성, 예: vpc×2) ·
     <b>one_of</b>(OR-의존 — 대상에 콤마로 대안 나열, 항목은 <code>id</code> 또는
     <code>id:use</code> 예: <code>load-balancer, server:ip</code>).

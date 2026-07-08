@@ -1,7 +1,14 @@
 ---
-status: draft
+status: superseded (드래프트 설계 — 1.0 의존-DAG 스케줄러로 실현됨)
 for: all
+superseded_by: CAMPAIGN-C3-100.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 이 드래프트가 제안한 병렬화는 **1.0 의존-DAG
+> 스케줄러**(closure → shared-roots → topological-waves)로 일반화·구현됐다 —
+> 설계·측정 정본: [`docs/scheduler-system.md`](../../scheduler-system.md) +
+> `docs/decisions/` ADR. 실행 관점의 현행 작업은
+> [`CAMPAIGN-C3-100.md`](CAMPAIGN-C3-100.md)가 정본.
 
 # Parallel execution plan — staged foundations + per-VPC lanes (DRAFT)
 

@@ -2,8 +2,6 @@
 {% block title %}Validate — SCP API Regression{% endblock %}
 {% block content %}
 
-{% include "_plan_steps.html" %}
-
 <h2>④ Validate <span class="hint">합성된 lifecycle 정합성 정적 검증 — <code>python -m regression.scenarios.validate</code> (live 호출 없음)</span></h2>
 
 {% if result.error %}
@@ -52,7 +50,7 @@
 {% endif %}
 
 <p class="small muted" style="margin-top:14px">
-  <a href="/planning?step=compose">← Compose</a> 단계에서 합성한 lifecycle이 검증 대상입니다.
-  결과가 깨끗해야 RUN 단계로 보냅니다.</p>
+  <a href="/planning/resources/compose">← 합성(Modeling ▸ Compose)</a>에서 만든 lifecycle이 검증 대상입니다.
+  결과가 깨끗해야 Testing 단계로 보냅니다.</p>
 
 {% endblock %}

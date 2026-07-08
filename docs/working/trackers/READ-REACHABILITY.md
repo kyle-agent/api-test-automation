@@ -1,7 +1,13 @@
 ---
-status: active
+status: superseded (2026-06-18 생성 리포트 — 재생성 가능: python -m spec.read_reachability)
 for: coverage
+superseded_by: ../plans/CAMPAIGN-C3-100.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04, 일자 스냅샷).** 이 리포트는 언제든
+> `python -m spec.read_reachability`로 **재생성**할 수 있는 정적 조인 산출물이며,
+> 갭 작업의 현행 정본은 [`../plans/CAMPAIGN-C3-100.md`](../plans/CAMPAIGN-C3-100.md)다.
+> 아래는 2026-06-18 생성분의 역사 기록.
 
 # READ-REACHABILITY — id-bound GET reachability from the resource model
 

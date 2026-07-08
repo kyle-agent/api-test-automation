@@ -3,7 +3,10 @@
     {
       "id": "networking-security-group-update",
       "service": "networking/security-group",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "networking-security-group",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 setsecuritygroup 이관 완료(set-sg).",
       "_note": "VALIDATED 2026-06-23 (all steps 2xx LIVE). Covers setsecuritygroup + listsecuritygrouprules. KEY FACTS: (1) setsecuritygroup body is {description, loggable} ONLY — 'name' is NOT valid (confirmed 200 without name; 400 with name). (2) listsecuritygrouprules requires security_group_id as REQUIRED query param (400 without, 200 with). (3) SGs are account/region-scoped — no VPC needed. (4) delete-sg returns 204 synchronously. Together with networking-security-group in scenarios.json, this achieves 9/9 coverage.",
       "steps": [
         {

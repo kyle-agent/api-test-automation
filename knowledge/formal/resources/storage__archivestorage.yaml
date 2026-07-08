@@ -83,6 +83,7 @@ resources:
     delete: {endpoint: "DELETE /v1/buckets/{bucket_id}", destructive: true,
              expect_status: [200, 202, 204, 400, 403, 404, 409], optional: true}
     provenance: docs
+    gated: entitlement-403  # 401 — scp-archivestorage_hmac not in this account catalog (owner: reachability-only)
     source: {lifecycle: archivestorage-bucket,
              steps: [create-bucket, show-bucket, set-bucket-versioning, set-bucket-encryption,
                      recover-objects, recover-object-versions, delete-bucket-objects,
@@ -130,6 +131,7 @@ resources:
          expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
          note: "reachability-only (owner): access-tested, 4xx tolerated. PUT, no path id, no documented body (api_docs body=[]) → empty {}; cancels an in-flight recovery history, 4xx when none running."}
     provenance: docs
+    gated: entitlement-403  # 401 — scp-archivestorage_hmac not in this account catalog (owner: reachability-only)
     source: {lifecycle: archivestorage-archiving-policy,
              steps: [create-archiving-policy, show-archiving-policy, set-archiving-policy,
                      set-archiving-policy-state, cancel-archiving, cancel-recovery]}

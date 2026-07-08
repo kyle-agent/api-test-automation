@@ -1,7 +1,13 @@
 ---
-status: active
+status: superseded (2026-06-17 측정 스냅샷 — 수치 stale; 재생성: python -m tools.catalog_status)
 for: coverage
+superseded_by: ../plans/CAMPAIGN-C3-100.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04, 일자 스냅샷).** 아래 수치는 2026-06-17 측정분으로
+> **stale**하다 (감사 C11 — 예: VALIDATED 131/275는 현재 165 VALIDATED, CONTEXT
+> 07-04). 최신 롤업은 `python -m tools.catalog_status`로 **재생성**하고, 현행
+> 커버리지 작업 정본은 [`../plans/CAMPAIGN-C3-100.md`](../plans/CAMPAIGN-C3-100.md)다.
 
 # CATALOG-VALIDATION-STATUS.md — 검증 되었는지 보고 (verification track)
 

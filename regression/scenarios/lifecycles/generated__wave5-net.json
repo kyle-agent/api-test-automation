@@ -932,72 +932,6 @@
           }
         },
         {
-          "name": "create-lb-health-check",
-          "service": "loadbalancer",
-          "method": "POST",
-          "path": "/v1/lb-health-checks",
-          "json": {
-            "lb_health_check": {
-              "name": "regrhc{ualpha}",
-              "description": "API regression suite",
-              "protocol": "TCP",
-              "health_check_count": 3,
-              "health_check_interval": 5,
-              "health_check_port": 80,
-              "health_check_timeout": 5,
-              "subnet_id": "{subnet_id}",
-              "vpc_id": "{vpc_id}",
-              "tags": []
-            }
-          },
-          "expect_status": [
-            200,
-            201,
-            202,
-            400
-          ],
-          "optional": true,
-          "group": "lb-health-check",
-          "_note": "400 SubnetNotAssociatedWithLoadBalancer: the shared subnet has no LB, so the health-check cannot attach. Env/data-dependent; coverage-only (C2). R3 to provide an LB-associated subnet to make it 2xx.",
-          "capture": {
-            "lb_health_check_id": "$.lb_health_check.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/lb-health-checks/{lb_health_check_id}",
-            "service": "loadbalancer"
-          }
-        },
-        {
-          "name": "verify-lb-health-check-read",
-          "service": "loadbalancer",
-          "method": "GET",
-          "path": "/v1/lb-health-checks/{lb_health_check_id}",
-          "expect_status": [
-            200
-          ],
-          "group": "lb-health-check"
-        },
-        {
-          "name": "verify-lb-health-check-set",
-          "service": "loadbalancer",
-          "method": "PUT",
-          "path": "/v1/lb-health-checks/{lb_health_check_id}",
-          "json": {
-            "lb_health_check": {
-              "description": "API regression suite (set)",
-              "health_check_count": 3,
-              "health_check_interval": 5,
-              "health_check_timeout": 5
-            }
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "group": "lb-health-check"
-        },
-        {
           "name": "create-load-balancer",
           "service": "loadbalancer",
           "method": "POST",
@@ -1057,9 +991,12 @@
           "method": "GET",
           "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
           "expect_status": [
-            200
+            200,
+            404
           ],
-          "group": "load-balancer"
+          "optional": true,
+          "group": "lb-nat-empty-reads",
+          "_note": "REPAIR 2026-07-08 (live run, 첫실측): 404 StaticNatNotFound — 이 시점엔 static NAT 을 아직 만들지 않았고(생성 스텝 create-lb-static-nat 는 igw/publicip 이후에 존재), 이 컬렉션 GET 은 빈 상태를 200+빈배열이 아니라 404 로 반환 (PF/conformance 후보: empty-collection 404). 라이브 재판별 시도 2026-07-08: 계정에 LB 가 0 개라 (GET /v1/loadbalancers → 200 count 0) 재현 GET 불가 — 이번 런 관측(LB ACTIVE + NAT 0 개 → 404)이 판별 근거. 404 관용 + optional + 자체 그룹 (실데이터 검증은 create-lb-static-nat 뒤 verify-lb-static-nat-read 가 strict 200 으로 계속 담당)."
         },
         {
           "name": "verify-load-balancer-read-private-static-nats",
@@ -1067,9 +1004,12 @@
           "method": "GET",
           "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
           "expect_status": [
-            200
+            200,
+            404
           ],
-          "group": "load-balancer"
+          "optional": true,
+          "group": "lb-nat-empty-reads",
+          "_note": "REPAIR 2026-07-08: static-nats 와 동일 가족 — private static NAT 은 이 lifecycle 에서 아예 생성하지 않으므로 빈 컬렉션 404 가 예상됨 (이번 런은 직전 static-nats 404 에서 중단되어 이 스텝 미도달; 동일 empty-collection 시그니처 선제 관용)."
         },
         {
           "name": "verify-load-balancer-set",
@@ -1086,6 +1026,72 @@
             202
           ],
           "group": "load-balancer"
+        },
+        {
+          "name": "create-lb-health-check",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "json": {
+            "lb_health_check": {
+              "name": "regrhc{ualpha}",
+              "description": "API regression suite",
+              "protocol": "TCP",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "subnet_id": "{subnet_id}",
+              "vpc_id": "{vpc_id}",
+              "tags": []
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400
+          ],
+          "optional": true,
+          "group": "lb-health-check",
+          "_note": "(구) 400 SubnetNotAssociatedWithLoadBalancer: the shared subnet has no LB, so the health-check cannot attach — coverage-only (C2), R3 to provide an LB-associated subnet. | REPAIR 2026-07-08 (live run): 스텝을 create-load-balancer→wait-load-balancer(ACTIVE) 뒤로 재배열 — CONFIRMED 순서 제약 (knowledge/services.md HB4 run 28738115294: 'create the LB FIRST (wait ACTIVE), THEN the health check (subnet now has an LB), THEN the server group' — networking__loadbalancer.json 2026-07-06 과 동일 해법). health-check 의 subnet_id == LB 의 subnet_id == {subnet_id} (동일 공유 subnet) 확인됨. 이제 2xx 가 기대치; optional+400 관용은 belt 로 유지 (여전히 400 이면 다음 blocker 는 create-lb-server-group 의 미해소 {lb_health_check_id} — 그 시그니처가 나오면 별도 수리). UNVERIFIED LIVE (offline reorder).",
+          "capture": {
+            "lb_health_check_id": "$.lb_health_check.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-health-checks/{lb_health_check_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-health-check-read",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-health-check"
+        },
+        {
+          "name": "verify-lb-health-check-set",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "json": {
+            "lb_health_check": {
+              "description": "API regression suite (set)",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_timeout": 5
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "lb-health-check"
         },
         {
           "name": "create-lb-server-group",

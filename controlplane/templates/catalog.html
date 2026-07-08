@@ -5,9 +5,12 @@
 <section>
   <h2>Catalog › API 인벤토리
     <span class="hint">읽기 전용 — 그래프 이전의 전체 목록</span></h2>
+  <p class="muted small" style="margin:2px 0 8px">📌 <b>Modeling으로 통합됨</b> — 이 화면은
+    전체 인벤토리 참조용입니다. 서비스별 모델됨/미모델 현황과 저작은
+    <a href="/planning/resources/map">Modeling</a>에서.</p>
   <p class="muted">Samsung Cloud Platform Open API 전체 엔드포인트
     <b>{{ total }}</b>개를 카테고리 ▸ 서비스로 묶어 보여줍니다. 각 행은
-    <code>METHOD path</code>. 서비스 헤더의 <b>정의 편집</b> 링크로
+    <code>METHOD path</code>. 서비스 헤더의 <b>✏️ 테스트 모델 편집</b> 링크로
     Modeling 노드 에디터로 바로 이동합니다 (자원 모델로 매핑된 서비스는
     그 노드, 아니면 service 프리필).</p>
   <div class="cards">
@@ -32,9 +35,16 @@
 </section>
 {% endif %}
 
+<style>
+  /* P2-7: 카테고리 기본 접힘 — 검색 중(body.filtering)엔 접힘 무시하고 매치를 펼친다 */
+  .cat-block h2.cat-h{cursor:pointer;user-select:none}
+  .cat-block h2.cat-h .caret{color:var(--muted);font-size:11px;width:14px;display:inline-block}
+  body:not(.filtering) .cat-block.collapsed .svc-block{display:none}
+</style>
+
 {% for cat in categories %}
-<section class="cat-block" data-text="{{ cat.category|lower }}">
-  <h2>{{ cat.category }}
+<section class="cat-block collapsed" data-cat="{{ cat.category }}" data-text="{{ cat.category|lower }}">
+  <h2 class="cat-h" title="클릭 = 접기/펴기"><span class="caret">▸</span>{{ cat.category }}
     <span class="cat">{{ cat.category }}</span>
     <span class="muted">({{ cat.services|length }} 서비스 · {{ cat.count }} 엔드포인트)</span></h2>
 
@@ -47,7 +57,7 @@
       {% if svc.modeled %}<span class="chip s-verified">modeled</span>{% endif %}
       <span class="muted small">({{ svc.count }})</span>
       <a href="{{ svc.recipe }}" style="margin-left:auto;font-weight:600"
-         title="Modeling 노드 에디터로 이동{% if svc.node_id %} (노드: {{ svc.node_id }}){% endif %}">✏️ 정의 편집 →</a>
+         title="Modeling 노드 에디터로 이동{% if svc.node_id %} (노드: {{ svc.node_id }}){% endif %}">✏️ 테스트 모델 편집 →</a>
     </div>
     <table>
       <tr><th style="width:90px">method</th><th>path</th><th style="width:230px">name</th></tr>
@@ -69,16 +79,39 @@
 
 <script>
 // 클라이언트 측 검색 — 행/서비스/카테고리 블록을 텍스트로 필터(서버 왕복 없음).
+// P2-7: 카테고리 기본 접힘 + 검색 시 자동 전개 + sessionStorage로 펼침 기억.
 (function () {
   var rows = Array.prototype.slice.call(document.querySelectorAll('.ep-row'));
   var svcs = Array.prototype.slice.call(document.querySelectorAll('.svc-block'));
   var cats = Array.prototype.slice.call(document.querySelectorAll('.cat-block'));
   var countEl = document.getElementById('catalog-count');
   var total = rows.length;
+  var SS = 'catalog.open';                 // 세션 동안 펼친 카테고리 기억
+  var open = {};
+  try { open = JSON.parse(sessionStorage.getItem(SS) || '{}') || {}; } catch (e) {}
+
+  function syncCollapse() {
+    cats.forEach(function (c) {
+      var isOpen = !!open[c.getAttribute('data-cat')];
+      c.classList.toggle('collapsed', !isOpen);
+      var car = c.querySelector('.caret');
+      if (car) car.textContent = isOpen ? '▾' : '▸';
+    });
+  }
+  cats.forEach(function (c) {
+    var h = c.querySelector('h2.cat-h');
+    if (h) h.addEventListener('click', function () {
+      var key = c.getAttribute('data-cat');
+      open[key] = !open[key];
+      try { sessionStorage.setItem(SS, JSON.stringify(open)); } catch (e) {}
+      syncCollapse();
+    });
+  });
 
   window.filterCatalog = function (q) {
     q = (q || '').trim().toLowerCase();
     var terms = q ? q.split(/\s+/) : [];
+    document.body.classList.toggle('filtering', !!terms.length);  // 검색 = 접힘 무시
     var shown = 0;
     rows.forEach(function (r) {
       var hay = r.getAttribute('data-text') || '';
@@ -98,9 +131,10 @@
     if (countEl) {
       countEl.textContent = q
         ? (shown + ' / ' + total + ' 엔드포인트')
-        : (total + ' 엔드포인트');
+        : (total + ' 엔드포인트 · 카테고리 클릭 = 펼치기');
     }
   };
+  syncCollapse();
   window.filterCatalog('');
 })();
 </script>

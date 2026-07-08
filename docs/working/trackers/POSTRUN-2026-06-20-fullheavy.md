@@ -1,3 +1,14 @@
+---
+status: superseded (2026-06-20 run 1회분 사후 분석 스냅샷)
+for: orchestrator
+superseded_by: ../CONTEXT.md
+---
+
+> **⚠️ SUPERSEDED (2026-07-04, 일자 스냅샷).** 2026-06-20 full-heavy run 한 건의
+> 사후 분석 — 현재 상태 정본은 `docs/working/CONTEXT.md`, 스케줄러 설계/측정
+> 정본은 `docs/scheduler-system.md`, run별 최적화는 매 run `tools.analyze_run` +
+> log-optimizer가 재생성한다. 역사 기록으로 보존.
+
 # Post-run Analysis: Full Heavy DAG Run — 2026-06-20
 
 **Run facts:** 184/184 lifecycles · 156 passed / 25 failed / 3 skipped ·

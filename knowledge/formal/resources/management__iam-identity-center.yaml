@@ -158,5 +158,6 @@ resources:
     delete: {endpoint: "DELETE /v1/account-assignments/{account_assignment_id}",
              destructive: true}
     provenance: docs
+    gated: org-master  # org member 계정 필요 — org-master 확보 후 R3
     source: {lifecycle: idc-account-assignment, steps: [create-account-assignment, delete-account-assignment]}
     notes: "가장 민감한 SSO write — principal에게 target 계정의 permission-set을 부여 (소스는 절대 실생성하지 않는 coverage-only). permission_set/principal id는 소스의 all-zero placeholder를 노드 참조로 배선(모델의 value-add); target_account_id는 Organization member 계정이 필요해 placeholder 유지 — organization-account 노드와의 배선은 org-master 계정 확보 후 R3 과제. body/capture UNPROVEN."

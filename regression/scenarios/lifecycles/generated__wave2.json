@@ -4,7 +4,10 @@
     {
       "id": "gen-wave2-queue",
       "service": "application-service/queueservice",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "application-queueservice-queue",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): SUBSUMED 3⊂11 — standard 큐 왕복 순증분. 표면이 application-queueservice-queue 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
@@ -186,7 +189,10 @@
     {
       "id": "gen-wave2-rg",
       "service": "management/resourcemanager",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "resourcemanager-tag-lifecycle",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): SUBSUMED 3⊂15/23. 표면이 resourcemanager-tag-lifecycle 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/working/plans/COVERAGE-GETID-PLAN.md); targets: resource-group",
       "steps": [
         {
@@ -238,7 +244,10 @@
     {
       "id": "gen-wave2-iam",
       "service": "management/iam",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-wave5-iam-bindings",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 listiamgroupmembers 이관 완료.",
       "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/working/plans/COVERAGE-GETID-PLAN.md); targets: iam-group, iam-policy",
       "steps": [
         {
@@ -373,8 +382,44 @@
       "id": "gen-wave2-scf",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
+      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred) | 2026-07-08 완전성 GAP 편입 (COMPLETENESS-AUDIT-2026-07-08): scf의 마지막 3개 (a)-class 전역 GET(listruntimes, listsamplecodes, checkfunctionnameduplication)을 create 앞 lookup/pre-check 스텝으로 흡수 — scf catalog 36/36 시나리오 커버.",
       "steps": [
+        {
+          "name": "list-scf-runtimes",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/runtimes",
+          "expect_status": [
+            200
+          ],
+          "group": "scf-lookups",
+          "_note": "GAP 편입 2026-07-08 (compute/scf/listruntimes, 전역 read). 쿼리 파라미터 없음(docs). live 200 2026-07-08 ({count:15, runtimes:[...Go 1.25 등]}). create가 쓰는 runtime Node.js:20의 자연스러운 선행 lookup."
+        },
+        {
+          "name": "list-scf-sample-codes",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/sample-codes",
+          "expect_status": [
+            200
+          ],
+          "group": "scf-lookups",
+          "_note": "GAP 편입 2026-07-08 (compute/scf/listsamplecodes, 전역 read). 쿼리 파라미터 없음(docs). live 200 2026-07-08 ({count:64, sample_codes:[...]})."
+        },
+        {
+          "name": "check-scf-function-name-duplication",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/check-duplication",
+          "params": {
+            "name": "regrscf{unique}"
+          },
+          "expect_status": [
+            200
+          ],
+          "group": "scf-lookups",
+          "_note": "GAP 편입 2026-07-08 (compute/scf/checkfunctionnameduplication). create-scf-function 직전 pre-check — create가 쓸 이름 그대로(name=regrscf{unique}, 동일 {unique} ctx) 중복 조회. 필수 쿼리 name (catalog/docs required:true, 누락 시 400). live 200 2026-07-08 ({result:false})."
+        },
         {
           "name": "create-scf-function",
           "service": "scf",
@@ -655,6 +700,14 @@
           }
         },
         {
+          "name": "list-volumes",
+          "method": "GET",
+          "path": "/v1/volumes",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listvolumes."
+        },
+        {
           "name": "verify-block-volume",
           "service": "virtualserver",
           "method": "GET",
@@ -715,6 +768,7 @@
             202,
             500
           ],
+          "capture_soft": {"transfer_auth_key": "$.auth_key"},
           "capture": {
             "transfer_id": "$.id"
           },
@@ -737,6 +791,24 @@
           ],
           "group": "volume-transfer",
           "_note": "downstream of PF-21 create 500 → no transfer_id captured; the optional create is group-skipped so this read runs with the literal {transfer_id} → 404. Tolerate 404 so the cascade is not a TEST FAILURE; run 27593608514"
+        },
+        {
+          "name": "list-volume-transfers",
+          "method": "GET",
+          "path": "/v1/volume-transfer",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listvolumetransfer."
+        },
+        {
+          "name": "accept-volume-transfer",
+          "service": "virtualserver",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/volume-transfer/{transfer_id}/accept",
+          "json": {"auth_key": "{transfer_auth_key}"},
+          "expect_status": [200, 202, 400, 404, 409],
+          "_note": "2026-07-08 25-편입(owner GO): acceptvolumetransfer — create 가 PF-21(500 baselined)이라 auth_key 는 soft 캡처; 미해결 시 관용 도달 기록. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
           "name": "delete-volume-snapshot",

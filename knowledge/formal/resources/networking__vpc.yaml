@@ -136,8 +136,8 @@ resources:
     delete: {endpoint: "DELETE /v1/internet-gateways/{internet_gateway_id}",
              destructive: true}
     provenance: VALIDATED
-    source: {lifecycle: networking-vpc-internet-gateway,
-             steps: [create-igw, wait-igw-active, delete-igw]}
+    source: {lifecycle: gen-pilot-net-basics,
+             steps: [create-internet-gateway, wait-internet-gateway, delete-internet-gateway]}
     notes: "firewall_enabled: true로 만들면 firewall이 암묵 생성된다 (firewall 노드 참조) — 옵션 기본 false는 VALIDATED body와 동일형. IGW 삭제가 암묵 firewall도 함께 제거한다 (firewall 노드는 delete 없음)."
 
   nat-gateway:
@@ -301,7 +301,7 @@ resources:
          note: "id-bound GET getid 갭 (PLS 연결 엔드포인트 목록). create가 UNPROVEN(docs)이라 4xx일 수 있어 관용 status"}
     delete: {endpoint: "DELETE /v1/privatelink-services/{privatelink_service_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/vpc/createprivatelinkservice
     source: {lifecycle: generated__wave5-appsvc,
              steps: [create-privatelink-service, wait-privatelink-service,
                      delete-privatelink-service]}
@@ -341,8 +341,17 @@ resources:
       body: {name: "regrtgw{ualpha}", description: "API regression transit gateway",
              tags: []}
     capture: {transit_gateway_id: "$.transit_gateway.id"}
+    # state enum = CREATING/ACTIVE/DELETING/DELETED/ERROR/EDITING (api_docs
+    # transitgateway) — the old until list (CREATED/RUNNING/AVAILABLE) named
+    # states that don't exist. ERROR/DELETED are terminal-bad (end the poll
+    # fast); give_up_status 400/404 stops a poll against a rejected create
+    # (database__subops-full pattern). ACTIVE took ~3.5 min in run 28648339307,
+    # so timeout 600. NOTE: the TGW re-enters EDITING while a vpc-connection
+    # attaches/detaches (live 2026-07-04) — consumers that need ACTIVE *after*
+    # a connection op must re-poll (see tgw-vpc-connection ready stage 2).
     ready: {field: "$.transit_gateway.state",
-            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
+            until: [ACTIVE, ERROR, DELETED], timeout: 600, interval: 15,
+            give_up_status: [400, 404]}
     verify:
       - {name: read-routing-rules,
          endpoint: "GET /v1/transit-gateways/{transit_gateway_id}/routing-rules",
@@ -354,6 +363,11 @@ resources:
              destructive: true}
     provenance: VALIDATED
     source: {lifecycle: heavy-shared-networking, steps: [tgw-create, tgw-wait, tgw-delete]}
+    notes: >
+      삭제는 async-slow (분 단위; 2026-07-03 incident 에서는 connection 이
+      DELETING 인 채 수 시간 관측) — 삭제 중 TGW 는 연결된 VPC 의 DELETE 를
+      409 로 막는다. reconciler 는 DELETING 을 in-progress 로 취급해 라운드를
+      추가 부여한다 (knowledge/validated-facts.md 2026-07-04 블록).
 
   tgw-vpc-connection:
     code: "nw-vpc-tgw-vpc-connection"
@@ -370,15 +384,38 @@ resources:
     capture: {vpc_connection_id: "$.transit_gateway_vpc_connection.id",
               transit_gateway_id: "$.transit_gateway_vpc_connection.transit_gateway_id"}
     # No single-connection GET show endpoint exists — only LIST + DELETE. Poll
-    # the LIST and read the (only) connection's state until ACTIVE; that ACTIVE
-    # connection is what makes the TGW "Connectable" for private-nat.
-    ready: {field: "$.transit_gateway_vpc_connections[0].state", until: ACTIVE,
-            timeout: 300, interval: 15,
-            endpoint: "GET /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections"}
+    # the NESTED per-TGW LIST (200, live-verified 2026-07-04; the FLAT
+    # /v1/transit-gateway-vpc-connections is 403 for this account) and read the
+    # (only) connection's state until ACTIVE; that ACTIVE connection is what
+    # makes the TGW "Connectable" for private-nat.
+    #
+    # TWO-STAGE ready (2026-07-04 pacing fix, incident run 28648339307 — the
+    # composer emits one wait step per list entry, in order):
+    #   1. connection ACTIVE on the nested list. The old single 300s poll timed
+    #      out SILENTLY (poll timeout keeps the 200 → expect_status passes) and
+    #      create-private-nat then 400'd active-transit-gateway-not-found →
+    #      lifecycle failed mid-chain and its one-shot teardown leaked the
+    #      TGW+connection (which pinned the shared VPC ~1 day). 600s +
+    #      terminal-bad until + give_up_status make the wait honest.
+    #   2. the PARENT TGW back to ACTIVE — the TGW sits EDITING while a
+    #      connection attaches (live-observed 2026-07-04), and private-nat's
+    #      create enforces exactly "TGW state == ACTIVE" (error code
+    #      scp-network.private-nat.active-transit-gateway-not-found). Pacing
+    #      family — same class as DBaaS ExistInprogress.
+    ready:
+      - {field: "$.transit_gateway_vpc_connections[0].state",
+         until: [ACTIVE, ERROR, DELETED], timeout: 600, interval: 15,
+         give_up_status: [400, 404],
+         endpoint: "GET /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections"}
+      - {field: "$.transit_gateway.state",
+         until: [ACTIVE, ERROR, DELETED], timeout: 600, interval: 15,
+         give_up_status: [400, 404],
+         endpoint: "GET /v1/transit-gateways/{transit-gateway.transit_gateway_id}",
+         note: "TGW는 connection 부착 중 EDITING — private-nat 전제(TGW ACTIVE)를 show 로 재확인 (run 28648339307)"}
     delete: {endpoint: "DELETE /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections/{vpc_connection_id}",
              destructive: true,
              retry_on_status: [409], retries: 4, retry_interval: 15}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/vpc/createtransitgatewayvpcconnection (run 28648339307)
     source: {lifecycle: gen-wave5-privnat,
              steps: [create-tgw-vpc-connection, wait-tgw-vpc-connection,
                      delete-tgw-vpc-connection]}
@@ -397,4 +434,7 @@ resources:
       라이브에서 정정될 수 있음. transit_gateway_id를 함께 capture해 private-nat의
       one_of 분기가 use: transit_gateway_id로 TGW id를 service_resource_id에
       주입한다(connection id가 아니라 TGW id가 필요). TGW당 VPC 연결 ≤5(userguide).
+      2026-07-04 pacing fix: ready 를 2단(list-ready — composer 확장)으로 강화 —
+      connection ACTIVE 후 TGW ACTIVE 재확인. recompose 시에도 유지됨
+      (incident run 28648339307; generated__light-batch2.json gen-private-nat 동기 수정).
       heavy(실 TGW+VPC 동반).

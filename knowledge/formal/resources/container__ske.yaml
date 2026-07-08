@@ -1,9 +1,10 @@
 # Resource-task model — container/ske (ct-ske group, Kubernetes Engine).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # container-ske-cluster-nodepool (enabled, HEAVY, live-validated end-to-end
-# ~27min billable cluster). ske-upgrade-write-coverage / ske-read-coverage are
-# op/read-only probes (irreversible upgrades, kubeconfig GETs) — no creatable
-# resource to extract there; their upgrade semantics live in the notes.
+# ~27min billable cluster). ske-upgrade-write-coverage / ske-read-coverage were
+# placeholder probes, RETIRED 2026-07-08 (owner: placeholder-id calls are
+# meaningless under heavy-전제) — their reads AND the real upgrades now ride
+# the heavy lifecycle itself (created at versions[1], rolled to [0]).
 # kubernetes-version is a read-only LOOKUP node (cross-service `lookups:`);
 # server-type is reused from compute__virtualserver.yaml (cross-file ref, C1).
 version: 1
@@ -63,7 +64,8 @@ resources:
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: container-ske-cluster-nodepool,
-             steps: [create-cluster, wait-cluster, delete-cluster, wait-cluster-gone]}
+             steps: [create-cluster, wait-cluster, get-cluster-kubeconfig,
+                     get-cluster-user-kubeconfig, delete-cluster, wait-cluster-gone]}
     notes: "HEAVY (~27분, 과금). capture envelope은 $.resource_id ($.cluster.id 아님 — services captures). v1.4 스키마: volume_id는 storage/filestorage 볼륨 id 문자열 (cross-service ske-volume-is-filestorage), service_watch_logging_enabled는 문자열 \"true\"로 REQUIRED. boolean류가 전부 문자열인 점 주의. 경로 /v1/clusters는 모든 DBaaS 엔진과 충돌 — 반드시 per-service host (cross-constraint shared-path-roots-need-per-service-hosts). 삭제는 409/500 재시도 8×30s + 404 폴링 1200/30; nodepool을 먼저 지워야 한다. setclusterupgrade는 ske-cluster-upgrade 액션 노드로 모델됨 (owner 승인 2026-06-13: 구버전 생성→업그레이드→삭제 흐름). 클러스터 setter들(logging/ACL/SG)은 async reconcile 경합으로 write 사이 RUNNING 재폴링 + 409 재시도 필요."
 
   ske-nodepool:
@@ -100,7 +102,8 @@ resources:
     delete: {endpoint: "DELETE /v1/nodepools/{nodepool_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: container-ske-cluster-nodepool,
-             steps: [create-nodepool, wait-nodepool, delete-nodepool, wait-nodepool-gone]}
+             steps: [create-nodepool, wait-nodepool, get-nodepool-nodes,
+                     delete-nodepool, wait-nodepool-gone]}
     notes: "HEAVY (클러스터 폐포 포함, billable 노드). 숫자 필드가 전부 문자열인 v1.4 스키마 verbatim. SSD_Provisioned는 volume_max_iops/throughput 필수 (services constraint nodepool-provisioned-iops VALIDATED). server-type lookup은 compute__virtualserver.yaml의 노드를 재사용 (s-프리픽스 필터 한계는 그 노드 노트 참조); keypair_name은 keypair 노드와 같은 {unique} 공유. 생성 전 클러스터 RUNNING 재확인 (소스 wait-cluster-running-pre-nodepool). 삭제는 409/500 재시도 6×30s + 404 폴링 900/30, 클러스터 삭제 전에. scale/label PUT은 best-guess 확장이라 verify로 승격하지 않음; setnodepoolupgrade는 ske-nodepool-upgrade 액션 노드로 모델됨 (owner 승인 2026-06-13). nodepool 목록은 /v1/clusters/{id}/nodepools뿐 (flat /v1/nodepools 목록 없음)."
 
   # 읽기 전용 LOOKUP — listimages는 수작업 체인에서 [200,400]+optional 뒤에
@@ -137,8 +140,9 @@ resources:
             field: "$.cluster.status", until: [RUNNING, ACTIVE, Running],
             timeout: 3600, interval: 60}
     provenance: VALIDATED
-    source: {lifecycle: ske-upgrade-write-coverage, steps: [upgrade-cluster]}
-    notes: "IRREVERSIBLE 컨트롤플레인 롤 — 1회용(합성 생성) 클러스터에서만. ClusterUpgradeSetRequest {kubernetes_version} (api_docs). 업그레이드 완료까지 RUNNING 재폴링 최대 60분. capture/delete 없음 (액션 노드)."
+    source: {lifecycle: container-ske-cluster-nodepool,
+             steps: [upgrade-cluster, wait-cluster-upgraded]}
+    notes: "IRREVERSIBLE 컨트롤플레인 롤 — 1회용(합성 생성) 클러스터에서만. ClusterUpgradeSetRequest {kubernetes_version} (api_docs). 업그레이드 완료까지 RUNNING 재폴링 최대 60분. capture/delete 없음 (액션 노드). 2026-07-08: placeholder probe(ske-upgrade-write-coverage) 은퇴 — heavy 라이프사이클이 [1]로 생성해 [0]으로 실업그레이드 (wait의 premature-pass 가능성은 스텝 _note 참조, 라이브가 정정)."
 
   ske-nodepool-upgrade:
     code: "ct-ske-nodepool-upgrade"
@@ -152,5 +156,6 @@ resources:
             field: "$.nodepool.status", until: [Running, RUNNING, ACTIVE, active],
             timeout: 2400, interval: 30}
     provenance: VALIDATED
-    source: {lifecycle: ske-upgrade-write-coverage, steps: [upgrade-nodepool]}
-    notes: "노드 롤 — 컨트롤플레인 업그레이드 후에만 (requires로 순서 강제). body는 NodepoolUpgradeSetRequestV1Dot4 {os_version} — k8s 버전이 아니라 OS 버전을 받는다 (api_docs; 노드는 컨트롤플레인 버전을 따라감). scp_gpu_driver는 optional 생략."
+    source: {lifecycle: container-ske-cluster-nodepool,
+             steps: [upgrade-nodepool, wait-nodepool-upgraded]}
+    notes: "노드 롤 — 컨트롤플레인 업그레이드 후에만 (requires로 순서 강제; 라이프사이클에선 같은 ske-upgrade 그룹이라 cluster-upgrade 실패 시 자동 skip). body는 NodepoolUpgradeSetRequestV1Dot4 {os_version} — k8s 버전이 아니라 OS 버전을 받는다 (api_docs; 노드는 컨트롤플레인 버전을 따라감; 은퇴한 probe는 kubernetes_version을 보냈음 — docs 모순, 편입 시 정정). scp_gpu_driver는 optional 생략."

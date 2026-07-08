@@ -188,6 +188,13 @@
           "capture_soft": {"data_flow_service_id": "$.contents[0].id"}
         },
         {
+          "name": "get-image-versions",
+          "method": "GET",
+          "path": "/v1/data-flows/image-versions",
+          "expect_status": [200],
+          "_note": "GAP 편입 2026-07-08 (data-analytics/data-flow/getdataflowimages, 마지막 data-flow 전역-read gap — COMPLETENESS-AUDIT-2026-07-08). 파라미터 없는 전역 read → strict [200]. live 200 2026-07-08 ({contents:[{image_id:IMAGE-9095b30d-..., image_name:'Data Flow 4.1.1', version:'4.1.1'}], total_count:1}) — guarded lifecycle의 create-data-flow가 쓰는 image_id의 원천 lookup."
+        },
+        {
           "name": "get-data-flow",
           "method": "GET",
           "path": "/v1/data-flows/{data_flow_id}",

@@ -165,6 +165,7 @@ resources:
              retry_on_status: [400, 401, 409, 500, 503],
              retries: 20, retry_interval: 60}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [create-cluster-guarded, delete-cluster-guarded]}
     notes: "KNOWN-BLOCKED for HA path: cluster create itself does NOT take a license field (a standalone instance can be created without one), but Always On / Secondary does — see ss-add-secondary credential gate. SQL Server is the only DBaaS engine excluded from heavy-shared-dbaas. HEAVY 과금. 소스는 subnet adopt: subnet#db 공유. body는 guarded 소스의 빈-id 템플릿을 relational 표준값으로 보강한 추정 — capture/ready envelope ($.resource.id, $.service_state)는 타 엔진(postgresql VALIDATED) 패턴의 외삽이며 sqlserver에서 UNPROVEN → docs. 비동기 쓰기 AsyncResponse {request_id, resource:{id}} — request_id는 생성 응답에서만 오고 GET /v1/requests/{request_id}(sqlservershowrequest)로만 조회 (services/database__sqlserver.yaml async-writes-return-request-id). delete 재시도 [400,401,409,500,503]×20×60s는 백엔드 auth/race quirk 대비 (postgresql 선례). 소스 delete 스텝은 합성 id만 노린다(실클러스터 보호) — 모델 delete는 표준 경로. requires는 body 소비 기준 subnet + lookup 2종."
@@ -187,6 +188,7 @@ resources:
          endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
          expect_status: [200]}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [capture-subop-ids]}
     notes: "InstanceGroupResponse {id, block_storage_groups[].id, ...}. 소스는 soft-capture (instance_group_id/bsg_id) — sqlserver에 라이브 RUNNING 클러스터가 없어 UNPROVEN → docs (postgresql는 run 27258520218로 VALIDATED). add-block-storages/resize-block-storage/resize-server-type 액션 노드가 여기 매달린다."
@@ -222,6 +224,7 @@ resources:
          endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/parameters/sync",
          expect_status: [200, 202, 409]}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [set-parameters, sync-parameters]}
     notes: "create=GET listparametervalues (per-cluster) — ParametersResponse $.contents[] {id, applied_value, is_modifiable, ...}. where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭. applied_value가 빈 문자열인 첫 매치면 set이 400 날 수 있음 — 라이브 정제 (pg-parameter 선례)."
@@ -240,6 +243,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [add-block-storages]}
     notes: "AddBlockStoragesRequest {role_type REQ, size_gb REQ, volume_type opt SSD} — guarded 소스 body verbatim. userguide (2026-06-14): DATA storage 16–5,120 GB, 8 GB 증분. DATA 볼륨 추가는 비가역(제거 API 없음) — 1회용 클러스터 전용, 클러스터 삭제로 회수."
@@ -256,6 +260,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [resize-block-storage]}
     notes: "ResizeBlockStorageGroupRequest {size_gb REQ} — 104→112 GB (guarded 소스 body verbatim; userguide 8 GB 증분과 정합). 축소 불가(비가역), 1회용 클러스터 전용."
@@ -276,6 +281,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [resize-instance-group]}
     notes: "InstanceGroupResizeRequest {server_type_name REQ} — guarded 소스 body verbatim. composer create expect [200,201,202] 고정이라 same-type 400을 관용 못함 — masked-defect 방지용 의도된 hard (pg 선례). in-place resize sub-op — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; 부모 cluster DELETE가 회수)."
@@ -296,6 +302,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [restart-cluster]}
     notes: "body 없음 (api_docs). 재기동 후 RUNNING 재폴링. 409 = 진행 중 작업 경합. 액션 sub-op — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; 부모 cluster DELETE가 회수)."
 
@@ -313,6 +320,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 900, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [sync-cluster-state]}
     notes: "body 없음. userguide (managing): 패치/업그레이드 전 '서비스 상태 동기화를 통해 서비스 상태를 먼저 조회한 후' 수행 권고 — patch 선행 후보. 202 AsyncResponse. 액션 sub-op — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; 부모 cluster DELETE가 회수)."
@@ -329,6 +337,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 900, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [set-audit-log]}
     notes: "UpdateAuditLogRequest {use_audit_log bool} — guarded 소스 body verbatim. userguide (overview): Audit로 DB 접근/DDL·DML 모니터링; audit 로그를 Object Storage로 내보내는 log-export 전제. 가역 (false로 되돌릴 수 있음). in-place PUT setter — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; use_audit_log:false 되돌림 또는 부모 cluster DELETE로 회수)."
 
@@ -350,6 +359,7 @@ resources:
     delete: {endpoint: "DELETE /v1/clusters/{sqlserver-cluster.cluster_id}/maintenance",
              destructive: true}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [set-maintenance, unset-maintenance]}
     notes: "SetMaintenanceRequest {start_day_of_week, start_minute, start_time, term_hour} — guarded 소스 body verbatim. teardown = unsetmaintenance DELETE .../maintenance (소스 unset-maintenance verbatim). 가역."
@@ -376,6 +386,7 @@ resources:
              retry_on_status: [400, 401, 409, 500, 503], retries: 4,
              retry_interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [create-backup, delete-backup]}
     notes: "BackupOption {archive_frequency_minute, retention_period_day, starting_time_hour} — guarded 소스 body verbatim. userguide (overview/backupandrestore): 백업은 예약 수행 — '백업을 설정한 경우에는 설정한 시간 이후 지정된 시간에 백업이 수행되며' (시작 '시'만 선택, 분은 랜덤); archive 주기가 PITR granularity(5/10/30min·1hr)를 결정. DELETE /backups는 401 quirk family (services backup-subresource-401-family와 동종) — retry_on_status로 흡수. remove-backup-histories (PUT .../backup-histories)는 _note: 빈 backup_history_number 배열 no-op이라 모델 verify에서 SKIP (소스 잔존 커버리지)."
@@ -416,6 +427,7 @@ resources:
              retry_on_status: [400, 401, 409, 500, 503],
              retries: 20, retry_interval: 60}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [create-restore]}
     notes: "HEAVY — 백업 기반 새 과금 클러스터. ClusterRestoreRequest verbatim (api_docs, mysql/epas와 동일 shape): name REQ ^[a-zA-Z]*$ 3-20, instance_name_prefix REQ, server_type_name REQ; backup_history_number/backup_recovery_time/block_storage_groups/maintenance_option/tags optional. userguide 확정 (2026-06-14, backupandrestore): 복구 2종 = '백업 시점(권장)'(backup_history_number) / '사용자 지정 시점' PITR(backup_recovery_time, 완료된 첫 백업 선행 필수); '신규 서버가 생성되고' = 새 클러스터(subnet/region 입력 없음, origin 상속); storage 유형 원본과 동일 강제. 생성 직후 즉시 restore는 백업 부재로 실패 → 별도 윈도우 게이트(enabled:false). backup_history_number/backup_recovery_time 둘 다 생략 시 동작 미문서 — 라이브 정제. 응답 AsyncResponse $.resource.id = 신규 클러스터 id. _note: 본 body는 두 백업 키 생략(최신 추정) — 소스 guarded는 backup_history_number '202501010000' 더미를 보냈다."
 
@@ -439,6 +451,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 3600, interval: 60}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [patch-minor-version]}
     notes: "MinorPatchRequest {backup_before_upgrade REQ bool, software_version REQ string} — guarded 소스 body verbatim. userguide 확정 (2026-06-14, managing): '동일한 Major 버전 내에서 Minor 버전 업그레이드 기능만 지원' (2019→2022 불가); 사전 백업 설정 필수 — '백업을 설정하지 않으면 업그레이드 중 문제가 발생했을 때 일부 데이터를 복구하지 못할 수 있습니다'; sync-state 선행 권고; backup_before_upgrade 데이터는 완료 후 자동 삭제. backup_before_upgrade=false: 1회용 클러스터라 사전 백업 불요(+완료 백업 미존재 시 true가 막힐 리스크 회피) — userguide 권고와 충돌하므로 합성 시 ss-set-backup 선행 후 true 검토. sqlserver는 kernel-upgrade 엔드포인트 없음 (relational 발산). IRREVERSIBLE 마이너 롤."
@@ -459,6 +472,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [switchover-cluster]}
     notes: "body 없음. userguide (overview): Always On 기반 Primary↔Secondary 수동 switchover. Secondary(ss-add-secondary)가 구성된 HA 클러스터에서만 유효 — ha_enabled:false 기본 body에서는 4xx 예상 → HA 변형 대기 게이트로 남긴다 (sqlserver-cluster body가 ha_enabled true + Secondary를 갖출 때까지 합성 제외). sqlserver는 reset-replica/sync-replica-state가 없어 postgresql식 분기 불가 — switchover가 유일한 HA 전환 동작. path param cluster_id = 해당 HA 클러스터. 액션 sub-op — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; 부모 cluster DELETE가 회수)."
@@ -487,6 +501,7 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 2400, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [add-secondary]}
     notes: "ESCALATE — SqlserverAddSecondaryRequest {license REQ string, name REQ ^[a-z][a-z0-9\\-]*[a-z0-9]$ 3-15, service_ip_address opt}. userguide 확정 (2026-06-14, secondary how_to): Secondary는 '이중화 구성(HA) 및 Enterprise Edition으로 생성되어야 하며, 백업 기능이 활성화' 되어야 하고 '하나의 클러스터당 1개만 구성 가능'. 즉 선행: ① Enterprise engine-version id(ss-engine-version override) ② ha_enabled:true 클러스터 ③ 백업 활성 ④ 유효 라이선스 key. name 패턴 ^[a-z]…[a-z0-9]$ 3-15는 relational replica(3-20)와 다름 (regrsec{ualpha} 충족). service_ip_address는 user subnet IP(opt) — 빈 문자열=auto. 라이선스 발급 절차가 문서에 없어 우선 credential 게이트로 차단; 합성은 라이선스 확보 시까지 보류."
 
@@ -507,5 +522,6 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [set-databases]}
     notes: "SqlserverUpdateDatabasesRequest {add_databases opt [SqlserverDatabaseOption], del_databases opt [...]}. SqlserverDatabaseOption {database_name REQ ^[a-zA-Z][a-zA-Z0-9._]*$ 3-20, drive_letter opt [E-Z] default E}. userguide 확정 (2026-06-14, managing): Enterprise edition 전용 — 'Microsoft SQL Server Enterprise 버전의 경우, 새로운 Database를 추가할 수 있습니다', '1개의 클러스터당 최대 100개까지 추가 가능'. 즉 Enterprise engine-version id 선행 필요(ss-engine-version override) — Standard 클러스터에선 4xx 예상. 라이선스는 불요(add-secondary와 별개). 소스는 빈 add/del(no-op)를 보냈다 — 본 모델은 1개 추가; del로 정리하거나 클러스터 삭제로 회수 (개별 DB 제거는 del_databases). 비가역 아님."

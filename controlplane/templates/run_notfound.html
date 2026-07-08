@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Run {{ gh_run_id }} — 기록 없음{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Run <code>{{ gh_run_id }}</code> — 기록 없음</h2>
+  <p class="muted">control-plane DB · 스냅샷 버킷 · 아카이브 index 어디에도 이
+    run id가 없습니다. 주소가 정확한지 확인하세요. (아카이브에만 있는 과거
+    run은 이 페이지가 아니라 스냅샷 정보와 함께 정상 표시됩니다.)</p>
+  <p><a href="/reporting?tab=runs">🗂 기록 없음 — 전체 실행 기록 (Runs &amp; Archive) →</a></p>
+</section>
+
+{% endblock %}

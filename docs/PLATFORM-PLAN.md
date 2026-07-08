@@ -6,16 +6,28 @@ for: all
 # SCP API Regression Test Platform — 업그레이드 계획
 
 > 현재의 "엔진 + GitHub Actions" 시스템을 **완결된 플랫폼**으로 승격하는 계획.
-> [ROADMAP.md](ROADMAP.md)의 Phase 2(스케줄 회귀)·Phase 3(전용 서버)을
-> 포괄하면서, 그 위에 **관리 UI·실행 개입·히스토리 리포팅**을 얹는다.
+> Phase 2(스케줄 회귀)·Phase 3(전용 서버)을 — 정본:
+> [ARCHITECTURE.md](ARCHITECTURE.md) §Direction — 포괄하면서, 그 위에
+> **관리 UI·실행 개입·히스토리 리포팅**을 얹는다.
 >
-> **상태 (2026-06-12): M0~M3 DONE, M4 DONE(live/docker 검증 대기 — 컷오버는
-> 마지막), M5는 R1·R2 DONE / R3 검증 웨이브 진행 중.** §0의 갭 표는 채택
-> 당시 진단으로 보존한다 — 표의 갭 항목은 이후 마일스톤에서 전부 구현됐다.
+> **상태 (2026-07-04, C2 정비): M0–M5 완료.** M0~M3 DONE · **M4 DONE — 단
+> 컷오버 잔여만 활성**: Docker 빌드/compose 기동의 실호스트 검증 + worker 경유
+> mutation run (worker 실행기 자체는 2026-07-02 in-process read-only E2E 검증
+> 완료; 컷오버는 의도적으로 마지막, §M4) · M5 R1·R2 DONE + R3 검증 웨이브
+> 완료(모델은 275노드/60파일로 성장 — 잔여 docs 노드의 검증·승격은
+> `docs/working/plans/CAMPAIGN-C3-100.md`가 흡수; R4 C4-변형은 그 이후 후속) ·
+> M6 설계 결정은 구현 완료(`docs/ARCHITECTURE.md` §Autonomy design).
+>
+> **이 문서에서 지금 활성인 것은 M4 컷오버 잔여뿐이다.** 완료된 절은 아래에
+> 접어 두었다(`<details>` — 채택 당시 설계/진단의 역사 기록). 현행 아키텍처
+> 정본은 `docs/ARCHITECTURE.md`, 현재 상태는 `docs/working/CONTEXT.md`.
 
 ---
 
-## 0. 현재 위치 진단 — 무엇이 있고 무엇이 없는가
+## 0. 현재 위치 진단 — 무엇이 있고 무엇이 없는가 (✅ 완료 — 갭 전부 구현됨)
+
+<details>
+<summary>채택 당시(2026-06-11) 진단 — 표의 갭 항목은 이후 마일스톤에서 전부 구현됐다</summary>
 
 핵심 진단: **데이터 평면(엔진)은 이미 플랫폼 수준이고, 제어 평면(Control
 Plane)이 없다.** 시나리오는 선언적 JSON이고, 할당량·의존성도 데이터로
@@ -35,9 +47,14 @@ Plane)이 없다.** 시나리오는 선언적 JSON이고, 할당량·의존성�
 | 결과 리포팅 | `dashboard/build.py` → GitHub Pages, `history.jsonl` | run별 결과가 **덮어써짐** — run 목록 → 클릭 → 그 시점 대시보드 복원이 안 됨 |
 | AI 활용 | `docs/agent-team.md` 역할 정의 (Claude Code 세션, 수동 위임) | API 통합 없음 — triage·시나리오 초안·spec 영향분석이 사람이 띄우는 세션에 의존 |
 
+</details>
+
 ---
 
-## 1. 목표 아키텍처
+## 1. 목표 아키텍처 (✅ 구현됨 — 현행 정본: `docs/ARCHITECTURE.md`)
+
+<details>
+<summary>채택 당시 목표 그림 + 원칙 5개 (엔진은 감싼다 · 설정은 데이터 · secret 미저장 · 핫패스 결정적 · 호스트 불문)</summary>
 
 ```
 ┌────────────────────────── Control Plane (신규) ──────────────────────────┐
@@ -82,9 +99,14 @@ Plane)이 없다.** 시나리오는 선언적 JSON이고, 할당량·의존성�
    계속하며, Compose 패키징과 worker 전환은 배포 직전 마일스톤(M4)에서
    수행.
 
+</details>
+
 ---
 
-## 2. 기능 영역별 설계
+## 2. 기능 영역별 설계 (✅ 구현됨 — M0~M3 산출물)
+
+<details>
+<summary>환경 프로파일 · spec 관리 · knowledge UI · suite 저작 · 실행/관제/개입 · 리포팅의 채택 당시 설계</summary>
 
 ### 2.1 Planning — Global 설정
 
@@ -224,9 +246,14 @@ Regression과 Conformance는 이미 같은 결과 스키마를 쓰므로 **실�
   일반화.
 - 알림: new-fail 발생 시 채널 통보 + AI triage 요약 첨부 (§4-B1).
 
+</details>
+
 ---
 
-## 3. 기술 선택 (확정 + 권고)
+## 3. 기술 선택 (✅ 확정·구현됨 — FastAPI+htmx · SQLite · Docker Compose · 파일 기반 편집)
+
+<details>
+<summary>기술 선택 표 + §3.1 파일 기반 편집 모델 (authoring 파이프라인이 구현체)</summary>
 
 | 항목 | 선택 | 근거 |
 |---|---|---|
@@ -260,9 +287,14 @@ run은 어떤 시나리오/knowledge 버전으로 돌았나" 추적 가능. 실�
 진행 중인 run에 영향을 주지 않도록 worker는 run 시작 시 정의 파일을
 스냅샷(복사)해서 사용한다.
 
+</details>
+
 ---
 
-## 4. AI 활용 지도 — 어디에 AI가 필요한가
+## 4. AI 활용 지도 (✅ 구현됨 — A1~A3·B1·B2는 `controlplane/ai_pipelines.py`, C1 탐색모드는 명시적 DEFERRED)
+
+<details>
+<summary>원칙(핫패스에 AI 금지 — 저작/후처리/옵트인 탐색에만) + A/B/C 표</summary>
 
 설계 원칙: **테스트 실행의 정상 경로(핫패스)에는 AI를 넣지 않는다.**
 regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은 입력에 같은
@@ -303,14 +335,20 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 커버리지 개척 모드에서만 켜는 옵션이며, 그 산출물도 즉시 결정적 데이터
 (validated fact, 수정된 body)로 환원시켜 다음 run부터는 AI 없이 돌게 한다.
 
+</details>
+
 ---
 
 ## 5. 단계별 로드맵
 
-기존 ROADMAP Phase 1(커버리지 100%)은 그대로 선행 조건. 플랫폼 작업은
-병행 가능하되 M2부터는 Phase 1 완료가 전제.
+Phase 로드맵 정본은 `docs/ARCHITECTURE.md` §Direction. 아래 마일스톤은 전부
+착지했다 — **활성 잔여는 M4 컷오버뿐** (아래 M4 절).
 
-### M0 — 기반 정비 (엔진 레벨, 서버 불필요) — DONE (live 검증 대기)
+### M0 — 기반 정비 — ✅ DONE (suites/profiles/스냅샷/oplog 훅)
+
+<details>
+<summary>산출물: suites/*.yaml + core/suites · environments/*.yaml + core/profiles · core/snapshot · oplog 플랫폼 미러</summary>
+
 - [x] Suite 정의 도입 — `suites/*.yaml` + `core/suites.py` (render →
       `.github/run-request` 옵션으로 컴파일; dispatch `suite` 입력 / 파일
       `suite=` 라인 양쪽 지원, 명시 라인이 suite 기본값을 override)
@@ -323,7 +361,13 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - [x] 엔진 보고 훅 — `core/oplog.py`에 `APITEST_PLATFORM_URL` POST 미러
       (fire-and-forget, 기본 비활성 — M1 서버가 수신)
 
-### M1 — Control Plane MVP (실행은 GitHub Actions 그대로) — DONE (배포 대기)
+</details>
+
+### M1 — Control Plane MVP — ✅ DONE (FastAPI+SQLite 서버 · 스케줄러 · 라이브 추적 · AI triage)
+
+<details>
+<summary>산출물: controlplane/ 서버 (수동 실행 UI · cron 데몬 · run 히스토리/스냅샷 복원 · /api/ingest/events · B1 triage + B2 알림)</summary>
+
 - [x] FastAPI 서버 + SQLite — `controlplane/` (suites/environments는 repo
       파일을 라이브로 읽고, DB는 runs/schedules/events/triage만 보유)
 - [x] 수동 실행 UI (suite × 환경 → `workflow_dispatch`) + cron 스케줄러
@@ -340,7 +384,13 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - 배포 절차: 서버 기동(`controlplane/README.md`) + repo Variables에
       `APITEST_PLATFORM_URL`/`APITEST_PLATFORM_TOKEN` 설정 + dispatch PAT
 
-### M2 — 관제와 개입 — DONE (live 검증 대기)
+</details>
+
+### M2 — 관제와 개입 — ✅ DONE (리소스 인벤토리/단일 삭제 · 명령 채널 · run 비교 · tenant 기초)
+
+<details>
+<summary>산출물: /testing/resources · core/commands + engine 체크포인트(skip/abort/stop_polling) · /reporting/compare · tenant 컬럼</summary>
+
 - [x] 라이브 run 뷰 — Testing 화면의 진행 중 run + 마일스톤 타임라인 (M1에서 선구현)
 - [x] 리소스 인벤토리 + 단일 리소스 삭제 — `/testing/resources`,
       `controlplane/resources.py` (reconciler의 per-kind 삭제 매핑 재사용,
@@ -352,7 +402,13 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - [x] run 비교 뷰 — `/reporting/compare` (new-fail/fixed/still-failing/변화)
 - [x] multi-tenancy 스키마 기초 — runs/schedules tenant 컬럼 (UI 선택자는 후속)
 
-### M3 — 저작도구 + AI 파이프라인 완성
+</details>
+
+### M3 — 저작도구 + AI 파이프라인 — ✅ DONE (authoring 파이프라인 · 의존 그래프 · A1/A2/A3; C1 탐색모드만 명시적 DEFERRED)
+
+<details>
+<summary>산출물: controlplane/authoring.py validate→write→commit · /planning/dependencies · ai_pipelines(A1 spec-diff · A2 시나리오 초안 · A3 fact 추출, 전부 drafts/ 초안)</summary>
+
 - [x] 시나리오/스위트/환경 편집 UI — `controlplane/authoring.py`의
       validate→write→commit 파이프라인 (§3.1 공용 코드: 임시 적용 → 해당
       validator → 실패 시 byte-identical 복원, 통과 시 원자적 교체 + 로컬
@@ -382,7 +438,21 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       끝난 뒤 별도 작업으로 진행한다 (`SCP_AI_EXPLORE` 게이트 설계는 §4-C1
       그대로 유지)
 
-### M4 — 배포 전환 (마지막: 로컬 파일 모드로 컷오버) — DONE (live/docker 검증 대기)
+</details>
+
+### M4 — 배포 전환 — 🟡 **컷오버 잔여 = 이 문서의 유일한 활성 항목**
+
+**잔여 (실호스트/owner 윈도우 필요):**
+
+- [ ] Docker 빌드 + `docker compose up` 기동 검증 (server + worker 컨테이너,
+      실호스트) — runbook: `docs/DEPLOY.md`
+- [ ] worker 경유 **mutation run** 1회 (지금까지의 worker E2E는 read-only)
+- [ ] 이후 `PLATFORM_EXECUTOR=worker` 컷오버 — 의도적으로 **모든 라이브 검증
+      뒤 마지막** 단계
+
+<details>
+<summary>✅ 빌드 완료분: runner/worker.py (in-process read-only E2E 검증 2026-07-02) · Dockerfile + docker-compose.yml · 실행기 스위치 · DEPLOY.md runbook</summary>
+
 - [x] 동일 호스트 worker: run 큐 직접 소비 → validate → regression(adopt∥B를
       직렬로, 동일 -k 파티션) → sweep → conformance → dashboard/snapshot —
       `runner/worker.py` (ROADMAP Phase 3 Step 2의 `runner/`; api-test.yml의
@@ -401,8 +471,29 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - 오프라인 테스트: `runner/tests_offline.py` (claim 단일 승자 · suite→게이트
   매핑 · 스테이지 시퀀싱/게이팅 · 실패해도 sweep/dashboard · 마일스톤 기록).
   Docker 빌드/compose 기동은 실 호스트에서 검증 필요.
+- [x] **worker 실행기 in-process live 검증 (2026-07-02, read-only):**
+      `PLATFORM_EXECUTOR=worker`로 uvicorn 기동 → `/runs/trigger`
+      (suite=smoke, service=quota) → run 레코드 큐잉(`dispatched`,
+      gh_run_id NULL) → `python -m runner.worker --once`가 claim
+      (`local-1783030980`) → validate → smoke(47 live GET pass, mutation
+      게이트 전부 false — 호스트 .env가 게이트를 arm해도 `build_env`의
+      명시 override가 이김) → dashboard build → snapshot 64파일 S3 업로드
+      (`runs/local-…/snapshot/`) → finalize, DB 마일스톤 타임라인 + status
+      `done` 확인. **코드 수정 0건** — 남은 M4 검증은 Docker 빌드/compose
+      기동(server+worker 컨테이너) + worker 경유 mutation run뿐이며 실
+      호스트/owner 윈도우 필요.
 
-### M5 — 자원 모델 기반 시나리오 합성 (owner 제안 2026-06-11 채택) — R1·R2 DONE, R3 진행 중
+</details>
+
+### M5 — 자원 모델 기반 시나리오 합성 — ✅ DONE (R1·R2·R3 웨이브; 모델 275노드/60파일)
+
+> 설계 정본: `docs/RESOURCE-MODEL-PLAN.md`. 잔여 docs 노드의 검증·VALIDATED
+> 승격과 커버리지 확장은 **`docs/working/plans/CAMPAIGN-C3-100.md`가 흡수**했고,
+> R4(C4 `vary:` 옵션 변형 suite)는 그 이후의 후속이다.
+
+<details>
+<summary>채택 당시 계획 + R1~R3 진행 기록 (수치는 당시 값 — 현재는 275노드/60파일, provenance는 tools.catalog_status로 재측정)</summary>
+
 - 자원 타입별 task 정의(최소 의존조건 + 생성 옵션 + 검증된 body 템플릿)
   → 의존 그래프에서 시나리오를 **조합으로 생성**: 단독 테스트(선행 생성 →
   대상 검증 → 역순 삭제), 전체 회귀(합집합 그래프 + 공통 접두 dedup),
@@ -458,7 +549,18 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       교체, 전체 회귀 plan 계산
 - [ ] **R4 C4 변형** — `vary:` 옵션 조합 변형 suite
 
-### M6 — 셀프서비스 온보딩 + 조합 실행 + 관제 통합 (owner 비전 2026-06-13)
+</details>
+
+### M6 — 셀프서비스 온보딩 + 조합 실행 + 관제 통합 — ✅ DONE (내구 결정: `docs/ARCHITECTURE.md` §Autonomy design)
+
+> 구현체: `tools/new_service.py`(M6a) · `regression/scenarios/targets.py`
+> selector→compose(M6b/c) · `core/oplog.py emit_plan` + ops 오버레이(M6d) ·
+> 확정 IA 수렴 + 발행 rebase 통일(M6e) · `docs/agent-team.md` 운영 루프 +
+> IMPROVEMENT-BACKLOG(M6f). 상세 설계 전문: `docs/M6-DESIGN.md`(superseded).
+
+<details>
+<summary>owner 비전(2026-06-13) 원문 + M6a~f 항목</summary>
+
 
 > 신규 서비스가 추가되면 **담당자가 task 정의만 작성하면 테스트된다.**
 > 서비스/서비스군/전체/theme(예: CRUD 없는 조회 전용) 조합으로 스케줄을
@@ -492,7 +594,13 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       (2026-06-13 현재 이미 사실상 이 구조로 운영 중 — 명문화 + Planner
       상설화)
 
-### 마일스톤별 가치
+</details>
+
+### 마일스톤별 가치 · UI 비고 (역사)
+
+<details>
+<summary>마일스톤별 가치 요약 + UI 비고(2026-06-12) + IA reorg(2026-06-17) — 주의: IA 서술은 그 시점 것; 현행 IA 정본은 PLATFORM-IA-DIRECTION.md §확정 IA(Catalog·Modeling·Testing·Reporting)</summary>
+
 - M0만으로도: 멀티 환경 매트릭스 + run 히스토리가 생김 (서버 없이).
 - M1로: "스케줄에 따라 수행 + 히스토리 리포팅" 요구 충족.
 - M2로: "콘솔 로그인 없이 조치" 요구 충족.
@@ -533,9 +641,14 @@ run pill + 히스토리 행 선택, S3 listing pagination(1000-key 캡 해소),
 - **Ops** `ops.html` DEP map은 빌드 생성(수동 paste 폐지),
   static_export PAGES는 새 IA에 정렬하고 per-file `view/*` fan-out을 제거.
 
+</details>
+
 ---
 
-## 6. 결정 사항
+## 6. 결정 사항 (✅ 전부 확정·구현 — 미결 없음)
+
+<details>
+<summary>확정 결정: FastAPI+htmx · 호스트 불문 Docker Compose+SQLite · 파일 직접 편집(M4 컷오버 시) · multi-tenancy 필요 · baseline 환경별 파일 분리</summary>
 
 ### 확정 (2026-06-11)
 
@@ -561,3 +674,5 @@ run pill + 히스토리 행 선택, S3 listing pagination(1000-key 캡 해소),
    경로 불일치로 매 run 재시드되던 버그(--baseline 명시)를 함께 해결.
 
 (미결 결정 없음 — 모두 확정.)
+
+</details>

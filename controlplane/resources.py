@@ -28,7 +28,11 @@ from __future__ import annotations
 
 import calendar
 import json
+import os
+import re
+import threading
 import time
+from pathlib import Path
 
 from controlplane import db
 
@@ -90,6 +94,135 @@ def inventory(gh_run_id: str | None = None) -> list[dict]:
     for r in out:
         r["age"] = _age(r["created_ts"]) if r["live"] else ""
     return out
+
+
+# --- owned-resource scan (실측 정본) ---------------------------------------------
+# 잔존 자원의 SINGLE SOURCE OF TRUTH = cleanup.verify_clean.scan_owned (reconciler의
+# 소유 태그 스윕을 delete-stub 으로 돌린 read-only 인벤토리 — console2 /api/owned 와
+# 같은 엔진). 스캔은 느리므로(전 컬렉션 LIST) 백그라운드 스레드 + 캐시 (_runtime
+# 캐시 패턴). 위의 ingest 기반 inventory()는 '이력(플랫폼이 본 것)'으로 강등.
+
+_OWNED = {"rows": None, "ts": 0.0, "scanning": False, "error": None}
+_OWNED_LOCK = threading.Lock()
+_VER_RE = re.compile(r"^v\d")
+_ROOT = Path(__file__).resolve().parent.parent
+
+
+def stuck_entries() -> list[dict]:
+    """data/baselines/known_issues.json 의 ``stuck_resources`` — 문서화된, 현재
+    API로 지울 수 없는 잔존 자원 목록 (부재/깨짐 → 빈 목록)."""
+    try:
+        from core import baselines
+        path = baselines.resolve(_ROOT / "data" / "baselines" / "known_issues.json")
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        return [e for e in data.get("stuck_resources", []) if isinstance(e, dict)]
+    except Exception:
+        return []
+
+
+def _expand_scan(scan: list[dict]) -> list[dict]:
+    """scan_owned 항목(service·path·json) → 행(service·collection·res_id·name·kind).
+
+    * 일반형  DELETE /v1/<coll>/<id>            → collection=<coll>, res_id=<id>
+    * kms     DELETE /v1/kms/transit/<id>       → kind=kms (단건 삭제 매핑과 일치)
+    * keypairs는 이름으로 삭제 → res_id 칸이 곧 name
+    * bulk(body.ids — servicewatch 등)          → id 하나당 한 행
+    ``kind`` 는 단건 삭제(_delete_call) 재사용을 위한 키."""
+    rows: list[dict] = []
+    for o in scan:
+        service, path = o.get("service", ""), o.get("path", "")
+        body = o.get("json") if isinstance(o.get("json"), dict) else {}
+        segs = [s for s in path.split("?")[0].split("/") if s]
+        if segs and _VER_RE.match(segs[0]):
+            segs = segs[1:]
+        ids = body.get("ids")
+        if isinstance(ids, list) and ids:
+            coll = "/".join(segs)
+            for rid in ids:
+                rows.append({"service": service, "collection": coll,
+                             "res_id": str(rid), "name": "",
+                             "kind": segs[-1] if segs else "", "path": path})
+            continue
+        if len(segs) > 1:
+            coll, rid = "/".join(segs[:-1]), segs[-1]
+        else:
+            coll, rid = "/".join(segs), ""
+        kind = "kms" if segs and segs[0] == "kms" else (segs[0] if segs else "")
+        name = rid if kind == "keypairs" else ""
+        rows.append({"service": service, "collection": coll, "res_id": rid,
+                     "name": name, "kind": kind, "path": path})
+    return rows
+
+
+def _owned_scan_worker() -> None:
+    rows = err = None
+    try:
+        # read-only-ness is guaranteed by scan_owned stubbing _delete/_wait_gone;
+        # the env default is just a belt-and-braces hint.
+        os.environ.setdefault("SCP_ALLOW_DESTRUCTIVE", "false")
+        from cleanup.verify_clean import scan_owned
+        rows = _expand_scan(scan_owned())
+        # 이름 보강: ingest 이력에서 res_id → name (있을 때만)
+        names = {r["res_id"]: r["name"] for r in inventory() if r.get("name")}
+        for r in rows:
+            if not r["name"]:
+                r["name"] = names.get(r["res_id"], "")
+    except Exception as exc:  # noqa: BLE001 — 스캔 실패는 상태로 노출, 서버는 계속
+        err = str(exc)
+    with _OWNED_LOCK:
+        if err is None:
+            _OWNED.update(rows=rows, error=None, ts=time.time(), scanning=False)
+        else:  # 실패 시 마지막 성공 결과 유지 (있다면), 에러만 갱신
+            _OWNED.update(error=err, ts=time.time(), scanning=False)
+
+
+def start_owned_scan() -> bool:
+    """백그라운드 owned 스캔 시작 (이미 도는 중이면 no-op). True = 새로 시작."""
+    with _OWNED_LOCK:
+        if _OWNED["scanning"]:
+            return False
+        _OWNED["scanning"] = True
+    threading.Thread(target=_owned_scan_worker, daemon=True).start()
+    return True
+
+
+def _match_stuck(row: dict, stuck: list[dict]) -> dict | None:
+    for e in stuck:
+        if row.get("res_id") and row["res_id"] == str(e.get("id", "")):
+            return e
+        nm = str(e.get("name", ""))
+        if nm and row.get("name") and (row["name"] == nm or nm in row["name"]):
+            return e
+    return None
+
+
+def owned_state() -> dict:
+    """현재 스캔 상태 스냅샷 — 화면 렌더용. rows 는 normal/stuck 으로 분리
+    (stuck = known_issues.stuck_resources 매칭, 접힌 '기지 항목' 그룹으로)."""
+    with _OWNED_LOCK:
+        st = {k: _OWNED[k] for k in ("rows", "ts", "scanning", "error")}
+    st["age_s"] = int(time.time() - st["ts"]) if st["ts"] else None
+    stuck_docs = stuck_entries()
+    normal, stuck_rows = [], []
+    for r in st["rows"] or []:
+        hit = _match_stuck(r, stuck_docs)
+        if hit:
+            stuck_rows.append({**r, "stuck": hit})
+        else:
+            normal.append(r)
+    st["normal"], st["stuck_rows"], st["stuck_docs"] = normal, stuck_rows, stuck_docs
+    st["total"] = len(st["rows"] or []) if st["rows"] is not None else None
+    return st
+
+
+def _age_label(sec) -> str:
+    if sec is None:
+        return ""
+    if sec < 60:
+        return f"{sec}초 전"
+    if sec < 3600:
+        return f"{sec // 60}분 전"
+    return f"{sec // 3600}시간 {sec % 3600 // 60}분 전"
 
 
 # --- single-resource delete ----------------------------------------------------

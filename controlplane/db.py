@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS runs (
   gh_run_id TEXT UNIQUE,                 -- GitHub Actions run id (joins oplog/snapshot data)
   suite TEXT DEFAULT '',
   profile TEXT DEFAULT '',
-  trigger TEXT DEFAULT 'manual',         -- manual | schedule:<id> | external
+  trigger TEXT DEFAULT 'manual',         -- manual | schedule:<id> | external | local
   status TEXT DEFAULT 'dispatched',      -- dispatched | running | done | failed
   requested_at TEXT, started_at TEXT, finished_at TEXT,
   detail TEXT DEFAULT ''
@@ -100,6 +100,33 @@ def create_run(suite: str, profile: str, trigger: str = "manual",
             " detail, tenant) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (gh_run_id, suite, profile, trigger, now(), detail, tenant))
         return cur.lastrowid
+
+
+def record_local_run(gh_run_id: str, *, status: str = "done",
+                     suite: str = "console2", profile: str = "",
+                     trigger: str = "local", requested_at: str | None = None,
+                     finished_at: str | None = None, detail: str = "") -> int:
+    """Upsert a FINISHED local (console2) run into the runs table so Reporting ▸
+    실행 기록 and /runs/{id} show it (P2-9). Idempotent on gh_run_id: status
+    converges to the latest; timestamps/detail are first-write-wins. Atomic
+    ``ON CONFLICT`` upsert (same pattern as set_triage) — concurrent writers
+    (multi-worker import backfill) can't race a check-then-insert."""
+    ts = requested_at or now()
+    with connect() as con:
+        con.execute(
+            "INSERT INTO runs (gh_run_id, suite, profile, trigger, status,"
+            " requested_at, started_at, finished_at, detail)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(gh_run_id) DO UPDATE SET"
+            " status = excluded.status,"
+            " finished_at = COALESCE(runs.finished_at, excluded.finished_at),"
+            " detail = CASE WHEN runs.detail = '' THEN excluded.detail"
+            "               ELSE runs.detail END",
+            (gh_run_id, suite, profile, trigger, status,
+             ts, ts, finished_at, detail[:2000]))
+        row = con.execute("SELECT id FROM runs WHERE gh_run_id = ?",
+                          (gh_run_id,)).fetchone()
+        return row["id"]
 
 
 def list_runs(limit: int = 50) -> list[sqlite3.Row]:

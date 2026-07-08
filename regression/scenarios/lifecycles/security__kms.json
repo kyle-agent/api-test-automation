@@ -7,6 +7,14 @@
       "_note": "KMS transit-key CRYPTO lifecycle (C3 Tier-1 fix 2026-06-20; purpose confirmed 2026-06-23). Spine: (1) create RSA-2048 key (asymmetric, for sign/verify/encrypt/decrypt) -> capture key_id; (2) create AES-256-GCM96 key (symmetric, for datakey ONLY) -> soft-capture sym_key_id; (3) create HMAC key (symmetric, for hmac) -> soft-capture hmac_key_id; (4) read-only list-managed-keys -> soft-capture managed_key_id; (5) exercise all crypto ops; (6) teardown all three keys. CONFIRMED LIVE 2026-06-23: purpose purpose-to-operation mapping: rsa-2048->encrypt/decrypt/rewrap/sign/verify; aes256-gcm96->datakey (NOT hmac); hmac->hmac (NOT datakey). Valid advanced key purposes: aes256-gcm96, ecdsa-p256, rsa-2048, aria (KR SOUTH only), hmac. aria returns 400 'g offering scp' error on non-government accounts. All crypto/rotation steps are optional+grouped; a 4xx records coverage and isolates cleanly.",
       "steps": [
         {
+          "name": "check-duplicate-name",
+          "method": "GET",
+          "path": "/v1/kms/transit/duplicate",
+          "params": {"name": "regrkmsc{unique}"},
+          "expect_status": [200],
+          "_note": "GAP 편입 2026-07-08 (security/kms/checkduplicatename, 마지막 kms gap — COMPLETENESS-AUDIT-2026-07-08). transit create 직전 pre-check: create가 쓸 키 이름 그대로(name=regrkmsc{unique}, 동일 {unique} ctx) 중복 조회. 필수 쿼리 name (catalog/docs required:true). live 200 2026-07-08 ({isDuplicateName:false})."
+        },
+        {
           "name": "create",
           "method": "POST",
           "path": "/v1/kms/transit",
@@ -26,6 +34,13 @@
             "path": "/v1/kms/transit/{key_id}",
             "service": "kms"
           }
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/kms/transit",
+          "expect_status": [200],
+          "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): security-kms-key 은퇴분 (listkeys)."
         },
         {
           "name": "create-sym",

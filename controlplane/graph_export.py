@@ -146,7 +146,13 @@ def build_catalog(model: dict | None = None) -> dict:
             "options": opts,
             "dependents": sorted(dep_index.get(nid, [])),
             "verify_n": len(task.get("verify") or []),
-            "ready_timeout": (task.get("ready") or {}).get("timeout"),
+            # ready may be a LIST of specs (multi-stage readiness, composer
+            # 2026-07-04) — sequential waits, so the estimate sums them.
+            "ready_timeout": (
+                sum(int(r.get("timeout", 180)) for r in task["ready"]
+                    if isinstance(r, dict))
+                if isinstance(task.get("ready"), list)
+                else (task.get("ready") or {}).get("timeout")),
         }
         try:
             focus[nid] = _focus_display_edges(composer.focus_view(nid, model=model), model)

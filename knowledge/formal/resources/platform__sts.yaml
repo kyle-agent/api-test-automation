@@ -20,5 +20,6 @@ resources:
                          note: "assume할 role의 SRN — 실값 필요 (소스 probe는 placeholder로 4xx). iam-role 생성이 라이브 500이라 콘솔 발급 role을 폼으로 입력"}
     capture: {access_key: "$.credentials.access_key"}
     provenance: docs
+    gated: credential  # self-assumable role 없음 (IAM createrole 500) — 자격 전제 미충족
     source: {lifecycle: sts-token-issuance-coverage, steps: [assume-role]}
     notes: "응답 envelope $.credentials.* UNPROVEN. assume-role-with-saml(SAML 어설션 필요)·object-store-authorization은 별도 자격 전제가 커서 task화 보류 — coverage probe lifecycle이 C2 유지."

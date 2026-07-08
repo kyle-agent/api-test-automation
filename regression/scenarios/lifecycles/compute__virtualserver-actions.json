@@ -1,0 +1,388 @@
+{
+  "_comment": "compute/virtualserver — VS 4-action VERIFY recipe (HEAVY-PREMISE-CONTRACT WP4, 2026-07-08). One HEAVY lifecycle that creates a minimal throwaway server and earns real 2xx on the 4 safe per-server write actions the validated compute-virtualserver-full spine deliberately omits: password / dump / server-type(resize) / rebuild. Conventions (create-server body, captures, ready polls, teardown order) copied from compute-virtualserver-full (scenarios.json, READ-ONLY reference) and gen-heavy-vs-netops. lock/unlock are deliberately ABSENT: stranding risk, owner-waived class:reachability 2026-07-08 (data/baselines/coverage_waivers.json) — the CI-lane probe vs-server-action-coverage keeps them REACHED.",
+  "lifecycles": [
+    {
+      "id": "vs-server-actions-verify",
+      "service": "compute/virtualserver",
+      "heavy": true,
+      "enabled": true,
+      "_note": "Composed for ENDPOINT-DEPTH: earns real 2xx on the 4 safe server actions the heavy full lifecycle omits — POST password, POST dump, POST server-type (resize), POST rebuild — then tears everything down. Runs ONLY under the heavy opt-in (billable VM ~17min class). Steps expect strict 2xx so the loader derives role=verify (contract §1); the one documented exception is password [200,400] = PF-17 (Linux servers have no encrypted admin password to decrypt — live 400 VirtualServer.InvalidPrivateKeyValue, run 27452095757; a real 2xx needs a Windows image, out of minimal-throwaway scope). Do NOT enable lock/unlock here (risk of stranding a billable VM undeletable — same deadlock class as the 2 stranded SCF functions in known_issues; owner-waived class:reachability 2026-07-08, exercised by the CI probe vs-server-action-coverage instead). Action order per plan: password -> dump (both on ACTIVE) -> stop -> server-type resize (SCP type change needs a STOPPED server; api_docs is silent on state, conservative) -> start -> rebuild (on ACTIVE, the standard path; docs list no request body — rebuilds from the server's own image) -> delete. create uses the fixed smallest standard type s1v1m2 (docs example; live-accepted by the ASG launch-configuration create 2026-06-19) so the resize target — first catalog s-type that is not s1v1m2 and not a g/GPU type, captured BEFORE the billable create so a missing type fails fast — is a valid different/larger type (standard ladder: s1v2m4-class).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvavpc{unique}",
+            "description": "API regression VS actions",
+            "cidr": "10.176.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc",
+          "_note": "Adopts the session-shared VPC when SCP_SHARED_VPC_ID is set (engine seeds vpc_id, skips this create); self-create fallback CIDR 10.176.0.0/20 is a unique range (no overlap with any other fragment or the shared 10.124.0.0/20)."
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": ["ACTIVE"],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrvasub{unique}",
+            "description": "API regression VS actions",
+            "cidr": "10.176.1.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": ["ACTIVE"],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-sg",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrvasg{unique}",
+            "description": "API regression VS actions",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-keypair",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrvakey{unique}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "private_key": "$.private_key"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrvakey{unique}",
+            "service": "virtualserver"
+          },
+          "_note": "STRICT 2xx (no 409 orphan tolerance like the full lifecycle): the password action needs THIS keypair's private_key from the create response ($.private_key, KeypairCreateResponse top-level — formal model VALIDATED); an orphan reuse would leave it uncapturable."
+        },
+        {
+          "name": "find-image",
+          "method": "GET",
+          "path": "/v1/images",
+          "expect_status": [200],
+          "params": {
+            "status": "active",
+            "scp_original_image_type": "standard",
+            "visibility": "public",
+            "os_distro": "ubuntu",
+            "limit": 50
+          },
+          "capture": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "find-resize-server-type",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [200],
+          "capture": {
+            "resize_server_type": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": ["g", "s1v1m2"]
+              },
+              "get": "id"
+            }
+          },
+          "_note": "Resize target: first standard s-type that is NOT the create type s1v1m2 and NOT a g/GPU type. s1v1m2 is the smallest standard size (v1m2 = 1 vCPU/2GB, ladder floor per docs + billingplan css ladder), so any other s-type is a valid larger/different type (expected s1v2m4-class). HARD capture placed BEFORE the billable create-server on purpose: an account with no second s-type fails fast here instead of churning a VM."
+        },
+        {
+          "name": "create-server",
+          "method": "POST",
+          "path": "/v1/servers",
+          "json": {
+            "name": "regrvasrv{unique}",
+            "image_id": "{image_id}",
+            "server_type_id": "s1v1m2",
+            "keypair_name": "regrvakey{unique}",
+            "product_category": "compute",
+            "product_offering": "virtual_server",
+            "networks": [
+              {
+                "subnet_id": "{subnet_id}"
+              }
+            ],
+            "security_groups": [
+              "{sg_id}"
+            ],
+            "volumes": [
+              {
+                "boot_index": 0,
+                "size": 104,
+                "type": "SSD",
+                "delete_on_termination": true
+              }
+            ]
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "server_id": "$.servers[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}",
+            "service": "virtualserver"
+          },
+          "_note": "Body verbatim from the VALIDATED compute-virtualserver-full create (array capture envelope $.servers[0].id, boot volume type SSD size 104 delete_on_termination true) EXCEPT server_type_id is pinned to the smallest standard s1v1m2 so the resize target is deterministically different (the full lifecycle's dynamic first-s-type capture would make 'different from current' inexpressible)."
+        },
+        {
+          "name": "wait-server-active",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.state",
+            "until": ["ACTIVE"],
+            "timeout": 1200,
+            "interval": 15
+          }
+        },
+        {
+          "name": "get-server-password",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/password",
+          "json": {
+            "private_key": "{private_key}"
+          },
+          "expect_status": [200, 400],
+          "_note": "showvirtualserverpassword with the REAL keypair private_key (read-only effect). OWNER DECISION 2026-07-08: fleet pinned to ubuntu (find-image os_distro=ubuntu — fast boot, no Windows-license rate) and the call keeps passing the real key, single-shot. On ubuntu the guest never publishes an encrypted admin password (the publish flow is the Windows/cloudbase-init mechanism), so live 400 'Failed to decrypt' is the EXPECTED terminal state — the 10-min until-200 poll added earlier the same day (Windows-latency hypothesis, PF-17 corrected) was removed as pure wall-time waste on ubuntu. Reachability-waiver decision pending with owner; PF-17 has the full history."
+        },
+        {
+          "name": "dump-server",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/dump",
+          "expect_status": [200, 201, 202],
+          "_note": "createvirtualserverdump — no request body (api_docs: server_id path param only; 202 Accepted). Strict-2xx on an ACTIVE server is live-proven: gen-heavy-vs-netops runs the same step non-optional and its later static-nat steps were proven 2xx in run 27450089575."
+        },
+        {
+          "name": "stop-server",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/stop",
+          "expect_status": [200, 202, 204],
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 15,
+          "_note": "Same endpoint/expectation as the full lifecycle's validated stop; 409-retry armor in case the dump is still materializing when stop fires."
+        },
+        {
+          "name": "wait-server-stopped",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.state",
+            "until": ["STOPPED", "SHUTOFF"],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "resize-server-type",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/server-type",
+          "json": {
+            "server_type": "{resize_server_type}"
+          },
+          "expect_status": [200, 201, 202],
+          "_note": "setvirtualservertype on the STOPPED server (SCP console requires stopped for a type change; api_docs states no server-state precondition, so stopped is the conservative path). Body field is server_type per the docs model serversetservertyperequestbody — NOT server_type_id (the old coverage probe's unproven guess)."
+        },
+        {
+          "name": "wait-server-resized",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [200],
+          "wait": 15,
+          "poll": {
+            "field": "$.state",
+            "until": ["STOPPED", "SHUTOFF"],
+            "timeout": 600,
+            "interval": 15
+          },
+          "_note": "Resize is async (202); the server returns to STOPPED when it completes. The 15s pre-sleep lets the state leave STOPPED for its transitional value first, defeating the instant-pass race; start-server below carries 409-retry armor for any residue."
+        },
+        {
+          "name": "start-server",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/start",
+          "expect_status": [200, 202, 204],
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "wait-server-restarted",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "rebuild-server",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/rebuild",
+          "expect_status": [200, 201, 202],
+          "retry_on_status": [409],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "rebuildvirtualserver — api_docs lists NO request body (server_id path param only): reinstalls the OS from the server's own image, so nothing external is wiped in. Run on ACTIVE (the standard rebuild path); 409-retry armor if the resize/start is still settling. Ordered last of the 4 actions since it re-provisions the guest."
+        },
+        {
+          "name": "wait-server-rebuilt",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [200],
+          "wait": 20,
+          "poll": {
+            "field": "$.state",
+            "until": ["ACTIVE"],
+            "timeout": 600,
+            "interval": 15
+          },
+          "_note": "20s pre-sleep lets the state flip out of ACTIVE into the rebuild transition before polling back to ACTIVE; if the platform never surfaces a transition this passes immediately and delete-server's 409-retry absorbs a still-rebuilding delete."
+        },
+        {
+          "name": "delete-server",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "wait-server-gone",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [200, 404],
+          "poll": {
+            "until_status": [404],
+            "timeout": 600,
+            "interval": 15
+          }
+        },
+        {
+          "name": "delete-keypair",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrvakey{unique}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        },
+        {
+          "name": "delete-sg",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 404],
+          "poll": {
+            "until_status": [404],
+            "timeout": 180,
+            "interval": 10
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "adopt": "vpc"
+        }
+      ]
+    }
+  ]
+}

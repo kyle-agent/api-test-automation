@@ -386,27 +386,25 @@ def test_save_validation_failure_keeps_file_intact():
     assert (RES_DIR / "networking__vpc.yaml").read_bytes() == orig
 
 
-# --- 5. compose — composer 미탑재 degrade + 스텁 합성기 ---------------------------------
+# --- 5. compose — 합성 페이지 + 스텁 합성기 --------------------------------------------
+# (WS4 e2be5356 이후 composer는 항상 탑재 — 옛 "미탑재 degrade" 분기는 삭제됨.
+#  스텁은 resource_routes에 바인딩된 composer 모듈 속성을 교체하는 방식.)
 
-def test_compose_page_degrades_without_composer():
-    # composer는 main에 실재 — 부재 상황은 _composer 패치로 시뮬레이션 (통합 후 형태)
-    orig_composer = resource_routes._composer
-    resource_routes._composer = lambda: None
+def test_compose_page_renders_targets_and_prefill():
     page = client.get("/planning/resources/compose").text
-    assert "합성기 미탑재" in page and "disabled" in page
-    assert 'value="vpc-endpoint"' in page               # 대상 체크박스는 동작
+    assert 'value="vpc-endpoint"' in page               # 대상 체크박스
     assert "choice__privatelink-service" in page        # one_of 분기 select
-    r = client.post("/planning/resources/compose",
-                    data={"targets": ["vpc"], "action": "plan"})
-    assert r.status_code == 200 and "합성기 미탑재" in r.text
     # 프리필: 노드 폼의 "이 자원만 테스트" 링크 경로
     page = client.get("/planning/resources/compose?targets=vpc").text
     assert 'value="vpc" checked' in page
-    resource_routes._composer = orig_composer
 
 
 class _stub_composer:
-    """with _stub_composer() as mod: — C2 모양의 가짜 composer 모듈 주입."""
+    """with _stub_composer() as mod: — C2 모양의 가짜 composer 모듈 주입.
+
+    resource_routes는 composer를 모듈 최상단에서 직접 import 하므로
+    (e2be5356), sys.modules가 아니라 resource_routes.composer 속성을 교체한다.
+    """
 
     def __enter__(self):
         mod = types.ModuleType("regression.scenarios.composer")
@@ -433,11 +431,12 @@ class _stub_composer:
                               {"name": "delete-vpc"}]}
 
         mod.plan, mod.compose = plan, compose
-        sys.modules["regression.scenarios.composer"] = mod
+        self._orig = resource_routes.composer
+        resource_routes.composer = mod
         return mod
 
     def __exit__(self, *exc):
-        sys.modules.pop("regression.scenarios.composer", None)
+        resource_routes.composer = self._orig
 
 
 def test_compose_plan_preview_with_stubbed_composer():
@@ -507,7 +506,7 @@ TESTS = [
     test_new_node_goes_to_service_derived_file,
     test_save_guards_resources_dir_only,
     test_save_validation_failure_keeps_file_intact,
-    test_compose_page_degrades_without_composer,
+    test_compose_page_renders_targets_and_prefill,
     test_compose_plan_preview_with_stubbed_composer,
     test_compose_save_writes_draft_and_links_run,
     test_lifecycle_draft_guards,

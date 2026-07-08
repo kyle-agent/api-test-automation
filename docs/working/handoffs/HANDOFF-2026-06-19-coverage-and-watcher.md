@@ -1,6 +1,7 @@
 ---
-status: active
+status: superseded (historical handoff — current state lives in docs/working/CONTEXT.md)
 for: all
+superseded_by: ../CONTEXT.md
 ---
 
 # Handoff — 2026-06-19 (Claude remote): coverage push, per-service agents, live-watcher

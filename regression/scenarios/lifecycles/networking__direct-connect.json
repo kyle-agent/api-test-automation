@@ -1,6 +1,21 @@
 {
   "lifecycles": [
     {
+      "id": "networking-direct-connect-reads",
+      "service": "networking/direct-connect",
+      "enabled": true,
+      "heavy": false,
+      "_note": "Light read-only lifecycle: covers the one collection GET that 2xxes with no resource. GET /v1/direct-connects (listdirectconnects) returns 200 on an empty account — confirmed live 2026-06-29. The id-bound GETs (showdirectconnect, listroutingrules) need a real direct_connect_id; none exists in the account so those remain heavy-gated. This lifecycle deliberately targets only the safely reachable collection endpoint. No teardown required (read-only). Ceiling for this lifecycle: 1/8 (listdirectconnects). All 5 write ops + showdirectconnect + listroutingrules remain in the heavy lifecycle (networking-direct-connect-routing).",
+      "steps": [
+        {
+          "name": "list-direct-connects",
+          "method": "GET",
+          "path": "/v1/direct-connects",
+          "expect_status": [200]
+        }
+      ]
+    },
+    {
       "id": "networking-direct-connect-routing",
       "service": "networking/direct-connect",
       "enabled": true,

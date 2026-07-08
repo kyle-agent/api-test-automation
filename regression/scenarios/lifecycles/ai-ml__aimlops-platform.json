@@ -48,11 +48,14 @@
           "method": "POST",
           "path": "/v1/aimlops-platform",
           "json": {
-            "release_name": "regr-aimlops-{unique}",
-            "cluster_id": "{cluster_id}",
-            "image_id": "{image_id}",
-            "namespace": "regr-aimlops-{ualpha}",
-            "description": "API regression suite — coverage-only, never provisioned"
+            "ai_ml_ops_platform_create_request": {
+              "ai_ml_ops_platform_type": "Enterprise",
+              "release_name": "regr-aimlops-{unique}",
+              "cluster_id": "{cluster_id}",
+              "image_id": "{image_id}"
+            },
+            "kubernetes_engine_create_request": null,
+            "node_pool_create_request": null
           },
           "expect_status": [
             200,
@@ -66,7 +69,7 @@
           ],
           "optional": true,
           "group": "aimlops-release",
-          "_note": "BILLABLE platform release — never actually provisioned. Body (release_name/cluster_id/image_id/namespace) best-effort from field semantics, UNPROVEN; expected 400/422 (needs a real cluster_id/image_id + full resource spec) or 403. Deliberately NOT chained to a delete of a real release."
+          "_note": "BILLABLE platform release — never actually provisioned. CORRECTED offline 2026-07-07 (A-repair-9, same fix as generated__heavy-aimlops.json:release-aimlops-platform): data/api_docs.json model `aimlopsplatformcreatewithk8senginerequest` proves the real body is a 3-key wrapper (required `ai_ml_ops_platform_create_request` with required ai_ml_ops_platform_type/image_id/release_name + optional cluster_id, plus sibling nullable kubernetes_engine_create_request/node_pool_create_request) — the prior flat body (with a bogus top-level `namespace`/`description`, neither of which exist in this model) was UNPROVEN and structurally wrong, though it still 400'd harmlessly here since cluster_id/image_id are placeholder literals anyway (this lifecycle deliberately never provisions). expected 400/422 (placeholder cluster_id/image_id) or 403. Deliberately NOT chained to a delete of a real release."
         },
         {
           "name": "update-aimlops-platform",

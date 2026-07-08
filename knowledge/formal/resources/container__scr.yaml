@@ -128,6 +128,7 @@ resources:
       - scr-repository
       - {credential: scr-auth-key}
     provenance: docs
+    gated: credential  # docker push 산물 — 콘솔 발급 scr-auth-key 필요
     source: {lifecycle: scr-image-write-coverage, steps: [seed-image-placeholder]}
     # show-image (GET /v1/images/{image_id}) getid는 scr-read-coverage 라이프사이클의
     # get-image 스텝이 닫는다 — list-images-harvest가 캡처한 실 image_id($.images[0].id)에
@@ -140,5 +141,6 @@ resources:
     no_api: true
     requires: [scr-image]
     provenance: docs
+    gated: credential  # docker push 산물 — 콘솔 발급 scr-auth-key 필요
     source: {lifecycle: scr-tags-write-coverage, steps: [seed-tags-placeholder]}
     notes: "Open API create 없음: 태그(tags/'tagses') 역시 docker push 산물이다. 카탈로그에는 PUT .../check-vulnerability·lock-policy와 DELETE /v1/tagses(BULK, body {ids:[...]})·DELETE /v1/tagses/{tags_id}만 존재. scr-image처럼 R3 push 러너 전까지 composer 대상 불가. [docs-mapper UNPROVEN 2026-06-15, userguide how_to_guides '이미지 및 태그 관리하기'/'이미지 태그 삭제 정책 관리하기']: 태그 삭제 정책(lifecycle: outdated/untagged 규칙)은 scr-repository의 lifecycle_policy 블록이 리포지토리 레벨에서 관할 — 태그 자체의 check-vulnerability/lock-policy PUT는 image-레벨 보안 ops. 태그 네이밍 수치 제약은 overview/how_to_guides에 미명시 (Docker 태그 규칙 + API Reference 영역)."

@@ -2,36 +2,28 @@
 
 Automated testing **platform** for the Samsung Cloud Platform (SCP) Open APIs
 documented at <https://docs.e.samsungsdscloud.com/apireference/>
-(**13 categories / ~60 services / ~1,372 endpoints**).
+(**13 categories / ~60 services / ~1,372 endpoints**). Engineered by a team of
+AI agents (`docs/agent-team.md`); session entry point: `START_HERE.md`; current
+state: `docs/working/CONTEXT.md`; doc index: `docs/INDEX.md`.
 
-What started as a catalog-driven test suite is now a full platform with
-**three areas**:
+**Three areas** (full blueprint + phase direction: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)):
 
-1. **Control plane — [`controlplane/`](controlplane/README.md)** · a FastAPI +
-   htmx + SQLite server (Overview → Plan → Run → Report + Knowledge IA) that
-   dispatches runs (suite × environment profile), schedules them (cron), tracks
-   them live (oplog event ingest + milestone timeline), lets you intervene
-   mid-run (abort / skip-scenario / stop-polling via the M2 command channel,
-   single-resource delete), restores any past run's dashboard from its
-   snapshot, and hosts the AI seams (`ai_pipelines.py`: triage, spec-impact,
-   scenario/task drafts, fact extraction — all draft-only, never on the hot path).
-2. **Execution plane — the two-axis engine**, today run by GitHub Actions
-   (`.github/workflows/api-test.yml`), at deployment cutover (M4) by the
-   same-host [`runner/worker.py`](runner/worker.py). Same `python -m …`
-   entrypoints either way.
-3. **Knowledge & model — [`knowledge/formal/`](knowledge/formal/FORMAT.md)**,
-   including the **M5 resource-task model**
-   (`knowledge/formal/resources/*.yaml`, 275 nodes / 60 service files) from which
+1. **Control plane — [`controlplane/`](controlplane/README.md)** · FastAPI +
+   htmx + SQLite work console on the confirmed IA **`Catalog · Modeling ·
+   Testing · Reporting (+ Knowledge)`** (canonical:
+   `docs/working/plans/PLATFORM-IA-DIRECTION.md` §확정 IA): dispatch, live
+   tracking, mid-run intervention, snapshot restore, authoring, draft-only AI
+   seams.
+2. **Execution plane — the two-axis engine**, run by GitHub Actions
+   (`.github/workflows/api-test.yml`) or the same-host `runner/worker.py`
+   (M4 cutover last — `docs/PLATFORM-PLAN.md`). Same `python -m …` entrypoints
+   either way.
+3. **Knowledge & model — [`knowledge/`](knowledge/README.md)** +
+   [`knowledge/formal/`](knowledge/formal/FORMAT.md), including the **M5
+   resource-task model** (`knowledge/formal/resources/*.yaml`, 275 nodes /
+   60 YAML files = 59 services + `_groups.yaml`) from which
    `regression/scenarios/composer.py` *composes* lifecycles — scenarios are
-   increasingly generated from the model rather than hand-written.
-
-The suite remains **catalog-driven** (the API Reference is parsed once into a
-machine-readable inventory; tests are generated from it) and organised around
-**two axes** on a shared kernel. See [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the
-full blueprint, [`ROADMAP.md`](docs/ROADMAP.md) for the phase plan,
-[`docs/PLATFORM-PLAN.md`](docs/PLATFORM-PLAN.md) for the platform milestones
-(M0–M5), and [`docs/agent-team.md`](docs/agent-team.md) for the multi-agent team that does
-the engineering.
+   generated from the model rather than hand-written.
 
 ```
                          core/  (shared kernel)
@@ -43,291 +35,145 @@ the engineering.
 ```
 
 - **AXIS 1 — `regression/` (does it work?)** read-only smoke + list→show
-  read-chains + ordered CRUD scenarios that create/delete real resources, recording
-  **pass/fail + response time** and widening coverage.
-- **AXIS 2 — `conformance/` (is it well designed/built?)** static spec analysis +
-  read-only runtime probes that surface design/implementation defects, with a
-  pluggable rule lens and a baseline so only NEW defects alarm.
-- **Supports:** `spec/` extracts the spec from the docs and diffs versions ·
-  `dashboard/` visualizes both axes from one results store · `cleanup/` guarantees
-  teardown via a tag-based reconciler.
+  read-chains + ordered CRUD scenarios that create/delete real resources,
+  recording **pass/fail + response time** and widening coverage
+  (coverage definitions: `docs/COVERAGE-CRITERIA.md`; current campaign:
+  `docs/working/plans/CAMPAIGN-C3-100.md`).
+- **AXIS 2 — `conformance/` (is it well designed/built?)** static spec analysis
+  + read-only runtime probes with a pluggable rule lens and a baseline so only
+  NEW defects alarm.
+- **Supports:** `spec/` extracts/diffs the spec · `dashboard/` visualizes both
+  axes from one results store · `cleanup/` guarantees teardown via a tag-based
+  reconciler.
 
 ## Layout
 
 ```
-core/         config·auth·http_client·catalog  +  registry·results·budgets·suites·profiles·oplog·snapshot·commands·baselines
-spec/         extract_catalog · extract_bodies · summary · diff · coverage_gap
-regression/   smoke · read_chains · scenarios/{engine, composer, loader, scenarios.json,
-              lifecycles/*.json (per-service fragments + generated__*), dependencies.json}
-conformance/  static · runtime · baseline · rules/  (pluggable Rule lens)
-cleanup/      reconciler   (tag-ownership sweep; legacy name-prefix fallback)
-dashboard/    build (redesigned index + per-service drilldowns) · ops.html (live ops view)
-controlplane/ the platform server: app · dispatch · scheduler · authoring · triage ·
-              ai_pipelines/ai_routes · resource_routes · snapshots · compare · static_export
-runner/       worker.py — same-host executor for the M4 cutover (queue consume → same stages)
-suites/       named suites (smoke/full/full-heavy/conformance) — run = suite × profile
-environments/ environment profiles (stage/prod × region; credential *references* only)
-tests/        thin pytest entrypoints that drive the regression engines
-knowledge/    SCP domain knowledge (human-readable, AI-maintained) + formal/ (editable YAML)
-              formal/resources/  ← M5 resource-task model (275 nodes / 60 files; composer input)
-drafts/       AI/composer outputs awaiting human review (never auto-enabled)
-data/         api_catalog.json · api_bodies.json · api_docs.json · conformance.json
-              baselines/known_issues.json · baselines/coverage_waivers.json (per-profile
-              suffixed siblings supported: known_issues.<profile>.json)
-docs/         design specs (ARCHITECTURE · agent-team · scheduler-system) + working/ (handoffs · trackers · plans) + decisions/  — see docs/INDEX.md
-reports/      per-run output (gitignored): results/*.jsonl, registry/*.jsonl, dashboard/
-.github/workflows/api-test.yml   one orchestrator (spec → regression → sweep + conformance → dashboard → snapshot)
+core/         kernel: config·auth·http_client·catalog + registry·results·budgets·suites·profiles·oplog·snapshot·commands·baselines
+spec/         extract_catalog · extract_bodies · summary · diff · coverage_gap · read_reachability
+regression/   smoke · read_chains · scenarios/ (engine·composer·targets·DAG scheduler — see its README)
+conformance/  static · runtime · baseline · rules/
+cleanup/      reconciler (tag-ownership sweep)
+dashboard/    build (index + drilldowns) · ops.html (live ops — docs/OPS-DASHBOARD.md)
+controlplane/ platform server (see controlplane/README.md)
+console2/     Testing console frontend, served by the spine (see console2/README.md)
+runner/       worker.py — same-host executor (M4)
+suites/ environments/  named suites × environment profiles (run = suite × profile)
+tests/        thin pytest entrypoints (smoke / crud / offline)
+knowledge/    domain knowledge (narrative + formal/ YAML model)
+drafts/       AI/composer outputs awaiting review (never auto-enabled)
+data/         api_catalog.json · api_bodies.json · api_docs.json · baselines/
+docs/         ARCHITECTURE · agent-team · working/{CONTEXT,plans,trackers} — see docs/INDEX.md
+reports/      per-run output (gitignored)
 ```
 
-## Setup
+## Setup & canonical commands
 
 ```bash
 pip install -r requirements.txt    # engine deps
-cp .env.example .env               # fill in SCP_REGION + credentials
+cp .env.example .env               # SCP_REGION + credentials (never commit .env)
 python -m spec.extract_catalog     # build/refresh data/api_catalog.json (resumable)
-python -m spec.summary             # coverage summary of the catalog
+python -m spec.summary             # live coverage summary (trust this over memory)
+
+# AXIS 1 — read-only smoke across the catalog (no resource changes)
+pytest tests/smoke -m smoke        #  --category compute --service virtualserver to scope
+
+# AXIS 1 — CRUD lifecycles (create/delete REAL resources)
+pytest tests/crud -m crud          # gates: see Safety model below
+
+# AXIS 2 — conformance
+python -m conformance.static
+python -m conformance.runtime --probe all
+python -m conformance.baseline --init-if-missing
+
+# supports
+python -m dashboard.build                                  # render dashboard
+SCP_ALLOW_DESTRUCTIVE=true python -m cleanup.reconciler    # reclaim leftovers (tag-scoped)
 ```
 
-Requirements are split so each piece installs only what it needs:
-`requirements.txt` (engine) · `controlplane/requirements.txt` (platform server —
-FastAPI/uvicorn/jinja2/croniter, dependency-light by design) ·
-`controlplane/requirements-ai.txt` (optional: `anthropic` for the AI features;
-the server runs fully without it, AI sections show 비활성).
+Platform server (from the repo root):
+`pip install -r requirements.txt -r controlplane/requirements.txt && uvicorn
+controlplane.app:app --host 0.0.0.0 --port 8800` — env vars, command-channel
+API and the editing model: [`controlplane/README.md`](controlplane/README.md);
+Docker Compose deployment: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-## Platform server (control plane)
+## Safety model (contract — canonical wording: `CLAUDE.md` Hard Rules)
 
-```bash
-pip install -r requirements.txt -r controlplane/requirements.txt
-uvicorn controlplane.app:app --host 0.0.0.0 --port 8800   # run from the repo root
-```
+Mutations default **ON** — the project's purpose is real execution; the
+deliberate opt-in is the run **selection** + the console2 pre-flight confirm,
+not an env flag (`core/config.py`):
 
-The UI follows the **Overview · Plan · Run · Report · Knowledge** IA
-(canonical IA: [`docs/IA.md`](docs/IA.md)): **Plan** is one linear
-`Catalog → Model → Compose → Validate` stepper (Validate runs
-`regression.scenarios.validate`; AI drafts are inline assist in Model/Compose),
-**Report** embeds the canonical static dashboard for coverage/conformance
-alongside run list/compare/triage. Trigger suite × profile runs, watch them live,
-queue abort/skip commands the engine polls at step boundaries, browse/edit
-suites · profiles · scenarios · knowledge (validator-gated saves, local git
-commits), view the resource inventory, compare two runs, and restore any past
-run's dashboard from its snapshot. See
-[`controlplane/README.md`](controlplane/README.md) for env vars and the command
-channel API, and [`docs/DEPLOY.md`](docs/DEPLOY.md) for the Docker Compose
-deployment bundle (M4 server + worker).
-
-`spec.extract_catalog` uses HTTP Range requests (only each page `<head>` is
-needed), retries the gateway's intermittent 503s with backoff, and is resumable.
-Track spec changes between two catalog snapshots with `python -m spec.diff old.json new.json`.
-
-## Running
-
-```bash
-# AXIS 1 — read-only smoke regression across the whole catalog (no resource changes)
-pytest tests/smoke -m smoke
-pytest tests/smoke -m smoke --category compute --service virtualserver   # scoped
-
-# AXIS 1 — CRUD lifecycles (create/delete REAL resources — opt in explicitly)
-SCP_ALLOW_MUTATIONS=true SCP_ALLOW_DESTRUCTIVE=true pytest tests/crud -m crud
-
-# AXIS 2 — conformance (design/impl defects; read-only / empty-body probes)
-python -m conformance.static                 # static spec analysis + rule lens
-python -m conformance.runtime --probe all    # runtime probes (gated; non-destructive)
-python -m conformance.baseline --init-if-missing   # only NEW defects alarm
-
-# support — render the dashboard from the results store
-python -m dashboard.build
-
-# support — reclaim any leftover test resources (tag-scoped; destructive)
-SCP_ALLOW_DESTRUCTIVE=true python -m cleanup.reconciler
-```
-
-Per-run signals land in `reports/results/` (`observations.jsonl` = axis-1 calls
-with response time; `findings.jsonl` = axis-2 defects) and the pytest HTML/JUnit
-in `reports/`.
-
-## Safety model
-
-The catalog includes destructive operations. A run never changes real cloud state
-unless explicitly opted in:
-
-| Operation | Default | Enable with |
-|-----------|---------|-------------|
+| Operation | Default | Gate |
+|-----------|---------|------|
 | `GET` (read-only) | runs | always allowed |
-| `POST` / `PUT` / `PATCH` | **blocked** | `SCP_ALLOW_MUTATIONS=true` |
-| `DELETE` | **blocked** | `SCP_ALLOW_DESTRUCTIVE=true` |
+| `POST` / `PUT` / `PATCH` | **allowed** | force read-only: `SCP_ALLOW_MUTATIONS=false` (CI smoke/conformance suites set it explicitly) or profile veto `SCP_PROFILE_FORBID` |
+| `DELETE` | **allowed** | disable: `SCP_ALLOW_DESTRUCTIVE=false` or profile veto |
+| Heavy/billable lifecycles (VM, K8s, DB) | **skipped** | explicit opt-in: `SCP_RUN_HEAVY=true` or a heavy run selection (console2 auto-derives + confirms) |
 
-Smoke + read-chains only call read-only `GET`s; mutating/parameterised endpoints
-are exercised by explicit, ordered CRUD scenarios.
+Smoke + read-chains only call read-only `GET`s; mutating endpoints are exercised
+by explicit, ordered CRUD scenarios.
 
-### Resource ownership & cleanup (registry)
+- **Ownership & cleanup:** every created resource is stamped
+  (`core.registry`) with an owner/run/axis/TTL tag and recorded in a per-run
+  manifest → deterministic reverse-order teardown; `cleanup.reconciler`
+  reclaims orphans **only under our owner tag** (name-prefix is a fallback).
+  CI exports `APITEST_RUN_ID` so tags are attributable per run.
+- **Quotas:** account caps (5-VPC, private-dns, …) are data (`core.budgets` +
+  `regression/scenarios/dependencies.json`); the engine **reserves** before a
+  capped create and **skips** (not fails) when exhausted — quota pressure is
+  never a false regression.
+- Mute a tracked backend bug in `data/baselines/known_issues.json`
+  (per-profile siblings: `known_issues.<profile>.json`).
 
-Every resource a run creates is stamped (`core.registry.owner_tags`) with an
-owner/run/axis/TTL tag and recorded in a per-run manifest. Teardown is therefore
-**deterministic and isolation-safe**: a run tears down its own manifest in reverse
-order, and `cleanup.reconciler` reclaims account-wide orphans **only when they
-carry our owner tag and are finished/expired** — it never touches another run's
-live resources (name-prefix matching remains a fallback for tag-less resources).
-CI exports `APITEST_RUN_ID` so the tags are attributable per run.
+## Scenarios (pointer)
 
-### Quotas & scheduling (budgets)
+CRUD lifecycles are **declarative data**; composed lifecycles are compiled from
+the resource model. Authoring contract (per-step features, light vs heavy,
+heavy self-trigger): [`regression/scenarios/README.md`](regression/scenarios/README.md).
+Model design: [`docs/RESOURCE-MODEL-PLAN.md`](docs/RESOURCE-MODEL-PLAN.md) ·
+format: [`knowledge/formal/FORMAT.md`](knowledge/formal/FORMAT.md) ·
+scheduler: [`docs/scheduler-system.md`](docs/scheduler-system.md).
 
-Account limits (e.g. the 5-VPC cap, private-dns) are modelled as data
-(`core.budgets` + `regression/scenarios/dependencies.json`). The scenario engine
-**reserves** a slot before a quota-bound create and environmentally **skips**
-(not fails) when exhausted, so quota pressure never shows up as a false regression.
+## Endpoints & auth (pointer)
 
-## CRUD scenarios
+SCP endpoints are **per service** (regional
+`https://<service>.<region>.<env>.samsungsdscloud.com`, global services have no
+region segment); path roots collide across services, so each call targets its
+own host. Auth is **Access Key + HMAC-SHA256** with tunable signing
+(`core/auth.py`, `SCP_HMAC_*`). Full details + the global-service list:
+`docs/working/CONTEXT.md` § "Endpoints, region & auth" and
+`knowledge/domain-model.md`. Overrides: `SCP_SERVICE_HOSTS` (JSON),
+`SCP_GLOBAL_SERVICES`, `SCP_BASE_URL` (last resort).
 
-Scenarios are **declarative** — add an entry to
-`regression/scenarios/scenarios.json` (no new Python) and the engine drives
-create → read → delete in order. Per-step features:
+## Dashboards & publishing (pointer)
 
-- `capture` — pull a value from a response (`$.vpc.id`) into a `{placeholder}`;
-  `{unique}`/`{region}` are seeded automatically.
-- `service` — override the host for that step (a chain can span services).
-- `poll` / `wait` — wait for async provisioning (`{field, until, timeout, interval}`).
-- `cleanup` — the delete to register for a created resource (reverse-order teardown).
-- `group` + `optional` — a multi-engine/family scenario isolates a failing group
-  (tears down just that group, keeps the rest) so one bad body costs one family,
-  not the whole run.
-- `destructive: true` — marks deletes (need `SCP_ALLOW_DESTRUCTIVE`).
+`python -m dashboard.build` renders the self-contained dashboard (verdict
+header, C1/C2/C3 coverage ladder, per-service drilldowns) from the unified
+results store. Everything publishes to the **`dashboard-data`** branch / Pages
+(enable once: Settings → Pages → Deploy from a branch → `dashboard-data` / root):
+`index.html` + history + per-service pages, **`ops.html`** (live ops view over
+the persistent oplog bucket — `docs/OPS-DASHBOARD.md`), the console2 static
+snapshot (`console2/README.md`), and per-run **snapshots** restorable from the
+control plane's Reporting screen.
 
-**Light** scenarios run in routine opted-in CRUD; **heavy** ones (`heavy: true`,
-real billable VM / K8s / DB / shared-networking, ~20–60 min) run ONLY when
-`SCP_RUN_HEAVY=true` (manual dispatch). Validate a single heavy scenario with the
-dispatch `crud_filter` input. In CI, set repo variable **`SCP_RUN_CRUD=true`** to
-opt a run into CRUD; the result + any teardown is posted as a PR comment.
-`dependencies.json` maps the seven VPC-creating scenarios to their quota kinds.
+## How runs are triggered (pointer)
 
-### Composed scenarios (M5 resource-task model)
+**On-demand only** — `api-test.yml`'s automatic push trigger is owner-DISABLED
+(2026-06-18). The three real lanes (chat-heavy request file · local platform
+console · manual `workflow_dispatch` fallback) and the conformance gating are
+canonical in [`docs/agent-team.md`](docs/agent-team.md) § "Run triggers".
+Ordinary pushes/PRs run only the offline gate `validate.yml`. One workflow run
+at a time (sweep included) — owner rule.
 
-Hand-written lifecycles are progressively being replaced by **composed** ones:
-`knowledge/formal/resources/*.yaml` defines per-resource tasks (requires graph
-incl. `one_of`/`count`/credential prerequisites, validated body templates,
-options, capture/ready/delete) — **275 nodes** across 13 categories with
-human-readable codes (`nw-vpc-vpc`, groups in `_groups.yaml`).
-`regression/scenarios/composer.py` compiles a target set into an ordinary
-lifecycle JSON (`gen-<node>` / `bundle-<group>`): dependency closure →
-topological order + capture wiring → verify steps → reverse teardown (with the
-conflict-retry delete semantics of the hand-written lifecycles). The engine is
-unmodified — composed output is just another lifecycle. Live-proven via the
-R3 verification waves (`regression/scenarios/lifecycles/generated__*.json` —
-~10 composed chains stably green incl. the full apigw bundle); see
-`docs/RESOURCE-MODEL-PLAN.md` §6 for wave results and
-`docs/working/trackers/PRODUCT-FINDINGS.md` for the ledger of product/API findings the waves
-surfaced.
+CI configuration (Settings → Secrets and variables → Actions): variables
+`SCP_REGION`, `SCP_ENV`, `SCP_RUN_CRUD`, optional `SCP_SERVICE_HOSTS` /
+`SCP_HMAC_*` / `SCP_AUTH_SCHEME`; secrets `SCP_ACCESS_KEY` / `SCP_SECRET_KEY`
+(+ optional `SCP_PROJECT_ID`). The gateway must be reachable from the runner
+(private network → self-hosted runner).
 
-> **Self-trigger for heavy runs:** a committed `.github/heavy.txt` (first
-> non-comment line = a `crud_filter` expression) lets a push drive which heavy
-> lifecycle runs next — used to chain heavy validations one per run. Empty file
-> = no heavy self-trigger.
+## Results contract
 
-## Endpoints (per-service hosts)
-
-SCP Open API endpoints are **per service**, not one gateway, in two flavours:
-
-```
-regional: https://<service>.<region>.<env>.samsungsdscloud.com   e.g. vpc.kr-west1.e...
-global  : https://<service>.<env>.samsungsdscloud.com            e.g. product.e...
-```
-
-Path roots collide across services (`/v1/clusters` is used by ske, mariadb,
-mysql, …), so each call targets its own host. Set `SCP_REGION` (+ `SCP_ENV`,
-default `e`) and the suite builds each service's host from the catalog name.
-**Global (account-scoped) services have no region segment** — the built-in list
-(`product, pricing, iam, organization, quota, billingplan, budget, costexplorer,
-cloudcontrol, resourcemanager, support`) was DNS-verified and is extendable via
-`SCP_GLOBAL_SERVICES`. Override odd subdomains via `SCP_SERVICE_HOSTS` (JSON);
-`SCP_BASE_URL` is a last-resort single-host fallback (a concrete URL, not a wildcard).
-
-## Authentication
-
-SCP signs Open API calls with **Access Key + HMAC-SHA256**. The signing-string
-layout and header names are not on the public API Reference pages, so
-`core/auth.py` keeps the signing string in one overridable method and the header
-names configurable via env (`SCP_HMAC_*`). Confirm against a real `200`; on
-`401/403`, adjust `HmacSigner.signing_string` / the header env vars.
-`SCP_AUTH_SCHEME=bearer|none` is also supported.
-
-## Dashboards & Pages
-
-`python -m dashboard.build` renders a self-contained HTML dashboard
-(**redesigned 2026-06 to the owner's mockups**: verdict header, coverage-ladder
-cards, per-service drilldown pages). It reads the unified results store
-(`reports/results/observations.jsonl` + `findings.jsonl`) first, falling back to
-legacy flat files so nothing regresses mid-migration. It shows health (new vs
-known regressions, pass rate, the C1/C2/C3 coverage ladder), per-service
-drill-down with **status + response time** and **design/behavior defect** columns,
-the CRUD grid, and trends.
-
-Everything is published to the **`dashboard-data`** branch each run (enable via
-**Settings → Pages → Deploy from a branch → `dashboard-data` / `(root)`**):
-
-- `index.html` + `history.jsonl` + per-service pages — the results dashboard.
-- `ops.html` — the **live ops view**: reads the persistent oplog bucket
-  directly and renders a dependency-ordered resource tree per run (kind map
-  generated from the resource model by `dashboard/gen_dep_map.py`), with
-  in-flight run pills + history-row selection, filters, a run-finished
-  **cleanup-integrity verdict** (testing/leaked/cleanup-failed/deleted),
-  paginated S3 listing and KST timestamps (watch a run without GitHub).
-- `/platform/` — a **static export of the whole platform UI**
-  (`python -m controlplane.static_export`): the `Overview · Plan · Run · Report ·
-  Knowledge` nav (Plan as the `Catalog → Model → Compose → Validate` stepper),
-  resource-model pages incl. a read-only page per resource node — PAGES aligned to
-  the new IA with the per-file `view/*` fan-out dropped (~289 pages), every
-  nav/menu clickable; server-only actions show a banner.
-- Per-run **snapshots** (results JSONL + built dashboard + meta) are archived to
-  the oplog bucket under `runs/<run_id>/snapshot/` and restorable from the
-  control plane's Report screen.
-
-Mute a tracked backend bug by adding it to `data/baselines/known_issues.json`
-so only genuinely new breakage alarms (per-environment baselines: a
-profile-suffixed sibling like `known_issues.<profile>.json` takes precedence).
-
-## How runs are triggered (CI · GitHub Actions)
-
-`.github/workflows/api-test.yml` is a single orchestrator:
-**spec** (refresh catalog + resolve suite/profile/run-request options) →
-**regression** (smoke + read-chains, opt-in CRUD; the adopt-class and serial
-VPC-CRUD passes run as parallel A∥B jobs) → **sweep** (`cleanup.reconciler`)
-and **conformance** (static + runtime + baseline) → **dashboard** (build +
-publish + `/platform/` static export) → **snapshot** (per-run archive).
-
-**Triggers are on-demand only** (live runs are expensive — no cron, no per-push
-runs). Three equivalent ways to start a run:
-
-1. **Run-request file**: touch **`.github/run-request`** and push (runs on that
-   branch; this is how a chat session starts a run). The file carries `KEY=VALUE`
-   options — `suite/profile/mutations/destructive/heavy/conformance/category/
-   service/crud_filter` — so every dispatch capability is chat-controllable.
-   Owner sequencing rule: never push a run-request commit while a previous run
-   (including its sweep) is still in progress.
-2. **workflow_dispatch** with the same inputs (named `suite` from `suites/*.yaml`
-   and `profile` from `environments/*.yaml` expand to gate defaults; explicit
-   inputs override).
-3. **The control plane UI** (`controlplane/`) — manual trigger or cron schedule;
-   dispatches via the Actions API today, or queues for `runner/worker.py` when
-   `PLATFORM_EXECUTOR=worker` (M4).
-
-Ordinary pushes/PRs run only the cheap offline gate `validate.yml`
-(scenario + knowledge validation, no credentials).
-**Conformance** is further gated: it runs only when the spec actually changed
-(catalog refresh diff), on `claude/run-conformance`/`run-schema-live` pushes,
-with dispatch `run_conformance=true`, or repo var `SCP_RUN_CONFORMANCE=true` —
-when skipped, the dashboard reuses the last committed conformance data (the two
-jobs write disjoint files on `dashboard-data`, nothing is clobbered).
-
-Configure once in **Settings → Secrets and variables → Actions**:
-
-| Type | Name | Notes |
-|------|------|-------|
-| Variable | `SCP_REGION` | e.g. `kr-west1` — builds per-service hosts |
-| Variable | `SCP_ENV` | default `e` |
-| Secret | `SCP_ACCESS_KEY` / `SCP_SECRET_KEY` | credentials |
-| Secret | `SCP_PROJECT_ID` | optional |
-| Variable | `SCP_RUN_CRUD` | `true` to opt scheduled/CI runs into CRUD |
-| Variable | `SCP_SERVICE_HOSTS` | optional JSON overrides for odd subdomains |
-| Variable | `SCP_HMAC_*`, `SCP_AUTH_SCHEME` | optional auth overrides |
-
-> The gateway must be reachable from the runner. If it is on a private
-> network/VPN, use a `self-hosted` runner with network access.
+Per-run signals land in `reports/results/` — `observations.jsonl` (AXIS 1,
+with response time) + `findings.jsonl` (AXIS 2). Write through `core.results`
+(`record(Observation(...))` / `record_finding(Finding(...))`); schema in
+`core/results.py`. The dashboard reads this store first.

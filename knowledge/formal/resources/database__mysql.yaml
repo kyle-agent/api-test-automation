@@ -440,7 +440,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{mysql-cluster.cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # evidence: database/mysql/mysqlrestartcluster
     source: {lifecycle: database-mysql-cluster, steps: [restart-cluster]}
     notes: "body 없음, 202 (api_docs). 수작업 restart-cluster 스텝은 optional이라 2xx 기록 불확실 → docs. requires 엣지로 start 이후 (stop→start→restart 풀 사이클)."
 
@@ -633,6 +633,6 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{mysql-cluster.cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 3600, interval: 60}
-    provenance: docs
+    provenance: VALIDATED  # evidence: database/mysql/mysqlupgradekernel (run 28602725440)
     source: {lifecycle: mysql-cluster-subops-guarded, steps: [upgrade-kernel]}
     notes: "body 없음 (api_docs — upgradekernel). OS Kernel 업그레이드 — PG userguide 준용: 진행 중 서비스 중단, 실패 시 원복, 성공 시 IRREVERSIBLE. 전제: is_kernel_patchable=true (구버전 이미지일 때만 의미). mysql 구버전 라이브 유무 owner 미확인 → gen-heavy-mysql-upgrade는 'owner가 콘솔에서 엔진 구버전 유무 확인 대기'로 비활성."

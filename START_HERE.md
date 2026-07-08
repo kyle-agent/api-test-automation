@@ -97,11 +97,15 @@ the first three automatically on every web session; the rest are gotchas to know
 
 ## Golden rules (do not break these)
 
-- **Safety gates are sacred.** A run never changes cloud state unless explicitly
-  opted in: `GET` always runs; `POST/PUT/PATCH` need `SCP_ALLOW_MUTATIONS=true`;
-  `DELETE` needs `SCP_ALLOW_DESTRUCTIVE=true`; heavy/billable lifecycles (VM, K8s,
-  DB) need `SCP_RUN_HEAVY=true`. Never weaken these defaults. (Canonical:
-  `docs/agent-team.md` safety rails.)
+- **Safety gates are sacred.** Mutations (`POST/PUT/PATCH/DELETE`) default **ON**
+  — the project's purpose is real execution; the deliberate opt-in is the run
+  **selection** + the console2 pre-flight confirm, not an env flag. Force a
+  **read-only** run with `SCP_ALLOW_MUTATIONS=false` (CI's smoke/conformance
+  suites set it explicitly) or a profile veto (`SCP_PROFILE_FORBID`);
+  heavy/billable lifecycles (VM, K8s, DB) still need an explicit opt-in
+  (`SCP_RUN_HEAVY=true` or a confirmed heavy selection). Never flip a gate just
+  to make a test pass. (Canonical: `CLAUDE.md` Hard Rules + `docs/agent-team.md`
+  safety rails.)
 - **Domain knowledge is data, not code.** Call order, dependencies, quotas and
   scenarios live in `knowledge/` + `regression/scenarios/*.json` so a human can
   read and adjust them. Agents generate them; humans review them. The

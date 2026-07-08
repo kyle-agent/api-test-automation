@@ -196,6 +196,7 @@ def _reset_campaign_state() -> None:
     _STUCK.clear()
     _REGION_CLIENTS.clear()
     _PROGRESS_THIS_ROUND[0] = 0
+    _INPROGRESS_THIS_ROUND[0] = 0
 
 
 def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
@@ -276,12 +277,25 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
         if skipped:
             print(f"    skipped: {', '.join(skipped[:5])}"
                   + (" …" if len(skipped) > 5 else ""))
+    # In-progress accounting (2026-07-03 TGW incident): an item in a
+    # TRANSITIONAL deleting state (DELETING/TERMINATING/…) is mid-async-removal
+    # — it will vanish on its own, but until it does it may 409-block parents
+    # (a DELETING transit-gateway blocks its VPC). Count it so main() grants
+    # another bounded round instead of declaring convergence.
+    inprog = [it for it in picked if _is_async_deleting(it)]
+    if inprog:
+        _INPROGRESS_THIS_ROUND[0] += len(inprog)
+        print(f"  {path}: {len(inprog)} item(s) mid-async-deletion "
+              f"(transitional state) — waiting, not converging")
     # Convergence (Task C, change 1): this pass yields no further progress when
     # it picked nothing deletable, OR everything it picked is already in a
     # terminal pending-deletion state (PF-09) that the delete site skips. Either
     # way a later round would re-list the same un-actionable items, so cache the
-    # pass as converged and skip re-listing it next round.
-    if _converge_enabled() and (
+    # pass as converged and skip re-listing it next round. NEVER cache while a
+    # picked item is mid-ASYNC-deletion — that collection WILL change (the item
+    # drops out) and later rounds must re-observe it to keep the in-progress
+    # signal alive until the chain (e.g. TGW → VPC) actually clears.
+    if _converge_enabled() and not inprog and (
             not picked or all(_is_pending_deletion(it) for it in picked)):
         _CONVERGED.add((service, path))
     return picked
@@ -316,6 +330,14 @@ _DELETE_ISSUED: set = set()   # ids we have issued a DELETE for this campaign
 _STUCK: dict = {}             # id -> reason, for items still listed after delete
 _PROGRESS_THIS_ROUND = [0]    # genuinely-gone deletions in the current round
                               # (boxed so run_sweep can reset/read it per round)
+_INPROGRESS_THIS_ROUND = [0]  # owned items observed mid-async-deletion (state
+                              # DELETING/TERMINATING/…) or deferred behind such a
+                              # holder this round. NOT progress, NOT convergence:
+                              # main() grants another bounded round while > 0.
+                              # (2026-07-03 incident: a 202-accepted transit-
+                              # gateway lists as DELETING for minutes; counting it
+                              # as non-progress converged the sweep while it still
+                              # 409-blocked its VPC — regrtgw*/regrvpcsh* leak.)
 
 
 def _item_id(it: dict):
@@ -415,6 +437,77 @@ def _is_pending_deletion(item: dict) -> bool:
     return False
 
 
+# TRANSITIONAL async-deletion states — distinct from the PF-09 SCHEDULED family
+# above. A KMS key in "To_Be_Terminated" sits in the list for its whole waiting
+# window (days): re-listing it is NOT progress and the sweep must CONVERGE past
+# it. A transit-gateway in "DELETING" is the opposite: its 202 DELETE is landing
+# within minutes, and while it lists it still 409-blocks its VPC — the sweep must
+# WAIT (grant another bounded round), not converge (2026-07-03 incident, CI run
+# 28648339307 + console2 FORCE log: TGW enum CREATING/ACTIVE/DELETING/DELETED/
+# ERROR/EDITING; the sweep stopped "converged" with the TGW mid-deletion and the
+# shared VPC leaked ~1 day). Deliberately EXCLUDES terminal spellings
+# ("deleted"/"terminated") and CDN's "stopping" (that pass defers by design).
+_ASYNC_DELETING_STATES = frozenset({
+    "deleting",
+    "terminating",
+    "releasing",
+    "deallocating",
+    "removing",
+    "destroying",
+    "purging",
+})
+
+
+def _is_async_deleting(item: dict) -> bool:
+    """True when the item reports a TRANSITIONAL deleting state — its removal is
+    in flight and it will drop out of the list on its own within minutes. Such an
+    item counts toward ``_INPROGRESS_THIS_ROUND`` (grants another bounded round)
+    and must never converge-cache its collection. Ownership-neutral, like
+    ``_is_pending_deletion``."""
+    for field in ("state", "status"):
+        v = item.get(field)
+        if not isinstance(v, str):
+            continue
+        norm = v.lower().replace(" ", "").replace("_", "").replace("-", "")
+        if norm in _ASYNC_DELETING_STATES:
+            return True
+    return False
+
+
+# A transit-gateway's own DELETE is only accepted while its state is ACTIVE or
+# ERROR — live evidence (HB4b repair-log, run 28827996068): "Transit Gateway
+# state is not deletable state(Active, Error)" on a TGW sitting in CREATING/
+# EDITING (the same transitional-non-active class that blocks child writes,
+# CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2 — creating/updating a
+# vpc-connection flips an ACTIVE TGW back to EDITING for a settle window that
+# HAS measured >300s live). Unlike _ASYNC_DELETING_STATES (DELETING/…), this
+# CREATING/EDITING window was NOT counted toward _INPROGRESS_THIS_ROUND by the
+# TGW delete call below (only a 2xx/404 counted as genuine, nothing counted
+# the 400) — so a sweep whose only remaining owned item was a transiently-
+# EDITING TGW (no vpc-connection left for _vpc_409_holder to detect either)
+# could report genuine=0/inprog=0 and converge ("stop") one round before the
+# TGW would have settled, stranding it (and, transitively, its VPC) for a
+# human FORCE re-sweep. _TGW_DELETABLE_STATES is the allow-list from that same
+# live error string.
+_TGW_DELETABLE_STATES = frozenset({"active", "error"})
+
+
+def _is_tgw_settling(item: dict) -> bool:
+    """True when a transit-gateway item's own ``state`` is present but is
+    neither a already-``_is_async_deleting`` state nor a DELETE-acceptable one
+    (ACTIVE/ERROR) — i.e. CREATING/EDITING. Callers should treat this the same
+    as ``_is_async_deleting``: count toward ``_INPROGRESS_THIS_ROUND`` and skip
+    the doomed-to-400 DELETE attempt this round rather than silently letting it
+    fail uncounted."""
+    v = item.get("state")
+    if not isinstance(v, str):
+        return False
+    norm = v.lower().replace(" ", "").replace("_", "").replace("-", "")
+    if norm in _ASYNC_DELETING_STATES:
+        return False  # already handled by _is_async_deleting
+    return norm not in _TGW_DELETABLE_STATES
+
+
 def _delete(client, service, path, json=None):
     key = (service, path, str(sorted((json or {}).items())))
     try:
@@ -451,6 +544,64 @@ def _wait_gone(client, service, path, timeout=150, interval=10):
         except Exception:
             return True
         time.sleep(interval)
+    return False
+
+
+def _reap_lb_static_nat(client, lb_id: str) -> bool:
+    """Delete an owned load balancer's static-NAT BEFORE the LB itself —
+    children-first, same pattern as the TGW vpc-connection reaping above.
+
+    REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see
+    CAMPAIGN-C3-100-repair-log.md §HB4d item 2): live incident chain —
+    static-nat-create (201) fires, then a delete attempted immediately 400s
+    `StaticNatNotDeletableState` (still CREATING) — the scenario's own
+    lifecycle fix is a settle-poll before its explicit static-nat-delete step
+    (see networking__loadbalancer.json wait-static-nat-active), but an
+    INTERRUPTED run (crash / kill between static-nat-create and
+    static-nat-delete) leaks a static-NAT that the lifecycle's own teardown
+    never reaches — only this account-wide sweep sees it, and until now the
+    sweep deleted the LB directly, which 409s ("associated") while the NAT is
+    still attached, stranding the LB + its publicip (ATTACHED, not deletable)
+    + (transitively) the shared VPC.
+
+    GET `/v1/loadbalancers/{id}/static-nats` (networking/loadbalancer/
+    showloadbalancerpublicnatip, response wraps `$.static_nat.state`,
+    CONFIRMED from `data/api_docs.json`) always 200s for a valid LB — an LB
+    with NO static-NAT reports `state: ""` (empty), one WITH a static-NAT
+    reports a real state (e.g. "ACTIVE"/"CREATING"). Only issue the DELETE
+    when a real state is present, so a nat-less LB isn't given a no-op DELETE
+    call. No request body is sent (mirrors the orchestrator's own manual
+    unwind for this exact incident: GET -> confirm ACTIVE -> bare
+    `DELETE .../static-nats` -> 204; the documented DELETE has no path/body
+    parameters other than loadbalancer_id, per
+    networking/loadbalancer/deleteloadbalancerpublicnatip). Retries on 400
+    (CREATING not yet settled) so a nat still mid-create gets a few chances
+    to reach ACTIVE before the LB delete is attempted; a 404/403 (already
+    gone / not entitled) is treated as done. Returns True if a delete was
+    issued (2xx) so the caller can count it as sweep progress.
+    """
+    try:
+        body = client.get(f"/v1/loadbalancers/{lb_id}/static-nats",
+                           service="loadbalancer").body
+    except Exception:
+        return False
+    nat = (body or {}).get("static_nat") if isinstance(body, dict) else None
+    state = (nat or {}).get("state") if isinstance(nat, dict) else None
+    if not state:
+        return False  # no static-NAT attached — nothing to reap
+    for attempt in range(6):
+        st = _delete(client, "loadbalancer",
+                     f"/v1/loadbalancers/{lb_id}/static-nats")
+        if _is_2xx_or_gone(st):
+            print(f"  lb-static-nat {lb_id} (state={state}) delete -> {st}")
+            return True
+        if st != 400:
+            print(f"  lb-static-nat {lb_id} (state={state}) delete -> {st} "
+                  f"(giving up, not a settle-state 400)")
+            return False
+        time.sleep(15)
+    print(f"  lb-static-nat {lb_id} (state={state}) still not deletable "
+          f"after retries — leaving for next sweep round")
     return False
 
 
@@ -523,6 +674,48 @@ def _purge_vpc_children(client, vid):
                 n += 1
                 _wait_gone(client, "vpc", f"/v1/subnets/{sn['id']}", 120, 10)
     return n
+
+
+def _vpc_409_holder(client, vid) -> str | None:
+    """Best-effort: NAME the still-present resource that 409-blocks a VPC delete
+    (all read-only GETs). When a holder is detectable the VPC pass burns ONE
+    attempt + prints "blocked by <holder>" and defers to the next round, instead
+    of 6 identical noisy 409s against a dependency that only time (or a later
+    pass/round) clears — the 2026-07-03 console2 FORCE log shape.
+
+    Detectable holders:
+      * an owned transit-gateway with a vpc-connection into this VPC. The
+        connection must be enumerated via the NESTED per-TGW list
+        (``GET /v1/transit-gateways/{id}/vpc-connections`` — 200, live-verified
+        2026-07-04); the FLAT ``/v1/transit-gateway-vpc-connections`` is 403 for
+        this account (knowledge/validated-facts.md 2026-07-04 block).
+      * a loadbalancer / NAT gateway whose ``vpc_id`` matches (they are reaped by
+        the pre-pass, but a mid-drain one still holds the VPC).
+    Returns a human-readable description, or None (caller falls back to the
+    blind purge-children + retry loop)."""
+    for t in _list_all(client, "vpc", "/v1/transit-gateways"):
+        if not (t.get("id") and _is_candidate(
+                t, name_prefixes=("regrtgw", "zznettgw"))):
+            continue
+        try:
+            conns = _items(client.get(
+                f"/v1/transit-gateways/{t['id']}/vpc-connections",
+                service="vpc").body)
+        except Exception:
+            conns = []
+        for cn in conns:
+            if isinstance(cn, dict) and str(cn.get("vpc_id")) == str(vid):
+                return (f"transit-gateway {_name_of(t) or t['id']} "
+                        f"vpc-connection {cn.get('id')} "
+                        f"(state={cn.get('state')})")
+    for svc, coll, label in (("loadbalancer", "/v1/loadbalancers",
+                              "loadbalancer"),
+                             ("vpc", "/v1/nat-gateways", "nat-gateway")):
+        for x in _list_all(client, svc, coll):
+            if isinstance(x, dict) and x.get("id") \
+                    and str(x.get("vpc_id")) == str(vid):
+                return f"{label} {_name_of(x) or x['id']} (state={x.get('state')})"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -720,9 +913,36 @@ def run_sweep(client) -> int:
             deleted += 1
             _wait_gone(c, "virtualserver", f"/v1/servers/{it['id']}", 300, 15)
 
-    # 2. keypairs + security-groups (independent)
+    # 2. launch-configurations, then keypairs + security-groups.
+    # 2-lc. launch-configurations (regrlc*/regrasglc*) — full-inventory sweep
+    # 2026-07-02 found a leaked ``regrlc371da604`` (compute__virtualserver /
+    # wave4 lifecycles create them; the collection was never in this map).
+    # Delete BEFORE keypairs: an LC pins a platform-derived keypair named
+    # ``regrlckp{run}-{lc_id}`` that is only freed with the LC.
+    for it in _select(c, "virtualserver", "/v1/launch-configurations",
+                      name_prefixes=("regrlc", "regrasglc")):
+        if it.get("id") and _note_progress(
+                _delete(c, "virtualserver",
+                        f"/v1/launch-configurations/{it['id']}"), it):
+            deleted += 1
+
+    # 2-sg. server groups (regrsgrp*, wave1 lifecycle) — same 2026-07-02 sweep
+    # found 4 leaked; the collection was never in this map. No dependencies
+    # once the servers (step 1) are gone.
+    for it in _select(c, "virtualserver", "/v1/server-groups",
+                      name_prefixes=("regrsgrp",)):
+        if it.get("id") and _note_progress(
+                _delete(c, "virtualserver",
+                        f"/v1/server-groups/{it['id']}"), it):
+            deleted += 1
+
+    # 2. keypairs + security-groups (independent). Keypair name families:
+    # regrkey* (canonical), regrlckp* (launch-config lifecycle + its
+    # platform-derived ``regrlckp{run}-{lc_id}``), regraskp*/regraskpc*
+    # (auto-scaling lifecycles) — the narrow ("regrkey",) list left a
+    # regrlckp* keypair behind (full-inventory sweep 2026-07-02).
     for it in _select(c, "virtualserver", "/v1/keypairs",
-                      name_prefixes=("regrkey",)):
+                      name_prefixes=("regrkey", "regrlckp", "regraskp")):
         if _delete(c, "virtualserver",
                    f"/v1/keypairs/{it.get('name')}"):
             deleted += 1
@@ -858,13 +1078,75 @@ def run_sweep(client) -> int:
                       name_prefixes=("regr",)):
         if it.get("id") and _delete(c, "dns", f"/v1/hosted-zones/{it['id']}"):
             deleted += 1
+    # transit-gateways + their vpc-connections. Live evidence (2026-07-03/04
+    # incident, run 28648339307 + console2 FORCE log): a TGW with a
+    # vpc-connection does NOT reliably cascade on DELETE — the connection sits
+    # DELETING (hours observed) while the TGW reports EDITING, and the pair
+    # 409-blocks the shared VPC. The FLAT /v1/transit-gateway-vpc-connections
+    # list is 403 for this account, but the NESTED per-TGW list is 200
+    # (live-verified 2026-07-04) — so enumerate + delete each owned TGW's
+    # connections FIRST, then the TGW. Transitional (DELETING) items count as
+    # in-progress (main() grants another bounded round) instead of converging;
+    # a rejected TGW delete is transitional (its connection is draining) and is
+    # retried next round, never stuck-marked.
     for it in _select(c, "vpc", "/v1/transit-gateways",
                       name_prefixes=("regrtgw", "zznettgw")):
-        if it.get("id") and _delete(
-                c, "vpc", f"/v1/transit-gateways/{it['id']}"):
+        tid = it.get("id")
+        if not tid:
+            continue
+        # 1) reap this owned TGW's vpc-connections (children; they block both
+        #    the TGW delete and the connected VPC's delete). Owned-safe: only
+        #    children of a TGW that already passed _select's ownership gate.
+        try:
+            conns = _items(c.get(
+                f"/v1/transit-gateways/{tid}/vpc-connections",
+                service="vpc").body)
+        except Exception:
+            conns = []
+        for cn in conns:
+            cnid = cn.get("id") if isinstance(cn, dict) else None
+            if not cnid:
+                continue
+            if _is_async_deleting(cn):
+                _INPROGRESS_THIS_ROUND[0] += 1
+                print(f"  tgw-vpc-connection {cnid} (tgw {tid}) already "
+                      f"{cn.get('state')} — waiting, not re-deleting")
+                continue
+            cst = _delete(
+                c, "vpc", f"/v1/transit-gateways/{tid}/vpc-connections/{cnid}")
+            if _note_progress(cst):
+                deleted += 1
+            print(f"  tgw-vpc-connection {cnid} (tgw {tid}) delete -> {cst}")
+        # 2) the TGW itself. Mid-deletion → skip the no-op re-DELETE (already
+        #    counted in-progress by _select's async check). A first 202 IS
+        #    genuine progress (_note_progress) — the old bare `if _delete(...)`
+        #    also counted a truthy 409 as a deletion, which inflated `reported`
+        #    and helped the premature "converged" stop.
+        if _is_async_deleting(it):
+            continue
+        # REPAIR 2026-07-07 (HB4b-2, offline, see CAMPAIGN-C3-100-repair-log.md
+        # #HB4b-2 item 5): a TGW still CREATING/EDITING (settling after its own
+        # create or after a vpc-connection create/delete) 400s "not deletable
+        # state(Active, Error)" on DELETE — that failure was never counted
+        # in-progress, so a sweep whose only remaining item was such a TGW
+        # converged one round early instead of granting the settle time. Skip
+        # the doomed DELETE and count it as in-progress instead, same as
+        # _is_async_deleting.
+        if _is_tgw_settling(it):
+            _INPROGRESS_THIS_ROUND[0] += 1
+            print(f"  transit-gateway {_name_of(it) or tid} ({tid}) state="
+                  f"{it.get('state')} — not yet settled (CREATING/EDITING), "
+                  f"deferring delete to next round")
+            continue
+        st = _delete(c, "vpc", f"/v1/transit-gateways/{tid}")
+        if _is_2xx_or_gone(st):
+            _note_progress(st)
             deleted += 1
-            _wait_gone(c, "vpc",
-                       f"/v1/transit-gateways/{it['id']}", 300, 15)
+            _wait_gone(c, "vpc", f"/v1/transit-gateways/{tid}", 300, 15)
+        elif st is not None:
+            print(f"  transit-gateway {_name_of(it)} ({tid}) delete -> {st} "
+                  f"(transitional while its vpc-connection drains — "
+                  f"retried next round)")
 
     # Load balancers + nat gateways have no regr name; delete any whose
     # vpc_id matches a regr* vpc. These would otherwise 409-block the vpc.
@@ -884,11 +1166,21 @@ def run_sweep(client) -> int:
             for it in items:
                 if (isinstance(it, dict) and it.get("id")
                         and str(it.get("vpc_id")) in regr_vpc_ids):
+                    lb_id = it["id"]
+                    if svc == "loadbalancer":
+                        _reap_lb_static_nat(c, lb_id)
                     if _delete(c, svc, f"{coll}/{it['id']}"):
                         deleted += 1
                         _wait_gone(c, svc, f"{coll}/{it['id']}", 300, 15)
 
-    # 4. vpcs — retry on 409 (lingering child), deleting any stray subnets
+    # 4. vpcs — 409 handling is HOLDER-AWARE (2026-07-03 incident): when the
+    # blocker is detectable (an owned TGW's vpc-connection into this VPC, or a
+    # mid-drain LB/NAT gateway — _vpc_409_holder), burn ONE attempt, print
+    # "blocked by <holder>", count the VPC as deferred-in-progress (grants the
+    # next round) and move on — the old loop burned 6 identical noisy 409s per
+    # round against a dependency only time clears. Only when NO holder is
+    # detectable fall back to the blind purge-children + retry loop
+    # (un-prefixed child leaks).
     deleted_vpc_ids = []
     for it in _select(c, "vpc", "/v1/vpcs",
                       name_prefixes=_VPC_NAME_PREFIXES):
@@ -901,7 +1193,12 @@ def run_sweep(client) -> int:
                 deleted_vpc_ids.append(vid)
                 break
             if st == 409:
-                # Children remain — purge ALL of this vpc's children
+                holder = _vpc_409_holder(c, vid)
+                if holder:
+                    _INPROGRESS_THIS_ROUND[0] += 1
+                    print(f"    blocked by {holder} — deferring to next round")
+                    break
+                # No detectable holder — purge ALL of this vpc's children
                 # (name-agnostic, by vpc_id) to catch un-prefixed leaks,
                 # then retry.
                 deleted += _purge_vpc_children(c, vid)
@@ -1047,13 +1344,68 @@ def run_sweep(client) -> int:
                 c, "apigateway", f"/v1/apis/{it['id']}"):
             deleted += 1
 
+    # cdn distributions (regr{ualpha}, networking__cdn lifecycle) — VPC-free
+    # control-plane resources; the collection was never in this map, so 7 leaked
+    # ACTIVE distributions accumulated (full-inventory sweep 2026-07-02). The
+    # /v1/cdns collection holds ONLY CDN distributions and nothing in this
+    # account names one regr* but us (same family-root argument as
+    # _VPC_NAME_PREFIXES).
+    #
+    # DISABLE-BEFORE-DELETE QUIRKS (all live-proven 2026-07-02):
+    #   * DELETE on an ACTIVE/STOPPING distribution -> **404 ResourceNotFound**
+    #     even though GET/PUT/stop on the same id work — a MASKED state error.
+    #     A CDN DELETE 404 therefore must NEVER be trusted as "already gone".
+    #   * DELETE on STOPPED while activation is still PENDING_DEACTIVATION ->
+    #     400 scp-network.cdn.service.property-invalid-state-delete.
+    #   * Only a FULLY deactivated distribution deletes (202). stop (POST
+    #     /v1/cdns/{id}/stop, body-less, 202) -> STOPPING for ~10-15 min ->
+    #     STOPPED, then deactivation settles a few more minutes.
+    # So this pass is a state machine, not a delete+retry: ACTIVE -> issue stop
+    # and move on (a later round / the next sweep reaps it once deactivation
+    # completes); STOPPING -> wait (skip); anything else -> attempt DELETE and
+    # count ONLY a 2xx (the 404 trap). A 400 invalid-state is transitional and
+    # deliberately NOT fed to the stuck-tracker.
+    for it in _select(c, "cdn", "/v1/cdns", name_prefixes=("regr", "zznet")):
+        cid = it.get("id")
+        if not cid:
+            continue
+        state = str(it.get("cdn_service_state") or "").upper()
+        if state in ("ACTIVE", "DEPLOYING", "UPDATING"):
+            try:  # stop takes no body (start/stop documented body-less)
+                r = c.post(f"/v1/cdns/{cid}/stop", service="cdn")
+                print(f"  cdn {_name_of(it)} ({cid}) {state} -> stop "
+                      f"{r.status}; delete deferred to a later round/sweep")
+            except core.MutationBlocked as exc:
+                print(f"  blocked: {exc}")
+            except Exception as exc:
+                print(f"  cdn stop {cid} -> {exc}")
+            continue
+        if state == "STOPPING":
+            print(f"  cdn {_name_of(it)} ({cid}) STOPPING — not yet deletable")
+            continue
+        st = _delete(c, "cdn", f"/v1/cdns/{cid}")
+        if st and 200 <= st < 300:
+            _note_progress(st)      # genuine teardown (no stuck-marking arg)
+            deleted += 1
+            _wait_gone(c, "cdn", f"/v1/cdns/{cid}", 300, 15)
+        else:
+            # 404 here is the masked state error (resource persists) and 400
+            # is the transitional invalid-state — both resolve with time, so
+            # report and let a later round / the next sweep retry.
+            print(f"  cdn {_name_of(it)} ({cid}) state={state} delete -> {st}")
+
     # iam groups (regrgrp) + policies (regrpol)
     for it in _select(c, "iam", "/v1/groups",
                       name_prefixes=("regrgrp",)):
         if it.get("id") and _delete(c, "iam", f"/v1/groups/{it['id']}"):
             deleted += 1
+    # policy name families: regrpol*/regrpolx* (canonical), regrgrpbpol*
+    # (group-binding test), regrrolepol* (role-binding test) — the narrow
+    # ("regrpol",) list left 2 regrgrpbpol* policies behind (full-inventory
+    # sweep 2026-07-02). Account built-ins (BillingplanFullAccess, …) never
+    # carry a regr* name, so the family roots stay safe.
     for it in _select(c, "iam", "/v1/policies",
-                      name_prefixes=("regrpol",)):
+                      name_prefixes=("regrpol", "regrgrpbpol", "regrrolepol")):
         if it.get("id") and _delete(c, "iam", f"/v1/policies/{it['id']}"):
             deleted += 1
 
@@ -1173,6 +1525,29 @@ def run_sweep(client) -> int:
     return deleted
 
 
+def _round_verdict(genuine: int, reported: int, inprog: int) -> str:
+    """Decide how main()'s fixed-point loop proceeds after a round.
+
+    * ``"continue"``     — genuine teardown (2xx/404) happened; keep sweeping.
+    * ``"grant-inprog"`` — nothing genuinely reaped THIS round, but ≥1 owned
+      resource was observed mid-ASYNC-deletion (state DELETING/…) or a VPC was
+      deferred behind such a holder. Stopping now would strand its 409-blocked
+      dependents — the 2026-07-03 incident ("no genuinely-removed resource this
+      round (reported=1); converged — stopping" while the regrtgw* TGW was
+      mid-deletion and regrvpcsh6a47724b stayed 409-blocked). Grant another
+      round, bounded by the existing SCP_SWEEP_ROUNDS cap.
+    * ``"stop"``         — nothing genuine, nothing in flight: converged. A
+      PF-09 scheduled-deletion re-list (KMS/secrets pending their waiting
+      window) contributes to neither counter, so it still converges here —
+      the behaviour the existing offline tests lock.
+    """
+    if genuine > 0:
+        return "continue"
+    if inprog > 0:
+        return "grant-inprog"
+    return "stop"
+
+
 def main() -> int:
     """Entry point for the account-wide reconciler sweep.
 
@@ -1200,23 +1575,43 @@ def main() -> int:
     for rnd in range(1, rounds + 1):
         print(f"--- sweep round {rnd} ---", flush=True)
         _PROGRESS_THIS_ROUND[0] = 0          # reset genuine-teardown counter
+        _INPROGRESS_THIS_ROUND[0] = 0        # reset async-in-flight counter
         reported = run_sweep(client)
         genuine = _PROGRESS_THIS_ROUND[0]
+        inprog = _INPROGRESS_THIS_ROUND[0]
+        # Machine-readable genuine tally per round: consumers (console2 클린업
+        # 요약 등) must count only genuinely-removed resources — ``reported`` is
+        # inflated by deceptive 2xx deletes that re-list next round (신규7).
+        print(f"sweep round {rnd} genuine-removed: {genuine}", flush=True)
         # Convergence stop (Bug 3): end the sweep as soon as a round makes no
         # REAL progress — i.e. nothing genuinely-gone (2xx/404) was reaped. This
         # is stricter than the legacy ``reported == 0`` because ``reported`` can
         # be inflated by passes that still tally a deceptive status; ``genuine``
         # counts only items that actually went away. Items that re-list after a
         # delete are now marked stuck (logged once) and not retried, so a sweep
-        # with only stuck/un-deletable owned items left converges here instead of
-        # looping to max rounds. Fall back to ``reported`` for any pass that
-        # hasn't been routed through _note_progress yet (still ends on a 0-round).
-        if genuine == 0 and reported == 0:
+        # with only stuck/un-deletable owned items left converges here instead
+        # of looping to max rounds. EXCEPTION (2026-07-03 incident): a round
+        # that observed an owned item mid-ASYNC-deletion (or a VPC deferred
+        # behind one) is NOT converged — the deletion is landing and its
+        # 409-blocked dependents need the next round; grant it (still bounded
+        # by the SCP_SWEEP_ROUNDS cap).
+        verdict = _round_verdict(genuine, reported, inprog)
+        if verdict == "stop":
+            if reported:
+                print(f"no genuinely-removed resource this round "
+                      f"(reported={reported}); converged — stopping.")
             break
-        if genuine == 0:
-            print(f"no genuinely-removed resource this round "
-                  f"(reported={reported}); converged — stopping.")
-            break
+        if verdict == "grant-inprog":
+            if rnd == rounds:
+                print(f"{inprog} owned resource(s) still mid-async-deletion at "
+                      f"the round cap ({rounds}) — reporting, not forcing; "
+                      f"re-run the sweep once they settle.")
+                break
+            pause = int(os.environ.get("SCP_SWEEP_INPROGRESS_SLEEP_S", "30"))
+            print(f"{inprog} owned resource(s) mid-async-deletion (or deferred "
+                  f"behind one) — granting another round after {pause}s")
+            time.sleep(pause)
+            continue
         # In FAST (no-wait) mode rounds fire back-to-back; pause briefly so
         # async deletes issued this round actually disappear before the next
         # pass retries their now-unblocked dependents.

@@ -172,32 +172,80 @@
       "service": "data-analytics/vertica",
       "enabled": true,
       "heavy": false,
-      "_note": "reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for vertica's two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-param name (dbaas_engine_version_id) so the final probe-reads step exercises verticalistengineversionproperties (/v1/engine-versions/{dbaas_engine_version_id}/properties). KNOWN-HARD: verticashowrequest (/v1/requests/{request_id}) — request_id is only returned by async write ops and is NOT exposed by any list/collection GET, so it cannot be harvested in a read-only run; it is called with a literal placeholder id so the endpoint is at least CALLED and RECORDED (a 404 counts as reached/covered per the engine). When the engine-versions collection is empty the {dbaas_engine_version_id} normalizes to the catalog '*' key so the properties endpoint is still CALLED. Every step optional + grouped + broad expect_status so an isolated failure never fails the run.",
+      "_note": "reachability-only (owner 2026-06-16): license-gated engine, access-tested, no functional validation — 단, 플랫폼 메타데이터 read는 라이선스 무관 200이 live 확인되어(2026-07-08) strict [200]로 승급. | 2026-07-08 완전성 GAP 편입 (COMPLETENESS-AUDIT-2026-07-08): (1) verticalistservertypes(마지막 (a)-class gap) + verticalistclusters(기존엔 heavy guarded probe에만 있어 verify 합집합 밖) strict 전역 read 추가; (2) §C2 debt 이행 — coverage_waivers class=reachability 4키(verticacreatecluster/deletecluster/listbackuphistories/showrequest)를 4xx-증거 스텝으로 호출(waiver 계약: waived여도 호출은 되어야 함). get-request는 리터럴 0000-UUID(카탈로그 매핑 불가 — 감사의 unmapped 튜플)에서 토큰화 uuid(0000{unique})로 교체해 verticashowrequest 키로 정상 기록. ROLE GUARD (§1 파생): 관용 스텝 4/9 = 0.444 < 0.5 → mutating(create/delete)이 전부 관용이어도 role=verify 유지 (list-engine-versions·properties의 strict 승급이 이 계산의 전제 — 관용으로 되돌리면 probe로 뒤집히니 주의).",
       "steps": [
+        {
+          "name": "list-server-types",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [200],
+          "group": "vt-read",
+          "_note": "GAP 편입 2026-07-08 (verticalistservertypes, 감사 'Gap = 1' 대상 키). 쿼리 전부 optional(name/product_image_type). live 200 2026-07-08 ({contents:[{name:db1v10m120, product_image_type:'Vertica Enterprise',...}]}) — 라이선스 무관 전역 read라 strict."
+        },
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [200],
+          "group": "vt-read",
+          "_note": "전역 read (verticalistclusters) — 기존엔 heavy guarded probe lifecycle에만 있어 verify 합집합에서 빠져 있던 키. strict [200], live 200 2026-07-08 ({contents:[], count:0} — 빈 목록 200으로 충분)."
+        },
         {
           "name": "list-engine-versions",
           "method": "GET",
           "path": "/v1/engine-versions",
-          "expect_status": [200, 400, 401, 403, 404, 500],
+          "expect_status": [200],
           "optional": true,
           "group": "vt-read",
-          "capture_soft": {"dbaas_engine_version_id": "$.contents[0].id"}
+          "capture_soft": {"dbaas_engine_version_id": "$.contents[0].id"},
+          "_note": "strict 승급 2026-07-08: live 200 ({contents:[{id:09c2fe88..., name:'Vertica ENTERPRISE 24.2.0-2',...}]}) — 플랫폼 메타데이터라 라이선스 무관. 관용으로 되돌리면 role 파생이 probe로 뒤집힘(ROLE GUARD 참조)."
         },
         {
           "name": "get-engine-version-properties",
           "method": "GET",
           "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
-          "expect_status": [200, 400, 401, 403, 404, 500],
+          "expect_status": [200],
           "optional": true,
-          "group": "vt-read"
+          "group": "vt-read",
+          "_note": "strict 승급 2026-07-08: 위 list의 실 capture id로 live 200 ({contents:[{name:db.locale, value:ko_KR.utf8,en_US.utf8}]}). id 원천이 항상 채워지는 플랫폼 메타데이터 리스트이므로 placeholder-read 아님. list가 비면 미해석 토큰 → 404지만 optional이라 런은 안 깨짐."
         },
         {
           "name": "get-request",
           "method": "GET",
-          "path": "/v1/requests/00000000-0000-0000-0000-000000000000",
+          "path": "/v1/requests/00000000-0000-0000-0000-0000{unique}",
           "expect_status": [200, 400, 401, 403, 404, 500],
           "optional": true,
-          "group": "vt-read"
+          "group": "vt-c2-waiver",
+          "_note": "C2 waiver 이행: 호출 증거(4xx) (verticashowrequest, class=reachability — request_id는 async 쓰기 응답에서만 나와 read-only 런에서 수확 불가). 경로를 리터럴 0000-UUID에서 토큰화 uuid(0000{unique}, 8-hex 빌트인 → 유효 포맷·확실히 미존재)로 교체: 세그먼트에 {token}이 있어야 카탈로그 * 키로 매핑·기록됨(리터럴은 unmapped — 감사 한계 ②). live 캘리브레이션 2026-07-08: 400 Dbaas.ResourceError.NotFound(404 아님 — DBaaS request-not-found 특이 400)."
+        },
+        {
+          "name": "create-cluster-waiver",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {},
+          "expect_status": [400, 401, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-c2-waiver",
+          "_note": "C2 waiver 이행: 호출 증거(4xx) (verticacreatecluster, class=reachability: license-gated — create가 license 필드를 요구). body {} → 400 Field-required 보장 — 실생성 절대 불가(라이선스 소비·과금 리스크 0). expect에 2xx 불포함: 만에 하나 2xx면 시끄럽게 실패해야 함."
+        },
+        {
+          "name": "delete-cluster-waiver",
+          "method": "DELETE",
+          "path": "/v1/clusters/00000000-0000-0000-0000-0000{unique}",
+          "expect_status": [400, 401, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "vt-c2-waiver",
+          "_note": "C2 waiver 이행: 호출 증거(4xx) (verticadeletecluster). 존재하지 않는 uuid(토큰화 세그먼트 → 카탈로그 * 매핑) → 404 기대: 같은 모양 GET(가짜 uuid backup-histories) live 404 ResourceNotFound 2026-07-08. destructive 게이트, 2xx 불포함."
+        },
+        {
+          "name": "list-backup-histories-waiver",
+          "method": "GET",
+          "path": "/v1/clusters/00000000-0000-0000-0000-0000{unique}/backup-histories",
+          "expect_status": [400, 401, 403, 404],
+          "optional": true,
+          "group": "vt-c2-waiver",
+          "_note": "C2 waiver 이행: 호출 증거(4xx) (verticalistbackuphistories, class=reachability — 실 cluster_id 공급원 없음(계정 클러스터 0, license-gated)). 가짜 uuid → live 404 ResourceNotFound 2026-07-08."
         },
         {
           "name": "probe-reads",

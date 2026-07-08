@@ -74,6 +74,16 @@ The `index.html` + `assets/*` here are the SAME files the spine serves (mounted 
   (mutations / destructive / heavy). The gates are explicit opt-ins, never set to "make
   a test pass".
 
+## Run records & offline tests
+
+- Run records persist under `reports/console2-runs/` (log + events per run);
+  the server **rehydrates** past runs from there on startup and mirrors
+  finished local runs into the controlplane runs DB (`local-<rec id>` ids), so
+  they appear in Reporting ▸ 실행 기록 and `/runs/{id}`.
+- Offline test coverage for the run-observability behaviors (run-bound graph,
+  now-playing bar, late-resource rescan, fail-closure on lifecycle end):
+  `pytest tests/offline/test_console2_run_observability.py`.
+
 ## Static demo snapshot (backend-free, for GitHub Pages)
 
 `build_static.py` assembles a **self-contained snapshot of the REAL app** so the

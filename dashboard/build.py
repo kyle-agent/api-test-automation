@@ -724,6 +724,7 @@ def render_service_page(s, meta):
             "@@NDEF@@": "0", "@@NRED@@": "0",
             "@@ACTION@@": action,
             "@@ROWSJSON@@": json.dumps(rows, ensure_ascii=False),
+            "@@CONFEVAL@@": "true" if (meta.get("conf") or {}).get("evaluated") else "false",
             "@@WHEN@@": str(meta["when"]), "@@BRANCH@@": html.escape(meta["branch"]),
         }.items():
             out = out.replace(k, v)
@@ -767,6 +768,7 @@ def render_service_page(s, meta):
         "@@NDEF@@": str(n_def_items), "@@NRED@@": str(n_red),
         "@@ACTION@@": action,
         "@@ROWSJSON@@": json.dumps(rows, ensure_ascii=False),
+        "@@CONFEVAL@@": "true" if (meta.get("conf") or {}).get("evaluated") else "false",
         "@@WHEN@@": str(meta["when"]), "@@BRANCH@@": html.escape(meta["branch"]),
     }.items():
         out = out.replace(k, v)
@@ -985,6 +987,7 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <script>
 var R=@@ROWSJSON@@;
+var CONF_EVAL=@@CONFEVAL@@;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
@@ -1008,7 +1011,9 @@ function matches(r){
 }
 function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function defBtn(r){
-  if(!r.d.length)return '<span class="ok">✓ 정상</span>';
+  if(!r.d.length)return CONF_EVAL
+    ?'<span class="ok">✓ 정상</span>'
+    :'<span class="mut" title="이 머신에서 컨포먼스 점검(python -m conformance.static)이 실행된 적이 없어 판정 근거가 없습니다 — 근거 없음 ≠ 정상">미평가</span>';
   var crit=r.d.some(function(i){return i.crit;});
   return '<button class="defbtn'+(crit?' crit':'')+'" onclick="toggleDetail(this)">'
     +(crit?'결함':'개선')+' '+r.d.length+'<span class="ca">▾</span></button>';
@@ -1702,6 +1707,36 @@ def build(
     known = str(_baselines.resolve(known))
     known_data = json.load(open(known)) if os.path.exists(known) else {"issues": []}
     waiver_data = json.load(open(waivers)) if os.path.exists(waivers) else {"waivers": []}
+
+    # 3b. Honest per-endpoint conformance (owner 2026-07-08 "왜 전부 정상이냐"):
+    #     the unified findings store is machine-local (gitignored), so a machine
+    #     that never ran `python -m conformance.static` built an all-green 결함
+    #     column — "no evidence" rendered as "정상". Two fixes:
+    #     (a) conf["evaluated"] tells the service page whether ANY per-endpoint
+    #         findings exist here; when not, rows with no items render 미평가.
+    #     (b) baselined PRODUCT bugs (known_issues.json — committed in git, e.g.
+    #         PF-21 createvolumetransfer 500) merge into by_endpoint as 결함 so
+    #         they show on every machine. Automation-side bugs are OUR bugs, not
+    #         API design defects — excluded.
+    conf["evaluated"] = bool(unified_findings)
+    for it in known_data.get("issues", []):
+        ik = it.get("key") or ""
+        typ = (it.get("type") or "").strip()
+        if not ik or "product" not in typ.lower():
+            continue
+        rec = conf["by_endpoint"].setdefault(ik, {"status": "green", "items": []})
+        rec["items"].append({
+            "type": f"{typ} (baselined)", "src": "known_issues",
+            "issue": it.get("since", ""),
+            "detail": ((f"live {it.get('status')} · " if it.get("status") else "")
+                       + (it.get("note") or "")),
+        })
+        rec["status"] = "red"
+    if conf["by_endpoint"]:
+        _cnt = Counter(v["status"] for v in conf["by_endpoint"].values())
+        conf["summary"] = {"red": _cnt.get("red", 0), "yellow": _cnt.get("yellow", 0),
+                           "green": _cnt.get("green", 0),
+                           "total": len(conf["by_endpoint"])}
     # cumulative verified set (pulled from the dashboard-data branch by CI)
     prior_verified = set()
     if prior and os.path.exists(prior):

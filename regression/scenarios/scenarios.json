@@ -156,6 +156,7 @@
       "id": "quota-reads",
       "service": "management/quota",
       "enabled": false,
+      "_status": "stale",
       "_note": "Read-only: list account-quotas + quota-requests, soft-capture an id each, probe the 2 path-param GETs (showaccountquota/showquotarequest). No writes/cleanup. Envelope/id grounded from docs ($.account_quotas[].id, $.quota_requests[].id). Runs in CRUD mode (engine gates all lifecycles on SCP_ALLOW_MUTATIONS); env-dependent (records SOFT if the account has no quota-requests).",
       "steps": [
         {
@@ -194,6 +195,7 @@
       "id": "support-reads",
       "service": "management/support",
       "enabled": false,
+      "_status": "stale",
       "_note": "Read-only: list inquiries + service-requests, soft-capture an id each, probe showinquiry/showservicerequest. No writes/cleanup. Env-dependent (records SOFT if the account has no inquiries/tickets — there is no create-ticket API in the catalog).",
       "steps": [
         {
@@ -335,6 +337,15 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "list-subnets",
+          "method": "GET",
+          "path": "/v1/subnets",
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap listsubnets — bare collection LIST, the only missing key of the subnet family; live 200 2026-07-08."
         },
         {
           "name": "create-port",
@@ -873,6 +884,20 @@
           ]
         },
         {
+          "name": "list-volume-replication-regions",
+          "method": "GET",
+          "path": "/v1/replications/regions",
+          "params": {
+            "type_name": "HDD",
+            "source_region_name": "{region}",
+            "replication_type": "replication"
+          },
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap listvolumereplicationregion. All three query params are REQUIRED per api_docs; HDD matches this lifecycle's volume type_name. live 200 2026-07-08 (kr-west1 source -> regions ['kr-east1'])."
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "volume_id": "{volume_id}"
@@ -1009,6 +1034,7 @@
       "id": "security-certificatemanager-import",
       "service": "security/certificatemanager",
       "enabled": false,
+      "_status": "blocked-owner",
       "needs_cert_material": true,
       "_note": "DISABLED: certificatemanager check-validation/import reject a runtime-minted self-signed key/cert regardless of PEM encoding (PKCS#8 and PKCS#1 both return 'This private key is not a PEM format'), so a synthetic keypair cannot satisfy the gateway's CA validation and there is no way to supply a real CA-signed cert in CI. The self-sign lifecycle already covers the create/read/delete spine; this import-only lifecycle stays disabled until real cert material is available. A throwaway self-signed cert+key is minted at runtime via openssl ({cert_body}/{private_key}/{cert_chain}); the lifecycle skips environmentally when openssl is unavailable. Synchronous.",
       "steps": [
@@ -1104,6 +1130,18 @@
       "enabled": true,
       "_note": "Light, self-contained: create a Standard queue, read it, then exercise the config/description/deduplication/ACL writes, list, probe-read, delete. Synchronous. COVERAGE EXPANSION (NOT yet validated against the live gateway): updatequeuedescription, updatequeueconfig (encryption omitted — no KMS key), updatequeuededuplication + updatequeuededuplicationscope (FIFO-oriented — may 400 on a Standard queue), setacl + deleteacl. Each write is optional+grouped so a rejection isolates to its group and never fails the create->delete spine.",
       "steps": [
+        {
+          "name": "check-queue-name-duplication",
+          "method": "GET",
+          "path": "/v1/queues/check-duplication",
+          "params": {
+            "name": "regrq{unique}"
+          },
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap checkqueuenameduplication — placed directly before create. Query param 'name' is REQUIRED per api_docs; reuses the exact create name so the answer is result:false (name free). live 200 2026-07-08."
+        },
         {
           "name": "create",
           "method": "POST",
@@ -1316,6 +1354,26 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "list-security-groups",
+          "method": "GET",
+          "path": "/v1/security-groups",
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap listsecuritygroups — bare SG list (only the rule-list query form existed before); live 200 2026-07-08."
+        },
+        {
+          "name": "set-sg",
+          "method": "PUT",
+          "path": "/v1/security-groups/{sg_id}",
+          "json": {
+            "description": "API regression suite — updated description",
+            "loggable": false
+          },
+          "expect_status": [200, 202],
+          "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): networking-security-group-update 은퇴분. setsecuritygroup VALIDATED 2026-06-23 (200 live). Body: {description, loggable} ONLY — 'name' 은 유효 필드 아님 (docs 확인; 포함 시 400)."
         },
         {
           "name": "create-rule",
@@ -1535,6 +1593,33 @@
           ]
         },
         {
+          "name": "show-snapshot",
+          "method": "GET",
+          "path": "/v1/snapshots/{snap_id}",
+          "expect_status": [
+            200
+          ],
+          "_note": "strict 단건 조회 — '이번 런에서 지금도 200인가'를 이 레시피가 자급자족으로 증명 (2026-07-08 owner: dup_store/CI read-chain 의존 제거). 뒤의 wait-snapshot-gone(삭제확인 404)과는 목적이 다르다."
+        },
+        {
+          "name": "update-snapshot",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/snapshots/{snap_id}",
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 202, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): updatesnapshot — body 필드 추정(description). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "revert-volume-to-snapshot",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/volumes/{vol_id}/revert",
+          "json": {"snapshot_id": "{snap_id}"},
+          "expect_status": [200, 202, 400, 404, 409],
+          "_note": "2026-07-08 25-편입(owner GO): revertvolumetosnapshot — 독립 볼륨(available)이라 되돌리기 안전; body 추정. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "volume_id": "{vol_id}",
@@ -1705,7 +1790,10 @@
     {
       "id": "networking-vpc-internet-gateway",
       "service": "networking/vpc",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-pilot-net-basics",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED 유일 0 (4중 커버); node internet-gateway 재지정.",
       "_note": "Light, self-contained: create a VPC inline, attach an internet gateway, read both, probe, tear down in reverse. Best-effort create body from docs (createinternetgateway 1.2); $.internet_gateway.id.",
       "steps": [
         {
@@ -2027,8 +2115,10 @@
             200
           ],
           "capture": {
-            "kube_ver": "$.kubernetes_versions[0].kubernetes_version"
-          }
+            "kube_ver": "$.kubernetes_versions[1].kubernetes_version",
+            "kube_ver_next": "$.kubernetes_versions[0].kubernetes_version"
+          },
+          "_note": "List is NEWEST-first (live 2026-07-08: [0]=v1.34.3, [1]=v1.33.5). Cluster+nodepool are created at [1] (second-newest) so the real upgrade-cluster/upgrade-nodepool steps later in this lifecycle can roll to [0] — owner-approved flow 2026-06-13 (구버전 생성→업그레이드→삭제). Strict capture: a hypothetical single-version catalog would abort HERE, before any create (nothing billed)."
         },
         {
           "name": "find-server-type",
@@ -2146,6 +2236,36 @@
             "timeout": 1800,
             "interval": 30
           }
+        },
+        {
+          "name": "get-cluster-kubeconfig",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/kubeconfig",
+          "params": {
+            "kubeconfig_type": "public"
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-kubeconfig",
+          "_note": "MIGRATED from retired ske-read-coverage (owner 2026-07-08: placeholder-id reads are meaningless under heavy-전제) — now rides the REAL RUNNING cluster. kubeconfig_type is a REQUIRED query, enum lowercase public/private (api_docs); the old probe never saw a 200. optional+own-group so an unproven-semantics miss warns instead of redding a ~27min billable build — tighten to strict after first live 200 (라이브가 정정)."
+        },
+        {
+          "name": "get-cluster-user-kubeconfig",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/user-kubeconfig",
+          "params": {
+            "kubeconfig_type": "public"
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-user-kubeconfig",
+          "_note": "See get-cluster-kubeconfig — same migration; own group so the two kubeconfig reads cannot skip each other."
         },
         {
           "name": "set-cluster-logging",
@@ -2347,12 +2467,13 @@
           "service": "ske",
           "method": "GET",
           "path": "/v1/images",
+          "params": {
+            "scp_original_image_type": "k8s"
+          },
           "expect_status": [
-            200,
-            400
+            200
           ],
-          "optional": true,
-          "group": "ske-lists"
+          "_note": "scp_original_image_type is a REQUIRED query (missing -> 400 'Field required', runs 27483895557/27491816948) — this step silently logged a 400 EVERY run behind [200,400]+optional until 2026-07-08. Param proven 200 live 2026-06-20 (15 nodepool_images); hard [200] per ct-ske-image model."
         },
         {
           "name": "wait-cluster-running-pre-nodepool",
@@ -2429,6 +2550,18 @@
             "timeout": 1200,
             "interval": 30
           }
+        },
+        {
+          "name": "get-nodepool-nodes",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}/nodes",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-np-nodes",
+          "_note": "MIGRATED from retired ske-read-coverage — first read against a REAL Running nodepool (the old probe only ever recorded placeholder 404s). optional+own-group until a live 200 proves it (라이브가 정정)."
         },
         {
           "name": "set-nodepool-taints",
@@ -2517,6 +2650,95 @@
             "cluster_id": "{cluster_id}",
             "nodepool_id": "{nodepool_id}"
           }
+        },
+        {
+          "name": "upgrade-cluster",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/upgrade",
+          "json": {
+            "kubernetes_version": "{kube_ver_next}"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-upgrade",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20,
+          "_note": "REAL control-plane upgrade (owner-approved 2026-06-13: 구버전 생성→업그레이드→삭제; replaces the retired placeholder probe ske-upgrade-write-coverage). Cluster was created at kube_ver=[1] and rolls to kube_ver_next=[0]. IRREVERSIBLE — acceptable only because this cluster is run-scoped and disposable. ONE group ske-upgrade for all four upgrade steps: nodepool upgrade is valid only after the control-plane roll, so a cluster-upgrade failure must skip the rest. optional so an upgrade defect warns instead of redding the run — teardown deletes are ungrouped and unaffected."
+        },
+        {
+          "name": "wait-cluster-upgraded",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 3600,
+            "interval": 60,
+            "verbose": true
+          },
+          "optional": true,
+          "group": "ske-upgrade",
+          "_note": "Control-plane roll can take up to ~60min (ct-ske-cluster-upgrade model: 3600/60). KNOWN CAVEAT (unproven wait semantics): if status has not yet flipped out of RUNNING when the first poll lands, this passes prematurely and upgrade-nodepool may hit 409 — its 409-retry ladder absorbs that; first live run records the real transition vocabulary (라이브가 정정)."
+        },
+        {
+          "name": "upgrade-nodepool",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/upgrade",
+          "json": {
+            "os_version": "22.04"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-upgrade",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 60,
+          "_note": "Body is NodepoolUpgradeSetRequestV1Dot4 {os_version} — an OS version, NOT kubernetes_version: nodes follow the control plane (api_docs; the retired probe sent kubernetes_version, contradicting docs, and was never proven). 8x60s 409-retry covers a control plane still settling after wait-cluster-upgraded's known premature-pass caveat."
+        },
+        {
+          "name": "wait-nodepool-upgraded",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 2400,
+            "interval": 30,
+            "verbose": true
+          },
+          "optional": true,
+          "group": "ske-upgrade",
+          "_note": "Node roll after control-plane upgrade (ct-ske-nodepool-upgrade model: 2400/30)."
         },
         {
           "name": "scale-up-nodepool",
@@ -2750,7 +2972,7 @@
     },
     {
       "id": "compute-virtualserver-full",
-      "service": "virtualserver",
+      "service": "compute/virtualserver",
       "enabled": true,
       "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. The field is volume_type NOT type. COVERAGE EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): (a) server-group create->show(probe via server_group_id)->delete; (b) probe-reads now exercises server_group_id so showservergroup joins the ~13 path-param GETs (showvirtualserver/console-log/interfaces/ips/security-groups/volumes + show* by id) driven off the live server; (c) image PUT updateimage (min_disk/min_ram/protected/visibility) added to the image group; (d) block-volume writes on the extra attached volume: updatevolume (name), updateservervolume (attachment), setvolumeqos, extendvolume (104->112); (e) attach/detach a 2nd security group to the running server; (f) SOFT reboot + wait ACTIVE. Every NEW write is optional+grouped so a rejection isolates to its group (tears down just that group) and never fails the expensive VM run; the validated create->...->delete spine is unchanged. lock/unlock intentionally omitted (risk of stranding a billable VM if unlock fails).",
       "steps": [
@@ -2941,6 +3163,20 @@
           "optional": true
         },
         {
+          "name": "list-server-groups",
+          "method": "GET",
+          "path": "/v1/server-groups",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listservergroups."
+        },
+        {
+          "name": "get-partition-size",
+          "method": "GET",
+          "path": "/v1/server-groups/partition-size",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): getpartitionsize."
+        },
+        {
           "name": "find-image",
           "method": "GET",
           "path": "/v1/images",
@@ -2954,8 +3190,44 @@
             "status": "active",
             "scp_original_image_type": "standard",
             "visibility": "public",
+            "os_distro": "ubuntu",
             "limit": 50
           }
+        },
+        {
+          "name": "list-default-configs",
+          "method": "GET",
+          "path": "/v1/default-configs",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
+        },
+        {
+          "name": "show-default-volume-type",
+          "method": "GET",
+          "path": "/v1/volume-types/default",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
+        },
+        {
+          "name": "show-quota-set",
+          "method": "GET",
+          "path": "/v1/quota-sets",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
+        },
+        {
+          "name": "show-volume-quota-set",
+          "method": "GET",
+          "path": "/v1/volumes/quota-sets",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
+        },
+        {
+          "name": "list-pending-images",
+          "method": "GET",
+          "path": "/v1/pending-images",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
         },
         {
           "name": "find-server-type",
@@ -2976,6 +3248,13 @@
               "get": "id"
             }
           }
+        },
+        {
+          "name": "show-server-type",
+          "method": "GET",
+          "path": "/v1/server-types/{server_type_id}",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): showservertype — find-server-type 이 고른 실측 id."
         },
         {
           "name": "create-server",
@@ -3027,13 +3306,20 @@
             200
           ],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": [
               "ACTIVE"
             ],
-            "timeout": 600,
+            "timeout": 1200,
             "interval": 15
           }
+        },
+        {
+          "name": "list-virtual-servers",
+          "method": "GET",
+          "path": "/v1/servers",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listvirtualservers."
         },
         {
           "name": "capture-server-port",
@@ -3043,7 +3329,7 @@
             200
           ],
           "capture_soft": {
-            "port_id": "$.interfaces[0].id"
+            "port_id": "$.interfaces[0].port_id"
           }
         },
         {
@@ -3074,6 +3360,65 @@
           ]
         },
         {
+          "name": "create-port-subnet",
+          "group": "vs-port",
+          "optional": true,
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrpsub{unique}",
+            "description": "API regression VS standalone port subnet",
+            "cidr": "10.124.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "_note": "HB3b-2 (2026-07-06, run 28766151214): attach-port-to-server 400 `VirtualServer.CreateInterface.Duplicated` — the server already has an interface in `{subnet_id}` (its own boot NIC, created by create-server earlier in this same lifecycle), and this lifecycle has no second/shared subnet to point the standalone test port at (unlike the DB-engine `-full` lifecycles' `adopt: subnet#db` pattern — checked, not present here). Fix: give the vs-port group its OWN subnet in the same VPC (`10.135.3.0/24`, free — the lifecycle's only other subnet is `10.135.2.0/24` inside the VPC's `10.135.0.0/20`), so create-port/attach-port-to-server target a subnet the server has no existing interface on. Scoped to the `vs-port` group (own create+cleanup) so a rejection here tears down just this subnet, never the main VM spine. | 2026-07-08 (owner '이 400/404 해결하자'): 라이브 400의 진짜 원인 확정 — 이 lifecycle 은 공유 VPC(10.124.0.0/20)를 ADOPT 하므로 10.135.3.0/24 는 VPC 대역 밖 → scp-network 400 (run 20260708-121432 POST /v1/subnets 400). 전용 /24 를 공유 /20 안의 빈 대역 10.124.8.0/24 로 재배정 (0=공유메인 · 1-6=fallback 예약 · 7=DB · 9=networking-vpc). fixed IP 도 10.124.8.10/.11 로 이동.",
+          "capture_soft": {
+            "port_subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            404,
+            409,
+            422
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{port_subnet_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-port-subnet",
+          "group": "vs-port",
+          "optional": true,
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{port_subnet_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10,
+            "give_up_status": [
+              400,
+              404
+            ]
+          }
+        },
+        {
           "name": "create-port",
           "group": "vs-port",
           "optional": true,
@@ -3083,13 +3428,19 @@
           "json": {
             "name": "regrport{unique}",
             "description": "API regression standalone port",
-            "subnet_id": "{subnet_id}",
+            "subnet_id": "{port_subnet_id}",
+            "fixed_ip_address": "10.124.8.10",
             "security_groups": [],
-            "fixed_ip_address": "",
             "tags": []
           },
+          "_note": "HB3b (2026-07-05, run 28723287734): CONFIRMED live 400 `scp-network.port.fixed_ip.format-error` (\"The requested Fixed IP() is invalid IP format.\" — note the empty parens) when `fixed_ip_address` was sent as `\"\"`. data/api_docs.json networking/vpc/portcreaterequest documents the field as `any of [string, null]` (optional, default \"\") and the doc's own request_example literally sends `\"fixed_ip_address\":\"\"` — so the DOCUMENTED default is rejected live; fix is to OMIT the key entirely (let the backend auto-assign from the subnet) rather than send an empty string. This unblocks the whole vs-port group (map-sg-to-port/attach-port-to-server/read-attached-port/detach-port-from-server/delete-port — 6 catalog keys share this group, previously 404-demoted once create-port failed). Not re-verified live this session (offline-only, no SCP calls) — next HEAVY dispatch should confirm 2xx. HB3b-2 (2026-07-06): `subnet_id` switched from `{subnet_id}` (the server's own subnet) to `{port_subnet_id}` (new dedicated subnet, see create-port-subnet) — see attach-port-to-server note for why. 2026-07-08 (owner review): omit 가설은 라이브 미검증인 채로 두고 **유효 IP 명시로 확정** — `fixed_ip_address: 10.135.3.10` (전용 /24 안, 게이트웨이 예약대 회피). absent를 백엔드가 \"\"처럼 다루든 아니든 성공 형태이며, format-error 계열이 원천 차단된다. 다음 heavy 런이 vs-port 6-endpoint 체인(갭이던 detach DELETE 포함)의 2xx 를 확인해야 함. | 2026-07-08(2): port-subnet CIDR 가 adopt-VPC 대역 밖(10.135.x)이라 400 → 10.124.8.0/24 로 교정, fixed_ip 10.124.8.10 (create-port-subnet note 참고).",
           "capture_soft": {
             "std_port_id": "$.port.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/ports/{std_port_id}",
+            "service": "vpc"
           },
           "expect_status": [
             200,
@@ -3131,9 +3482,15 @@
           "method": "POST",
           "path": "/v1/servers/{server_id}/interfaces",
           "json": {
-            "port_id": "{std_port_id}",
-            "subnet_id": "{subnet_id}"
+            "port_id": "{std_port_id}"
           },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
+            "service": "virtualserver"
+          },
+
+          "_note": "2026-07-08(3) owner run: port_id+subnet_id 동시 전송 400 — 같은 런 netops attach(port_id 단독) 200 라이브 증명 → subnet_id 제거. | HB3b-2 (2026-07-06, run 28766151214): CONFIRMED live 400 `VirtualServer.CreateInterface.Duplicated` when this sent `subnet_id: {subnet_id}` — that's the server's OWN boot subnet, and it already has an interface there (create-server). Switched to `{port_subnet_id}` (the dedicated vs-port-group subnet created by create-port-subnet, matching create-port's own subnet_id) so the new interface lands on a subnet the server has no prior interface on. Not re-verified live this session (offline-only).",
           "expect_status": [
             200,
             201,
@@ -3155,6 +3512,49 @@
             200,
             400,
             404
+          ]
+        },
+        {
+          "name": "create-private-static-nat",
+          "group": "vs-port",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats",
+          "json": {},
+          "capture_soft": {"pvnat_id": "$.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}", "service": "virtualserver"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "2026-07-08 25-편입(owner GO): createserverinterfaceprivatenat — body 스키마 미문서(빈 body로 도달+정정 유도), PF-15 계열 403 관용. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "delete-private-static-nat",
+          "group": "vs-port",
+          "optional": true,
+          "destructive": true,
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "_note": "2026-07-08 25-편입(owner GO): deleteserverinterfaceprivatenat."
+        },
+        {
+          "name": "updateserverinterface",
+          "service": "virtualserver",
+          "method": "PUT",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
+          "group": "vs-port",
+          "optional": true,
+          "json": {
+            "fixed_ip_address": "10.124.8.11",
+            "subnet_id": "{port_subnet_id}"
+          },
+          "_note": "2026-07-08 owner 재설계: 기존 xcov 단독 스텝은 (a) port_id 미캡처(capture 필드 버그 — 실응답은 interfaces[].port_id) (b) VPC 밖 IP 192.169.3.2 (c) subnet_id \"\" (PF-24 와 같은 빈값-거부 위험) 삼중 파손 + default NIC 대상이라 성공해도 위험했다. 자기가 만든 std 포트의 IP 를 전용 /24(10.135.3.0/24) 안에서 변경하는 형태로 vs-port 그룹에 이동 — attach 상태에서 시도하고, 관용 expect 라 실패해도 그룹 teardown(detach/delete-port)은 계속된다.",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            404,
+            409
           ]
         },
         {
@@ -3199,6 +3599,29 @@
           ],
           "retries": 4,
           "retry_interval": 15
+        },
+        {
+          "name": "delete-port-subnet",
+          "group": "vs-port",
+          "optional": true,
+          "destructive": true,
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{port_subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "2026-07-08: vs-port 전용 서브넷의 happy-path 삭제. 이 스텝이 없어서 PASSED 런마다 포트 서브넷이 살아남아 공유 VPC teardown 이 자식-존재로 실패했다 (07-07 공유 VPC 2개 잔존 사건의 유력 원인 — step cleanup 은 실패 경로에서만 돈다)."
         },
         {
           "name": "create-volume",
@@ -3263,6 +3686,14 @@
             "path": "/v1/servers/{server_id}/volumes/{vol_id}",
             "service": "virtualserver"
           }
+        },
+        {
+          "name": "show-server-volume",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/volumes/{vol_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "_note": "2026-07-08 25-편입(owner GO): showservervolume — attach 202 직후라 404 관용. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
           "name": "wait-volume-attached",
@@ -3371,7 +3802,7 @@
             200
           ],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": [
               "STOPPED",
               "SHUTOFF"
@@ -3438,7 +3869,7 @@
             200
           ],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": [
               "ACTIVE"
             ],
@@ -3484,7 +3915,7 @@
             200
           ],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": [
               "ACTIVE"
             ],
@@ -3499,31 +3930,15 @@
           "method": "PUT",
           "path": "/v1/images/{custom_image_id}",
           "json": {
-            "min_disk": 100,
             "min_ram": 0,
-            "protected": false
+            "protected": false,
+            "visibility": "private"
           },
           "expect_status": [
             200,
             202
-          ]
-        },
-        {
-          "name": "updateserverinterface",
-          "service": "virtualserver",
-          "method": "PUT",
-          "path": "/v1/servers/{server_id}/interfaces/{port_id}",
-          "group": "xcov-updateserverinterface",
-          "optional": true,
-          "json": {
-            "fixed_ip_address": "192.169.3.2",
-            "subnet_id": ""
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ]
+          ],
+          "_note": "HB3b-2 (2026-07-06, run 28766151214): the min_disk:104 fix from HB3b (run 28723287734) still 400s, but with a DIFFERENT/categorical message this time: `Image with volumes cannot update min disk` — not a value-mismatch, an outright rejection of the min_disk field whenever the image was created from a server with attached volumes (this lifecycle's image IS such a snapshot). No min_disk value can satisfy it, so the field is dropped entirely rather than re-tuned. `data/api_docs.json` `compute/virtualserver/imagesetrequest` (ImageSetRequest, PUT /v1/images/{id}) has exactly 4 fields: min_disk, min_ram, protected, visibility — there is NO `description` field on this model (unlike some other services' update bodies), so the safe substitute is `visibility` (kept at its default `private` — a genuine no-op-safe value, pattern `private|shared`) alongside the pre-existing min_ram/protected. Not re-verified live this session (offline-only); next dispatch should confirm 2xx with this body shape."
         },
         {
           "name": "image-delete",
@@ -3595,6 +4010,31 @@
           "destructive": true
         },
         {
+          "name": "wait-server-settled",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "wait": 20,
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "ACTIVE",
+              "STOPPED",
+              "SHUTOFF",
+              "RUNNING"
+            ],
+            "timeout": 120,
+            "interval": 15,
+            "give_up_status": [
+              404
+            ]
+          },
+          "_note": "HB3b (2026-07-05, run 28723287734): CONFIRMED delete-server 400 `InvalidVirtualServerState.DeleteImpossible` reproduced 3x in the same run, immediately after image-delete/detach-volume/detach-security-group — yet the reconciler's LATER sweep (cleanup/reconciler.py `_delete`+next-round retry, no special server-state handling, just elapsed time) deletes the SAME server successfully, so this is a transient post-mutation settle window, not a hard backend block. `state` itself may already read a stable value (ACTIVE/STOPPED) throughout the transition — the doc-visible field does not expose a task_state — so the fixed 20s pre-wait is the load-bearing part; the poll is a best-effort top-up in case state does briefly report something outside the accepted list. Paired with retry_on_status on delete-server itself (belt-and-suspenders, matching how the reconciler's cross-round retry eventually succeeds). Not re-verified live this session (offline-only)."
+        },
+        {
           "name": "delete-server",
           "method": "DELETE",
           "path": "/v1/servers/{server_id}",
@@ -3603,7 +4043,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 20
         },
         {
           "name": "wait-server-gone",
@@ -3620,6 +4066,26 @@
             "timeout": 600,
             "interval": 15
           }
+        },
+        {
+          "name": "delete-boot-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{boot_vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
+          "destructive": true,
+          "optional": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "HB3b-2 (2026-07-06, run 28766151214): the boot volume (`delete_on_termination:true` on create-server) survived the final chat-heavy sweep TWICE after the server itself was gone, needing a manual `SCP_SWEEP_IGNORE_TTL=true` recovery both times — `delete_on_termination`'s async cascade evidently doesn't always finish before the workflow's own final sweep pass runs. `boot_vol_id` was already captured by the pre-existing `capture-server-volume` step (`$.volumes[0].id`) but was a DEAD capture — nothing in this lifecycle used it. Explicitly deleting it right after the server is confirmed gone (`wait-server-gone` 404) closes that window directly, instead of leaning on the account-wide reconciler sweep's TTL/own-run heuristics (`cleanup/reconciler.py _is_deletable`) to reclaim it later. `optional:true` + broad `expect_status` (400/404 included) so a volume the cascade DID already reap (404), or one still mid-detach (400), never fails the lifecycle. Not re-verified live this session (offline-only) — next HEAVY dispatch should confirm the final sweep no longer needs an IGNORE_TTL rescue for this lifecycle's boot volume. See repair-log §HB3b-2 item 4 for the (b) workflow-level alternative considered and NOT applied (`.github/` is out of scope for this session)."
         },
         {
           "name": "delete-server-group",
@@ -3646,6 +4112,68 @@
           "destructive": true
         },
         {
+          "name": "final-release-private-static-nat",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "_note": "2026-07-08 delete-sg 409 회귀 수리 (이번 라이브 런: delete-sg 409 scp-network.securitygroup.has-related-resources + 계정에 이 체인의 포트 2개 잔존). 무그룹 safety-net 1/5 — vs-port 그룹이 중도 실패(엔진: 그룹 실패 시 같은 그룹 후속만 skip)했든 그룹 내 teardown이 관용 409로 '통과'만 했든, delete-sg 전에 NAT해제→detach→port삭제→port-subnet삭제를 무조건 한 번 더 시도한다(무그룹 스텝은 항상 실행). 정상 경로(서버 이미 삭제·포트 이미 정리)에선 404 관용 no-op. pvnat_id/std_port_id 는 capture_soft 라 미해결 placeholder 로 남을 수 있음 → 400/404 관용."
+        },
+        {
+          "name": "final-detach-port",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 404, 409],
+          "retry_on_status": [409],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "무그룹 safety-net 2/5: 서버가 아직 살아있는 엣지(wait-server-gone 200 타임아웃 통과)에서 표준 포트를 실제로 detach. 서버가 이미 사라진 정상 경로에선 404 관용. 409 사다리는 그룹 내 detach-port-from-server 와 동일 패턴(4×15s)."
+        },
+        {
+          "name": "final-delete-port",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/ports/{std_port_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 404],
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 20,
+          "_note": "무그룹 safety-net 3/5 — 핵심 스텝: map-sg-to-port 가 SG 를 참조시킨 표준 포트를 delete-sg 전에 확실히 제거. 서버 삭제가 표준 포트를 detach 상태로 살려두는 것이 이번 런에서 실측됨(포트 2개 잔존). expect 에 409 미포함(netops port-delete 패턴) — 사다리(6×20s) 소진 후에도 409 면 optional 실패 로그로 신호를 남기고 계속 진행, 최종 판정은 delete-sg 가 내린다. 400/404 는 이미 삭제됐거나 std_port_id placeholder 미해결(생성 자체가 실패)인 정상 경로."
+        },
+        {
+          "name": "final-wait-port-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/ports/{std_port_id}",
+          "optional": true,
+          "expect_status": [200, 400, 404],
+          "poll": {
+            "until_status": [404],
+            "timeout": 180,
+            "interval": 10,
+            "give_up_status": [400]
+          },
+          "_note": "무그룹 safety-net 4/5: 포트 삭제(202 비동기)가 실제로 끝나 SG 참조가 풀린 것을 delete-sg 전에 확인 — until_status[404] 는 wait-subnet-gone, give_up_status 는 wait-port-subnet 의 기존 파일 패턴 복사. 이미 삭제된 정상 경로에선 첫 GET 404 로 즉시 종료(체감 0s), placeholder 미해결이면 400 즉시 give-up."
+        },
+        {
+          "name": "final-delete-port-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{port_subnet_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 404],
+          "retry_on_status": [409],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "무그룹 safety-net 5/5: vs-port 전용 서브넷 최종 청소 — 그룹 실패로 그룹 내 delete-port-subnet 이 skip 된 경로를 닫아 공유 VPC teardown 의 자식-잔존 실패(07-07 사건 유형)까지 방지. 포트가 방금 지워졌으면 409 사다리(4×15s, 그룹 내 스텝과 동일)로 흡수."
+        },
+        {
           "name": "delete-sg",
           "service": "security-group",
           "method": "DELETE",
@@ -3655,7 +4183,11 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 20,
+          "_note": "2026-07-08 회귀 수리: 이번 라이브 런에서 이 스텝이 409 scp-network.securitygroup.has-related-resources 로 종결(과거 passed → failed). 1차 방어는 바로 앞 무그룹 final-* 포트 청소 라인 + vs-port 그룹 create 3종(create-port/attach/create-nat)의 cleanup 등록(그룹 실패 시 엔진 _teardown_group 이 NAT→detach→port→subnet LIFO 로 청소); 이 사다리(6×20s)는 포트 삭제의 202 비동기 전파·참조 해소 지연을 흡수한다. expect 는 strict 유지 — 사다리 소진 후에도 409 면 진짜 잔존이므로 실패가 맞다(회귀 신호 보존, role=verify 유지)."
         },
         {
           "name": "delete-sg2",
@@ -3722,7 +4254,7 @@
       "service": "database/mysql",
       "enabled": true,
       "heavy": true,
-      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address left blank so the platform auto-assigns a free IP from the subnet (a hardcoded IP can collide / be reserved -> 'not available'). | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch). | SUB-OP WINDOW 2026-06-11 (lever 1 prep, docs-derived pending live validation): while the cluster is RUNNING, group mysql-subop-window fires the conservative sub-ops only — read-only GETs (show-request via AsyncResponse request_id capture, engine-version properties, parameter-groups/parameters, backup-histories, log-export-configs, replicas) + no-body sync-state + restart with wait (group mysql-restart). Deliberately EXCLUDED as not obviously reversible: kernel-upgrade, patch (minor version), promote/switchover/reset-replica, restore, replica create, stop/start, log-export-config writes, remove-backup-histories. Gated by the lifecycle's own heavy:true (SCP_RUN_HEAVY).",
+      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address left blank so the platform auto-assigns a free IP from the subnet (a hardcoded IP can collide / be reserved -> 'not available'). | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch). | SUB-OP WINDOW 2026-06-11 (lever 1 prep, docs-derived pending live validation): while the cluster is RUNNING, group mysql-subop-window fires the conservative sub-ops only — read-only GETs (show-request via AsyncResponse request_id capture, engine-version properties, parameter-groups/parameters, backup-histories, log-export-configs, replicas) + no-body sync-state + restart with wait (group mysql-restart). Deliberately EXCLUDED as not obviously reversible: kernel-upgrade, patch (minor version), promote/switchover/reset-replica, restore, replica create, stop/start, log-export-config writes, remove-backup-histories. Gated by the lifecycle's own heavy:true (SCP_RUN_HEAVY). | COMPLETENESS 2026-07-08 (owner GO, COMPLETENESS-AUDIT-2026-07-08): archive set/sync (group mysql-archive), block-storage resize (mysql-bsresize) and stop->start (mysql-stopstart) folded in — bodies/expects/settle-polls copied from the database-postgresql-cluster twin, each optional + own group so failures isolate and teardown (ungrouped delete steps) always runs; stop/start is hereby REMOVED from the exclusion list above (stop->start placed after all config writes, directly before delete).",
       "steps": [
         {
           "name": "create-vpc",
@@ -3949,6 +4481,18 @@
           ]
         },
         {
+          "name": "capture-block-storage-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+          },
+          "_note": "COMPLETENESS-AUDIT-2026-07-08: bsg_id feeds set-block-storage-size (mysqlsetblockstoragesize); JSONPath copied verbatim from the database-postgresql-cluster twin's capture-instance-group step."
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "cluster_id": "{cluster_id}",
@@ -4114,6 +4658,77 @@
           },
           "group": "mysql-backup",
           "optional": true
+        },
+        {
+          "name": "set-archive-config",
+          "optional": true,
+          "group": "mysql-archive",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlsetarchiveconfig. Body = api_docs request example, identical to the database-postgresql-cluster twin's set-archive; optional + own group so a failure isolates and can never block teardown."
+        },
+        {
+          "name": "wait-after-set-archive",
+          "optional": true,
+          "group": "mysql-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "sync-archive-config",
+          "optional": true,
+          "group": "mysql-archive",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlsyncarchiveconfig — no-body POST right after the archive set, same group; expects mirror the PG twin's sync-archive (409 tolerated while the set is still settling)."
+        },
+        {
+          "name": "wait-after-sync-archive",
+          "optional": true,
+          "group": "mysql-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
         },
         {
           "name": "list-parameter-values-before",
@@ -4290,6 +4905,108 @@
           "path": "/v1/clusters/{cluster_id}",
           "group": "mysql-restart",
           "optional": true,
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "set-block-storage-size",
+          "optional": true,
+          "group": "mysql-bsresize",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "json": {
+            "size_gb": 112
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlsetblockstoragesize. Body/expects = PG twin's resize-block-storage (112 > create's 104 GB; 400 tolerated like the twin); bsg_id soft-captured by capture-block-storage-group."
+        },
+        {
+          "name": "wait-after-bsresize",
+          "optional": true,
+          "group": "mysql-bsresize",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "stop-cluster",
+          "optional": true,
+          "group": "mysql-stopstart",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlstopcluster. stop->start pair sits after every config write and directly before delete so no other sub-op touches a stopped cluster; pattern/expects = PG twin's pg-stopstart group."
+        },
+        {
+          "name": "wait-stopped",
+          "optional": true,
+          "group": "mysql-stopstart",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "SHUTDOWN"
+            ],
+            "timeout": 900,
+            "interval": 20
+          }
+        },
+        {
+          "name": "start-cluster",
+          "optional": true,
+          "group": "mysql-stopstart",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlstartcluster — returns the cluster to RUNNING before teardown; expects = PG twin's start-cluster."
+        },
+        {
+          "name": "wait-started",
+          "optional": true,
+          "group": "mysql-stopstart",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
           "expect_status": [
             200
           ],
@@ -6037,6 +6754,7 @@
       "id": "networking-dns-hosted-zone",
       "service": "networking/dns",
       "enabled": false,
+      "_status": "stale",
       "heavy": false,
       "_note": "DISABLED — SUPERSEDED 2026-06-11 by networking-dns-hosted-zone-private (regression/scenarios/lifecycles/networking__dns.json), which encodes the full userguide chain: create private-dns -> poll Active -> connect shared VPC -> hosted zone -> A record -> reverse teardown (zone before private-dns delete). Per the ingested userguide facts (networking__dns.yaml private-dns-account-global), an ACTIVATE call is only needed when re-using the account-global private-dns name in ANOTHER region — a fresh create in the run region polls straight to Active, so no activate sub-flow is required. Kept disabled as a historical record; bodies here lack the required private_dns_id chain. Real response shapes (framework/api_bodies.json + api_docs response examples): createprivatedns $.private_dns.id; createhostedzone and createhostedzonerecord return BARE envelopes — the id is $.id (not $.hosted_zone.id / $.record.id).",
       "steps": [
@@ -6156,7 +6874,10 @@
     {
       "id": "security-kms-key",
       "service": "security/kms",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "security-kms-transit-crypto",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 listkeys 이관 완료; node kms-key 재지정.",
       "_note": "Real body from API ref (security/kms/createkey, see framework/api_bodies.json). Self-contained: create transit key -> get -> list -> probe path-param GETs -> delete (schedule deletion). Response envelope $.key.id confirmed from the doc response example.",
       "steps": [
         {
@@ -6237,7 +6958,10 @@
     {
       "id": "security-secretsmanager-secret",
       "service": "security/secretsmanager",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "security-secretsmanager-writes",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 listsecrets 이관 완료; KMS+secret 이중 프로비저닝 제거; node secret 재지정.",
       "_note": "Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down last. secret_value must be a JSON STRING; private_acl_enabled is a string 'false'. Captures $.secret.id / $.key.id confirmed from doc response examples. Secret DELETE requires a body {waiting_time_ndays} (recovery window) — sent on both the delete step and the cleanup.",
       "steps": [
         {
@@ -6446,7 +7170,10 @@
     {
       "id": "application-apigateway-api-resource",
       "service": "application-service/apigateway",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "apigateway-api-write-coverage",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08 §B): SUBSUMED-1 — 유일 listapis 이관 완료; API 3중 생성 감축; nodes apigw-api/root-resource/resource 재지정.",
       "_note": "Light, VPC-FREE, self-contained. Creates an API (REGION endpoint), reads root resource id, creates a child resource, creates a deployment, probe-reads every {api_id} GET, tears down. Create body grounded from docs createapi 1.3 ({name,description,endpoint_type:REGION,tags:[{key,value}],id:''}; 202 -> $.id). A new API auto-creates a root resource, recovered via listresources (200 -> $.resources[0].id) and used as createresource parent_id. createresource path is /v1/apis/{api_id}/resources/{parent_id} with body {path_part} (200 -> $.id). createapideployment POST /v1/apis/{api_id}/deployments (200 -> $.deployment_id) exercises listapideployments. regrapi{unique} is lowercase-alnum (safe). create-deployment removed: deploying requires >=1 API method (NoMethodsExist); not needed for the api/resource GETs, and listapideployments is already covered via api_id.",
       "steps": [
         {
@@ -8467,6 +9194,7 @@
       "id": "iam-role",
       "service": "management/iam",
       "enabled": false,
+      "_status": "blocked-owner",
       "_note": "Light, self-contained: create a USER_DEFINED role (no path-param POST /v1/roles), read it, probe the 2 role-id path-param GETs, delete. Body grounded on management/iam/createrole example; assume_role_policy_document copied verbatim (sts:AssumeRole). policy_ids/principals sent empty to avoid referencing non-existent users. Create response envelope $.role.id confirmed from the doc 202 example. RISK: the trust-policy / principals validation is account-specific — if the gateway requires a real principal SRN, create returns 400 and this lifecycle should be disabled; everything else is grounded.",
       "steps": [
         {
@@ -8620,6 +9348,24 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "list-log-groups",
+          "method": "GET",
+          "path": "/v1/log-groups",
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap listloggroups — bare list; the group created above guarantees a non-empty page. live 200 2026-07-08."
+        },
+        {
+          "name": "show-agent-download-link",
+          "method": "GET",
+          "path": "/v1/agents/download-link",
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap showagentdownloadlink — global read, no params per api_docs; live 200 2026-07-08 (returns the ServiceWatch_Agent.zip object-store link)."
         },
         {
           "name": "probe-reads",

@@ -70,6 +70,11 @@ jobs:
           echo "category=$(get category)"     >> "$GITHUB_OUTPUT"
           echo "service=$(get service)"       >> "$GITHUB_OUTPUT"
           echo "parallel=$(get parallel)"     >> "$GITHUB_OUTPUT"
+          # scheduler 1.0-d (flag-gated, default OFF): dag=true switches the heavy
+          # step from pytest-xdist to the dependency-DAG live runner. Absent/other
+          # values keep the default xdist path exactly as before.
+          echo "dag=$(get dag)"               >> "$GITHUB_OUTPUT"
+          echo "dag_targets=$(get dag_targets)">> "$GITHUB_OUTPUT"
           echo "----- chat-heavy-request -----"; cat "$F" || true
 
       - name: No-op / stop (skip the heavy work)
@@ -111,7 +116,7 @@ jobs:
       #     xdist distribution, so they start at t=0 instead of late);
       #   * warm per-host connection pool -> core.http_client.ApiClient.
       - name: Run heavy CRUD lifecycles (xdist — shared longest-first + warm pool)
-        if: steps.req.outputs.action == 'run'
+        if: steps.req.outputs.action == 'run' && steps.req.outputs.dag != 'true'
         env:
           SCP_ALLOW_MUTATIONS: ${{ steps.req.outputs.mutations || 'true' }}
           SCP_ALLOW_DESTRUCTIVE: ${{ steps.req.outputs.destructive || 'true' }}
@@ -125,12 +130,73 @@ jobs:
         run: |
           K="${{ steps.req.outputs.crud_filter }}"
           N="${{ steps.req.outputs.parallel }}"; N="${N:-6}"
-          ARGS="tests/crud -m crud -n $N -o addopts= -q"
+          # --junitxml explicit: `-o addopts=` clears pytest.ini addopts, so junit was
+          # never written and the tracked stale reports/junit-crud.xml rode into the
+          # artifact byte-identical across runs (campaign log 2026-07-04). Fixed + file
+          # untracked in the same commit.
+          ARGS="tests/crud -m crud -n $N -o addopts= -q --junitxml=reports/junit-crud.xml"
           if [ -n "$K" ]; then
             python -m pytest $ARGS -k "$K" || true
           else
             python -m pytest $ARGS || true
           fi
+
+      # Scheduler 1.0-d cutover experiment (OPT-IN via `dag=true` in the request
+      # file — the default path above is untouched). Runs the SAME enabled plan
+      # through the dependency-DAG live runner (SCP_DAG_RUNNER + AIMD adaptive
+      # concurrency, tools/dag_run_live.py) instead of pytest-xdist. Targets:
+      # `dag_targets=<catalog targets>` narrows to their dependency closure,
+      # default ALL. The provisioned SCP_SHARED_* ids above are adopted as-is
+      # (dag_runner_live env-adoption branch). Evidence lands in reports/results/
+      # like the xdist path, so the upload/mirror/sweep steps below apply
+      # unchanged. `|| true` keeps the always() sweep semantics identical.
+      - name: Run heavy CRUD via dependency-DAG runner (opt-in dag=true)
+        if: steps.req.outputs.action == 'run' && steps.req.outputs.dag == 'true'
+        env:
+          SCP_ALLOW_MUTATIONS: ${{ steps.req.outputs.mutations || 'true' }}
+          SCP_ALLOW_DESTRUCTIVE: ${{ steps.req.outputs.destructive || 'true' }}
+          SCP_RUN_HEAVY: ${{ steps.req.outputs.heavy || 'true' }}
+          SCP_VPC_SHARED_RESERVED: '1'
+        run: |
+          T="${{ steps.req.outputs.dag_targets }}"
+          python tools/dag_run_live.py ${T:-ALL} || true
+
+      # Persist the run's evidence. The runner is ephemeral and this workflow has no
+      # other observation sink (oplog only carries resource events), so without this
+      # upload the per-step observations — the ONLY real-2xx evidence a verified fold
+      # can use — die with the runner (lost for run 28595785223, found 2026-07-02).
+      - name: Upload results (observations/findings/junit)
+        if: always() && steps.req.outputs.action == 'run'
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ github.run_id }}
+          path: |
+            reports/results/
+            reports/junit-crud.xml
+          if-no-files-found: warn
+          retention-days: 30
+
+      # Also mirror the same evidence to the PERMANENT oplog bucket: chat sessions
+      # cannot download GitHub artifacts (the session proxy blocks api.github.com;
+      # MCP has no artifact-download tool) but they read this bucket directly.
+      # Best-effort — never fails the run.
+      - name: Mirror results to oplog bucket (S3)
+        if: always() && steps.req.outputs.action == 'run'
+        run: |
+          python - <<'EOF' || echo "oplog mirror failed (non-fatal)"
+          import glob, os
+          from core.oplog import _client
+          c, cfg = _client()
+          if not c:
+              print("[mirror] oplog disabled — skipping"); raise SystemExit
+          rid = os.environ["APITEST_RUN_ID"]
+          for p in glob.glob("reports/results/*.jsonl") + ["reports/junit-crud.xml"]:
+              if not os.path.exists(p):
+                  continue
+              key = f"runs/{rid}/artifact/{os.path.basename(p)}"
+              c.upload_file(p, cfg["bucket"], key)
+              print("[mirror]", p, "->", key)
+          EOF
 
       # ALWAYS reclaim our tag-scoped resources for a 'run' or 'stop' — on success,
       # on heavy failure, AND when this run was CANCELLED by a later action=stop push

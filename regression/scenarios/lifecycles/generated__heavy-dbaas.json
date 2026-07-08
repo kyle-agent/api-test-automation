@@ -5,6 +5,7 @@
       "id": "gen-heavy-epas-replica",
       "service": "database/epas",
       "enabled": false,
+      "_status": "stale",
       "_note": "PRIORITY heavy chain — epas-create has NO recorded live 2xx anywhere (heavy-shared-dbaas epas leg was optional-grouped); this chain is the first proof opportunity for the epas create path — on success promote epas-cluster/lookups docs->VALIDATED (C5). PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster nod DE-DUP (2026-06-18, audit-confirmed): DISABLED — redundant with the comprehensive hand-written {engine}-cluster-subops-guarded (primary+replica+region-replica+restore+all sub-ops). This composed draft spun its OWN ~8-12min billable cluster for only a few unique endpoints (replica sync/reset/promote; -upgrade GET .../archive is now auto-probed by subops-guarded via the engine auto-probe). Per contract C4 drafts are not auto-enabled. TODO: fold the replica-state ops (sync-replica-state/reset-replica/promote) into {engine}-cluster-subops-guarded on its EXISTING replica, then this stays retired.",
       "steps": [
         {
@@ -619,6 +620,7 @@
       "id": "gen-heavy-mysql-replica",
       "service": "database/mysql",
       "enabled": false,
+      "_status": "stale",
       "_note": "replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance) move to a separate setter chain. PG/epas pattern. DE-DUP (2026-06-18, audit-confirmed): DISABLED — redundant with the comprehensive hand-written {engine}-cluster-subops-guarded (primary+replica+region-replica+restore+all sub-ops). This composed draft spun its OWN ~8-12min billable cluster for only a few unique endpoints (replica sync/reset/promote; -upgrade GET .../archive is now auto-probed by subops-guarded via the engine auto-probe). Per contract C4 drafts are not auto-enabled. TODO: fold the replica-state ops (sync-replica-state/reset-replica/promote) into {engine}-cluster-subops-guarded on its EXISTING replica, then this stays retired.",
       "steps": [
         {
@@ -1142,6 +1144,7 @@
       "id": "gen-heavy-mariadb-replica",
       "service": "database/mariadb",
       "enabled": false,
+      "_status": "stale",
       "_note": "replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance) move to a separate setter chain. PG/epas pattern. DE-DUP (2026-06-18, audit-confirmed): DISABLED — redundant with the comprehensive hand-written {engine}-cluster-subops-guarded (primary+replica+region-replica+restore+all sub-ops). This composed draft spun its OWN ~8-12min billable cluster for only a few unique endpoints (replica sync/reset/promote; -upgrade GET .../archive is now auto-probed by subops-guarded via the engine auto-probe). Per contract C4 drafts are not auto-enabled. TODO: fold the replica-state ops (sync-replica-state/reset-replica/promote) into {engine}-cluster-subops-guarded on its EXISTING replica, then this stays retired.",
       "steps": [
         {
@@ -3847,6 +3850,7 @@
       "id": "gen-heavy-mariadb-upgrade",
       "service": "database/mariadb",
       "enabled": false,
+      "_status": "stale",
       "_note": "DISPATCH-READY (2026-06-14): old-major(10.x) create -> kernel-upgrade chain, faithful PG gen-heavy-pg-upgrade / SKE gen-heavy-ske-upgrade mirror. GATE-1 (old version creatable) RESOLVED by mariadb userguide overview 2026-06-14: majors 10.6.x(10) / 10.11.x(3) / 11.4.7 coexist, so where_prefix major_version='10' resolves to a creatable OLD major while 11.4.7 is latest. NOTE 10.6.x EoTS 2026-07-06: after that, prefix '10' still matches 10.11.x (still an older major than 11.4.7) — re-check the live catalog only if the engine-versions list ever collapses to 11.x-only (then capture None -> engine hard-fails THIS chain only, intended blast radius). GATE-2 still LIVE: kernel-upgrade needs is_kernel_patchable=true on the cluster detail v1.1 — a fresh 10.x image may already run the newest OS kernel, in which case the PUT 4xxes and the fixed create expect [200,201,202] surfaces it as a hard-fail (expected live refinement). Dedicated heavy window only (own VPC). composed by regression/scenarios/composer.py — targets: mariadb-cluster, mariadb-kernel-upgrade DE-DUP (2026-06-18, audit-confirmed): DISABLED — redundant with the comprehensive hand-written {engine}-cluster-subops-guarded (primary+replica+region-replica+restore+all sub-ops). This composed draft spun its OWN ~8-12min billable cluster for only a few unique endpoints (replica sync/reset/promote; -upgrade GET .../archive is now auto-probed by subops-guarded via the engine auto-probe). Per contract C4 drafts are not auto-enabled. TOD",
       "steps": [
         {

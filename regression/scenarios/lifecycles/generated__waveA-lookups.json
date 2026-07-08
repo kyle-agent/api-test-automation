@@ -5,7 +5,7 @@
       "id": "gen-gpu-node-image",
       "service": "compute/multinodegpucluster",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: gpu-node-image",
+      "_note": "composed by regression/scenarios/composer.py — targets: gpu-node-image. +2 MANUAL strict-200 bare-read steps appended 2026-07-08 (list-cluster-fabrics, list-gpu-node-products) per COMPLETENESS-AUDIT-2026-07-08 — keep them if this lifecycle is ever re-composed.",
       "steps": [
         {
           "name": "create-gpu-node-image",
@@ -35,6 +35,26 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "list-cluster-fabrics",
+          "service": "multinodegpucluster",
+          "method": "GET",
+          "path": "/v1/cluster-fabrics",
+          "expect_status": [
+            200
+          ],
+          "_note": "listclusterfabrics — zero-required-param global list (size/page/sort/cluster_fabric_name/state/node_pool_id all optional). LIVE-CONFIRMED 200 2026-07-08 (empty cluster_fabrics[], count 0 — empty-list 200 is the steady state without provisioned GPU clusters). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
+        },
+        {
+          "name": "list-gpu-node-products",
+          "service": "multinodegpucluster",
+          "method": "GET",
+          "path": "/v1/gpu-nodes/products",
+          "expect_status": [
+            200
+          ],
+          "_note": "listgpunodeproducts — zero-required-param global read (type/image_id optional). LIVE-CONFIRMED 200 2026-07-08 (real product entries, e.g. B300*8 GPU node). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         }
       ]
     },
@@ -51,12 +71,12 @@
           "path": "/v1/cloud-ml/images",
           "expect_status": [
             200,
-            201,
-            202
+            404
           ],
-          "capture": {
+          "capture_soft": {
             "image_id": "$.images[0].id"
-          }
+          },
+          "_note": "SCR 활성화 게이트 (2026-07-08 확정, 이번 전체 런 실패 주체): cloud-ml 전면이 계정 SCR credential 미활성으로 404 — 404 관용 + capture_soft로 게이트 하에서도 호출 증거는 기록. SCR 활성화 후 strict [200] + hard capture로 승급 (gen-cloudml-chain의 게이트 격리와 동일 날짜 처리)."
         },
         {
           "name": "verify-cloudml-image-read",
@@ -64,8 +84,10 @@
           "method": "GET",
           "path": "/v1/cloud-ml/images",
           "expect_status": [
-            200
-          ]
+            200,
+            404
+          ],
+          "_note": "SCR 게이트 관용 — 위 create-cloudml-image _note 참조."
         }
       ]
     },

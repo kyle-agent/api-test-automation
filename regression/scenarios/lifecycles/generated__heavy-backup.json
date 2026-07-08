@@ -4,8 +4,8 @@
     {
       "id": "gen-heavy-backup",
       "service": "storage/backup",
-      "enabled": false,
-      "_note": "storage/backup AGENTLESS VM_IMAGE chain on a REAL server (owner directive 2026-06-13 — prior blocker was docs-example server UUIDs, '실 서버 UUID 의존'): VM closure -> backup-target lookup (GET /v1/backups/backup-targets discovers the live server's server_uuid/server_guid; covers getbackuptargetlist) -> create backup policy (BackupCreateRequest1Dot2 verbatim; agentless needs NO agent per userguide overview: 'Agentless Backup: No separate agent installation required') -> ready $.state AVAILABLE -> verify family: showbackup, check-name-dup, check-restore-name-dup, check-filesystem-dup(broad: FILESYSTEM/agent-oriented), list/set schedules, backup-/restore-histories, restore-targets, restorable-subnets(broad), set-filesystem-path(broad: agent-policy-only per userguide), update-replication(broad: replication is Agent-Backup-only per userguide), update-retention (WEEK_2->MONTH_1) -> manual-backup ('즉시 Backup은 Full Backup으로 수행됩니다' — always FULL) with AVAILABLE re-poll up to 60min -> teardown (delete-backup retries 409/500 40x30s in case the full-backup job still holds the policy). Restore flow lives in gen-heavy-backup-restore (disabled, timing-gated).",
+      "enabled": true,
+      "_note": "storage/backup AGENTLESS VM_IMAGE chain on a REAL server (owner directive 2026-06-13 — prior blocker was docs-example server UUIDs, '실 서버 UUID 의존'): VM closure -> backup-target lookup (GET /v1/backups/backup-targets discovers the live server's server_uuid/server_guid; covers getbackuptargetlist) -> create backup policy (BackupCreateRequest1Dot2 verbatim; agentless needs NO agent per userguide overview: 'Agentless Backup: No separate agent installation required') -> ready $.state AVAILABLE -> verify family: showbackup, check-name-dup, check-restore-name-dup, check-filesystem-dup(broad: FILESYSTEM/agent-oriented), list/set schedules, backup-/restore-histories, restore-targets, restorable-subnets(broad), set-filesystem-path(broad: agent-policy-only per userguide), update-replication(broad: replication is Agent-Backup-only per userguide), update-retention (WEEK_2->MONTH_1) -> manual-backup ('즉시 Backup은 Full Backup으로 수행됩니다' — always FULL) with AVAILABLE re-poll up to 60min -> teardown (delete-backup retries 409/500 40x30s in case the full-backup job still holds the policy). Restore flow lives in gen-heavy-backup-restore (disabled, timing-gated). | REPAIR 2026-07-08 (live run — HB3b count-poll의 첫실측): create-backup-target 이 poll(『$.count until 1』, 300s/15s — HB3b 가 이미 심어둔 폴, 지시문이 요구한 폴 어휘/동일-스텝 capture 그대로) 을 다 태우고도 {\"contents\":[],\"count\":0} 인 채 capture assert 로 red — 등록 지연이 300s 를 초과 (IB-014 propagation 가족 재발). 수리: (1) poll timeout 300→600 (interval 15 유지); (2) create-backup-target 을 optional + group backup-policy 로 격리하고 backup 의존 체인 전체(create/wait-backup-policy · verify family · manual-backup · delete-backup-policy — 구 backup-manual 그룹 포함 backup-policy 로 통일)에 같은 그룹을 부여 — 대상이 끝내 미등록이면 backup 체인만 그룹 skip(non-red) 하고 VM/subnet/VPC/SG/keypair spine teardown(그룹 밖)은 항상 실행. 라이브 재확인 2026-07-08 (read-only): 무필터 GET /v1/backups/backup-targets?...policy_type=FILESYSTEM → 200 {\"contents\":[],\"count\":0} (런 종료 후 서버 0 대 — 쿼리 자체는 정상, 지연 길이는 오프라인 측정 불가). 다음 heavy 런이 600s 내 count=1 도달 여부를 관측해야 함.",
       "steps": [
         {
           "name": "create-keypair",
@@ -34,7 +34,7 @@
           "name": "create-image",
           "service": "virtualserver",
           "method": "GET",
-          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50",
+          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&os_distro=ubuntu&limit=50",
           "expect_status": [
             200,
             201,
@@ -232,7 +232,7 @@
             200
           ],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": [
               "ACTIVE"
             ],
@@ -245,12 +245,29 @@
           "service": "backup",
           "method": "GET",
           "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}",
-          "_note": "CONFIRMED 2026-06-20: policy_type=VM_IMAGE causes backend 500 ContactAdminForAssistance for VIRTUAL_SERVER+GPU_SERVER. Using FILESYSTEM (returns 200 count=0) to cover getbackuptargetlist key safely. Capture will be empty; create-backup-policy will 4xx on missing server_uuid. To fix: capture server_uuid from GET /v1/servers/{server_id} after wait-server (field name TBD from live test).",
+          "_note": "HB3b (2026-07-05, run 28723287734 job-log diagnosis): CONFIRMED 2026-06-20 that policy_type=VM_IMAGE 500s (ContactAdminForAssistance) for VIRTUAL_SERVER/GPU_SERVER, so FILESYSTEM is the only usable policy_type here (covers getbackuptargetlist). HB3 (2026-07-05) showed the query itself returns 200 but `contents` can still be EMPTY right after wait-server-active flips ACTIVE -- inventory-registration lag, not a hard rejection. Turned into a settle-poll on `$.count` (NOT the uuid itself -- the engine's poll only supports exact-value equality via field+until, and server_uuid is an arbitrary value we cannot predict, so we poll the one field whose target value IS predictable: `count` must reach exactly 1, per the documented BackupTargetListResponse example `{\"contents\":[{...}],\"count\":1}` -- data/api_docs.json storage/backup/getbackuptargetlist). give_up_status short-circuits on any status that means 'this query itself is broken' rather than 'not registered yet', so we don't burn the full timeout on a structural error. server_name=regrsrv{unique} in the query already scopes the result server-side to exactly OUR server (unique per run) -- so once count=1, contents[0] IS our own server and no client-side name filter is needed; if the account ever had a stale duplicate the query's own server_name match would still return only one row, so [0] stays safe (documented as the load-bearing premise, not re-verified live this session since this session is offline-only).",
           "expect_status": [
             200,
             201,
             202
           ],
+          "poll": {
+            "field": "$.count",
+            "until": [
+              1
+            ],
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              401,
+              403,
+              404,
+              500
+            ]
+          },
+          "optional": true,
+          "group": "backup-policy",
           "capture": {
             "backup_server_uuid": "$.contents[0].server_uuid",
             "backup_server_guid": "$.contents[0].server_guid"
@@ -286,6 +303,7 @@
             201,
             202
           ],
+          "group": "backup-policy",
           "capture": {
             "backup_id": "$.resource.id"
           },
@@ -303,6 +321,7 @@
           "expect_status": [
             200
           ],
+          "group": "backup-policy",
           "poll": {
             "field": "$.state",
             "until": [
@@ -477,7 +496,8 @@
             200,
             201,
             202
-          ]
+          ],
+          "group": "backup-policy"
         },
         {
           "name": "wait-backup-manual",
@@ -487,6 +507,7 @@
           "expect_status": [
             200
           ],
+          "group": "backup-policy",
           "poll": {
             "field": "$.state",
             "until": [
@@ -504,7 +525,7 @@
           "expect_status": [
             200
           ],
-          "group": "backup-manual"
+          "group": "backup-policy"
         },
         {
           "name": "delete-backup-policy",
@@ -519,6 +540,7 @@
             404
           ],
           "destructive": true,
+          "group": "backup-policy",
           "retry_on_status": [
             409,
             500
@@ -625,8 +647,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "TWO BLOCKERS: (1) run 27483004836: backup-target lookup returned {contents:[],count:0} — server not yet registered as backup target (propagation delay). (2) CONFIRMED 2026-06-20: GET /v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE always returns 500 ContactAdminForAssistance (backend bug); same for GPU_SERVER+VM_IMAGE. BAREMETAL_SERVER+VM_IMAGE returns 400 NotAllowedVmImageBackup (correct). FILESYSTEM policy_type returns 200 count=0 for all server_categories (no agent servers on this account). The step must be reworked: to get server_uuid/server_guid for agentless VM_IMAGE backup, use GET /v1/servers/{server_id} capture path instead of backup-targets (VM_IMAGE is broken). Additionally, the engine needs poll-list capability (IB-014) for server registration delay.",
-      "_status": "blocked-engine"
+      "_disabled_reason": "STALE (kept for history; lifecycle stays enabled:true). Original two blockers: (1) run 27483004836: backup-target lookup returned {contents:[],count:0} — server not yet registered as backup target (propagation delay); (2) CONFIRMED 2026-06-20: GET .../backup-targets?...&policy_type=VM_IMAGE always 500s (ContactAdminForAssistance) for VIRTUAL_SERVER/GPU_SERVER (backend bug) — worked around by using policy_type=FILESYSTEM (200) and reading server_uuid/server_guid off THAT response instead. Blocker (1) (the registration-delay/poll-list gap, IB-014) is addressed HB3b (2026-07-05): the create-backup-target step now polls `$.count` until 1 — see its step `_note`. Live re-verification is the next dispatch's job (this session is offline-only).",
+      "_status": "done-modeled"
     },
     {
       "id": "gen-heavy-backup-restore",
@@ -661,7 +683,7 @@
           "name": "create-image",
           "service": "virtualserver",
           "method": "GET",
-          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50",
+          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&os_distro=ubuntu&limit=50",
           "expect_status": [
             200,
             201,
@@ -859,7 +881,7 @@
             200
           ],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": [
               "ACTIVE"
             ],
@@ -872,12 +894,27 @@
           "service": "backup",
           "method": "GET",
           "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}",
-          "_note": "CONFIRMED 2026-06-20: policy_type=VM_IMAGE causes backend 500 ContactAdminForAssistance for VIRTUAL_SERVER+GPU_SERVER. Using FILESYSTEM (returns 200 count=0) to cover getbackuptargetlist key safely. Capture will be empty; create-backup-policy will 4xx on missing server_uuid. To fix: capture server_uuid from GET /v1/servers/{server_id} after wait-server (field name TBD from live test).",
+          "_note": "HB3b (2026-07-05, run 28723287734 job-log diagnosis): CONFIRMED 2026-06-20 that policy_type=VM_IMAGE 500s (ContactAdminForAssistance) for VIRTUAL_SERVER/GPU_SERVER, so FILESYSTEM is the only usable policy_type here (covers getbackuptargetlist). HB3 (2026-07-05) showed the query itself returns 200 but `contents` can still be EMPTY right after wait-server-active flips ACTIVE -- inventory-registration lag, not a hard rejection. Turned into a settle-poll on `$.count` (NOT the uuid itself -- the engine's poll only supports exact-value equality via field+until, and server_uuid is an arbitrary value we cannot predict, so we poll the one field whose target value IS predictable: `count` must reach exactly 1, per the documented BackupTargetListResponse example `{\"contents\":[{...}],\"count\":1}` -- data/api_docs.json storage/backup/getbackuptargetlist). give_up_status short-circuits on any status that means 'this query itself is broken' rather than 'not registered yet', so we don't burn the full timeout on a structural error. server_name=regrsrv{unique} in the query already scopes the result server-side to exactly OUR server (unique per run) -- so once count=1, contents[0] IS our own server and no client-side name filter is needed; if the account ever had a stale duplicate the query's own server_name match would still return only one row, so [0] stays safe (documented as the load-bearing premise, not re-verified live this session since this session is offline-only).",
           "expect_status": [
             200,
             201,
             202
           ],
+          "poll": {
+            "field": "$.count",
+            "until": [
+              1
+            ],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              401,
+              403,
+              404,
+              500
+            ]
+          },
           "capture": {
             "backup_server_uuid": "$.contents[0].server_uuid",
             "backup_server_guid": "$.contents[0].server_guid"

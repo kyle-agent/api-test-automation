@@ -1,4 +1,15 @@
+---
+status: superseded (legacy poc console/console_server.py — 현행은 controlplane 척추 + console2)
+for: all
+superseded_by: ../../console2/README.md
+---
+
 # Platform Console — 로컬 실행 플랫폼 핸드오프
+
+> **⚠️ SUPERSEDED.** 이 문서가 다루는 로컬 콘솔(`tools/console_server.py` +
+> `poc/scenario-viz/console.html`, port 9000)은 **console2 + controlplane 척추**로
+> 대체되었다 (`console2/README.md`, `controlplane/README.md`; 확정 IA:
+> `docs/working/plans/PLATFORM-IA-DIRECTION.md`). 역사 기록으로만 보존.
 
 > 다음 세션이 이어서 작업하기 위한 현재 상태 스냅샷. 분기: `claude/start-here-review-5z8jt2`
 > (이번 작업은 매 커밋 `main`으로 FF 했음 — 둘이 동일). 최신 커밋: `152e9b3c`.

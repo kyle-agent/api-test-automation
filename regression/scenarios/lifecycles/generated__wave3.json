@@ -4,7 +4,10 @@
     {
       "id": "gen-wave3-quota",
       "service": "management/quota",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "quota-read-coverage",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): DUPLICATE J=1.0. 표면이 quota-read-coverage 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "_note": "recomposed after run 27428457582 — account-quota PROVEN (capture+read 200); quota-requests list empty in env -> capture_soft + optional verify",
       "steps": [
         {
@@ -144,7 +147,10 @@
     {
       "id": "gen-wave3-product",
       "service": "platform/product",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "product-catalog-readonly",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): DUPLICATE J=1.0 — 분석노트 있는 정본 유지. 표면이 product-catalog-readonly 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "_note": "recomposed after run 27444823109 — live body: items carry category_id/product_id fields, not id",
       "steps": [
         {
@@ -200,7 +206,10 @@
     {
       "id": "gen-wave3-cost",
       "service": "financial-management/costexplorer",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-cost-reads",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): DUPLICATE J=1.0 — step·payload 동일. 표면이 gen-cost-reads 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "_note": "composed wave 3 rev 1 — lookup-task verification (read-only)",
       "steps": [
         {
@@ -237,7 +246,10 @@
     {
       "id": "gen-wave3-pricing",
       "service": "financial-management/pricing",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "gen-pricing-reads",
+      "_disabled_reason": "2026-07-08 owner GO (DEDUP-AUDIT-2026-07-08): DUPLICATE J=1.0. 표면이 gen-pricing-reads 에 완전 포함 — 서비스 선택 중복 제거. 재활성화 시 감사 문서 참조",
       "_note": "composed wave 3 rev 1 — lookup-task verification (read-only)",
       "steps": [
         {

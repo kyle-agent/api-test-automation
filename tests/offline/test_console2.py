@@ -389,7 +389,8 @@ def test_owned_worker_records_structured_list(monkeypatch):
     marks it done (no cloud — scan_owned is monkeypatched)."""
     monkeypatch.setattr(
         "cleanup.verify_clean.scan_owned",
-        lambda client=None: [{"service": "networking/vpc", "path": "/v1/vpcs/vpc-1"}])
+        lambda client=None, list_errors=None:
+            [{"service": "networking/vpc", "path": "/v1/vpcs/vpc-1"}])
     rec = C2._new_rec("owned")
     C2._owned_worker(rec)
     assert rec["status"] == "done", rec.get("error")
@@ -649,3 +650,37 @@ def test_peak_zero_run_never_queues(monkeypatch):
     finally:
         C2._RESERVED.pop("other", None)
         C2._RESERVED.pop(rec["id"], None)
+
+
+# --------------------------------------------------------------------------- #
+# CX 재배치 (2026-07-07) — ② Test Execution: 현재 실행 전면 (frontend contract)
+# --------------------------------------------------------------------------- #
+def test_execution_cx_relayout_frontend_contract():
+    """Pin the CX-relayout UI contract in the shipped frontend files (the JS is
+    not executed here — these are the load-bearing strings a refactor must keep):
+
+      1. 실행 기록 is a DEFAULT-COLLAPSED section (toggle header + hidden body,
+         fold state persisted in sessionStorage) — the hero (현재 실행) leads.
+      2. plan↔run continuity: the run-bound graph carries the "① 폐쇄집합
+         그대로" chip and the ② copy of the 생성·검증·삭제 순서표 with the
+         in-progress row highlight (.ordnow).
+      3. 런타임 is an INLINE 4th detail tab embedding the EXISTING /runtime
+         page (scope=mine) — single source, popup kept but labeled 새 창."""
+    html = (ROOT / "console2" / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
+    # 1) history demoted to a collapsed fold
+    assert 'id="hist-toggle"' in html
+    assert '<div id="report-side" class="hidden">' in html
+    assert "c2.histOpen.v1" in js, "fold state must persist in sessionStorage"
+    assert "runsOnly.find" in js  # 최근 종료 1건 요약 행 (실행 없을 때 상시 노출)
+    # 2) plan↔run continuity chip + run-side order table w/ live-row highlight
+    assert "폐쇄집합 그대로" in js and "생성 순서 동일" in js
+    assert 'id="r1-order-tbl"' in js and "ordnow" in js
+    assert "tr.ordnow td" in css
+    # 3) inline runtime tab reuses the one runtime URL (no logic duplication)
+    assert 'data-d="rt"' in html
+    assert 'id="rt-frame"' in js
+    # runtimeUrl() is the ONE place the runtime URL lives (popup, pf link, iframe)
+    assert js.count('"/runtime?scope=mine"') == 1 and "function runtimeUrl()" in js
+    assert "새 창" in html  # popup 유지 + 라벨

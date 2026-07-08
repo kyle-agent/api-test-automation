@@ -89,6 +89,28 @@ def print_filters():
 # --------------------------------------------------------------------------- #
 # provision / teardown
 # --------------------------------------------------------------------------- #
+def _needs_db_subnet() -> bool:
+    """True iff this run's selection (``SCP_CRUD_IDS``; unset = every enabled
+    lifecycle) contains at least one ``{"adopt": "subnet#db"}`` step. Without
+    this check a VS-only interactive run serialized ~1-2 min behind a DB-lane
+    subnet nothing would adopt (owner 2026-07-08: "db subnet 만들어지기 전까지
+    아무것도 안 하고 있네.. 이게 맞나?"). Fail-open: any error → True (create
+    the subnet; harmless, just slower)."""
+    import os
+    try:
+        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
+                if x.strip()}
+        for lc in engine.active_lifecycles():
+            if only and lc.get("id") not in only:
+                continue
+            if any((s.get("adopt") or "") == "subnet#db"
+                   for s in lc.get("steps", [])):
+                return True
+        return False
+    except Exception:  # noqa: BLE001 — 스킵 최적화가 provision 실패 원인이 되면 안 됨
+        return True
+
+
 def provision():
     cfg, client = _build_client()
     if not getattr(cfg, "allow_mutations", False):
@@ -103,9 +125,11 @@ def provision():
     # our explicit SCP_SHARED_*= lines below reach STDOUT.
     import contextlib
     shared_ctx = {}
+    need_db = _needs_db_subnet()
     try:
         with contextlib.redirect_stdout(sys.stderr):
-            shared_ctx, _teardown = engine.provision_shared_vpc(client, cfg)
+            shared_ctx, _teardown = engine.provision_shared_vpc(
+                client, cfg, need_db_subnet=need_db)
     except Exception as exc:
         # Wave D root cause: provision_shared_vpc CREATED the VPC (slot won,
         # counts against the 5-cap) but a *post-create* step inside it raised —

@@ -59,6 +59,7 @@ def api_model() -> JSONResponse:
     try:
         m = dict(c2._model())
         m["endpoint_params"] = c2._endpoint_params()      # API-tab param schema
+        m["durations"] = c2._durations_view()             # now-playing 평균 ETA
         return _json(m)
     except Exception as exc:                               # noqa: BLE001
         return _json({"error": f"model build failed: {exc}"}, 500)
@@ -128,7 +129,25 @@ def api_run_events(rid: str) -> JSONResponse:
         rec = c2._RUNS.get(rid)
     if not rec:
         return _json({"error": "no such run"}, 404)
-    return _json({"id": rid, "status": rec["status"], "events": c2._read_events(rec["events"])})
+    # §4: step-end soft에 soft_class(중복/갭/정책) 부착 — UI가 chip으로 렌더
+    events = c2._enrich_soft_classes(c2._read_events(rec["events"]))
+    return _json({"id": rid, "status": rec["status"], "events": events})
+
+
+@router.get("/api/runs/{rid}/graph")
+def api_run_graph(rid: str) -> JSONResponse:
+    """The run's OWN composition DAG (composer.graph_view over its lifecycle
+    closure) — the master 흐름 scene binds to THIS in run 모드, so navigating
+    away / clicking a history row never leaves it on the 구성 selection [F1·F2].
+    Same renderer contract as /api/graph (IA-BUILD-CONTRACT)."""
+    with c2._LOCK:
+        rec = c2._RUNS.get(rid)
+    if not rec:
+        return _json({"error": "no such run"}, 404)
+    try:
+        return _json({"id": rid, **c2._run_graph(rec)})
+    except Exception as exc:                               # noqa: BLE001
+        return _json({"error": f"run graph failed: {exc}"}, 500)
 
 
 @router.get("/api/runs/{rid}")
@@ -142,11 +161,15 @@ def api_run(rid: str) -> JSONResponse:
 
 @router.get("/api/runtime", response_class=HTMLResponse)
 @router.get("/runtime", response_class=HTMLResponse)
-def api_runtime(hours: float = 6.0) -> HTMLResponse:
-    """Runtime topology (loggingaudit) as standalone HTML for the 런타임 뷰 popup.
+def api_runtime(hours: float = 1.0, scope: str = "mine",
+                deleted: str = "hide") -> HTMLResponse:
+    """Runtime topology (loggingaudit × oplog origin join) as standalone HTML.
+    scope=mine|all (default mine; auto-falls back to all when mine is empty and
+    nothing local is running) · hours∈{1,6,24} (default 1) · deleted=hide|show.
     Best-effort: a cold load returns the '수집 중' auto-refresh placeholder."""
+    hours = hours if hours in c2._RUNTIME_HOURS else 1.0
     try:
-        out, _ready = c2._runtime_view(hours)
+        out, _ready = c2._runtime_view(hours, scope=scope, deleted=deleted)
     except Exception:                                      # noqa: BLE001
         out = None
     if not out:
@@ -178,6 +201,17 @@ async def api_plan(request: Request) -> JSONResponse:
         return _json({"error": f"plan failed: {exc}"}, 500)
 
 
+@router.post("/api/preflight")
+async def api_preflight(request: Request) -> JSONResponse:
+    """HEAVY-PREMISE-CONTRACT §3 — 실행 전 confirm의 정보원 (자원·과금·예상시간).
+    선택 payload를 받아 {lifecycles, resources, peak_quota, billable_count, est,
+    warnings}를 반환. staging·직접실행 confirm이 이걸 표시한다."""
+    try:
+        return _json(c2._preflight(await _body(request)))
+    except Exception as exc:                               # noqa: BLE001
+        return _json({"error": f"preflight failed: {exc}"}, 500)
+
+
 @router.post("/api/run")
 async def api_run_start(request: Request) -> JSONResponse:
     b = await _body(request)
@@ -190,6 +224,17 @@ async def api_run_start(request: Request) -> JSONResponse:
     heavy = c2._selection_is_heavy(ids)                    # gate DERIVED from selection
     peak = c2._run_peak_vpcs(ids)
     if mode == "live":
+        # dup-admit guard (2026-07-04): a second LIVE run while one is in flight
+        # pollutes the account-wide scan/rescan verdicts — 409, never silent admit.
+        act = c2._active_live_run()
+        if act:
+            return _json({
+                "error": ("이미 진행 중(또는 대기 중)인 LIVE 실행이 있습니다 — "
+                          f"run {act['id']} "
+                          f"({', '.join(act.get('lifecycle_ids') or [])[:120]}). "
+                          "동시 LIVE 실행은 자원 스캔·재스캔 판정을 오염시키므로 "
+                          "차단됩니다. 완료(또는 중단) 후 다시 시작하세요."),
+                "active_run": act["id"]}, 409)
         # live CRUD lifecycles need mutations+destructive; heavy auto-enables iff the
         # selected closure contains a heavy (billable) lifecycle. The deliberate
         # opt-in (Hard Rule 1) is the selection + the client pre-flight confirm.
@@ -232,6 +277,14 @@ def api_cleanup() -> JSONResponse:
     return _json(c2._rec_view(c2._start("cleanup", c2._cleanup_worker)), 202)
 
 
+@router.post("/api/runs/{rid}/abort")
+def api_run_abort(rid: str) -> JSONResponse:
+    """로컬 run 중단 (2026-07-04): kill the pytest process tree → teardown 스윕
+    → status '중단됨(aborted)'. Engine half lives in c2._abort_run."""
+    code, payload = c2._abort_run(rid)
+    return _json(payload, code)
+
+
 @router.post("/api/verify")
 def api_verify() -> JSONResponse:
     return _json(c2._rec_view(c2._start("verify", c2._verify_worker)), 202)
@@ -240,3 +293,21 @@ def api_verify() -> JSONResponse:
 @router.post("/api/owned")
 def api_owned() -> JSONResponse:
     return _json(c2._rec_view(c2._start("owned", c2._owned_worker)), 202)
+
+
+def local_run_summary(gh_run_id: str) -> dict | None:
+    """Pass/fail summary for a ``local-*`` run — used by the /runs/{id} detail
+    page (P2-9 잔여). Thin re-export of the engine helper."""
+    try:
+        return c2._local_run_summary(gh_run_id)
+    except Exception:                                      # noqa: BLE001
+        return None
+
+
+# Server start (spine import): mirror the rehydrated finished local runs into
+# the controlplane runs DB so Reporting ▸ 실행 기록 shows them (신규2 · P2-9).
+# c2 already rehydrated _RUNS at its own import; this only backfills the DB.
+try:
+    c2._backfill_runs_db()
+except Exception:                                          # noqa: BLE001
+    pass

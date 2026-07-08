@@ -24,6 +24,12 @@ for var in ("PLATFORM_INGEST_TOKEN", "SCP_ALLOW_DESTRUCTIVE",
             "SCP_OPLOG_ACCESS_KEY", "SCP_OPLOG_SECRET_KEY",
             "PLATFORM_GIT_PUSH", "SCP_BUDGET_LIMITS"):
     os.environ.pop(var, None)
+# pop alone is NOT hermetic: core.config._load_dotenv() (triggered by the app
+# import below) setdefault()s values from a host .env back INTO os.environ, and
+# _bool("SCP_ALLOW_DESTRUCTIVE") defaults True — so on a host whose .env arms
+# the gate, test_delete_gated_without_destructive_env broke. Pin the gate OFF
+# explicitly (existing env vars always win over .env). 2026-07-02.
+os.environ["SCP_ALLOW_DESTRUCTIVE"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -184,6 +190,68 @@ def test_delete_gated_without_destructive_env():
 def test_empty_inventory_explains_ingest_only():
     page = client.get("/testing/resources?gh_run_id=no-such-run").text
     assert "ingest된 이벤트만" in page
+
+
+# --- 3b. 에러/빈 상태 폴리시 (UIUX-AUDIT P2-12) -------------------------------------
+
+def test_error_empty_states():
+    # /planning/edit·view without ?path= -> friendly HTML picker, not raw 422
+    for mode in ("edit", "view"):
+        r = client.get(f"/planning/{mode}")
+        assert r.status_code == 200, (mode, r.status_code)
+        assert "파일을 선택하세요" in r.text, mode
+        assert "suites/smoke.yaml" in r.text, mode
+    # unknown run id -> 404 page with the "전체 목록" link (was a 200 empty page)
+    r = client.get("/runs/no-such-run-424242")
+    assert r.status_code == 404, r.status_code
+    assert "기록 없음" in r.text and "/reporting?tab=runs" in r.text
+    # a run the DB knows still renders 200 (archive-only runs ride snapshots/index)
+    db.create_run("smoke", "stage", gh_run_id="9200")
+    assert client.get("/runs/9200").status_code == 200
+
+
+def test_reporting_subtabs_single_include():
+    # 서브탭 단일 정의 (P2-8): 세 화면 모두 같은 6탭 세트를 렌더한다
+    for path in ("/reporting?tab=summary", "/reporting/coverage",
+                 "/reporting/compare"):
+        page = client.get(path).text
+        for label in ("색칠지도", "요약", "대시보드", "실행 기록", "비교",
+                      "트리아지"):
+            assert label in page, (path, label)
+
+
+def test_ia_catalog_absorbed_into_modeling():
+    """2026-07-07 IA 개정 — Catalog는 네비 단계에서 우측 유틸 링크(📖 카탈로그)로,
+    Modeling이 서비스별 카탈로그 엔드포인트를 인라인(집계 + lazy 드로어)으로 품는다."""
+    home = client.get("/").text
+    assert "📖 카탈로그" in home                       # 유틸 링크
+    assert '<a href="/catalog" class=' in home         # 딥링크 유지
+    assert "3단계 현황" in home                        # 파이프라인 4칸 → 3칸
+    assert 'class="pl">Catalog<' not in home           # Catalog 칸 제거
+    assert "API의 테스트 모델 저작" in home            # Modeling 칸의 흡수 표기
+
+    # /catalog 는 남고(참조용) 머리에 통합 안내 1줄
+    cat = client.get("/catalog")
+    assert cat.status_code == 200 and "Modeling으로 통합됨" in cat.text
+
+    # Modeling 표: 서비스 행 집계 + 표 CX (code/opt 숨김 · 검증상태 헤더 · 범례)
+    r = client.get("/planning/resources/map")
+    assert r.status_code == 200
+    page = r.text
+    assert "모델됨" in page and "미모델" in page and "epdrawer" in page
+    assert ">검증상태</th>" in page and ">code</th>" not in page \
+        and ">opt</th>" not in page
+    assert "범례:" in page and "의존 그래프 (영향 파악)" in page
+
+    # 엔드포인트 드로어 파셜 — 상태 칩 3종 분류 (규칙: resource_routes.py 주석)
+    part = client.get("/planning/resources/map/endpoints",
+                      params={"service": "networking/vpc"})
+    assert part.status_code == 200
+    assert "epchip ok" in part.text          # 모델됨 → 노드 편집 딥링크
+    assert "/planning/resources/" in part.text
+    missing = client.get("/planning/resources/map/endpoints",
+                         params={"service": "no/such"})
+    assert missing.status_code == 200 and "없습니다" in missing.text
 
 
 # --- 4. run comparison ------------------------------------------------------------
@@ -390,6 +458,9 @@ TESTS = [
     test_inventory_platform_delete_marks_gone_only_on_ok,
     test_delete_gated_without_destructive_env,
     test_empty_inventory_explains_ingest_only,
+    test_error_empty_states,
+    test_reporting_subtabs_single_include,
+    test_ia_catalog_absorbed_into_modeling,
     test_compare_diff_buckets,
     test_compare_view_with_stubbed_snapshots,
     test_editor_pages_render,

@@ -36,7 +36,7 @@ resources:
     delete: {endpoint: "DELETE /v1/vpn-gateways/{vpn_gateway_id}",
              retry_on_status: [409], retries: 8, retry_interval: 15,
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/vpn/createvpngateway (run 28833316852)
     source: {lifecycle: networking-vpn-gateway-tunnel,
              steps: [create-vpn-gateway, delete-vpn-gateway]}
     notes: "이름은 3-20자 영숫자만 — 하이픈/언더스코어 금지 (vpn-gateway-name-rules;
@@ -105,7 +105,7 @@ resources:
     delete: {endpoint: "DELETE /v1/vpn-tunnels/{vpn_tunnel_id}",
              retry_on_status: [409], retries: 6, retry_interval: 15,
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/vpn/createvpntunnel (run 28835929967)
     source: {lifecycle: networking-vpn-gateway-tunnel,
              steps: [create-vpn-tunnel, delete-vpn-tunnel]}
     notes: "이름은 3-20자 영숫자만 (vpn-tunnel-name-rules; regrvpntun{ualpha}=18).

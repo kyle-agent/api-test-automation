@@ -1,0 +1,2768 @@
+{
+ "_comment": "A0 baseline (2026-07-04). C3 remaining-gap classification. class: L=light(console dogfood) H=heavy(chat-heavy lane) W=window(ride parent run) G=gated(waiver proposal). Evidence basis: union of data/baselines/verified_endpoints.json (lifecycle:step resolved service-scoped) + dashboard-data verified_endpoints.json(746) + endpoint_status.json(touched). Consumed by A1..An coverage-service agents.",
+ "baseline": {
+  "c3_pct": 72.78,
+  "c3_num": 920,
+  "c3_denom": 1264,
+  "catalog_total": 1372,
+  "verified_2xx_union": 776,
+  "excluded_waivers": 108,
+  "reachability_waivers": 153,
+  "reach_covered": 149,
+  "remaining_gap": 344
+ },
+ "gap": [
+  {
+   "key": "ai-ml/aimlops-platform/deleteaimlopsplatformv1",
+   "method": "DELETE",
+   "path": "/v1/aimlops-platform/{release_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "gen-heavy-aimlops (HB6, ~48m)"
+  },
+  {
+   "key": "ai-ml/aimlops-platform/getaimlopsplatformnodelistv1",
+   "method": "GET",
+   "path": "/v1/aimlops-platform/internal/clusters/{cluster_id}/nodes",
+   "last_status": 404,
+   "class": "W",
+   "note": "need installed release -> ride HB6 gen-heavy-aimlops"
+  },
+  {
+   "key": "ai-ml/aimlops-platform/getaimlopsplatformstorageclasseslistv1",
+   "method": "GET",
+   "path": "/v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses",
+   "last_status": 404,
+   "class": "W",
+   "note": "need installed release -> ride HB6 gen-heavy-aimlops"
+  },
+  {
+   "key": "ai-ml/aimlops-platform/getaimlopsplatformv1",
+   "method": "GET",
+   "path": "/v1/aimlops-platform/{release_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-aimlops (HB6, ~48m)"
+  },
+  {
+   "key": "ai-ml/aimlops-platform/releaseaimlopsplatformv1",
+   "method": "POST",
+   "path": "/v1/aimlops-platform",
+   "last_status": 400,
+   "class": "H",
+   "note": "gen-heavy-aimlops (HB6, ~48m)"
+  },
+  {
+   "key": "ai-ml/aimlops-platform/updateaimlopsplatformv1",
+   "method": "PUT",
+   "path": "/v1/aimlops-platform/{release_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "gen-heavy-aimlops (HB6, ~48m)"
+  },
+  {
+   "key": "ai-ml/cloud-ml/checkduplicationnameanddomainname",
+   "method": "GET",
+   "path": "/v1/cloud-ml/check-duplication",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "ai-ml/cloud-ml/cloudmlclusterestimate",
+   "method": "GET",
+   "path": "/v1/cloud-ml/clusters/{cluster_id}/estimate",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "ai-ml/cloud-ml/cloudmlimages",
+   "method": "GET",
+   "path": "/v1/cloud-ml/images",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "ai-ml/cloud-ml/clustercheckreleasable",
+   "method": "GET",
+   "path": "/v1/cloud-ml/clusters/{cluster_id}/check-releasable",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "ai-ml/cloud-ml/clusterproduct",
+   "method": "GET",
+   "path": "/v1/cloud-ml/clusters/{cluster_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "ai-ml/cloud-ml/createcloudml",
+   "method": "POST",
+   "path": "/v1/cloud-ml",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "ai-ml/cloud-ml/deletecloudml",
+   "method": "DELETE",
+   "path": "/v1/cloud-ml/{cloud_ml_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "ai-ml/cloud-ml/getcloudml",
+   "method": "GET",
+   "path": "/v1/cloud-ml/{cloud_ml_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "ai-ml/cloud-ml/updatecloudml",
+   "method": "PUT",
+   "path": "/v1/cloud-ml/{cloud_ml_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: product not subscribed -> entitlement waiver"
+  },
+  {
+   "key": "application-service/apigateway/approveprivatelinkendpoint",
+   "method": "PUT",
+   "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/approval",
+   "last_status": 403,
+   "class": "G",
+   "note": "PL entitlement-403 x5 + PF-23 create-500 -> waivers"
+  },
+  {
+   "key": "application-service/apigateway/connectprivatelinkendpoint",
+   "method": "PUT",
+   "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/connection",
+   "last_status": 403,
+   "class": "G",
+   "note": "PL entitlement-403 x5 + PF-23 create-500 -> waivers"
+  },
+  {
+   "key": "application-service/apigateway/createprivatelinkendpoint",
+   "method": "POST",
+   "path": "/v1/privatelink-endpoints",
+   "last_status": 500,
+   "class": "G",
+   "note": "PL entitlement-403 x5 + PF-23 create-500 -> waivers"
+  },
+  {
+   "key": "application-service/apigateway/deleteprivatelinkendpoint",
+   "method": "DELETE",
+   "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}",
+   "last_status": 403,
+   "class": "G",
+   "note": "PL entitlement-403 x5 + PF-23 create-500 -> waivers"
+  },
+  {
+   "key": "application-service/apigateway/requestprivatelinkendpoint",
+   "method": "PUT",
+   "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/request",
+   "last_status": 403,
+   "class": "G",
+   "note": "PL entitlement-403 x5 + PF-23 create-500 -> waivers"
+  },
+  {
+   "key": "application-service/apigateway/setprivatelinkendpoint",
+   "method": "PUT",
+   "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}",
+   "last_status": 403,
+   "class": "G",
+   "note": "PL entitlement-403 x5 + PF-23 create-500 -> waivers"
+  },
+  {
+   "key": "compute/scf/approveprivatelinkendpoint",
+   "method": "PUT",
+   "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/approval",
+   "last_status": 403,
+   "class": "G",
+   "note": "PF 404 privatelink-endpoint-not-found -> reachability waiver"
+  },
+  {
+   "key": "compute/scf/connectprivatelinkendpoint",
+   "method": "PUT",
+   "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/connection",
+   "last_status": 403,
+   "class": "G",
+   "note": "PF 404 privatelink-endpoint-not-found -> reachability waiver"
+  },
+  {
+   "key": "compute/scf/setcloudfunctioncodefile",
+   "method": "PUT",
+   "path": "/v1/cloud-functions/{cloud_function_id}/codes/file",
+   "last_status": 400,
+   "class": "W",
+   "note": "needs Java fn + OBS jar (env input) -> ride HB3/env"
+  },
+  {
+   "key": "compute/scf/showcloudfunctionlogs",
+   "method": "GET",
+   "path": "/v1/cloud-functions/{cloud_function_id}/logs",
+   "last_status": 400,
+   "class": "L",
+   "note": "add time/period param (LB1 smoke fix)"
+  },
+  {
+   "key": "compute/scf/showcloudfunctionmetrics",
+   "method": "GET",
+   "path": "/v1/cloud-functions/{cloud_function_id}/metrics",
+   "last_status": 400,
+   "class": "L",
+   "note": "add time/period param (LB1 smoke fix)"
+  },
+  {
+   "key": "compute/virtualserver/acceptvolumetransfer",
+   "method": "POST",
+   "path": "/v1/volume-transfer/{transfer_id}/accept",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/createimage",
+   "method": "POST",
+   "path": "/v1/images",
+   "last_status": 400,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/createimagemember",
+   "method": "POST",
+   "path": "/v1/images/{image_id}/members",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/createserverinterfaceprivatenat",
+   "method": "POST",
+   "path": "/v1/servers/{server_id}/interfaces/{port_id}/private-static-nats",
+   "last_status": 400,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/createsharingimage",
+   "method": "POST",
+   "path": "/v1/images/{image_id}/share",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/deleteimage",
+   "method": "DELETE",
+   "path": "/v1/images/{image_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/deleteimagemember",
+   "method": "DELETE",
+   "path": "/v1/images/{image_id}/members/{member_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/deleteserverinterface",
+   "method": "DELETE",
+   "path": "/v1/servers/{server_id}/interfaces/{port_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/deleteserverinterfacenat",
+   "method": "DELETE",
+   "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats/{nat_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/deleteserverinterfaceprivatenat",
+   "method": "DELETE",
+   "path": "/v1/servers/{server_id}/interfaces/{port_id}/private-static-nats/{nat_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/importimage",
+   "method": "POST",
+   "path": "/v1/images/{image_id}/import",
+   "last_status": 400,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/listimagemembers",
+   "method": "GET",
+   "path": "/v1/images/{image_id}/members",
+   "last_status": 400,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/rebuildvirtualserver",
+   "method": "POST",
+   "path": "/v1/servers/{server_id}/rebuild",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/revertvolumetosnapshot",
+   "method": "POST",
+   "path": "/v1/volumes/{volume_id}/revert",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/setvirtualservertype",
+   "method": "POST",
+   "path": "/v1/servers/{server_id}/server-type",
+   "last_status": 400,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/showimagemember",
+   "method": "GET",
+   "path": "/v1/images/{image_id}/members/{member_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/showvirtualserverpassword",
+   "method": "POST",
+   "path": "/v1/servers/{server_id}/password",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/updateimage",
+   "method": "PUT",
+   "path": "/v1/images/{image_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/updateimagemember",
+   "method": "PUT",
+   "path": "/v1/images/{image_id}/members/{member_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/updateserverinterface",
+   "method": "PUT",
+   "path": "/v1/servers/{server_id}/interfaces/{port_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "compute/virtualserver/updatesnapshot",
+   "method": "PUT",
+   "path": "/v1/snapshots/{snapshot_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "compute-virtualserver-full + vs-image/server-action (HB3)"
+  },
+  {
+   "key": "container/scr/checktagsvulnerability",
+   "method": "PUT",
+   "path": "/v1/tagses/{tags_id}/check-vulnerability",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/createregistry",
+   "method": "POST",
+   "path": "/v1/container-registries",
+   "last_status": 403,
+   "class": "G",
+   "note": "quota 1EA occupied by sample registry -> reachability waiver"
+  },
+  {
+   "key": "container/scr/deleteimage",
+   "method": "DELETE",
+   "path": "/v1/images/{image_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/deletetags",
+   "method": "DELETE",
+   "path": "/v1/tagses/{tags_id}",
+   "last_status": 400,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/deletetagses",
+   "method": "DELETE",
+   "path": "/v1/tagses",
+   "last_status": 400,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/downloadmanifest",
+   "method": "GET",
+   "path": "/v1/tagses/{tags_id}/download/manifest",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/listtagses",
+   "method": "GET",
+   "path": "/v1/images/{image_id}/tagses",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/runimagelifecyclepolicypreview",
+   "method": "POST",
+   "path": "/v1/images/{image_id}/lifecycle-policy/preview",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/showimage",
+   "method": "GET",
+   "path": "/v1/images/{image_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/showimagelifecyclepolicypreview",
+   "method": "GET",
+   "path": "/v1/images/{image_id}/lifecycle-policy/preview",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/showtags",
+   "method": "GET",
+   "path": "/v1/tagses/{tags_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/showtagspackages",
+   "method": "GET",
+   "path": "/v1/tagses/{tags_id}/packages",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/showtagssecrets",
+   "method": "GET",
+   "path": "/v1/tagses/{tags_id}/secrets",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/showtagsvulnerabilities",
+   "method": "GET",
+   "path": "/v1/tagses/{tags_id}/vulnerabilities",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/updateimagedescription",
+   "method": "PUT",
+   "path": "/v1/images/{image_id}/description",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/updateimagelifecyclepolicy",
+   "method": "PUT",
+   "path": "/v1/images/{image_id}/lifecycle-policy",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/updateimagelockpolicy",
+   "method": "PUT",
+   "path": "/v1/images/{image_id}/lock-policy",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/updateimagepullpolicy",
+   "method": "PUT",
+   "path": "/v1/images/{image_id}/pull-policy",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/updateimagescanpolicy",
+   "method": "PUT",
+   "path": "/v1/images/{image_id}/scan-policy",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/scr/updatetagslockpolicy",
+   "method": "PUT",
+   "path": "/v1/tagses/{tags_id}/lock-policy",
+   "last_status": 404,
+   "class": "G",
+   "note": "images/tags need docker-push (unsatisfiable via REST) -> waiver; optional docker lane"
+  },
+  {
+   "key": "container/ske/createclusterkubeconfig",
+   "method": "GET",
+   "path": "/v1/clusters/{cluster_id}/kubeconfig",
+   "last_status": 400,
+   "class": "W",
+   "note": "createclusterkubeconfig rides HB6 SKE cluster"
+  },
+  {
+   "key": "data-analytics/data-flow/createdataflow",
+   "method": "POST",
+   "path": "/v1/data-flows",
+   "last_status": 400,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/createdataflowserviceconsole",
+   "method": "POST",
+   "path": "/v1/data-flow-services",
+   "last_status": 400,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/dataflowservicevalidateresourcescreation",
+   "method": "POST",
+   "path": "/v1/data-flow-services/clusters/{cluster_id}/validate-resources",
+   "last_status": 400,
+   "class": "W",
+   "note": "needs SKE cluster_id -> ride HB6"
+  },
+  {
+   "key": "data-analytics/data-flow/dataflowservicevalidateresourcesupdate",
+   "method": "POST",
+   "path": "/v1/data-flow-services/{data_flow_service_id}/validate-resources",
+   "last_status": 400,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/deletedataflow",
+   "method": "DELETE",
+   "path": "/v1/data-flows/{data_flow_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/deletedataflowserviceconsole",
+   "method": "DELETE",
+   "path": "/v1/data-flow-services/{data_flow_service_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/getdataflow",
+   "method": "GET",
+   "path": "/v1/data-flows/{data_flow_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/getdataflowserviceconsole",
+   "method": "GET",
+   "path": "/v1/data-flow-services/{data_flow_service_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/getdataflowservicesubversions",
+   "method": "GET",
+   "path": "/v1/data-flow-services/data-flows/{data_flow_id}/sub-versions",
+   "last_status": null,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/ingresscluster",
+   "method": "GET",
+   "path": "/v1/data-flows/clusters/{cluster_id}/ingress-controllers",
+   "last_status": null,
+   "class": "W",
+   "note": "needs SKE cluster_id -> ride HB6"
+  },
+  {
+   "key": "data-analytics/data-flow/updatedataflow",
+   "method": "PUT",
+   "path": "/v1/data-flows/{data_flow_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-flow/updatedataflowserviceconsole",
+   "method": "PUT",
+   "path": "/v1/data-flow-services/{data_flow_service_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "NiFi via data-flow-service-and-flow-guarded (HB7); bodies part-unproven"
+  },
+  {
+   "key": "data-analytics/data-ops/createdataops",
+   "method": "POST",
+   "path": "/v1/data-ops",
+   "last_status": 400,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/createdataopsservice",
+   "method": "POST",
+   "path": "/v1/data-ops-services",
+   "last_status": 400,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/deletedataopsservice",
+   "method": "DELETE",
+   "path": "/v1/data-ops-services/{data_ops_service_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/deletedataopsv1",
+   "method": "DELETE",
+   "path": "/v1/data-ops/{data_ops_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/getdataopsdetail",
+   "method": "GET",
+   "path": "/v1/data-ops/{data_ops_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/getdataopsservice",
+   "method": "GET",
+   "path": "/v1/data-ops-services/{data_ops_service_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/getdataopsservicevalidateresourcescreation",
+   "method": "POST",
+   "path": "/v1/data-ops-services/clusters/{cluster_id}/validate-resources",
+   "last_status": 400,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/getdataopsservicevalidateresourcesupdate",
+   "method": "POST",
+   "path": "/v1/data-ops-services/{data_ops_service_id}/validate-resources",
+   "last_status": 400,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/getdataopssubversion",
+   "method": "GET",
+   "path": "/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions",
+   "last_status": 400,
+   "class": "G",
+   "note": "parent path 403 Action-not-found entitlement -> waiver"
+  },
+  {
+   "key": "data-analytics/data-ops/getingresscontrollerlistv1",
+   "method": "GET",
+   "path": "/v1/data-ops/clusters/{cluster_id}/ingress-controllers",
+   "last_status": 404,
+   "class": "G",
+   "note": "parent path 403 Action-not-found entitlement -> waiver"
+  },
+  {
+   "key": "data-analytics/data-ops/updatedataopsservice",
+   "method": "PUT",
+   "path": "/v1/data-ops-services/{data_ops_service_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/data-ops/updatedataopsv1",
+   "method": "PUT",
+   "path": "/v1/data-ops/{data_ops_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "Airflow heavy (HB7); createdataopsservice body UNKNOWN -> docs research"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamsaddinstances",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/add-instances",
+   "last_status": 404,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamscreatecluster",
+   "method": "POST",
+   "path": "/v1/clusters",
+   "last_status": null,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamsdeletecluster",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamslistparametervalues",
+   "method": "GET",
+   "path": "/v1/clusters/{cluster_id}/parameters",
+   "last_status": null,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamspatchminorversion",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/patch",
+   "last_status": 400,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamsrestartcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/restart",
+   "last_status": 404,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamssetblockstoragesize",
+   "method": "POST",
+   "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+   "last_status": 400,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamssetmaintenance",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/maintenance",
+   "last_status": 404,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamssetparametervalues",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/parameters",
+   "last_status": 404,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamssetsecuritygrouprules",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/security-group-rules",
+   "last_status": 400,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamssetservertype",
+   "method": "POST",
+   "path": "/v1/instance-groups/{instance_group_id}/resize",
+   "last_status": 404,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamsshowcluster",
+   "method": "GET",
+   "path": "/v1/clusters/{cluster_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamsshowrequest",
+   "method": "GET",
+   "path": "/v1/requests/{request_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamsstartcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/start",
+   "last_status": null,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamsstopcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/stop",
+   "last_status": null,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamssyncclusterstate",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/sync-state",
+   "last_status": 404,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamssyncparametervalues",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/parameters/sync",
+   "last_status": 404,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/eventstreams/eventstreamsunsetmaintenance",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/maintenance",
+   "last_status": 404,
+   "class": "H",
+   "note": "real Kafka cluster + subops (HB2)"
+  },
+  {
+   "key": "data-analytics/quick-query/createquickquery",
+   "method": "POST",
+   "path": "/v1/quick-query",
+   "last_status": 500,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "data-analytics/quick-query/deletequickquery",
+   "method": "DELETE",
+   "path": "/v1/quick-query/{quick_query_id}",
+   "last_status": 400,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "data-analytics/quick-query/getquickquery",
+   "method": "GET",
+   "path": "/v1/quick-query/{quick_query_id}",
+   "last_status": null,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "data-analytics/quick-query/updatequickquerydescription",
+   "method": "PUT",
+   "path": "/v1/quick-query/{quick_query_id}/description",
+   "last_status": 404,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "data-analytics/quick-query/updatequickquerydomain",
+   "method": "PUT",
+   "path": "/v1/quick-query/{quick_query_id}/domain",
+   "last_status": 404,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "data-analytics/quick-query/updatequickquerydscdomain",
+   "method": "PUT",
+   "path": "/v1/quick-query/{quick_query_id}/dsc-domain",
+   "last_status": 404,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "data-analytics/quick-query/updatequickqueryengine",
+   "method": "PUT",
+   "path": "/v1/quick-query/{quick_query_id}/engine",
+   "last_status": 404,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "data-analytics/quick-query/updatequickqueryhostalias",
+   "method": "PUT",
+   "path": "/v1/quick-query/{quick_query_id}/host-alias",
+   "last_status": 404,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "data-analytics/quick-query/validatequickqueryresources",
+   "method": "POST",
+   "path": "/v1/quick-query/validate-resources",
+   "last_status": 500,
+   "class": "G",
+   "note": "createquickquery+validate 500 PF; cascade blocked -> reachability waiver"
+  },
+  {
+   "key": "database/cachestore/cachestorecreaterestore",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/restore",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestorepatchminorversion",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/patch",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoreremovebackuphistories",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/backup-histories",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoresetblockstoragesize",
+   "method": "POST",
+   "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoresetcommands",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/commands",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoresetparametervalues",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/parameters",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoresetsecuritygrouprules",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/security-group-rules",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoresetservertype",
+   "method": "POST",
+   "path": "/v1/instance-groups/{instance_group_id}/resize",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoreshowrequest",
+   "method": "GET",
+   "path": "/v1/requests/{request_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestorestartcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/start",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestorestopcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/stop",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoreswitchovercluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/switchover",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoresyncparametervalues",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/parameters/sync",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/cachestore/cachestoreunsetbackup",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/backups",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasaddblockstorages",
+   "method": "POST",
+   "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epascreateotherregionreplica",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/replicas/other-region",
+   "last_status": 500,
+   "class": "G",
+   "note": "product-bug 500 (baselined) -> reachability waiver"
+  },
+  {
+   "key": "database/epas/epascreaterestore",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/restore",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasdeletearchivelog",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/archive",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasexportlog",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epaspatchminorversion",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/patch",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasregisterlogexportconfig",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs",
+   "last_status": 500,
+   "class": "G",
+   "note": "product-bug 500 (baselined) -> reachability waiver"
+  },
+  {
+   "key": "database/epas/epasremovebackuphistories",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/backup-histories",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasrestartcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/restart",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epassetarchiveconfig",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/archive",
+   "last_status": 500,
+   "class": "G",
+   "note": "product-bug 500 (baselined) -> reachability waiver"
+  },
+  {
+   "key": "database/epas/epassetauditlog",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/audit-log",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epassetblockstoragesize",
+   "method": "POST",
+   "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epassetlogexportconfig",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epassetservertype",
+   "method": "POST",
+   "path": "/v1/instance-groups/{instance_group_id}/resize",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasshowrequest",
+   "method": "GET",
+   "path": "/v1/requests/{request_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasstartcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/start",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasstopcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/stop",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasswitchovercluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/switchover",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epassyncarchiveconfig",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/archive/sync",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epassyncclusterstate",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/sync-state",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasunregisterlogexportconfig",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasunsetbackup",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/backups",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + *-subops-guarded (HB2)"
+  },
+  {
+   "key": "database/epas/epasupgradekernel",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
+   "last_status": 500,
+   "class": "G",
+   "note": "product-bug 500 (baselined) -> reachability waiver"
+  },
+  {
+   "key": "database/mariadb/mariadbcreateotherregionreplica",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/replicas/other-region",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbcreaterestore",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/restore",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbexportlog",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbpatchminorversion",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/patch",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbregisterlogexportconfig",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs",
+   "last_status": 500,
+   "class": "G",
+   "note": "product-bug 500 (baselined) -> reachability waiver"
+  },
+  {
+   "key": "database/mariadb/mariadbremovebackuphistories",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/backup-histories",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbsetblockstoragesize",
+   "method": "POST",
+   "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbsetlogexportconfig",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbsetparametervalues",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/parameters",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbsetservertype",
+   "method": "POST",
+   "path": "/v1/instance-groups/{instance_group_id}/resize",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbshowrequest",
+   "method": "GET",
+   "path": "/v1/requests/{request_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbswitchovercluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/switchover",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbunregisterlogexportconfig",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mariadb/mariadbunsetbackup",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/backups",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqladdblockstorages",
+   "method": "POST",
+   "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlcreateotherregionreplica",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/replicas/other-region",
+   "last_status": 500,
+   "class": "G",
+   "note": "product-bug 500 (baselined) -> reachability waiver"
+  },
+  {
+   "key": "database/mysql/mysqlcreaterestore",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/restore",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlexportlog",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlpatchminorversion",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/patch",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlregisterlogexportconfig",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlremovebackuphistories",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/backup-histories",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlsetblockstoragesize",
+   "method": "POST",
+   "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+   "last_status": null,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlsetlogexportconfig",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlsetservertype",
+   "method": "POST",
+   "path": "/v1/instance-groups/{instance_group_id}/resize",
+   "last_status": null,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlstartcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/start",
+   "last_status": null,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlstopcluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/stop",
+   "last_status": null,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlswitchovercluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/switchover",
+   "last_status": 404,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlunregisterlogexportconfig",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+   "last_status": 400,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/mysql/mysqlunsetbackup",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/backups",
+   "last_status": 401,
+   "class": "H",
+   "note": "real cluster + subops-guarded (HB1)"
+  },
+  {
+   "key": "database/postgresql/postgresqlcreateotherregionreplica",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/replicas/other-region",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlcreaterestore",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/restore",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlexportlog",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlpatchminorversion",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/patch",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlregisterlogexportconfig",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlremovebackuphistories",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/backup-histories",
+   "last_status": 401,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlsetblockstoragesize",
+   "method": "POST",
+   "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlsetlogexportconfig",
+   "method": "PUT",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlsetservertype",
+   "method": "POST",
+   "path": "/v1/instance-groups/{instance_group_id}/resize",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlswitchovercluster",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/switchover",
+   "last_status": 404,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlsyncparametervalues",
+   "method": "POST",
+   "path": "/v1/clusters/{cluster_id}/parameters/sync",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlunregisterlogexportconfig",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+   "last_status": 400,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "database/postgresql/postgresqlunsetbackup",
+   "method": "DELETE",
+   "path": "/v1/clusters/{cluster_id}/backups",
+   "last_status": 401,
+   "class": "G",
+   "note": "createcluster 500 PF blocks all sub-ops -> reachability waiver until fix"
+  },
+  {
+   "key": "devops-tools/devopsservice/checkdeletabledevopsservice",
+   "method": "GET",
+   "path": "/v1/devops-services/{devops_service_id}/check-deletable",
+   "last_status": null,
+   "class": "G",
+   "note": "409 not-found-admin-user-service entitlement -> waiver"
+  },
+  {
+   "key": "devops-tools/devopsservice/createdevopsservice",
+   "method": "POST",
+   "path": "/v1/devops-services",
+   "last_status": 409,
+   "class": "G",
+   "note": "409 not-found-admin-user-service entitlement -> waiver"
+  },
+  {
+   "key": "devops-tools/devopsservice/deletedevopsservice",
+   "method": "DELETE",
+   "path": "/v1/devops-services/{devops_service_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "409 not-found-admin-user-service entitlement -> waiver"
+  },
+  {
+   "key": "devops-tools/devopsservice/showdevopsservice",
+   "method": "GET",
+   "path": "/v1/devops-services/{devops_service_id}",
+   "last_status": null,
+   "class": "G",
+   "note": "409 not-found-admin-user-service entitlement -> waiver"
+  },
+  {
+   "key": "financial-management/billingplan/createplannedcomputes",
+   "method": "POST",
+   "path": "/v1/planned-computes",
+   "last_status": 400,
+   "class": "G",
+   "note": "billable commitment / PF-500 -> billing-prohibitive + reachability waivers"
+  },
+  {
+   "key": "financial-management/billingplan/listplannedcomputeinstances",
+   "method": "GET",
+   "path": "/v1/planned-computes/instances",
+   "last_status": 500,
+   "class": "G",
+   "note": "billable commitment / PF-500 -> billing-prohibitive + reachability waivers"
+  },
+  {
+   "key": "financial-management/billingplan/showcancellationfee",
+   "method": "POST",
+   "path": "/v1/planned-computes/cancellation-fee",
+   "last_status": 400,
+   "class": "G",
+   "note": "billable commitment / PF-500 -> billing-prohibitive + reachability waivers"
+  },
+  {
+   "key": "financial-management/billingplan/showplannedcompute",
+   "method": "GET",
+   "path": "/v1/planned-computes/{planned_compute_id}",
+   "last_status": null,
+   "class": "G",
+   "note": "billable commitment / PF-500 -> billing-prohibitive + reachability waivers"
+  },
+  {
+   "key": "financial-management/billingplan/updateplannedcompute",
+   "method": "PUT",
+   "path": "/v1/planned-computes/{planned_compute_id}",
+   "last_status": 400,
+   "class": "G",
+   "note": "billable commitment / PF-500 -> billing-prohibitive + reachability waivers"
+  },
+  {
+   "key": "management/cloudcontrol/deletelandingzone",
+   "method": "DELETE",
+   "path": "/v1/landing-zones/{landing_zone_id}",
+   "last_status": null,
+   "class": "L",
+   "note": "reachability-waived, untouched -> C2 touch batch (LB1)"
+  },
+  {
+   "key": "management/cloudcontrol/setlandingzone",
+   "method": "PUT",
+   "path": "/v1/landing-zones/{landing_zone_id}",
+   "last_status": null,
+   "class": "L",
+   "note": "reachability-waived, untouched -> C2 touch batch (LB1)"
+  },
+  {
+   "key": "management/cloudcontrol/showguardrail",
+   "method": "GET",
+   "path": "/v1/guardrails/{guardrail_id}",
+   "last_status": null,
+   "class": "L",
+   "note": "reachability-waived, untouched -> C2 touch batch (LB1)"
+  },
+  {
+   "key": "management/cloudcontrol/showlandingzone",
+   "method": "GET",
+   "path": "/v1/landing-zones/{landing_zone_id}",
+   "last_status": null,
+   "class": "L",
+   "note": "reachability-waived, untouched -> C2 touch batch (LB1)"
+  },
+  {
+   "key": "management/iam/accesskeycreate",
+   "method": "POST",
+   "path": "/v1/access-keys",
+   "last_status": 500,
+   "class": "G",
+   "note": "500 PF -> reachability waiver"
+  },
+  {
+   "key": "management/iam/accesskeydelete",
+   "method": "DELETE",
+   "path": "/v1/access-keys/{access_key_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "cascade on 500-PF create -> reachability waiver until fix"
+  },
+  {
+   "key": "management/iam/accesskeydeletebulk",
+   "method": "DELETE",
+   "path": "/v1/access-keys/bulk",
+   "last_status": 400,
+   "class": "G",
+   "note": "cascade on 500-PF create -> reachability waiver until fix"
+  },
+  {
+   "key": "management/iam/accesskeyset",
+   "method": "PUT",
+   "path": "/v1/access-keys/{access_key_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "cascade on 500-PF create -> reachability waiver until fix"
+  },
+  {
+   "key": "management/iam/addgroupmember",
+   "method": "POST",
+   "path": "/v1/groups/{group_id}/members",
+   "last_status": 404,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/adduserpolicybinding",
+   "method": "POST",
+   "path": "/v1/users/{user_id}/policy-bindings",
+   "last_status": 403,
+   "class": "G",
+   "note": "403 project-membership entitlement -> waiver"
+  },
+  {
+   "key": "management/iam/createiamuser",
+   "method": "POST",
+   "path": "/v1/accounts/{account_id}/users",
+   "last_status": 400,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/createrole",
+   "method": "POST",
+   "path": "/v1/roles",
+   "last_status": 500,
+   "class": "G",
+   "note": "500 PF -> reachability waiver"
+  },
+  {
+   "key": "management/iam/createsamlprovider",
+   "method": "POST",
+   "path": "/v1/saml-providers",
+   "last_status": 400,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/deleteiamuser",
+   "method": "DELETE",
+   "path": "/v1/accounts/{account_id}/users/{user_id}",
+   "last_status": 403,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/deleterole",
+   "method": "DELETE",
+   "path": "/v1/roles/{role_id}",
+   "last_status": null,
+   "class": "G",
+   "note": "cascade on 500-PF create -> reachability waiver until fix"
+  },
+  {
+   "key": "management/iam/deletesamlproviders",
+   "method": "DELETE",
+   "path": "/v1/saml-providers/bulk",
+   "last_status": 404,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/getiamuser",
+   "method": "GET",
+   "path": "/v1/accounts/{account_id}/users/{user_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/removegroupmember",
+   "method": "DELETE",
+   "path": "/v1/groups/{group_id}/members/{user_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/removeuserpolicybinding",
+   "method": "DELETE",
+   "path": "/v1/users/{user_id}/policy-bindings/{policy_id}",
+   "last_status": 403,
+   "class": "G",
+   "note": "403 project-membership entitlement -> waiver"
+  },
+  {
+   "key": "management/iam/setsamlprovider",
+   "method": "PUT",
+   "path": "/v1/saml-providers/{saml_provider_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/showsamlprovider",
+   "method": "GET",
+   "path": "/v1/saml-providers/{saml_provider_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/updateiamuser",
+   "method": "PUT",
+   "path": "/v1/accounts/{account_id}/users/{user_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/iam/updateiamuserpassword",
+   "method": "PUT",
+   "path": "/v1/accounts/{account_id}/users/{user_id}/password",
+   "last_status": 400,
+   "class": "H",
+   "note": "iam-credentials-heavy (HB8, no VPC)"
+  },
+  {
+   "key": "management/organization/listaccounts",
+   "method": "GET",
+   "path": "/v1/organization-accounts",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/listorganizationinvitations",
+   "method": "GET",
+   "path": "/v1/organization-invitations",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/listorganizationunits",
+   "method": "GET",
+   "path": "/v1/organization-units",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/listparents",
+   "method": "GET",
+   "path": "/v1/organization-units/{unit_id}/parents",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/listpoliciesfortarget",
+   "method": "GET",
+   "path": "/v1/assignments/policies",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/listservicecontrolpolicies",
+   "method": "GET",
+   "path": "/v1/service-control-policies",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/listtargetsforpolicy",
+   "method": "GET",
+   "path": "/v1/assignments/targets",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/showaccount",
+   "method": "GET",
+   "path": "/v1/organization-accounts/{account_id}",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/showdelegationpolicy",
+   "method": "GET",
+   "path": "/v1/delegation-policies",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/showorganization",
+   "method": "GET",
+   "path": "/v1/organizations/{organization_id}",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/showorganizationunit",
+   "method": "GET",
+   "path": "/v1/organization-units/{unit_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/organization/showservicecontrolpolicy",
+   "method": "GET",
+   "path": "/v1/service-control-policies/{policy_id}",
+   "last_status": 403,
+   "class": "G",
+   "note": "entitlement: member acct, not org-master -> entitlement waiver"
+  },
+  {
+   "key": "management/quota/showquotarequest",
+   "method": "GET",
+   "path": "/v1/quota-requests/{request_id}",
+   "last_status": null,
+   "class": "G",
+   "note": "showquotarequest: request is UI-only -> unsatisfiable-flow waiver"
+  },
+  {
+   "key": "management/servicewatch/createcustommetrics",
+   "method": "POST",
+   "path": "/v1/metrics/custom",
+   "last_status": 400,
+   "class": "L",
+   "note": "createcustommetrics body fix attempt (LB1)"
+  },
+  {
+   "key": "networking/cdn/deletecdnservice",
+   "method": "DELETE",
+   "path": "/v1/cdns/{id}",
+   "last_status": 404,
+   "class": "L",
+   "note": "networking-cdn-service writes on own/existing CDN (LB1)"
+  },
+  {
+   "key": "networking/cdn/purgecdnservice",
+   "method": "POST",
+   "path": "/v1/cdns/{id}/purge",
+   "last_status": 400,
+   "class": "L",
+   "note": "networking-cdn-service writes on own/existing CDN (LB1)"
+  },
+  {
+   "key": "networking/cdn/startcdnservice",
+   "method": "POST",
+   "path": "/v1/cdns/{id}/start",
+   "last_status": 404,
+   "class": "L",
+   "note": "networking-cdn-service writes on own/existing CDN (LB1)"
+  },
+  {
+   "key": "networking/cdn/stopcdnservice",
+   "method": "POST",
+   "path": "/v1/cdns/{id}/stop",
+   "last_status": 404,
+   "class": "L",
+   "note": "networking-cdn-service writes on own/existing CDN (LB1)"
+  },
+  {
+   "key": "networking/cdn/updatecdnservice",
+   "method": "PUT",
+   "path": "/v1/cdns/{id}",
+   "last_status": 404,
+   "class": "L",
+   "note": "networking-cdn-service writes on own/existing CDN (LB1)"
+  },
+  {
+   "key": "networking/direct-connect/createroutingrule",
+   "method": "POST",
+   "path": "/v1/direct-connects/{direct_connect_id}/routing-rules",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-direct-connect-routing (HB5); entitlement fallback G"
+  },
+  {
+   "key": "networking/direct-connect/deletedirectconnect",
+   "method": "DELETE",
+   "path": "/v1/direct-connects/{direct_connect_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-direct-connect-routing (HB5); entitlement fallback G"
+  },
+  {
+   "key": "networking/direct-connect/deleteroutingrule",
+   "method": "DELETE",
+   "path": "/v1/direct-connects/{direct_connect_id}/routing-rules/{routing_rule_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-direct-connect-routing (HB5); entitlement fallback G"
+  },
+  {
+   "key": "networking/direct-connect/listroutingrules",
+   "method": "GET",
+   "path": "/v1/direct-connects/{direct_connect_id}/routing-rules",
+   "last_status": null,
+   "class": "H",
+   "note": "networking-direct-connect-routing (HB5); entitlement fallback G"
+  },
+  {
+   "key": "networking/direct-connect/setdirectconnect",
+   "method": "PUT",
+   "path": "/v1/direct-connects/{direct_connect_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-direct-connect-routing (HB5); entitlement fallback G"
+  },
+  {
+   "key": "networking/dns/activateprivatedns",
+   "method": "POST",
+   "path": "/v1/private-dns/activate",
+   "last_status": 400,
+   "class": "H",
+   "note": "networking-dns-hosted-zone-private (HB5)"
+  },
+  {
+   "key": "networking/dns/createpublicdomainname",
+   "method": "POST",
+   "path": "/v1/public-domain-names",
+   "last_status": 500,
+   "class": "G",
+   "note": "paid public-domain registration -> billing-prohibitive waiver"
+  },
+  {
+   "key": "networking/dns/deleteprivatedns",
+   "method": "DELETE",
+   "path": "/v1/private-dns/{private_dns_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "networking-dns-hosted-zone-private (HB5)"
+  },
+  {
+   "key": "networking/dns/sethostedzone",
+   "method": "PUT",
+   "path": "/v1/hosted-zones/{hosted_zone_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-dns-hosted-zone-private (HB5)"
+  },
+  {
+   "key": "networking/dns/sethostedzonerecord",
+   "method": "PUT",
+   "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-dns-hosted-zone-private (HB5)"
+  },
+  {
+   "key": "networking/dns/setpublicdomainname",
+   "method": "PUT",
+   "path": "/v1/public-domain-names/{public_domain_id}",
+   "last_status": null,
+   "class": "G",
+   "note": "paid public-domain registration -> billing-prohibitive waiver"
+  },
+  {
+   "key": "networking/dns/setpublicdomainnamewhoisinfo",
+   "method": "PUT",
+   "path": "/v1/public-domain-names/{public_domain_id}/information",
+   "last_status": null,
+   "class": "G",
+   "note": "paid public-domain registration -> billing-prohibitive waiver"
+  },
+  {
+   "key": "networking/dns/showpublicdomainname",
+   "method": "GET",
+   "path": "/v1/public-domain-names/{public_domain_id}",
+   "last_status": null,
+   "class": "G",
+   "note": "paid public-domain registration -> billing-prohibitive waiver"
+  },
+  {
+   "key": "networking/dns/transferpublicdomainname",
+   "method": "POST",
+   "path": "/v1/public-domain-names/{public_domain_id}/transfer",
+   "last_status": null,
+   "class": "G",
+   "note": "paid public-domain registration -> billing-prohibitive waiver"
+  },
+  {
+   "key": "networking/loadbalancer/addlbservergroupmembers",
+   "method": "POST",
+   "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+   "last_status": 403,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/createloadbalancerprivatenatip",
+   "method": "POST",
+   "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+   "last_status": 403,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/createloadbalancerpublicnatip",
+   "method": "POST",
+   "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+   "last_status": 400,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/removelbservergroupmember",
+   "method": "DELETE",
+   "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/setlbhealthcheck",
+   "method": "PUT",
+   "path": "/v1/lb-health-checks/{lb_health_check_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/setlblistener",
+   "method": "PUT",
+   "path": "/v1/lb-listeners/{listener_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/setlbservergroup",
+   "method": "PUT",
+   "path": "/v1/lb-server-groups/{lb_server_group_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/setlbservergroupmember",
+   "method": "PUT",
+   "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/showlbservergroupmember",
+   "method": "GET",
+   "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/loadbalancer/showloadbalancercertificate",
+   "method": "GET",
+   "path": "/v1/loadbalancers/certificates/{lb_certificate_id}",
+   "last_status": null,
+   "class": "W",
+   "note": "needs LB cert -> selfsign pre-step in HB4"
+  },
+  {
+   "key": "networking/loadbalancer/showloadbalancerpublicnatip",
+   "method": "GET",
+   "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-loadbalancer-members-nat (HB4)"
+  },
+  {
+   "key": "networking/vpc/approvalvpcpeering",
+   "method": "PUT",
+   "path": "/v1/vpc-peerings/{vpc_peering_id}/approval",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-peering (2 VPCs, free>=3)"
+  },
+  {
+   "key": "networking/vpc/createprivatenat",
+   "method": "POST",
+   "path": "/v1/private-nats",
+   "last_status": 404,
+   "class": "W",
+   "note": "needs DC service_resource_id -> ride HB5 direct-connect; else G"
+  },
+  {
+   "key": "networking/vpc/createprivatenatip",
+   "method": "POST",
+   "path": "/v1/private-nats/{private_nat_id}/private-nat-ips",
+   "last_status": null,
+   "class": "W",
+   "note": "needs DC service_resource_id -> ride HB5 direct-connect; else G"
+  },
+  {
+   "key": "networking/vpc/createtransitgatewayfirewall",
+   "method": "POST",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/firewalls",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/createtransitgatewayfirewallconnection",
+   "method": "POST",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/firewall-connections",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/createtransitgatewayrule",
+   "method": "POST",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/createtransitgatewayuplinkrule",
+   "method": "POST",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/uplink-routing-rules",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/createvpcendpoint",
+   "method": "POST",
+   "path": "/v1/vpc-endpoints",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-endpoint (shared-adopt VPC)"
+  },
+  {
+   "key": "networking/vpc/createvpcpeeringrule",
+   "method": "POST",
+   "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-peering (2 VPCs, free>=3)"
+  },
+  {
+   "key": "networking/vpc/deleteprivatenat",
+   "method": "DELETE",
+   "path": "/v1/private-nats/{private_nat_id}",
+   "last_status": null,
+   "class": "W",
+   "note": "needs DC service_resource_id -> ride HB5 direct-connect; else G"
+  },
+  {
+   "key": "networking/vpc/deleteprivatenatip",
+   "method": "DELETE",
+   "path": "/v1/private-nats/{private_nat_id}/private-nat-ips/{private_nat_ip_id}",
+   "last_status": null,
+   "class": "W",
+   "note": "needs DC service_resource_id -> ride HB5 direct-connect; else G"
+  },
+  {
+   "key": "networking/vpc/deletesubnetvipconnectedport",
+   "method": "DELETE",
+   "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports/{connected_port_id}",
+   "last_status": 404,
+   "class": "W",
+   "note": "needs real port_id -> ride HB3 VS run"
+  },
+  {
+   "key": "networking/vpc/deletesubnetvipnatip",
+   "method": "DELETE",
+   "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/static-nat-ips/{static_nat_id}",
+   "last_status": 404,
+   "class": "L",
+   "note": "vpc-subnet-vip-nat + publicip pre-create"
+  },
+  {
+   "key": "networking/vpc/deletetransitgatewayfirewall",
+   "method": "DELETE",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/firewalls/{firewall_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/deletetransitgatewayfirewallconnection",
+   "method": "DELETE",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/firewall-connections",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/deletetransitgatewayrule",
+   "method": "DELETE",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules/{routing_rule_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/deletetransitgatewayuplinkrule",
+   "method": "DELETE",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/uplink-routing-rules/{routing_rule_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/deletetransitgatewayvpcconnection",
+   "method": "DELETE",
+   "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-transit-gateway-children (own VPC)"
+  },
+  {
+   "key": "networking/vpc/deletevpcendpoint",
+   "method": "DELETE",
+   "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "vpc-endpoint (shared-adopt VPC)"
+  },
+  {
+   "key": "networking/vpc/deletevpcpeeringrule",
+   "method": "DELETE",
+   "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules/{routing_rule_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "vpc-peering (2 VPCs, free>=3)"
+  },
+  {
+   "key": "networking/vpc/listprivatenatips",
+   "method": "GET",
+   "path": "/v1/private-nats/{private_nat_id}/private-nat-ips",
+   "last_status": null,
+   "class": "W",
+   "note": "needs DC service_resource_id -> ride HB5 direct-connect; else G"
+  },
+  {
+   "key": "networking/vpc/setprivatenat",
+   "method": "PUT",
+   "path": "/v1/private-nats/{private_nat_id}",
+   "last_status": null,
+   "class": "W",
+   "note": "needs DC service_resource_id -> ride HB5 direct-connect; else G"
+  },
+  {
+   "key": "networking/vpc/setvpcendpoint",
+   "method": "PUT",
+   "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "vpc-endpoint (shared-adopt VPC)"
+  },
+  {
+   "key": "networking/vpc/setvpcpeering",
+   "method": "PUT",
+   "path": "/v1/vpc-peerings/{vpc_peering_id}",
+   "last_status": 400,
+   "class": "H",
+   "note": "vpc-peering (2 VPCs, free>=3)"
+  },
+  {
+   "key": "networking/vpc/showprivatenat",
+   "method": "GET",
+   "path": "/v1/private-nats/{private_nat_id}",
+   "last_status": null,
+   "class": "W",
+   "note": "needs DC service_resource_id -> ride HB5 direct-connect; else G"
+  },
+  {
+   "key": "networking/vpc/showvpcendpoint",
+   "method": "GET",
+   "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "vpc-endpoint (shared-adopt VPC)"
+  },
+  {
+   "key": "networking/vpn/createvpngateway",
+   "method": "POST",
+   "path": "/v1/vpn-gateways",
+   "last_status": 400,
+   "class": "H",
+   "note": "networking-vpn-gateway-tunnel (HB4, VPC+publicip)"
+  },
+  {
+   "key": "networking/vpn/createvpntunnel",
+   "method": "POST",
+   "path": "/v1/vpn-tunnels",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-vpn-gateway-tunnel (HB4, VPC+publicip)"
+  },
+  {
+   "key": "networking/vpn/deletevpngateway",
+   "method": "DELETE",
+   "path": "/v1/vpn-gateways/{vpn_gateway_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-vpn-gateway-tunnel (HB4, VPC+publicip)"
+  },
+  {
+   "key": "networking/vpn/deletevpntunnel",
+   "method": "DELETE",
+   "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-vpn-gateway-tunnel (HB4, VPC+publicip)"
+  },
+  {
+   "key": "networking/vpn/setvpngateway",
+   "method": "PUT",
+   "path": "/v1/vpn-gateways/{vpn_gateway_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-vpn-gateway-tunnel (HB4, VPC+publicip)"
+  },
+  {
+   "key": "networking/vpn/setvpntunnel",
+   "method": "PUT",
+   "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "networking-vpn-gateway-tunnel (HB4, VPC+publicip)"
+  },
+  {
+   "key": "networking/vpn/showvpngateway",
+   "method": "GET",
+   "path": "/v1/vpn-gateways/{vpn_gateway_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "networking-vpn-gateway-tunnel (HB4, VPC+publicip)"
+  },
+  {
+   "key": "networking/vpn/showvpntunnel",
+   "method": "GET",
+   "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "networking-vpn-gateway-tunnel (HB4, VPC+publicip)"
+  },
+  {
+   "key": "platform/sts/assumerole",
+   "method": "POST",
+   "path": "/v1/assume-role",
+   "last_status": 404,
+   "class": "G",
+   "note": "chain blocked on IAM createrole 500 PF + no SAML provider -> reachability waiver"
+  },
+  {
+   "key": "platform/sts/assumerolewithsaml",
+   "method": "POST",
+   "path": "/v1/assume-role-with-saml",
+   "last_status": 404,
+   "class": "G",
+   "note": "chain blocked on IAM createrole 500 PF + no SAML provider -> reachability waiver"
+  },
+  {
+   "key": "platform/sts/objectstoreauthorization",
+   "method": "POST",
+   "path": "/v1/object-store-authorization",
+   "last_status": 404,
+   "class": "G",
+   "note": "chain blocked on IAM createrole 500 PF + no SAML provider -> reachability waiver"
+  },
+  {
+   "key": "security/certificatemanager/createcertificate",
+   "method": "POST",
+   "path": "/v1/certificatemanager",
+   "last_status": 400,
+   "class": "G",
+   "note": "needs real CA-signed cert material -> unsatisfiable-flow waiver"
+  },
+  {
+   "key": "security/certificatemanager/validatecertificate",
+   "method": "POST",
+   "path": "/v1/certificatemanager/check-validation",
+   "last_status": 400,
+   "class": "G",
+   "note": "needs real CA-signed cert material -> unsatisfiable-flow waiver"
+  },
+  {
+   "key": "security/configinspection/creatediagnosisobject",
+   "method": "POST",
+   "path": "/v1/configinspection/diagnosis/save",
+   "last_status": 400,
+   "class": "G",
+   "note": "needs inspectable acct auth_key_id / foreign CSP creds -> entitlement waiver"
+  },
+  {
+   "key": "security/configinspection/diagnosisrequest",
+   "method": "POST",
+   "path": "/v1/configinspection/diagnosis/request",
+   "last_status": 404,
+   "class": "G",
+   "note": "needs inspectable acct auth_key_id / foreign CSP creds -> entitlement waiver"
+  },
+  {
+   "key": "security/configinspection/getdiagnosisobjectdetail",
+   "method": "GET",
+   "path": "/v1/configinspection/diagnosis/detail/{diagnosis_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "needs inspectable acct auth_key_id / foreign CSP creds -> entitlement waiver"
+  },
+  {
+   "key": "security/configinspection/getdiagnosisresultdetail",
+   "method": "GET",
+   "path": "/v1/configinspection/report/diagnosis/detail",
+   "last_status": 404,
+   "class": "G",
+   "note": "needs inspectable acct auth_key_id / foreign CSP creds -> entitlement waiver"
+  },
+  {
+   "key": "security/configinspection/terminatediagnosisobject",
+   "method": "DELETE",
+   "path": "/v1/configinspection/diagnosis/terminate/{diagnosis_id}",
+   "last_status": 404,
+   "class": "G",
+   "note": "needs inspectable acct auth_key_id / foreign CSP creds -> entitlement waiver"
+  },
+  {
+   "key": "security/kms/updatemanagedkeydescription",
+   "method": "PUT",
+   "path": "/v1/managed-kms/transit/{key_id}/description",
+   "last_status": 404,
+   "class": "G",
+   "note": "needs system-managed key, no create API -> unsatisfiable-flow waiver"
+  },
+  {
+   "key": "security/secretsmanager/createsecretsmanagerkmskey",
+   "method": "POST",
+   "path": "/v1/secrets/kms-key",
+   "last_status": 404,
+   "class": "G",
+   "note": "kms-key endpoint not routed (404) -> reachability waiver"
+  },
+  {
+   "key": "security/secretvault/gettemporarykey",
+   "method": "GET",
+   "path": "/v1/temporarykey/{secret_vault_id}",
+   "last_status": 400,
+   "class": "G",
+   "note": "vault-issued Sv* headers underivable -> unsatisfiable-flow waiver"
+  },
+  {
+   "key": "storage/backup/checkfilesystemduplication",
+   "method": "GET",
+   "path": "/v1/backups/check-filesystem-duplication",
+   "last_status": 400,
+   "class": "L",
+   "note": "missing query param fix (LB1)"
+  },
+  {
+   "key": "storage/backup/createbackup",
+   "method": "POST",
+   "path": "/v1/backups",
+   "last_status": 500,
+   "class": "H",
+   "note": "attempt FILESYSTEM policy in HB3; 500 on VM_IMAGE is PF -> fallback G"
+  },
+  {
+   "key": "storage/backup/deletebackup",
+   "method": "DELETE",
+   "path": "/v1/backups/{backup_id}",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/deletebackuprestoretarget",
+   "method": "DELETE",
+   "path": "/v1/backups/{backup_id}/restore-targets",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/listbackuphistories",
+   "method": "GET",
+   "path": "/v1/backups/{backup_id}/backup-histories",
+   "last_status": null,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/listbackuprestorehistories",
+   "method": "GET",
+   "path": "/v1/backups/{backup_id}/restore-histories",
+   "last_status": null,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/listbackuprestoresubnets",
+   "method": "GET",
+   "path": "/v1/backups/{backup_id}/restore/restorable-subnets",
+   "last_status": null,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/listbackuprestoretarget",
+   "method": "GET",
+   "path": "/v1/backups/{backup_id}/restore-targets",
+   "last_status": null,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/listbackupschedules",
+   "method": "GET",
+   "path": "/v1/backups/{backup_id}/schedules",
+   "last_status": null,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/listfilesystempath",
+   "method": "GET",
+   "path": "/v1/backups/{backup_id}/filesystem-path",
+   "last_status": null,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/manualbackup",
+   "method": "POST",
+   "path": "/v1/backups/{backup_id}/manual-backup",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/restorebackup",
+   "method": "POST",
+   "path": "/v1/backups/{backup_id}/restore",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/setbackupschedules",
+   "method": "PUT",
+   "path": "/v1/backups/{backup_id}/schedules",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/setfilesystempath",
+   "method": "PUT",
+   "path": "/v1/backups/{backup_id}/filesystem-path",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/showbackup",
+   "method": "GET",
+   "path": "/v1/backups/{backup_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/updatereplicationuse",
+   "method": "PUT",
+   "path": "/v1/backups/{backup_id}/replication",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/backup/updateretentionperiod",
+   "method": "PUT",
+   "path": "/v1/backups/{backup_id}/retention-period",
+   "last_status": 404,
+   "class": "H",
+   "note": "gen-heavy-backup rides HB3 VM"
+  },
+  {
+   "key": "storage/filestorage/deletevolumereplication",
+   "method": "DELETE",
+   "path": "/v1/replications/{replication_id}",
+   "last_status": 400,
+   "class": "G",
+   "note": "DR-region-side op, product-constraint 400 -> unsatisfiable-flow waiver"
+  },
+  {
+   "key": "storage/filestorage/setaccessrule",
+   "method": "PUT",
+   "path": "/v1/volumes/{volume_id}/access-rules",
+   "last_status": 404,
+   "class": "W",
+   "note": "setaccessrule rides HB3 VM"
+  },
+  {
+   "key": "storage/filestorage/setvolumereplication",
+   "method": "PUT",
+   "path": "/v1/replications/{replication_id}",
+   "last_status": 400,
+   "class": "G",
+   "note": "DR-region-side op, product-constraint 400 -> unsatisfiable-flow waiver"
+  },
+  {
+   "key": "storage/parallel-filestorage/listaccessrule",
+   "method": "GET",
+   "path": "/v1/volumes/{volume_id}/access-rules",
+   "last_status": null,
+   "class": "H",
+   "note": "parallel-filestorage-capacity-restore (HB7, 1TB billable)"
+  },
+  {
+   "key": "storage/parallel-filestorage/listsnapshots",
+   "method": "GET",
+   "path": "/v1/snapshots",
+   "last_status": 400,
+   "class": "H",
+   "note": "parallel-filestorage-capacity-restore (HB7, 1TB billable)"
+  },
+  {
+   "key": "storage/parallel-filestorage/showvolume",
+   "method": "GET",
+   "path": "/v1/volumes/{volume_id}",
+   "last_status": null,
+   "class": "H",
+   "note": "parallel-filestorage-capacity-restore (HB7, 1TB billable)"
+  }
+ ]
+}

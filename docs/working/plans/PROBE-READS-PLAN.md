@@ -1,7 +1,14 @@
 ---
-status: active
+status: superseded (2026-06-15 스냅샷 워크리스트 — 커버리지 캠페인 정본으로 대체)
 for: coverage
+superseded_by: CAMPAIGN-C3-100.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 현행 커버리지 캠페인의 정본은
+> [`CAMPAIGN-C3-100.md`](CAMPAIGN-C3-100.md)다. probe-read **원칙 자체**는 내구
+> 규칙으로 `knowledge/formal/FORMAT.md` § "Probe-read completion"에 산다. 아래
+> endpoint→parent 매핑(80건)은 2026-06-15 당시 스냅샷 — `python -m spec.coverage_gap`
+> 으로 재측정하라.
 
 # PROBE-READS-PLAN — where the probe-read principle still needs applying
 

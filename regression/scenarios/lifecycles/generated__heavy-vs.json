@@ -34,7 +34,7 @@
           "name": "create-image",
           "service": "virtualserver",
           "method": "GET",
-          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50",
+          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&os_distro=ubuntu&limit=50",
           "expect_status": [
             200,
             201,
@@ -279,7 +279,7 @@
             200
           ],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": [
               "ACTIVE"
             ],
@@ -376,7 +376,136 @@
             400
           ],
           "group": "server",
-          "_note": "live 400 VirtualServer.InvalidPrivateKeyValue 'Failed to decrypt' (run 27452095757) — Linux/ubuntu 서버는 복호화할 암호화된 관리자 패스워드가 없음(Windows 전용 기능 추정). private_key capture 자체는 정상. [200,400] 관용 + PF-17"
+          "_note": "OWNER DECISION 2026-07-08: ubuntu 고정(create-image os_distro=ubuntu) + 실키 단발 전달 유지. ubuntu 게스트는 암호화 admin password 를 게시하지 않으므로(게시 흐름은 Windows/cloudbase-init 기전) 400 'Failed to decrypt' 가 예상 종착 상태 — 같은 날 넣었던 10분 until-200 poll(Windows 지연 가설, PF-17 정정 참고)은 ubuntu 에선 순수 낭비라 제거. waiver 여부는 owner 결정 대기."
+        },
+        {
+          "name": "create-custom-image",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/images",
+          "json": {
+            "image_name": "regrimg{ualpha}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400
+          ],
+          "optional": true,
+          "group": "custom-image",
+          "_note": "400 VirtualServer.BadRequest (vague): custom-image create needs specific server/volume state (e.g. stopped server, no in-flight attach). Coverage-only (C2); R3 to drive the server into a valid image-from state to make it 2xx. | 2026-07-08 재조사(PF-27): 07-08 재현 2회 모두 소스 서버가 Windows 2016 (blind images[0]) — Windows 게스트 이미징 거부(미문서) 추정이 vague-400 의 유력 원인. ubuntu 핀(3e3c6e24) 후 다음 런에서 2xx 복귀 기대. | 2026-07-08(3): ubuntu 에서도 동일 400(req-59b8e9fe) — Windows 가설 반증. 같은 런에서 -full 은 (추가 볼륨 attach 없는 시점에) 이미지 202 성공했고, -full 의 image-update 는 Image.InvalidVolumeOnVisibilityUpdate('Image with volumes cannot update visibility')를 반환 — 유력 전제조건: 추가 볼륨이 attach 된 서버는 이미징 불가. 그래서 이 그룹을 create-volume-attachment 앞으로 재배열.",
+          "capture": {
+            "custom_image_id": "$.image_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/images/{custom_image_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-custom-image-read-members",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/images/{custom_image_id}/members",
+          "expect_status": [
+            200
+          ],
+          "poll": {"until_status": [200], "give_up_status": [404], "timeout": 300, "interval": 15},
+          "optional": true,
+          "group": "custom-image",
+          "_note": "공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)"
+        },
+        {
+          "name": "create-image-member",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images/{custom_image_id}/members",
+          "json": {"member": "ec11538abf8f46d2953539521f745366"},
+          "capture_soft": {"member_id": "$.member_id"},
+          "expect_status": [200, 201, 202, 400, 403, 409, 422],
+          "_note": "2026-07-08 25-편입(owner GO): createimagemember — 자기 계정으로 share (asg notification user_ids 선례의 계정 고정값). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "show-image-member",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/images/{custom_image_id}/members/{member_id}",
+          "expect_status": [200, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): showimagemember."
+        },
+        {
+          "name": "update-image-member",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/images/{custom_image_id}/members/{member_id}",
+          "json": {"status": "accepted"},
+          "expect_status": [200, 202, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): updateimagemember — status 값 추정(glance 계열). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "delete-image-member",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "destructive": true,
+          "method": "DELETE",
+          "path": "/v1/images/{custom_image_id}/members/{member_id}",
+          "expect_status": [200, 202, 204, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): deleteimagemember."
+        },
+        {
+          "name": "create-sharing-image",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images/{custom_image_id}/share",
+          "json": {"account_id": "ec11538abf8f46d2953539521f745366"},
+          "expect_status": [200, 201, 202, 400, 403, 409, 422],
+          "_note": "2026-07-08 25-편입(owner GO): createsharingimage — body 스키마 추정. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "create-image-shell",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images",
+          "json": {"container_format": "bare", "disk_format": "qcow2", "min_disk": 100, "min_ram": 0, "name": "regrimgsh{ualpha}", "os_distro": "ubuntu", "protected": false},
+          "capture_soft": {"pending_image_id": "$.id"},
+          "expect_status": [200, 201, 202, 400, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/images/{pending_image_id}", "service": "virtualserver"},
+          "_note": "2026-07-08 25-편입(owner GO): createimage — 업로드 대기 셸 생성 (docs request_example body 그대로, os_distro 만 ubuntu). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "import-image",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images/{pending_image_id}/import",
+          "json": {},
+          "expect_status": [200, 202, 400, 404, 409, 422],
+          "_note": "2026-07-08 25-편입(owner GO): importimage — 소스 URL 스키마 미문서(빈 body 도달+정정 유도). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "delete-image-shell",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "destructive": true,
+          "method": "DELETE",
+          "path": "/v1/images/{pending_image_id}",
+          "expect_status": [200, 202, 204, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): pending 셸 teardown."
         },
         {
           "name": "create-volume-attachment",
@@ -404,6 +533,15 @@
           }
         },
         {
+          "name": "wait-volume-inuse",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.state", "until": ["in-use", "IN-USE", "in_use"], "timeout": 180, "interval": 10},
+          "_note": "2026-07-08 (run 936s 실패 재발 방지): attach 202 는 비동기 — 대기 수정으로 빨라진 흐름에서 후속/해제 스텝이 attach 완료 전에 나가는 레이스를 명시 settle 로 차단."
+        },
+        {
           "name": "verify-volume-attachment-volume-shows-attachment",
           "service": "virtualserver",
           "method": "GET",
@@ -412,43 +550,6 @@
             200
           ],
           "group": "volume-attachment"
-        },
-        {
-          "name": "create-custom-image",
-          "service": "virtualserver",
-          "method": "POST",
-          "path": "/v1/servers/{server_id}/images",
-          "json": {
-            "image_name": "regrimg{ualpha}"
-          },
-          "expect_status": [
-            200,
-            201,
-            202,
-            400
-          ],
-          "optional": true,
-          "group": "custom-image",
-          "_note": "400 VirtualServer.BadRequest (vague): custom-image create needs specific server/volume state (e.g. stopped server, no in-flight attach). Coverage-only (C2); R3 to drive the server into a valid image-from state to make it 2xx.",
-          "capture": {
-            "custom_image_id": "$.image_id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/images/{custom_image_id}",
-            "service": "virtualserver"
-          }
-        },
-        {
-          "name": "verify-custom-image-read-members",
-          "service": "virtualserver",
-          "method": "GET",
-          "path": "/v1/images/{custom_image_id}/members",
-          "expect_status": [
-            200
-          ],
-          "group": "custom-image",
-          "_note": "공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)"
         },
         {
           "name": "create-port",
@@ -674,6 +775,15 @@
           "retry_interval": 15
         },
         {
+          "name": "wait-volume-detached",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.state", "until": ["available", "AVAILABLE"], "timeout": 180, "interval": 10},
+          "_note": "2026-07-08: detach 202 settle — delete-block-volume 이 detaching 상태를 때리지 않게."
+        },
+        {
           "name": "delete-block-volume",
           "service": "virtualserver",
           "method": "DELETE",
@@ -703,7 +813,10 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "custom-image",
+          "optional": true,
+          "_note": "2026-07-08 owner '이건 왜 실패야?' 근본원인: 이 스텝만 custom-image 그룹 밖이라, create-custom-image 가 400(PF-27, Windows 소스 거부)으로 그룹이 죽어도 혼자 실행돼 리터럴 {custom_image_id} 로 DELETE → 404 → strict expect 가 lifecycle 전체를 실패시켰다 (E2E 20260708-010208 rc=1 + owner 런 140335 동일). 그룹 합류로 create 실패 시 스킵(유령 404 소멸), create 성공 시 strict teardown 검증 유지 — 실패하면 그룹 경고 + 등록된 cleanup/reconciler 백스톱."
         },
         {
           "name": "delete-server-static-nat",
@@ -724,6 +837,28 @@
           "retry_interval": 15
         },
         {
+          "name": "wait-public-ip-detached",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.publicip.state",
+            "until": [
+              "DETACHED",
+              "AVAILABLE",
+              "ACTIVE",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 180,
+            "interval": 10
+          },
+          "_note": "2026-07-08 전런 수리: delete-public-ip 400 'PublicIP state is not deletable state(ATTACHED)' — attach는 create-server-static-nat가 수행했고(카탈로그에 publicip 전용 detach endpoint 없음: create/delete/list/set/show뿐), detach = 직전 delete-server-static-nat인데 202 비동기라 ATTACHED가 남은 채 delete가 나갔다. wait-volume-detached와 동일한 settle 폴: ATTACHED 이탈(라이브 2026-07-08: attached 상태 문자열은 'ATTACHED'; until은 DETACHED/AVAILABLE + create쪽 wait의 검증 어휘)까지 대기, 미도달 시 180s 후 200 통과 → delete의 400 retry가 보험."
+        },
+        {
           "name": "delete-public-ip",
           "service": "vpc",
           "method": "DELETE",
@@ -737,10 +872,12 @@
           ],
           "destructive": true,
           "retry_on_status": [
-            409
+            409,
+            400
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "_note": "2026-07-08: 400(ATTACHED 잔존) retry 보험 — 엔진은 스텝당 retry 설정이 하나라 별도 3x15s 대신 기존 409 백스톱(40x30)에 400을 동승시킨다(409 인내 약화 없음). 1차 수리는 앞의 wait-public-ip-detached settle 폴; 끝내 400이면 스텝 실패로 신호 유지(expect에 400은 넣지 않음)."
         },
         {
           "name": "delete-internet-gateway",

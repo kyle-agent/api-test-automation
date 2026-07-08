@@ -83,6 +83,85 @@
           "_note": "destructive: only runs under SCP_ALLOW_DESTRUCTIVE. Deletes the account budget. Budget id is 32-hex (e.g. 240200fd2b02490ca63bb3965048b493). optional so a 403/404 records coverage without failing."
         }
       ]
+    },
+    {
+      "id": "budget-account-budget-full",
+      "service": "financial-management/budget",
+      "enabled": true,
+      "heavy": false,
+      "_note": "완전성 GAP 편입 2026-07-08 (COMPLETENESS-AUDIT-2026-07-08 'Gap = 1' showaccountbudget): budget의 VERIFY 체인 신설 — list→create→show→set→delete. 기존 budget-account-budget은 전 스텝 optional+관용이라 §1 파생 role=probe(verify 합집합 미포함)여서 budget 5키 전부가 verify-gap이었음(probe role 뒤집기 금지라 그 lifecycle은 무수정). 무과금 판단 근거: budget은 예산 알림/차단 '설정 객체'(BudgetCreateRequest — api_docs.json financial-management/budget/budgetcreaterequest: 필수 amount(int)/name(str)/start_month('YYYY-MM')/unit(MONTHLY|OVERALL))로 과금 리소스를 만들지 않음; create 201은 probe lifecycle에서 2026-06-23 실검증(VALIDATED 201 live). 제약 2건 명시: (1) 계정당 budget 1개 — 이미 존재하면 create 409 (오늘 live 확인 2026-07-08: GET /v1/budgets/account → {budgets:[],count:0} = 충돌 없음; probe의 create는 start_month 2026-06 하드코드가 과거월이 되어 현재 400이라 실생성 없음 → 충돌 리스크 현재 0). (2) start_month는 현재월 이상 필수(과거월 400) — 엔진 ctx에 YYYY-MM 빌트인이 없어 2026-07 하드코드; 매월 갱신 필요(rot 시 create 400으로 표면화). (3) name ≤20자 (docs 미기재 — 2026-07-08 첫 실측 런에서 25자 템플릿이 400 'Name length cannot exceed 20.'; 'regrbud{unique}' 15자로 수리). show 응답 코드: docs가 GET에 201로 기재(문서 오류 의심, conformance 후보)라 [200,201] 허용 — 여전히 strict(4xx/5xx 없음). role 파생: create/delete가 strict mutating → verify.",
+      "steps": [
+        {
+          "name": "list-account-budgets",
+          "method": "GET",
+          "path": "/v1/budgets/account",
+          "expect_status": [200],
+          "_note": "strict 전역 read (listaccountbudgets — 함께 verify 편입). live 200 2026-07-08: {budgets:[], count:0, page:0, size:20}. 쿼리 전부 optional. create 직전 단일-budget 제약 사전 확인 지점(비어 있지 않으면 아래 create가 409로 표면화)."
+        },
+        {
+          "name": "create-account-budget",
+          "method": "POST",
+          "path": "/v1/budgets/account",
+          "json": {
+            "amount": 1000000,
+            "name": "regrbud{unique}",
+            "start_month": "2026-07",
+            "unit": "MONTHLY",
+            "notifications": {
+              "is_use_notification": true,
+              "notification_send_period": "FIRST",
+              "receivers": ["kchoic.ai+budget@gmail.com"],
+              "thresholds": [80]
+            }
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "budget_id": "$.budget.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/budgets/account/{budget_id}",
+            "service": "budget"
+          },
+          "_note": "STRICT create (createaccountbudget). body 근거: api_docs.json BudgetCreateRequest(필수 amount/name/start_month/unit + optional notifications) — probe lifecycle에서 동일 shape 201 실검증(2026-06-23). NAME ≤20자 제약 (docs 미기재): 첫 실측 2026-07-08 라이브 런에서 'regr-budget-full-{unique}'(17+8hex=25자) → 400 'Name length cannot exceed 20.' — 'regrbud{unique}'(7+8=15자)로 단축, set 스텝과 동일 템플릿 유지 (probe lifecycle의 'regr-budget-'(12+8=20자)는 정확히 한계선이라 201 통과했던 것). start_month 2026-07 하드코드(현재월, 과거월이면 400) — 매월 갱신 필요. capture $.budget.id (BudgetAccountShowResponse.budget). 409 = 계정에 budget 이미 존재(단일 제약) — 사전 list 스텝으로 진단 가능 (2026-07-08 라이브 재확인: budgets 0건 = 충돌 없음)."
+        },
+        {
+          "name": "show-account-budget",
+          "method": "GET",
+          "path": "/v1/budgets/account/{budget_id}",
+          "expect_status": [200, 201],
+          "_note": "STRICT show (showaccountbudget — 감사 'Gap = 1' 대상 키, b-class). 방금 create가 캡처한 실 budget_id로 조회(placeholder-id read 금지 규정 충족). docs response는 201 Created로 기재(GET인데 201 — 문서 오류 의심, conformance 후보)라 [200,201] 허용; 4xx/5xx 없음 = strict 유지. 응답 envelope {budget:{...}, notifications:{...}, prevention:{...}}."
+        },
+        {
+          "name": "set-account-budget",
+          "method": "PUT",
+          "path": "/v1/budgets/account/{budget_id}",
+          "json": {
+            "amount": 1500000,
+            "name": "regrbud{unique}",
+            "start_month": "2026-07",
+            "unit": "MONTHLY",
+            "notifications": {
+              "is_use_notification": true,
+              "notification_send_period": "FIRST",
+              "receivers": ["kchoic.ai+budget@gmail.com"],
+              "thresholds": [90]
+            }
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "budget-full-set",
+          "_note": "setaccountbudget — 자기 소유 budget in-place 수정(BudgetSetRequest = BudgetCreateRequest shape, probe lifecycle note 근거). name은 create와 동일 'regrbud{unique}' 유지 (≤20자 제약 — create 스텝 note 참조; 2026-07-08 400 실측으로 단축). 2xx 라이브 미검증이라 관용+optional로 편입(2xx 확인 후 strict 승급 — 승급해도 create가 strict mutating이라 role은 이미 verify). 이 스텝으로 budget catalog 5/5가 verify 합집합에 편입."
+        },
+        {
+          "name": "delete-account-budget",
+          "method": "DELETE",
+          "path": "/v1/budgets/account/{budget_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "_note": "STRICT delete (deleteaccountbudget) — 방금 만든 자기 소유 budget_id만 삭제(name-guessing 아님). destructive 게이트."
+        }
+      ]
     }
   ]
 }

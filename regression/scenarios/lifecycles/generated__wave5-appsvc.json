@@ -611,14 +611,14 @@
           "service": "vpc",
           "method": "POST",
           "path": "/v1/privatelink-services",
-          "_note": "UNPROVEN — first live exercise of PrivateLinkServiceCreateRequest. approval_type AUTO so downstream endpoint requests self-approve; connected_resource_type IP with two free IPs inside the subnet /24 (no LB/VM needed). 202 PrivateLinkServiceShowResponse. 400 ip-address-overlap observed: the hardcoded service_ip_address (10.163.8.5) is not inside the shared subnet's CIDR, which is provisioned/dynamic (not 10.163.x). Coverage-only (C2); R3 to compute service/connected IPs from the live subnet CIDR.",
+          "_note": "UNPROVEN — first live exercise of PrivateLinkServiceCreateRequest. approval_type AUTO so downstream endpoint requests self-approve; connected_resource_type IP with two free IPs inside the subnet /24 (no LB/VM needed). 202 PrivateLinkServiceShowResponse. 2026-07-08 전런 수리(ip-overlap 근본원인): 구 IP(10.163.8.5/.10)는 자체 서브넷(10.163.8.0/24) 기준값인데 create-subnet이 adopt:subnet이라 전런에선 공유 서브넷(10.124.0.0/24, engine._SHARED_SUBNET_CIDR)로 치환돼 CIDR 밖 → 400 ip-address-overlap. ADOPT-class 고정 IP 재호밍 규칙(knowledge/domain-constraints.md)대로 10.124.0.7/.8로 정정 — fixed_ip_map 선점분(.5/.6 vpc-privatelink-service, .20 vpc-endpoint, .30/.31 lb-members-nat, .100~.102 lb 기본값)과 비충돌(전 시나리오 grep 확인 2026-07-08; dependencies.json fixed_ip_map에 .7/.8 등재는 후속). 듀얼모드 주의(validated-facts.md): 공유 인프라 없는 단독(자가 생성 10.163.8.0/24) 실행에선 이 IP가 역으로 대역 밖 400 → optional+group이라 privatelink-service 그룹 스킵으로 관용되고, xdist 전런에선 IB-049가 자가 생성을 막아 adopt 모드가 유일 경로.",
           "json": {
             "name": "regrpls{ualpha}",
             "description": "API regression wave5 privatelink service",
             "approval_type": "AUTO",
             "connected_resource_type": "IP",
-            "connected_resource_ip_address": "10.163.8.10",
-            "service_ip_address": "10.163.8.5",
+            "connected_resource_ip_address": "10.124.0.8",
+            "service_ip_address": "10.124.0.7",
             "subnet_id": "{subnet_id}",
             "tags": []
           },
@@ -647,6 +647,7 @@
           "expect_status": [
             200
           ],
+          "group": "privatelink-service",
           "poll": {
             "field": "$.privatelink_service.state",
             "until": [
@@ -654,7 +655,8 @@
             ],
             "timeout": 300,
             "interval": 10
-          }
+          },
+          "_note": "2026-07-08 전런 수리: create와 같은 그룹으로 편입 — 전런 첫실측에서 create가 400(ip-overlap)으로 그룹 스킵됐는데 이 wait만 그룹 밖이라 리터럴 {pls_id}로 실행돼 GET 404 → 5분 폴 소진 → strict 실패로 lifecycle 전체가 죽었다. 그룹 동승으로 create 실패 시 함께 스킵, 성공 시 기존과 동일하게 ACTIVE 폴."
         },
         {
           "name": "create-api",
@@ -687,7 +689,9 @@
           "service": "apigateway",
           "method": "POST",
           "path": "/v1/privatelink-endpoints",
-          "_note": "PrivateLinkEndpointCreateRequest verbatim: name (alnum 3-20, NO hyphens), privatelink_service_id, description? — wired to the real AUTO-approval service created above. capture envelope $.privatelink_endpoint.id is docs-derived (UNPROVEN).",
+          "optional": true,
+          "group": "apigw-ple",
+          "_note": "PrivateLinkEndpointCreateRequest verbatim: name (alnum 3-20, NO hyphens), privatelink_service_id, description? — wired to the real AUTO-approval service created above. capture envelope $.privatelink_endpoint.id is docs-derived (UNPROVEN). 2026-07-08: optional+group apigw-ple — pls create가 다른 사유로 실패하면 이 스텝이 리터럴 {pls_id}로 실행돼 strict 실패하던 경로 차단(실패 시 ple 의존 스텝들 그룹 스킵; cleanup은 실2xx에서만 등록되는 엔진 게이트로 안전).",
           "json": {
             "name": "regrple{ualpha}",
             "privatelink_service_id": "{pls_id}",
@@ -716,6 +720,16 @@
             200
           ],
           "group": "apigw-ple"
+        },
+        {
+          "name": "list-apigw-privatelink-endpoints",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/privatelink-endpoints",
+          "expect_status": [
+            200
+          ],
+          "_note": "GAP 편입 2026-07-08 (application-service/apigateway/listprivatelinkendpoints, 마지막 apigateway gap — COMPLETENESS-AUDIT-2026-07-08). vpc의 동일 path GET /v1/privatelink-endpoints와 catalog key가 다르므로(step service=apigateway 명시, apigw 호스트로 라우팅) 여기서만 apigateway key로 기록됨. 쿼리 전부 optional(size/page/sort/name). live 200 2026-07-08 ({count:0, privatelink_endpoints:[]} — 빈 목록 200으로 충분; 체인 내에선 방금 만든 endpoint가 보이는 위치)."
         },
         {
           "name": "set-apigw-privatelink-endpoint",

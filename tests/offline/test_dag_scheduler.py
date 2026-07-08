@@ -16,8 +16,29 @@ from __future__ import annotations
 import threading
 import time
 
+import pytest
+
 from regression.scenarios import dag_planner, dag_scheduler
 from regression.scenarios.dag_runner import LifecycleOutcome
+
+
+def _blocking_sleep(secs: float) -> None:
+    """Genuine wall-clock sleep via the C-level lock timeout — works no matter
+    what ``time.sleep`` currently points to."""
+    threading.Event().wait(secs)
+
+
+@pytest.fixture(autouse=True)
+def _genuine_time_sleep(monkeypatch):
+    """Full-suite guard: ``cleanup/verify_clean.py`` no-ops ``time.sleep``
+    PROCESS-WIDE at import (``import time as _t; _t.sleep = lambda: None``), and
+    tests/offline/test_console2.py's scan_owned tests import it. Any test after
+    them then sees a no-op sleep, which collapses this file's real waits (fake
+    task durations, the scheduler's heavy-stagger gap) to ~0 — pass alone, fail
+    in the full offline run. Pin a genuine sleep per-test here; monkeypatch
+    restores the outside state afterwards. Proper fix belongs in verify_clean
+    (stub sleep only inside scan_owned's try/finally, like _delete/_wait_gone)."""
+    monkeypatch.setattr(time, "sleep", _blocking_sleep)
 
 
 def _plan(*, free=None, adopters=None, self_creators=None, shared_roots=("vpc",),

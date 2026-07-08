@@ -219,7 +219,7 @@ resources:
       - {name: syncparametervalues,
          endpoint: "POST /v1/clusters/{postgresql-cluster.cluster_id}/parameters/sync",
          expect_status: [200, 202, 409]}
-    provenance: docs
+    provenance: VALIDATED  # evidence: database/postgresql/postgresqllistparametervalues (run 28631983945)
     source: {lifecycle: database-postgresql-cluster,
              steps: [set-parameters, sync-parameters]}
     notes: "create=GET listparametervalues (per-cluster) — ParametersResponse $.contents[] ParameterDTO {id, applied_value, is_modifiable, ...}. where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭. applied_value가 빈 문자열인 항목이 첫 매치면 set이 400 날 수 있음 — 라이브 정제 예상."
@@ -237,7 +237,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{postgresql-cluster.cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # evidence: database/postgresql/postgresqladdblockstorages (run 28631983945)
     source: {lifecycle: postgresql-cluster-subops-guarded,
              steps: [add-block-storages]}
     notes: "AddBlockStoragesRequest {role_type REQ enum(OS,DATA,ARCHIVE,TEMP,BACKUP), size_gb REQ 16-5120, volume_type opt enum(SSD,...) default SSD} (api_docs verbatim). DATA 볼륨 추가는 비가역(제거 API 없음) — 합성 1회용 클러스터에서만. 클러스터 삭제로 회수."
@@ -515,7 +515,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{postgresql-cluster.cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 3600, interval: 60}
-    provenance: docs
+    provenance: VALIDATED  # evidence: database/postgresql/postgresqlupgradekernel (run 28631983945)
     source: {lifecycle: postgresql-cluster-subops-guarded,
              steps: [upgrade-kernel]}
     notes: "body 없음 (api_docs — upgradekernel). OS Kernel 업그레이드 — userguide (2026-06-13, managing): \"OS 업그레이드가 진행되는 동안 서비스가 중단됩니다\", \"업그레이드가 실패할 경우 이전 구성으로 원복\", \"업그레이드 완료 후 기존 OS로 복구할 수 없습니다\" (성공 시 IRREVERSIBLE). 전제: cluster detail v1.1의 is_kernel_patchable=true (구버전 이미지일 때만 의미 — owner 전략: 16.x 생성 후 업그레이드; postgresql-cluster options.engine_version_16 + engine_version_id override로 구성). 최신 16.10 이미지가 이미 최신 커널이면 4xx 예상 — composer create expect [200,201,202] 고정이라 hard-fail로 드러난다 (라이브 정제 예상)."

@@ -725,7 +725,7 @@
       "service": "database/sqlserver",
       "enabled": true,
       "heavy": false,
-      "_note": "reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY sqlserver catalog GET whose path params are satisfied (engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). sqlserver has NO clusters/{cluster_id}/replicas endpoint. 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected).",
+      "_note": "reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY sqlserver catalog GET whose path params are satisfied (engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). sqlserver has NO clusters/{cluster_id}/replicas endpoint. 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected). EXTENDED 2026-07-08 (completeness-audit 편입): two strict-[200] license-independent global reads (list-parameter-groups / list-server-types, both LIVE-VERIFIED 200) close the service's last two audit gaps, and four c2-* tolerant literal-uuid GETs fulfil the reachability-waiver call contract (waiver 이행: 호출 증거 4xx) for sqlserverlistbackuphistories / sqlserverlistparametervalues / sqlserverlistparameters / sqlservershowrequest. Still 100% read-only, zero mutating steps — role derivation stays verify by construction.",
       "steps": [
         {
           "name": "list-engine-versions",
@@ -759,6 +759,92 @@
           ],
           "optional": true,
           "group": "read-cov"
+        },
+        {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "parameter-groups",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (sqlserverlistparametergroups, class a): license-independent global read — LIVE-VERIFIED 200 this session (non-empty contents: predefined 'Microsoft SQL Server 2019 ... Default' groups exist without any cluster), so strict [200] verify-lane. optional + own group so an isolated surprise never fails the run or skips the other reads."
+        },
+        {
+          "name": "list-server-types",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "server-types",
+          "_note": "completeness-audit 2026-07-08 gap 편입 (sqlserverlistservertypes, class a): license-independent global read — LIVE-VERIFIED 200 this session (non-empty contents, e.g. db1v10m120), so strict [200] verify-lane; the same path is 2xx-verified on every other DB engine. optional + own group."
+        },
+        {
+          "name": "c2-list-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/0000{unique}/backup-histories",
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
+          "optional": true,
+          "group": "c2-backup-histories",
+          "_note": "waiver 이행: 호출 증거(4xx). sqlserverlistbackuphistories is reachability-waived (license-gated engine, no cluster to bind to) — the waiver contract still requires the endpoint to be CALLED; a deliberately non-existent 0000{unique} id guarantees a safe 4xx and can never touch a real resource. LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 404 ResourceNotFound. Tokenized id (searchengine/vertica/idc C2 관례와 통일, 2026-07-08): the {unique} segment norm-maps this call site to its catalog key so the completeness audit can statically SELF-VERIFY the C2-debt contract is implemented — runtime semantics stay a guaranteed 4xx (waived, NOT a 2xx-verify claim; audit still buckets this key as waived)."
+        },
+        {
+          "name": "c2-list-parameter-values",
+          "method": "GET",
+          "path": "/v1/clusters/0000{unique}/parameters",
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
+          "optional": true,
+          "group": "c2-parameter-values",
+          "_note": "waiver 이행: 호출 증거(4xx). sqlserverlistparametervalues is reachability-waived — called with a deliberately non-existent 0000{unique} id for a guaranteed safe 4xx. LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 404 ResourceNotFound. Tokenized 2026-07-08 (se/vt/idc C2 관례 통일 — 정적 자가검증; runtime은 여전히 4xx 계약, 2xx-verify 주장 아님)."
+        },
+        {
+          "name": "c2-list-parameters",
+          "method": "GET",
+          "path": "/v1/parameters?dbaas_parameter_group_id=00000000-0000-0000-0000-000000000000",
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
+          "optional": true,
+          "group": "c2-parameters",
+          "_note": "waiver 이행: 호출 증거(4xx). sqlserverlistparameters is reachability-waived; dbaas_parameter_group_id is a REQUIRED query param (api_docs — same as the database-mysql-cluster twin's list-parameters step in scenarios.json), supplied as a non-existent LITERAL uuid for a guaranteed safe 4xx. LIVE-VERIFIED this session: 400 Dbaas.BadRequest 'dbaas_parameter_group_id ... not found'. NOTE: unlike the id-bound c2 steps the bare path still maps to the catalog key statically (query params are stripped by _norm), which is fine — the key simply gains static union membership on top of its waiver."
+        },
+        {
+          "name": "c2-show-request",
+          "method": "GET",
+          "path": "/v1/requests/0000{unique}",
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
+          "optional": true,
+          "group": "c2-show-request",
+          "_note": "waiver 이행: 호출 증거(4xx). sqlservershowrequest is reachability-waived (request_id only comes from async writes, none possible without a license) — same 0000{unique} tokenized convention as searchengine/vertica read-coverage (2026-07-08 통일; 정적 자가검증용, runtime은 4xx 계약). LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 400 Dbaas.ResourceError.NotFound. The probe-reads step's request_id placeholder is conditional at runtime; this explicit step guarantees the call."
         },
         {
           "name": "probe-reads",

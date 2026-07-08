@@ -1,7 +1,14 @@
 ---
-status: active
+status: superseded (ARCHITECTURE.md §Direction으로 병합 — 2026-07-04)
 for: all
+superseded_by: ARCHITECTURE.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 페이즈 로드맵은
+> [`ARCHITECTURE.md`](ARCHITECTURE.md) § "Direction — phases"로 병합됐다.
+> 마일스톤 상세는 `docs/PLATFORM-PLAN.md`, 현재 상태·수치는
+> `docs/working/CONTEXT.md` / `python -m spec.summary`가 정본 — 아래 본문의
+> 수치(C3 44.79%, 128 nodes 등)는 병합 당시가 아닌 **작성 당시(06월 중순)** 값이다.
 
 # ROADMAP — where this project is going
 
