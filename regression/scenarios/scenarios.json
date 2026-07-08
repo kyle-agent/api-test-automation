@@ -339,6 +339,15 @@
           }
         },
         {
+          "name": "list-subnets",
+          "method": "GET",
+          "path": "/v1/subnets",
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap listsubnets — bare collection LIST, the only missing key of the subnet family; live 200 2026-07-08."
+        },
+        {
           "name": "create-port",
           "method": "POST",
           "path": "/v1/ports",
@@ -875,6 +884,20 @@
           ]
         },
         {
+          "name": "list-volume-replication-regions",
+          "method": "GET",
+          "path": "/v1/replications/regions",
+          "params": {
+            "type_name": "HDD",
+            "source_region_name": "{region}",
+            "replication_type": "replication"
+          },
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap listvolumereplicationregion. All three query params are REQUIRED per api_docs; HDD matches this lifecycle's volume type_name. live 200 2026-07-08 (kr-west1 source -> regions ['kr-east1'])."
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "volume_id": "{volume_id}"
@@ -1108,6 +1131,18 @@
       "_note": "Light, self-contained: create a Standard queue, read it, then exercise the config/description/deduplication/ACL writes, list, probe-read, delete. Synchronous. COVERAGE EXPANSION (NOT yet validated against the live gateway): updatequeuedescription, updatequeueconfig (encryption omitted — no KMS key), updatequeuededuplication + updatequeuededuplicationscope (FIFO-oriented — may 400 on a Standard queue), setacl + deleteacl. Each write is optional+grouped so a rejection isolates to its group and never fails the create->delete spine.",
       "steps": [
         {
+          "name": "check-queue-name-duplication",
+          "method": "GET",
+          "path": "/v1/queues/check-duplication",
+          "params": {
+            "name": "regrq{unique}"
+          },
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap checkqueuenameduplication — placed directly before create. Query param 'name' is REQUIRED per api_docs; reuses the exact create name so the answer is result:false (name free). live 200 2026-07-08."
+        },
+        {
           "name": "create",
           "method": "POST",
           "path": "/v1/queues",
@@ -1319,6 +1354,15 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "list-security-groups",
+          "method": "GET",
+          "path": "/v1/security-groups",
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap listsecuritygroups — bare SG list (only the rule-list query form existed before); live 200 2026-07-08."
         },
         {
           "name": "set-sg",
@@ -4133,7 +4177,7 @@
       "service": "database/mysql",
       "enabled": true,
       "heavy": true,
-      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address left blank so the platform auto-assigns a free IP from the subnet (a hardcoded IP can collide / be reserved -> 'not available'). | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch). | SUB-OP WINDOW 2026-06-11 (lever 1 prep, docs-derived pending live validation): while the cluster is RUNNING, group mysql-subop-window fires the conservative sub-ops only — read-only GETs (show-request via AsyncResponse request_id capture, engine-version properties, parameter-groups/parameters, backup-histories, log-export-configs, replicas) + no-body sync-state + restart with wait (group mysql-restart). Deliberately EXCLUDED as not obviously reversible: kernel-upgrade, patch (minor version), promote/switchover/reset-replica, restore, replica create, stop/start, log-export-config writes, remove-backup-histories. Gated by the lifecycle's own heavy:true (SCP_RUN_HEAVY).",
+      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address left blank so the platform auto-assigns a free IP from the subnet (a hardcoded IP can collide / be reserved -> 'not available'). | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch). | SUB-OP WINDOW 2026-06-11 (lever 1 prep, docs-derived pending live validation): while the cluster is RUNNING, group mysql-subop-window fires the conservative sub-ops only — read-only GETs (show-request via AsyncResponse request_id capture, engine-version properties, parameter-groups/parameters, backup-histories, log-export-configs, replicas) + no-body sync-state + restart with wait (group mysql-restart). Deliberately EXCLUDED as not obviously reversible: kernel-upgrade, patch (minor version), promote/switchover/reset-replica, restore, replica create, stop/start, log-export-config writes, remove-backup-histories. Gated by the lifecycle's own heavy:true (SCP_RUN_HEAVY). | COMPLETENESS 2026-07-08 (owner GO, COMPLETENESS-AUDIT-2026-07-08): archive set/sync (group mysql-archive), block-storage resize (mysql-bsresize) and stop->start (mysql-stopstart) folded in — bodies/expects/settle-polls copied from the database-postgresql-cluster twin, each optional + own group so failures isolate and teardown (ungrouped delete steps) always runs; stop/start is hereby REMOVED from the exclusion list above (stop->start placed after all config writes, directly before delete).",
       "steps": [
         {
           "name": "create-vpc",
@@ -4360,6 +4404,18 @@
           ]
         },
         {
+          "name": "capture-block-storage-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+          },
+          "_note": "COMPLETENESS-AUDIT-2026-07-08: bsg_id feeds set-block-storage-size (mysqlsetblockstoragesize); JSONPath copied verbatim from the database-postgresql-cluster twin's capture-instance-group step."
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "cluster_id": "{cluster_id}",
@@ -4525,6 +4581,77 @@
           },
           "group": "mysql-backup",
           "optional": true
+        },
+        {
+          "name": "set-archive-config",
+          "optional": true,
+          "group": "mysql-archive",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlsetarchiveconfig. Body = api_docs request example, identical to the database-postgresql-cluster twin's set-archive; optional + own group so a failure isolates and can never block teardown."
+        },
+        {
+          "name": "wait-after-set-archive",
+          "optional": true,
+          "group": "mysql-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "sync-archive-config",
+          "optional": true,
+          "group": "mysql-archive",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlsyncarchiveconfig — no-body POST right after the archive set, same group; expects mirror the PG twin's sync-archive (409 tolerated while the set is still settling)."
+        },
+        {
+          "name": "wait-after-sync-archive",
+          "optional": true,
+          "group": "mysql-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
         },
         {
           "name": "list-parameter-values-before",
@@ -4701,6 +4828,108 @@
           "path": "/v1/clusters/{cluster_id}",
           "group": "mysql-restart",
           "optional": true,
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "set-block-storage-size",
+          "optional": true,
+          "group": "mysql-bsresize",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "json": {
+            "size_gb": 112
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlsetblockstoragesize. Body/expects = PG twin's resize-block-storage (112 > create's 104 GB; 400 tolerated like the twin); bsg_id soft-captured by capture-block-storage-group."
+        },
+        {
+          "name": "wait-after-bsresize",
+          "optional": true,
+          "group": "mysql-bsresize",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "stop-cluster",
+          "optional": true,
+          "group": "mysql-stopstart",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlstopcluster. stop->start pair sits after every config write and directly before delete so no other sub-op touches a stopped cluster; pattern/expects = PG twin's pg-stopstart group."
+        },
+        {
+          "name": "wait-stopped",
+          "optional": true,
+          "group": "mysql-stopstart",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "SHUTDOWN"
+            ],
+            "timeout": 900,
+            "interval": 20
+          }
+        },
+        {
+          "name": "start-cluster",
+          "optional": true,
+          "group": "mysql-stopstart",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlstartcluster — returns the cluster to RUNNING before teardown; expects = PG twin's start-cluster."
+        },
+        {
+          "name": "wait-started",
+          "optional": true,
+          "group": "mysql-stopstart",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
           "expect_status": [
             200
           ],
@@ -9042,6 +9271,24 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "list-log-groups",
+          "method": "GET",
+          "path": "/v1/log-groups",
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap listloggroups — bare list; the group created above guarantees a non-empty page. live 200 2026-07-08."
+        },
+        {
+          "name": "show-agent-download-link",
+          "method": "GET",
+          "path": "/v1/agents/download-link",
+          "expect_status": [
+            200
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap showagentdownloadlink — global read, no params per api_docs; live 200 2026-07-08 (returns the ServiceWatch_Agent.zip object-store link)."
         },
         {
           "name": "probe-reads",
