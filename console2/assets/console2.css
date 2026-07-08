@@ -501,6 +501,11 @@ g.rg-selbox{cursor:pointer}
 /* MASTER: compact lifecycle list + 전체 toggle (escape hatch for a dense graph) */
 .lc-picker{margin-top:12px}
 .lcp-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px}
+/* 대기 중(이벤트 0) 라이프사이클 접힌 요약 — 카드 홍수 대신 한 줄 */
+.lcqueue{margin:0 0 6px;padding:6px 10px;border:1px dashed var(--line);border-radius:8px;
+  color:var(--muted);font-size:12px;background:#fafbfc}
+.lcqueue summary{cursor:pointer;font-weight:600}
+.lcqueue .qnames{margin-top:6px;line-height:1.8;word-break:break-all}
 .lclist{display:flex;flex-direction:column;gap:6px}
 .lcitem{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
   border-radius:8px;padding:7px 10px;cursor:pointer}

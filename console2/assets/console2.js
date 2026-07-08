@@ -49,6 +49,7 @@ let stagedOpen = null;      // id of the staged item whose detail is expanded (1
 let runId = null;
 let runEvents = [];
 let runStatus = "idle";
+let runSelIds = [];         // 이 run의 전체 선택 (rec.lifecycle_ids) — 대기 중 표시용
 let pollTimer = null;
 let lastLogText = null;     // last log text written to the 로그 <pre> (in-place diff → no flicker)
 let r4LogTimer = null;      // dedicated slow (2s) log poller while running (detail 로그 tab)
@@ -1292,6 +1293,7 @@ function loadRunIntoReport(id) {
   graphMode = "run"; ensureRunGraph();       // run 클릭 = run 뷰로 재바인딩 (F2)
   fetch("/api/runs/" + id + "/events").then(r => r.json()).then(j => {
     runEvents = j.events || []; runStatus = j.status || "done";
+    runSelIds = j.lifecycle_ids || [];
     if (runStatus === "running" || runStatus === "queued") pollEvents();
     drawReport();
     renderNowPlaying();
@@ -1734,6 +1736,7 @@ function pollEvents() {
   fetch("/api/runs/" + runId + "/events").then(r => r.json()).then(j => {
     runEvents = j.events || [];
     runStatus = j.status || runStatus;
+    if (j.lifecycle_ids) runSelIds = j.lifecycle_ids;
     // A run admitted under the cap is "running"; one that exceeded the cap is
     // "queued" — no events yet. Show a waiting banner and keep polling the record
     // (cheap, robust) until it flips to running, then the normal event flow takes
@@ -2040,8 +2043,17 @@ function renderLcPicker() {
         ${b.failN ? `<span class="pill fail">${b.failN} fail</span>` : ""}</span>
     </button>`;
   }).join("");
+  // 대기 중(이벤트 0) 라이프사이클 — 카드는 이벤트 폴딩으로만 생기므로 rec의
+  // 전체 선택(runSelIds)과의 차집합으로 파생한다 (2026-07-08 owner: "대기중인
+  // 라이프사이클은 표시가 안되는구나"). 125장 카드 홍수 대신 접힌 요약 한 줄.
+  const pending = (runSelIds || []).filter(id => !lcs[id]).sort();
+  const inflight = runStatus === "running" || runStatus === "queued" || runStatus === "…";
+  const qstrip = pending.length && inflight
+    ? `<details class="lcqueue"><summary>⏸ 대기 ${pending.length}개 — 워커가 비면 순서대로 시작</summary>
+       <div class="qnames">${pending.map(esc).join(" · ")}</div></details>` : "";
   host.innerHTML =
     `<div class="lcp-h">라이프사이클 <span class="muted small">· 클릭 = 상세 (밀집/접힌 그래프용)</span></div>
+     ${qstrip}
      <div class="lclist">${rows || '<p class="muted small">라이프사이클 대기 중…</p>'}</div>
      <button class="aggitem ${isAggScope() ? "sel" : ""}" id="agg-toggle" title="크로스-런 집계 — 평면 탭의 기존 동작">
        <span class="ico">🗂️</span><span class="aggtxt"><b>전체 (집계)</b>

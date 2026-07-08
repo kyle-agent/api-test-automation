@@ -2510,6 +2510,8 @@ class Handler(BaseHTTPRequestHandler):
             if not rec:
                 return self._json(404, {"error": "no such run"})
             return self._json(200, {"id": rid, "status": rec["status"],
+                                    # 대기 중(이벤트 0) 라이프사이클 표시용 — 전체 선택
+                                    "lifecycle_ids": rec.get("lifecycle_ids", []),
                                     "events": _read_events(rec["events"])})
         if p.startswith("/api/runs/") and p.endswith("/graph"):
             rid = p[len("/api/runs/"):-len("/graph")]
