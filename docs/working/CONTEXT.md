@@ -132,7 +132,13 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   (남은 건 기지 IAM-gated ske log-group 2건뿐). ⑤ 콘솔 Q&A: 서비스 선택은
   role=verify만 확장(프로브는 CI 스윕 전용 — 이제 SKE엔 프로브 자체가 없음),
   동시 LIVE 차단은 by-design(스캔 오염+owner-tag 공유), 회색 동그라미=대기(queued),
-  회색 "–"=건너뜀(skip). **다음: GAP-62 편입 검증 → 전체 suite 런.**
+  회색 "–"=건너뜀(skip). ⑥ **owner 결정 (2026-07-08): §C '클러스터 2기 통합' 드랍**
+  — DB는 시간 우선·병렬 유지 ("오래 걸리는 db를 db 종류마다 직렬로 할 이유는 없음";
+  필요시 subnet 추가 생성 허용, 한 subnet 다(多) 클러스터 무방). 엔진당
+  cluster/subops-full 2체인이 각자 클러스터를 만들어 병렬로 도는 현행이 벽시계에
+  유리(통합 시 임계 경로 66→90분대 위험); 통합은 과금 절감이 우선될 때 재검토.
+  같은 맥락: 실행 워커 캡 6→10 (콘솔·local_run), duration_stats 병렬 가정 4→6.
+  **다음: GAP-62 편입 검증 → 전체 suite 런 (로컬 pull + 콘솔 재시작 후).**
 - **(2026-07-08 오후, owner 라이브 검수 후속 배치 — main FF까지 완료):** owner가
   Model B 첫 실사용 런을 보며 잡아준 결함들을 당일 수리. ① 런 시작 지연 — provision
   서브프로세스 출력 스트리밍 + poll 하트비트(간격 5s) + 서브넷 2개 선생성-후대기 +
