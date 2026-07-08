@@ -1775,3 +1775,18 @@ variants) — all **UNVERIFIED LIVE**, apply + observe in HB1b/HB2b:
 - 교정: 13곳 전부 `field: "$.state"`. duration_stats 의 기존 실측치(예: VS
   makespan ~52분)는 이 소진으로 부풀려진 값 — 교정 후 런들이 다시 접히며
   자동 재학습된다. 타임아웃 상향(600→1200s)은 헤드룸으로 유지.
+
+## SKE 버전 목록은 최신-우선, 업그레이드는 실행 흐름으로 (2026-07-08 실측·편입)
+
+- `GET /v1/kubernetes-versions` 는 **내림차순(최신 먼저)**: 실측 [0]=v1.34.3,
+  [1]=v1.33.5, … 총 6개 (`end_dt` 동반). heavy 라이프사이클은 **[1]로 생성해
+  [0]으로 실업그레이드** 한다 (owner 2026-06-13 승인 "구버전 생성→업그레이드→삭제"
+  흐름을 2026-07-08 실제 스텝으로 편입; placeholder 프로브 2종 은퇴).
+- nodepool 업그레이드 body 는 `{os_version}` (NodepoolUpgradeSetRequestV1Dot4) —
+  `kubernetes_version` 이 **아니다** (노드는 컨트롤플레인을 따라감; 은퇴한 프로브가
+  kubernetes_version 을 보내던 것은 docs 모순으로 정정).
+- SKE `GET /v1/images` 는 `scp_original_image_type=k8s` 가 **필수 쿼리** (누락 시
+  400 'Field required'). heavy 의 list-images 가 `[200,400]+optional` 뒤에서
+  **매 런 400 을 조용히 기록**해 온 masked-defect 를 2026-07-08 교정 (hard 200).
+- kubeconfig 2종 GET 은 `kubeconfig_type` 필수 쿼리, enum **소문자** public/private.
+  실 클러스터 대상 200 은 아직 미실측 — optional 자체그룹으로 편입, 첫 라이브가 정정.

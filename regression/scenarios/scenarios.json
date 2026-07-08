@@ -2071,8 +2071,10 @@
             200
           ],
           "capture": {
-            "kube_ver": "$.kubernetes_versions[0].kubernetes_version"
-          }
+            "kube_ver": "$.kubernetes_versions[1].kubernetes_version",
+            "kube_ver_next": "$.kubernetes_versions[0].kubernetes_version"
+          },
+          "_note": "List is NEWEST-first (live 2026-07-08: [0]=v1.34.3, [1]=v1.33.5). Cluster+nodepool are created at [1] (second-newest) so the real upgrade-cluster/upgrade-nodepool steps later in this lifecycle can roll to [0] — owner-approved flow 2026-06-13 (구버전 생성→업그레이드→삭제). Strict capture: a hypothetical single-version catalog would abort HERE, before any create (nothing billed)."
         },
         {
           "name": "find-server-type",
@@ -2190,6 +2192,36 @@
             "timeout": 1800,
             "interval": 30
           }
+        },
+        {
+          "name": "get-cluster-kubeconfig",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/kubeconfig",
+          "params": {
+            "kubeconfig_type": "public"
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-kubeconfig",
+          "_note": "MIGRATED from retired ske-read-coverage (owner 2026-07-08: placeholder-id reads are meaningless under heavy-전제) — now rides the REAL RUNNING cluster. kubeconfig_type is a REQUIRED query, enum lowercase public/private (api_docs); the old probe never saw a 200. optional+own-group so an unproven-semantics miss warns instead of redding a ~27min billable build — tighten to strict after first live 200 (라이브가 정정)."
+        },
+        {
+          "name": "get-cluster-user-kubeconfig",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/user-kubeconfig",
+          "params": {
+            "kubeconfig_type": "public"
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-user-kubeconfig",
+          "_note": "See get-cluster-kubeconfig — same migration; own group so the two kubeconfig reads cannot skip each other."
         },
         {
           "name": "set-cluster-logging",
@@ -2391,12 +2423,13 @@
           "service": "ske",
           "method": "GET",
           "path": "/v1/images",
+          "params": {
+            "scp_original_image_type": "k8s"
+          },
           "expect_status": [
-            200,
-            400
+            200
           ],
-          "optional": true,
-          "group": "ske-lists"
+          "_note": "scp_original_image_type is a REQUIRED query (missing -> 400 'Field required', runs 27483895557/27491816948) — this step silently logged a 400 EVERY run behind [200,400]+optional until 2026-07-08. Param proven 200 live 2026-06-20 (15 nodepool_images); hard [200] per ct-ske-image model."
         },
         {
           "name": "wait-cluster-running-pre-nodepool",
@@ -2473,6 +2506,18 @@
             "timeout": 1200,
             "interval": 30
           }
+        },
+        {
+          "name": "get-nodepool-nodes",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}/nodes",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-np-nodes",
+          "_note": "MIGRATED from retired ske-read-coverage — first read against a REAL Running nodepool (the old probe only ever recorded placeholder 404s). optional+own-group until a live 200 proves it (라이브가 정정)."
         },
         {
           "name": "set-nodepool-taints",
@@ -2561,6 +2606,95 @@
             "cluster_id": "{cluster_id}",
             "nodepool_id": "{nodepool_id}"
           }
+        },
+        {
+          "name": "upgrade-cluster",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/upgrade",
+          "json": {
+            "kubernetes_version": "{kube_ver_next}"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-upgrade",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20,
+          "_note": "REAL control-plane upgrade (owner-approved 2026-06-13: 구버전 생성→업그레이드→삭제; replaces the retired placeholder probe ske-upgrade-write-coverage). Cluster was created at kube_ver=[1] and rolls to kube_ver_next=[0]. IRREVERSIBLE — acceptable only because this cluster is run-scoped and disposable. ONE group ske-upgrade for all four upgrade steps: nodepool upgrade is valid only after the control-plane roll, so a cluster-upgrade failure must skip the rest. optional so an upgrade defect warns instead of redding the run — teardown deletes are ungrouped and unaffected."
+        },
+        {
+          "name": "wait-cluster-upgraded",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 3600,
+            "interval": 60,
+            "verbose": true
+          },
+          "optional": true,
+          "group": "ske-upgrade",
+          "_note": "Control-plane roll can take up to ~60min (ct-ske-cluster-upgrade model: 3600/60). KNOWN CAVEAT (unproven wait semantics): if status has not yet flipped out of RUNNING when the first poll lands, this passes prematurely and upgrade-nodepool may hit 409 — its 409-retry ladder absorbs that; first live run records the real transition vocabulary (라이브가 정정)."
+        },
+        {
+          "name": "upgrade-nodepool",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/upgrade",
+          "json": {
+            "os_version": "22.04"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-upgrade",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 60,
+          "_note": "Body is NodepoolUpgradeSetRequestV1Dot4 {os_version} — an OS version, NOT kubernetes_version: nodes follow the control plane (api_docs; the retired probe sent kubernetes_version, contradicting docs, and was never proven). 8x60s 409-retry covers a control plane still settling after wait-cluster-upgraded's known premature-pass caveat."
+        },
+        {
+          "name": "wait-nodepool-upgraded",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 2400,
+            "interval": 30,
+            "verbose": true
+          },
+          "optional": true,
+          "group": "ske-upgrade",
+          "_note": "Node roll after control-plane upgrade (ct-ske-nodepool-upgrade model: 2400/30)."
         },
         {
           "name": "scale-up-nodepool",

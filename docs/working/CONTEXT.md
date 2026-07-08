@@ -113,7 +113,27 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-07-08 오후, owner 라이브 검수 후속 배치 — main FF까지 완료):** owner가
+- **LATEST (2026-07-08 저녁, SKE 단일화 + 실측 잔존 핀 + 완전성 감사 착지):** ①
+  **SKE 재편** — placeholder 프로브 2종(ske-read-coverage / ske-upgrade-write-coverage)
+  은퇴("생성은 안하고 조회만 하는게 무슨의미?"), 6개 리드가 실ID로 heavy 편입
+  (kubeconfig×2는 소문자 public 쿼리, nodes 리드, 전부 optional 자체그룹 —
+  라이브가 정정), **실업그레이드 편입**: find-k8s-version이 [1](구)+[0](신) 캡처 →
+  [1]로 생성, upgrade-cluster/upgrade-nodepool(ske-upgrade 단일그룹, os_version
+  body!)로 [0] 롤 (owner 2026-06-13 승인 흐름의 실화). list-images 필수쿼리
+  `scp_original_image_type=k8s` 누락으로 **매 런 조용한 400**(masked-defect) →
+  hard 200 교정. ske 분해 **24/24 zero-gap**, 서비스당 라이프사이클 1개.
+  ② **실측 잔존 핀 고정** — /runtime이 최신 owned 스캔의 창-밖 잔존을 합성
+  스팬(붉은 점선 + 스캔시각 배지 + 범례 칩)으로 항상 표시; 상태집계와 분리
+  (`tests/offline/test_survivor_pinning.py`). ③ **완전성 감사 착지**
+  (`docs/working/trackers/COMPLETENESS-AUDIT-2026-07-08.md`): 합집합 **94.2%**
+  (1,293/1,372) · GAP 62 (41 global-read / 13 id-bound-read / 8 write-with-context /
+  0 standalone-write — 전부 기존 라이프사이클 편입 가능) · 28개 서비스 100% ·
+  dedup 무손실 재확인(71→62). GAP-62 편입 배치 진행. ④ 잔존 5건 스윕 수렴
+  (남은 건 기지 IAM-gated ske log-group 2건뿐). ⑤ 콘솔 Q&A: 서비스 선택은
+  role=verify만 확장(프로브는 CI 스윕 전용 — 이제 SKE엔 프로브 자체가 없음),
+  동시 LIVE 차단은 by-design(스캔 오염+owner-tag 공유), 회색 동그라미=대기(queued),
+  회색 "–"=건너뜀(skip). **다음: GAP-62 편입 검증 → 전체 suite 런.**
+- **(2026-07-08 오후, owner 라이브 검수 후속 배치 — main FF까지 완료):** owner가
   Model B 첫 실사용 런을 보며 잡아준 결함들을 당일 수리. ① 런 시작 지연 — provision
   서브프로세스 출력 스트리밍 + poll 하트비트(간격 5s) + 서브넷 2개 선생성-후대기 +
   라이브뷰 "공유 인프라 준비 중" (provision-start/-end 이벤트) ② 유령 빈 lifecycle 카드

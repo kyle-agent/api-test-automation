@@ -563,6 +563,21 @@ def _local_run_youngest_age() -> float:
     return min(ages) if ages else float("inf")
 
 
+def _latest_owned_scan():
+    """Newest COMPLETED owned scan -> ``(scan_epoch, items)`` or None. items =
+    ``[{"service","path",("json")}]`` exactly as verify_clean.scan_owned returned
+    them (one entry per delete the sweep WOULD issue; json = bulk-id body)."""
+    with _LOCK:
+        recs = [r for r in _RUNS.values()
+                if r.get("kind") == "owned" and r.get("status") == "done"
+                and isinstance(r.get("owned"), list)]
+        if not recs:
+            return None
+        r = max(recs, key=lambda x: x.get("ended") or x.get("started") or 0)
+        return (r.get("ended") or r.get("started") or time.time(),
+                list(r["owned"]))
+
+
 def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"):
     """Return ``(html_or_None, ready)`` without blocking — kick a bg harvest when
     the cache is stale so the popup never hangs on a cold load.
@@ -652,6 +667,52 @@ def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"
         if stale:
             chip += " — 재수집 중, 자동 새로고침"
         note = chip + ((" · " + note) if note else "")
+    # 실측 잔존 핀 고정 (owner GO 2026-07-08): 최근 완료된 owned 스캔이 확인한
+    # 잔존 자원은 이벤트 창(기본 1h) 밖이어도 항상 보여야 한다 — 창 밖 잔존
+    # 5건이 라이브 뷰에서 통째로 안 보였던 목격이 계기. 화면의 어떤 스팬
+    # (res_id/name)과도 매칭되지 않는 스캔 항목만 합성 스팬으로 덧붙인다
+    # (읽기 전용 오버레이; 스캔 시각을 배지·노트로 명시해 실시간과 구분).
+    surv = _latest_owned_scan()
+    if surv:
+        scan_ep, items = surv
+        # loggingaudit 스팬과 같은 ts 어휘(초 단위 Z, 마이크로초 없음) — live_view._t
+        # 가 이 포맷만 파싱한다 (isoformat()의 +00:00/micros는 ValueError).
+        scan_iso = datetime.fromtimestamp(scan_ep, tz=timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ")
+        hhmm = time.strftime("%H:%M", time.localtime(scan_ep))
+        seen = set()
+        for d in shown.values():
+            for f in ("res_id", "name"):
+                if d.get(f):
+                    seen.add(str(d[f]))
+        n_surv = 0
+        for it in items:
+            path = str(it.get("path") or "").split("?", 1)[0].rstrip("/")
+            segs = [s for s in path.split("/") if s]
+            body = it.get("json")
+            rids, rtype = [], "?"
+            if isinstance(body, dict):   # bulk delete: id 리스트가 body에 실림
+                for v in body.values():
+                    if isinstance(v, list) and v and all(isinstance(x, str) for x in v):
+                        rids, rtype = list(v), (segs[-1] if segs else "?")
+                        break
+            if not rids and segs:
+                rids, rtype = [segs[-1]], (segs[-2] if len(segs) >= 2 else segs[-1])
+            for rid in rids:
+                if not rid or rid in seen:
+                    continue
+                seen.add(rid)
+                disp = f"(잔존) {rid[:24]}"
+                shown[(rtype, "regr-survivor", disp)] = {
+                    "rtype": rtype, "tag": "regr-survivor", "name": disp,
+                    "start": scan_iso, "end": None,
+                    "ops": [(scan_iso, "SurvivorScan")],
+                    "res_id": rid, "survivor": True, "scan_hhmm": hhmm}
+                n_surv += 1
+        if n_surv:
+            extra = (f"⚠ 실측 잔존 {n_surv}건 핀 고정 — owned 스캔({hhmm}) 확인분, "
+                     f"이벤트 창 밖 포함 (붉은 점선 박스)")
+            note = (note + " · " + extra) if note else extra
     chrome = {"scope": scope, "hours": int(hours), "deleted": deleted,
               "banner": banner, "note": note}
     html_out = lv.render_flow(shown, now, meta, refresh=refresh, chrome=chrome)

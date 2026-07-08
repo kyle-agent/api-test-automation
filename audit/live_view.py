@@ -859,7 +859,11 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0,
     H = max(col_h.values(), default=PADY) + 40
 
     nstate = defaultdict(int)
+    nsurv = 0
     for d in insts:
+        if d.get("survivor"):   # 실측 잔존 핀 (owned 스캔 오버레이) — 상태 집계와 분리
+            nsurv += 1
+            continue
         nstate[_state_of(d)] += 1
 
     P = [f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>live flow</title>']
@@ -894,7 +898,9 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0,
              f'<i style="background:#e6e9ee"></i>삭제됨 {nstate["deleted"]}'
              f'<i style="background:#d6dbe2"></i>삭제예정 {nstate["terminating"]}'
              f'<i style="background:#ffd6d6"></i>생성실패 {nstate["failed"]}'
-             f'<span style="margin-left:12px">— 실선=자체생성 · ┄점선=공유인프라 채택</span></div>')
+             + (f'<i style="background:#fff1f1;border-color:#cf222e;border-style:dashed"></i>'
+                f'실측 잔존 {nsurv}' if nsurv else '')
+             + f'<span style="margin-left:12px">— 실선=자체생성 · ┄점선=공유인프라 채택</span></div>')
 
     P.append(f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
     P.append('<defs><marker id="rel" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">'
@@ -995,8 +1001,17 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0,
         badge = _origin_badge(origin)
         rtext = (f'<tspan fill="{badge[1]}" font-weight="700">{html.escape(badge[0])}</tspan> {dur}'
                  if badge else dur)
+        dash = ""
+        if d.get("survivor"):
+            # 실측 잔존 (owned 스캔 오버레이): SurvivorScan ops 뿐이라 _state_of가
+            # 'creating'으로 오분류·펄스하므로 여기서 선처리 — 붉은 점선, 펄스 없음.
+            fill, bd, run, dash = "#fff1f1", "#cf222e", "", ' stroke-dasharray="5 3"'
+            rtext = f'스캔 {d.get("scan_hhmm", "")}'
+            tip = (f'{rt} · {html.escape(d["name"] or tag)} · 실측 잔존 — owned 스캔 '
+                   f'{d.get("scan_hhmm", "")} 확인분 (이벤트 창 밖, 라이브 LIST 실측) '
+                   f'· id {html.escape(str(d.get("res_id", "")))}')
         P.append(f'<g class="n{run}" id="{myid}" onclick="hi(\'{myid}\')"><title>{html.escape(tip)}</title>'
-                 f'<rect x="{x}" y="{y}" width="{BW}" height="{BH}" rx="6" fill="{fill}" stroke="{bd}" stroke-width="1.4"/>'
+                 f'<rect x="{x}" y="{y}" width="{BW}" height="{BH}" rx="6" fill="{fill}" stroke="{bd}" stroke-width="1.4"{dash}/>'
                  f'<circle cx="{x+10}" cy="{y+BH/2}" r="3.5" fill="{bd}"/>'
                  f'<text x="{x+20}" y="{y+16}" font-size="11" fill="{"#9aa4b2" if txt_gray else "#1f2733"}"{deco}>{html.escape(lab)}</text>'
                  f'<text x="{x+BW-6}" y="{y+16}" font-size="9.5" text-anchor="end" fill="#7a8493">{rtext}</text></g>')
