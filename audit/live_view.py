@@ -93,24 +93,44 @@ def _is_ours(name: str) -> bool:
 def build_spans(events: list[dict], now: datetime, ours_only: bool = True,
                 terminating: set | None = None):
     """Return per-resource-instance spans:
-    {(rtype, tag, name): {start, end|None, rtype, tag, name, ops:[(ts,event)]}}.
+    {(rtype, tag, key): {start, end|None, rtype, tag, name, ops:[(ts,event)]}}.
 
     ``ours_only`` (default) keeps only regr*/zznet*-tagged resources — the ones a
     test run created — so pre-existing account resources don't pollute the view.
     ``terminating`` (names from :func:`fetch_terminating`) flags deferred-delete
     resources whose delete was accepted (pending-deletion) so they read as
-    삭제예정 instead of lingering as testing/created."""
+    삭제예정 instead of lingering as testing/created.
+
+    INSTANCE KEY = resource_id when the event stream carries one (2026-07-08
+    영구 유령 수리): rename 검증 스텝들(regrsrvXu / regrdashuX / '-renamed' 류)이
+    이름을 바꾸면 name-키는 스팬을 쪼개 — pre-rename 스팬이 Delete End를 영영
+    못 받아 화면에 영구 생존(이번 런 실측 3쌍). loggingaudit resource_id는
+    rename 불변이므로 id-우선 키로 병합한다; id가 아예 없는 이벤트는 같은
+    (rtype, tag, name)이 id를 가진 적 있으면 그 id로 귀속, 아니면 name 폴백.
+    표시 name은 첫-등장 이름을 유지(_lk의 8-hex 접미 규약 보존)하고 최신
+    이름은 renamed_to로 실어 툴팁에서 보이게 한다."""
     inst: dict = {}
+    name_to_id: dict = {}   # (rtype, tag, name) -> resource_id (id 없는 이벤트 귀속용)
     for e in sorted(events, key=lambda x: x.get("timestamp", "")):
         rt = e.get("resource_type") or "?"
         nm = e.get("resource_name") or ""
         if ours_only and not _is_ours(nm):
             continue
-        key = (rt, _tag_of(e), nm)
-        d = inst.setdefault(key, {"rtype": rt, "tag": _tag_of(e), "name": nm,
+        tag = _tag_of(e)
+        rid = str(e["resource_id"]) if e.get("resource_id") else ""
+        if rid:
+            name_to_id[(rt, nm)] = rid
+        else:
+            rid = name_to_id.get((rt, nm), "")
+        # rid가 있으면 키에서 tag/name을 모두 배제 — _tag_of는 unique 포함
+        # 이름 전체를 태그로 쓰므로 rename 시 tag도 같이 변해 키가 갈라진다.
+        key = (rt, rid) if rid else (rt, tag, nm)
+        d = inst.setdefault(key, {"rtype": rt, "tag": tag, "name": nm,
                                   "start": None, "end": None, "ops": []})
-        if e.get("resource_id") and not d.get("res_id"):
-            d["res_id"] = str(e["resource_id"])      # for the oplog origin join
+        if rid and not d.get("res_id"):
+            d["res_id"] = rid                        # for the oplog origin join
+        if nm and nm != d["name"]:
+            d["renamed_to"] = nm                     # rename 흔적 — 표시는 툴팁에서
         ts = e.get("timestamp"); nmn = e.get("event_name") or ""
         d["ops"].append((ts, nmn))
         if "Create" in nmn and d["start"] is None:
@@ -121,7 +141,8 @@ def build_spans(events: list[dict], now: datetime, ours_only: bool = True,
     for d in inst.values():
         if d["start"] is None and d["ops"]:
             d["start"] = d["ops"][0][0]
-        if terminating and d["rtype"] in _DEFERRED_DELETE and d["name"] in terminating:
+        if terminating and d["rtype"] in _DEFERRED_DELETE and (
+                d["name"] in terminating or d.get("renamed_to") in terminating):
             d["terminating"] = True
     return inst
 

@@ -1292,7 +1292,19 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # Register teardown + track in the kernel registry for the freshly
             # created resource (deletes only on a later failure; the happy path
             # deletes via its own steps).
+            #
+            # 2026-07-08 gate: only when the create ACTUALLY succeeded (real 2xx).
+            # Tolerant coverage steps (e.g. apigw set-resource-policy allowing
+            # 400~500 to ride past PF-19) used to register cleanup + a console
+            # resource row even when nothing was created — the sweep's delete
+            # then 404s harmlessly, but the 자원 화면 showed phantom rows
+            # (owner screenshot: RESOURCE_ID 빈 값). _is_already_present also
+            # skips: the resource pre-existed, this step created nothing new.
             cu = step.get("cleanup")
+            if cu and not (200 <= resp.status < 300):
+                cu = None
+                if bkind == "vpc" and _pending_vpc_tok:
+                    _release_pending_vpc_tok()   # 미생성 — 슬롯 누수 방지
             if cu:
                 created_count += 1
                 cu_path = _fill(cu["path"], ctx)
@@ -1323,6 +1335,13 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                     break
                 if not rid and isinstance(body, dict):
                     rid = str(body.get("name") or "")
+                if not rid:
+                    # last fallback (2026-07-08): the cleanup path's tail segment
+                    # (e.g. …/stages/dev -> "dev") — an addressable identity for
+                    # capture-less children; never an unfilled {token}.
+                    _tail = cu_path.rstrip("/").rsplit("/", 1)[-1]
+                    if _tail and "{" not in _tail:
+                        rid = _tail
                 reg.track(ResourceRecord(
                     service=cu_svc or "", delete_path=cu_path, resource_id=rid,
                     kind=bkind or step["name"], parent=grp))

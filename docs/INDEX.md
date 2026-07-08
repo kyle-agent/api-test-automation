@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 58 docs · 19 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 60 docs · 19 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -63,7 +63,9 @@
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
 | [`working/trackers/CATALOG-VALIDATION-STATUS.md`](working/trackers/CATALOG-VALIDATION-STATUS.md) | coverage | 검증 되었는지 보고 (verification track) |  superseded (2026-06-17 측정 스냅샷 — 수치 stale; 재생성: python -m tools.catalog_status) |
+| [`working/trackers/COMPLETENESS-AUDIT-2026-07-08.md`](working/trackers/COMPLETENESS-AUDIT-2026-07-08.md) | owner | Completeness Audit — 서비스별 catalog 전량이 시나리오 합집합에서 테스트되는가 (2026-07-08) |  active (2026-07-08 오프라인 정적 감사 — owner 편입 worklist) |
 | [`working/trackers/COVERAGE-C3-ANALYSIS-2026-06-20.md`](working/trackers/COVERAGE-C3-ANALYSIS-2026-06-20.md) | coverage | C3 Coverage Analysis & Plan — 2026-06-20 |  superseded (2026-06-20 분석 스냅샷 — 커버리지 캠페인 정본으로 대체) |
+| [`working/trackers/DEDUP-AUDIT-2026-07-08.md`](working/trackers/DEDUP-AUDIT-2026-07-08.md) | owner | DEDUP Audit — 단위 서비스 선택 시 lifecycle 최소중복 전수 확인 (2026-07-08) |  active (2026-07-08 오프라인 정적 감사 — owner 결정 대기) |
 | [`working/trackers/IMPROVEMENT-BACKLOG.md`](working/trackers/IMPROVEMENT-BACKLOG.md) | orchestrator | Planner가 유지하는 개선 계획 | 🟢 active |
 | [`working/trackers/LIVE-READINESS-GATES.md`](working/trackers/LIVE-READINESS-GATES.md) | all | disabled-lifecycle inventory (IB-023) | 🟢 active |
 | [`working/trackers/POSTRUN-2026-06-20-fullheavy.md`](working/trackers/POSTRUN-2026-06-20-fullheavy.md) | orchestrator | Post-run Analysis: Full Heavy DAG Run — 2026-06-20 |  superseded (2026-06-20 run 1회분 사후 분석 스냅샷) |

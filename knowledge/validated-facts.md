@@ -1790,3 +1790,11 @@ variants) — all **UNVERIFIED LIVE**, apply + observe in HB1b/HB2b:
   **매 런 400 을 조용히 기록**해 온 masked-defect 를 2026-07-08 교정 (hard 200).
 - kubeconfig 2종 GET 은 `kubeconfig_type` 필수 쿼리, enum **소문자** public/private.
   실 클러스터 대상 200 은 아직 미실측 — optional 자체그룹으로 편입, 첫 라이브가 정정.
+
+## servicewatch log-stream 읽기는 계정 전역 IAM-gated (2026-07-08 실측 확장)
+
+- `GET /v1/log-groups/{id}/log-streams` 가 **모든** log-group에서 403 — 기지
+  케이스(47fabeca…, IAM-gated 삭제불가 log-group) 1건 한정이 아니라 이번 런의
+  신규 log-group 4개(mysql/mariadb slowlog·alertlog)에서도 동일 재현. 계정에
+  log-stream 계열 IAM 액션이 없다 (대사 에이전트 실측). log-group 삭제가
+  child-stream 권한을 요구해 실패하는 기지 잔존의 뿌리와 같은 게이트.

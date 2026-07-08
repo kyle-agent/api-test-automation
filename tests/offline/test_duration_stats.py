@@ -215,19 +215,20 @@ def test_estimate_mixed_basis(tmp_path):
 
 
 def test_estimate_makespan_parallel_bound(tmp_path):
-    # 5 measured lifecycles of 100s each: longest=100, sum/parallel=500/4=125
-    # -> makespan 125 (the sum/parallel term dominates).
+    # 12 measured lifecycles of 100s each: longest=100, sum/parallel=1200/6=200
+    # -> makespan 200 (the sum/parallel term dominates; PARALLEL_DEFAULT=6
+    # since the 2026-07-08 worker-cap bump 6->10).
     evs = []
-    for i in range(5):
+    for i in range(12):
         evs += _lifecycle_events(f"lc{i}", 1000.0 * i, 1000.0 * i + 100.0)
     _run_file(tmp_path, "r1", evs)
-    ids = [f"lc{i}" for i in range(5)]
+    ids = [f"lc{i}" for i in range(12)]
     est = ds.estimate(ids, _model(tmp_path, []))
-    assert est["p50_s"] == 125
-    # admission override: parallel=5 -> max(100, 500/5)=100
-    est5 = ds.estimate(ids, _model(tmp_path, [], parallel=5))
-    assert est5["p50_s"] == 100
-    # parallel capped by len(ids): 2 ids, parallel=4 -> max(100, 200/2)=100
+    assert est["p50_s"] == 200
+    # admission override: parallel=12 -> max(100, 1200/12)=100
+    est12 = ds.estimate(ids, _model(tmp_path, [], parallel=12))
+    assert est12["p50_s"] == 100
+    # parallel capped by len(ids): 2 ids, parallel=6 -> max(100, 200/2)=100
     est2 = ds.estimate(ids[:2], _model(tmp_path, []))
     assert est2["p50_s"] == 100
 
