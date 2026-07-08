@@ -59,11 +59,13 @@ workers. The estimator uses the simple, honest bound::
     makespan ≈ max(longest single lifecycle, total_sum / parallel)
 
 which is exact for equal-length jobs and a lower-bound-tight approximation of
-list scheduling otherwise. ``parallel`` defaults to :data:`PARALLEL_DEFAULT` = 4
-— deliberately below the observed engine fan-out (console2 runs pytest
-``-n min(6, len(ids))``; ``dag_runner.run_plan`` defaults to 8 workers) so the
-estimate errs high, the safe direction for a pre-flight confirm. The lead can
-pass the admission's current value via ``model["parallel"]``.
+list scheduling otherwise. ``parallel`` defaults to :data:`PARALLEL_DEFAULT` = 6
+— deliberately below the engine fan-out (console2 runs pytest
+``-n min(10, len(ids))`` since 2026-07-08 owner bump; ``dag_runner.run_plan``
+defaults to 8 workers) so the estimate still errs high — effective
+lifecycle-level parallelism trails worker count (long-pole phases, account
+VPC 5-slot cap). The lead can pass the admission's current value via
+``model["parallel"]``.
 
 Caching: :func:`refresh_cache` persists the folded stats to
 ``reports/duration_stats_cache.json`` (reports/ is gitignored) for inspection;
@@ -89,8 +91,9 @@ EVENTS_DIR = ROOT / "reports" / "console2-runs"
 CACHE_PATH = ROOT / "reports" / "duration_stats_cache.json"
 
 #: Conservative lifecycle-level parallelism for the makespan bound (see module
-#: docstring — engine observed at 6/8; 4 errs high). Override: model["parallel"].
-PARALLEL_DEFAULT = 4
+#: docstring — worker cap is 10 since 2026-07-08, but effective fan-out trails
+#: it; 6 still errs high). Override: model["parallel"].
+PARALLEL_DEFAULT = 6
 
 #: Contract §3 class defaults (seconds) for unmeasured lifecycles.
 CLASS_DEFAULT_S = {"read": 30.0, "small-create": 120.0, "cluster-grade": 2400.0}
