@@ -2142,11 +2142,19 @@ function reportRT() {
 // inner `.scroll` container), which would otherwise snap the 자원/API/로그 list
 // back to the top every refresh while the user is scrolled down reading it.
 function keepDetailScroll(render) {
-  const before = $("detail-body") && $("detail-body").querySelector(".scroll");
+  // 로그 <pre class="runlog">도 스크롤 보존 대상 (owner 2026-07-08: 스코프 로그가
+  // 이벤트 폴마다 재렌더되며 맨 위로 스냅 — 바닥까지 내려도 확인 불가). 바닥
+  // 근처였으면 tail 추적(바닥 고정), 아니면 기존 위치 유지.
+  const pick = () => $("detail-body")
+    && ($("detail-body").querySelector(".scroll") || $("detail-body").querySelector("pre.runlog"));
+  const before = pick();
   const top = before ? before.scrollTop : 0;
+  const stick = before ? _nearBottom(before) : false;
   render();
-  const after = $("detail-body") && $("detail-body").querySelector(".scroll");
-  if (after && top) after.scrollTop = top;
+  const after = pick();
+  if (!after) return;
+  if (stick) after.scrollTop = after.scrollHeight;
+  else if (top) after.scrollTop = top;
 }
 
 // derive live lifecycle state from events: queued/running/done/fail/skip
