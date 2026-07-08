@@ -689,3 +689,21 @@ g.rg-selbox{cursor:pointer}
   text-overflow:ellipsis;vertical-align:bottom}
 .resid:hover{white-space:pre-wrap;word-break:break-all;max-width:none;
   max-height:180px;overflow:auto}
+
+/* DAG 의존 그래프 팝업 (owner 2026-07-08): 메인 리포트는 "현재 실행" 전용 —
+   그래프는 필요할 때만 이 모달에서. 씬 캔버스가 넉넉하도록 넓고 높게. */
+.dag-modal{width:min(1240px,94vw)}
+.dag-modal .mbody{max-height:82vh;overflow:auto}
+.dag-modal .stage-wrap{height:56vh}
+.dag-launch{display:flex;align-items:center;gap:10px;margin:6px 0 2px}
+
+/* 실행 화면 재배치 (owner 2026-07-08): ① 실행용량 = 최상단 풀폭 스트립 ② 대기열
+   행 인라인 [▶ 실행] ③ 이력은 Reporting 링크로 (이 화면 = 현재 실행 전용) */
+#cap-strip{margin:0 0 10px}
+#cap-strip .cap-panel{margin:0}
+.staged-rowwrap{display:flex;align-items:center;gap:6px}
+.staged-rowwrap .staged-row{flex:1;min-width:0}
+.staged-inline-act{display:flex;gap:4px;flex-shrink:0;align-items:center}
+.hist-head{display:flex;align-items:center;gap:12px}
+.hist-head .hist-toggle{flex:1;width:auto}
+.hist-rep{white-space:nowrap;flex-shrink:0}

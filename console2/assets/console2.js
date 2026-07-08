@@ -83,7 +83,8 @@ let scopeAuto = true;       // true until the user explicitly picks a scope (so 
 // the 흐름 live-run DAG. Both drive the SAME graph object via ResourceGraph.scene
 // (group/collapse · focus · zoom). buildView toggles 그림|표 on ①.
 let dagScene = null;        // 구성 (#dag-svg) scene
-let r1Scene = null;         // 흐름 (#r1-svg) scene
+let r1Scene = null;         // DAG 씬 — 이제 온디맨드 팝업(#dag-modal) 안에서만 산다
+let dagOpen = false;        // 🕸 의존 그래프 팝업 열림 상태 (owner 2026-07-08)
 let stagedScene = null;     // 실행 대기열 미리보기 (#sp-svg) — DAG of the OPEN staged item
 let buildView = "fig";      // 그림 | 표 (구성 DAG mode)
 let dagFocus = null;        // current focus info on the 구성 DAG (for 표 scoping)
@@ -270,7 +271,7 @@ function go(scr) {
   // not dangle on a hidden stage) and stop the log poller. Rebuilt cleanly on return
   // (the scene shell is keyed by runId → a fresh build re-attaches everything).
   if (scr !== "run") {
-    if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
+    closeDagModal();         // 팝업 + 그 안의 DAG 씬까지 정리 (열려있지 않아도 무해)
     if (stagedScene) { stagedScene.destroy(); stagedScene = null; }
     stopR4Poll();
     stopCapPoll();           // leaving the run screen → stop the capacity poll
@@ -1001,11 +1002,12 @@ function launchSummary() {
 
 // ================= ② 실행 & 리포트 =================
 function drawRunScreen() {
-  // capacity bar (VPC budget + 진행중/대기 큐) at the TOP — the hero of concurrent
-  // execution — then the 실행 대기열(STAGED) where each item is committed with a
-  // budget-informed [▶ 실행], then the pre-flight 남은 자원(잔존) panel + run settings.
+  // 실행용량(#cap-bar)은 탭 최상단 풀폭 스트립(#cap-strip)으로 승격 (owner
+  // 2026-07-08: "제일 먼저 현재 vpc 상태") — 좌측 컬럼은 실행 대기열(STAGED,
+  // 행마다 인라인 [▶ 실행]) + 남은 자원(잔존) 패널 + run settings.
+  $("cap-strip").innerHTML = '<div id="cap-bar"></div>';
   $("run-left").innerHTML =
-    '<div id="cap-bar"></div><div id="staged-panel"></div><div id="leftover-panel"></div><div id="run-settings"></div>';
+    '<div id="staged-panel"></div><div id="leftover-panel"></div><div id="run-settings"></div>';
   drawCapBar();
   drawStagedPanel();
   startCapPoll();           // poll /api/capacity every ~2s while on the run screen
@@ -1052,11 +1054,20 @@ function drawStagedPanel() {
             <button class="minibtn red" data-stage-del="${esc(it.id)}">✕ 제거</button>
           </div>
         </div>` : "";
+      // [▶ 실행]은 행에 인라인 (owner 2026-07-08: "매번 뭘 열어야 보이던데" —
+      // 대기열 1건이 대부분인 흐름에서 펼침 없이 바로 실행). 펼침(▸)은 상세·DAG
+      // 미리보기용으로 유지.
       return `<div class="staged-item ${open ? "open" : ""}">
-        <button class="staged-row" data-stage-tog="${esc(it.id)}" title="클릭하면 상세 · 실행/제거">
-          <span class="staged-sum">${summary}</span>
-          <span class="staged-car">${open ? "▾" : "▸"}</span>
-        </button>${detail}</div>`;
+        <div class="staged-rowwrap">
+          <button class="staged-row" data-stage-tog="${esc(it.id)}" title="클릭하면 상세 + 합성 DAG 미리보기">
+            <span class="staged-sum">${summary}</span>
+            <span class="staged-car">${open ? "▾" : "▸"}</span>
+          </button>
+          <span class="staged-inline-act">
+            <button class="minibtn go" data-stage-run="${esc(it.id)}" title="바로 실행 (LIVE) — cap 아래면 ADMIT, 아니면 대기 큐">${runLabel}</button>
+            <button class="minibtn red" data-stage-del="${esc(it.id)}" title="대기열에서 제거">✕</button>
+          </span>
+        </div>${detail}</div>`;
     }).join("");
   }
   host.innerHTML = `<div class="panel staged-pnl">
@@ -1890,7 +1901,7 @@ function abortConfirm() {
 // the user's selected lifecycle / sub-tab / open API row survive.
 function drawReport() {
   if (!runId) {
-    if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
+    closeDagModal();         // run 바인딩 해제 — 팝업/씬 동반 정리
     $("lc-picker").innerHTML = "";
     $("md-report") && $("md-report").classList.remove("has-detail");
     $("scopebar").innerHTML = "";
@@ -2308,82 +2319,31 @@ function reportR1() {
         <b>${esc(prog.phaseLabel)}</b> · <span class="mono">${esc(activeLc || "")}</span>
         ${prog.active ? `<span class="muted small">${esc((prog.active.method || "") + " " + (prog.active.path || ""))}</span>` : ""}</div>`
     : `<div class="nowbar done"><span class="dot"></span><b>${runStatus === "aborted" ? "중단됨" : "완료"}</b> · 상태 ${esc(runStatus === "aborted" ? "aborted (사용자 중단 — teardown 스윕 수행)" : runStatus)}</div>`;
-  // (re)build the shell only when missing or the run/graph-binding changed
-  // (keeps the scene alive across polls).
+  // (re)build the shell only when missing or the run/graph-binding changed.
+  // 메인은 "현재 실행" 전용 (owner 2026-07-08: "상단 dag 의존 그래프는 잘 볼 일이
+  // 없어") — DAG 씬은 여기서 그리지 않고 🕸 버튼의 온디맨드 팝업(openDagModal)이
+  // 소유한다. 배너(지금 뭐 실행) + 계획연속성 칩 + 진행 KPI만 인라인.
   const shellKey = String(runId) + "|" + choice.mode + "|" + (choice.mode === "run" ? String(runGraphFor) : "build");
-  const shell = $("r1-stage-wrap");
+  const shell = $("r1-shell");
   const fresh = !shell || shell.dataset.run !== shellKey;
   if (fresh) {
-    if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
     $("report-main").innerHTML = `<div id="r1-banner">${banner}</div>
-      ${graphModeChip(choice.mode)}
       <div id="r1-plan-cont">${planContinuityHtml(choice, g)}</div>
-      <div class="legend">${legend([["#ffffff", "대기"], ["#e8f0fd", "진행 중"], ["#eaf7ee", "완료"], ["#fdeaea", "실패"]])}
-        <span>접힌 그룹 = done/total · 그룹 클릭=펼치기 · <b>노드 클릭 = focus + 그 라이프사이클 상세 열기</b> · 🗑 = 자원 삭제됨</span></div>
-      <div class="dag-toolbar">
-        <div class="tgroup" id="r1-gran"><button data-gran="category" class="on">카테고리</button><button data-gran="service">서비스</button><button data-gran="resource">전체 펼침</button></div>
-        <button class="minibtn" id="r1-collapse">⊟ 전체 접기</button>
-        <button class="minibtn" id="r1-expand">⊞ 전체 펼치기</button>
-        <span class="statchip" id="r1-stat"></span>
+      <div class="dag-launch" id="r1-shell">
+        <button class="minibtn" id="r1-dag-open"
+          title="이 시나리오의 폐쇄집합 의존 그래프 + 생성·검증·삭제 순서표 — 필요할 때만 팝업으로">🕸 의존 그래프</button>
+        <span class="muted small">메인 = 현재 실행 · 의존관계/순서표는 팝업에서</span>
       </div>
-      <div class="stage-wrap" id="r1-stage-wrap">
-        <div class="stage" id="r1-stage">
-          <svg id="r1-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
-          <div class="hint-pill" id="r1-hint"></div>
-          <div class="zoomctl"><button id="r1-zin">+</button><button id="r1-zout">−</button><button id="r1-zfit" class="fit">맞춤</button></div>
-        </div>
-      </div>
-      <div id="r1-prog" style="margin-top:8px"></div>
-      <details class="r1-order" id="r1-order">
-        <summary>생성 · 검증 · 삭제 순서표 <span class="muted small">— ① 과 동일한 표 · <b id="r1-order-n">0</b> 자원 · 진행 중 행 하이라이트</span></summary>
-        <div class="scroll r1-order-scroll"><table class="tbl" id="r1-order-tbl"></table></div>
-      </details>`;
-    $("r1-stage-wrap").dataset.run = shellKey;
-    const mt = $("r1-mode-toggle");
-    if (mt) mt.onclick = () => {
-      graphMode = choice.mode === "run" ? "build" : "run";
-      drawReport();
-    };
-    if (g) {
-      r1Scene = window.ResourceGraph.scene($("r1-svg"), $("r1-stage"), g, {
-        hint: $("r1-hint"), stat: $("r1-stat"),
-        overlay: r1Overlay, groupOverlay: r1GroupOverlay,
-        // node focus = DRILL into that lifecycle's detail (master→detail). The focus
-        // gesture IS the drill, reconciling cleanly with B2: focusing a node both
-        // highlights its dependency path AND opens its detail. We only DRILL IN here
-        // (focus set); clearing focus does NOT reset the scope (the user changes scope
-        // via the 전체 pill or another lifecycle) — so a granularity/collapse change,
-        // which fires onFocus(null), never wipes the user's selected detail.
-        onFocus: info => {
-          if (!info) return;
-          const lc = N[info.label] && N[info.label].lifecycle;
-          if (lc) selectScope(lc, { fromScene: true });
-        },
-        // the report is READ-ONLY: no target selection here, so we DON'T wire
-        // onToggleTarget/isSelectable — the scene then renders a static provenance dot
-        // in the node corner instead of the ＋/✓ selection box. Node-click = focus+drill.
-      });
-      r1Scene.start();
-      els("#r1-gran button").forEach(b => b.onclick = () => {
-        els("#r1-gran button").forEach(x => x.classList.toggle("on", x === b));
-        r1Scene.setGranularity(b.dataset.gran);
-      });
-      $("r1-collapse").onclick = () => { els("#r1-gran button").forEach(x => x.classList.toggle("on", x.dataset.gran === "category")); r1Scene.setGranularity("category"); };
-      $("r1-expand").onclick = () => { els("#r1-gran button").forEach(x => x.classList.toggle("on", x.dataset.gran === "resource")); r1Scene.expandAll(); };
-      $("r1-zin").onclick = () => r1Scene.zoomIn();
-      $("r1-zout").onclick = () => r1Scene.zoomOut();
-      $("r1-zfit").onclick = () => r1Scene.zoomToFit();
-    } else {
-      $("r1-svg").innerHTML = runGraphFor === runId && !runGraph
-        ? '<text x="12" y="22" fill="#656d76">run 그래프 로딩 중…</text>'
-        : '<text x="12" y="22" fill="#656d76">합성 그래프 없음</text>';
-    }
+      <div id="r1-prog" style="margin-top:8px"></div>`;
+    $("r1-shell").dataset.run = shellKey;
+    $("r1-dag-open").onclick = openDagModal;
+    if (dagOpen) openDagModal();   // 팝업이 열린 채 run/그래프 바인딩이 바뀜 → 재구성
   } else {
     // same run, subsequent poll: refresh the banner + overlay in place (no rebuild)
     $("r1-banner").innerHTML = banner;
     const pc = $("r1-plan-cont");
     if (pc) pc.innerHTML = planContinuityHtml(choice, g);   // 실행 중 → 실행 (종료 시)
-    if (r1Scene) r1Scene.refresh();
+    if (r1Scene) r1Scene.refresh();   // 팝업이 열려 있을 때만 존재
   }
   const st = lifecycleStates();
   // wave progress under the canvas. SIMULATE emits explicit wave-start events; a
@@ -2428,7 +2388,82 @@ function reportR1() {
     <h3>${waveHdr}</h3>${waveLines || (runEvents.length
       ? '<p class="muted small">진행 정보 집계 중…</p>'
       : '<p class="muted small">실행 시작을 기다리는 중…</p>')}`;
-  renderRunOrderTable(g);   // ① 과 같은 순서표 — 진행 중 행 하이라이트 동기 (폴마다)
+  renderRunOrderTable(g);   // 팝업이 닫혀 있으면 r1-order-tbl 부재로 no-op
+}
+
+// 🕸 의존 그래프 — 온디맨드 팝업 (owner 2026-07-08: "메인은 현재의 실행을 확인하게
+// 하고 dag는 … 별도 팝업으로"). 씬(레전드·granularity·줌·순서표)을 통째로 이 모달이
+// 소유한다; 폴 tick 은 reportR1 의 r1Scene.refresh() + renderRunOrderTable 이 그대로
+// 갱신해 준다 (요소가 팝업 안에 있을 뿐 id 계약은 동일).
+function openDagModal() {
+  const choice = reportGraphChoice();
+  const g = choice.g;
+  dagOpen = true;
+  if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
+  $("dag-body").innerHTML = `${graphModeChip(choice.mode)}
+    <div class="legend">${legend([["#ffffff", "대기"], ["#e8f0fd", "진행 중"], ["#eaf7ee", "완료"], ["#fdeaea", "실패"]])}
+      <span>접힌 그룹 = done/total · 그룹 클릭=펼치기 · <b>노드 클릭 = 그 라이프사이클 상세 열기(팝업 닫힘)</b> · 🗑 = 자원 삭제됨</span></div>
+    <div class="dag-toolbar">
+      <div class="tgroup" id="r1-gran"><button data-gran="category" class="on">카테고리</button><button data-gran="service">서비스</button><button data-gran="resource">전체 펼침</button></div>
+      <button class="minibtn" id="r1-collapse">⊟ 전체 접기</button>
+      <button class="minibtn" id="r1-expand">⊞ 전체 펼치기</button>
+      <span class="statchip" id="r1-stat"></span>
+    </div>
+    <div class="stage-wrap" id="r1-stage-wrap">
+      <div class="stage" id="r1-stage">
+        <svg id="r1-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="hint-pill" id="r1-hint"></div>
+        <div class="zoomctl"><button id="r1-zin">+</button><button id="r1-zout">−</button><button id="r1-zfit" class="fit">맞춤</button></div>
+      </div>
+    </div>
+    <details class="r1-order" id="r1-order" open>
+      <summary>생성 · 검증 · 삭제 순서표 <span class="muted small">— ① 과 동일한 표 · <b id="r1-order-n">0</b> 자원 · 진행 중 행 하이라이트</span></summary>
+      <div class="scroll r1-order-scroll"><table class="tbl" id="r1-order-tbl"></table></div>
+    </details>`;
+  $("dag-modal").classList.add("open");
+  $("dag-scrim").classList.add("open");
+  $("dag-close").onclick = closeDagModal;
+  $("dag-scrim").onclick = closeDagModal;
+  const mt = $("r1-mode-toggle");
+  if (mt) mt.onclick = () => {
+    graphMode = choice.mode === "run" ? "build" : "run";
+    openDagModal();          // 새 바인딩으로 팝업 재구성
+  };
+  if (g) {
+    r1Scene = window.ResourceGraph.scene($("r1-svg"), $("r1-stage"), g, {
+      hint: $("r1-hint"), stat: $("r1-stat"),
+      overlay: r1Overlay, groupOverlay: r1GroupOverlay,
+      // node focus = DRILL into that lifecycle's detail; the popup closes so the
+      // detail pane behind it is immediately visible (master→detail 유지).
+      onFocus: info => {
+        if (!info) return;
+        const lc = N[info.label] && N[info.label].lifecycle;
+        if (lc) { selectScope(lc, { fromScene: true }); closeDagModal(); }
+      },
+    });
+    r1Scene.start();
+    els("#r1-gran button").forEach(b => b.onclick = () => {
+      els("#r1-gran button").forEach(x => x.classList.toggle("on", x === b));
+      r1Scene.setGranularity(b.dataset.gran);
+    });
+    $("r1-collapse").onclick = () => { els("#r1-gran button").forEach(x => x.classList.toggle("on", x.dataset.gran === "category")); r1Scene.setGranularity("category"); };
+    $("r1-expand").onclick = () => { els("#r1-gran button").forEach(x => x.classList.toggle("on", x.dataset.gran === "resource")); r1Scene.expandAll(); };
+    $("r1-zin").onclick = () => r1Scene.zoomIn();
+    $("r1-zout").onclick = () => r1Scene.zoomOut();
+    $("r1-zfit").onclick = () => r1Scene.zoomToFit();
+  } else {
+    $("r1-svg").innerHTML = runGraphFor === runId && !runGraph
+      ? '<text x="12" y="22" fill="#656d76">run 그래프 로딩 중…</text>'
+      : '<text x="12" y="22" fill="#656d76">합성 그래프 없음</text>';
+  }
+  renderRunOrderTable(g);
+}
+
+function closeDagModal() {
+  dagOpen = false;
+  if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
+  $("dag-modal").classList.remove("open");
+  $("dag-scrim").classList.remove("open");
 }
 
 // 자원 (DETAIL · scoped) — per-resource rows (생성·테스트·삭제 + id) for the current
