@@ -247,6 +247,30 @@
           "_note": "id-bound read (showhostedzonerecord). Closes the getid GET /v1/hosted-zones/{hosted_zone_id}/records/{record_id}. Keys off both the create-hosted-zone hosted_zone_id and create-a-record record_id; tolerant [200,400,403,404] for the same LIGHT-run placeholder reason. Runs before the record/zone teardown so a real id (when present) resolves."
         },
         {
+          "name": "list-hosted-zones",
+          "method": "GET",
+          "path": "/v1/hosted-zones",
+          "expect_status": [200],
+          "params": {},
+          "_note": "2026-07-08 완전성 편입(COMPLETENESS-AUDIT-2026-07-08, dns gap listhostedzone — 과거 networking-dns-hosted-zone(disabled)이 커버하다 끊긴 이력): 전역 bare list — live 200 2026-07-08 (빈 목록 200도 실검증). 전역 read라 부모 불필요 — 의도적으로 group 'pdns' 미지정(pdns 그룹 실패에도 실행) + strict [200]. params:{} forces catalog-key recording (engine only records GET catalog key when params present)."
+        },
+        {
+          "name": "list-private-dns",
+          "method": "GET",
+          "path": "/v1/private-dns",
+          "expect_status": [200],
+          "params": {},
+          "_note": "2026-07-08 완전성 편입(COMPLETENESS-AUDIT-2026-07-08, dns gap listprivatedns): 전역 bare list — live 200 2026-07-08 (빈 목록 200도 실검증). group 미지정 + strict [200], 기존 read 스텝 이웃 배치. params:{} forces catalog-key recording (engine only records GET catalog key when params present)."
+        },
+        {
+          "name": "list-public-domain-names",
+          "method": "GET",
+          "path": "/v1/public-domain-names",
+          "expect_status": [200],
+          "params": {},
+          "_note": "2026-07-08 완전성 편입(COMPLETENESS-AUDIT-2026-07-08, dns gap listpublicdomainnames): 전역 bare list — live 200 2026-07-08 (빈 목록 200도 실검증; public-domain 쓰기와 달리 목록 조회는 등록·과금 무관). group 미지정 + strict [200]. params:{} forces catalog-key recording (engine only records GET catalog key when params present)."
+        },
+        {
           "name": "probe-dns-reads",
           "probe_reads": {
             "private_dns_id": "{private_dns_id}",

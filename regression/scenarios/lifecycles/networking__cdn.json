@@ -127,6 +127,23 @@
           "expect_status": [200, 202, 204, 400, 403, 404, 409]
         }
       ]
+    },
+    {
+      "id": "networking-cdn-reads",
+      "service": "networking/cdn",
+      "enabled": true,
+      "heavy": false,
+      "_note": "2026-07-08 완전성 편입(COMPLETENESS-AUDIT-2026-07-08, cdn gap 1/9: listcdnservice). READ-ONLY verify lifecycle 신설 — networking-cdn-service(probe, 전 mutating tolerant)는 건드리지 않는다: 거기에 strict read를 추가하면 tolerant 비율 하락으로 role 파생(HEAVY-PREMISE CONTRACT §1)이 probe→verify로 뒤집혀 placeholder-id 쓰기들이 2xx-target verify 레인에 유입될 수 있기 때문. 이 lifecycle은 mutating 스텝 0 → role 자동 verify. 전역 bare list만 담음(빈 목록 200도 실검증) — owner 규정상 placeholder-id read(404 노이즈)는 넣지 않는다. live 200 2026-07-08 (빈 목록, 응답 envelope cdn). REGION GATE(networking-cdn-service 노트 승계): Global CDN은 kr-west1/kr-east1 전용 — kr-south 프로필에서는 이 lifecycle도 disable 필요; 현재 기본 env stage-kr-west1은 in-gate.",
+      "steps": [
+        {
+          "name": "list-cdns",
+          "method": "GET",
+          "path": "/v1/cdns",
+          "expect_status": [200],
+          "params": {},
+          "_note": "전역 bare list (listcdnservice) — live 200 2026-07-08. params:{} forces catalog-key recording (engine only records GET catalog key when params present)."
+        }
+      ]
     }
   ]
 }

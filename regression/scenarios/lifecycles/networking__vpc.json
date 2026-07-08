@@ -1469,6 +1469,17 @@
           "params": {}
         },
         {
+          "name": "list-transit-gateways",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways",
+          "expect_status": [
+            200
+          ],
+          "params": {},
+          "_note": "2026-07-08 완전성 편입(COMPLETENESS-AUDIT-2026-07-08, vpc gap listtransitgateways — TGW family 17개 중 목록만 빠져 있던 gap): 전역 bare list — live 200 2026-07-08 (빈 목록 200도 실검증). 전역 read라 부모 불필요 — 의도적으로 group 'tgw' 미지정(TGW 그룹 실패에도 실행) + strict [200]. 기존 read 스텝(show-transit-gateway) 이웃 배치. params:{} forces catalog-key recording (engine only records GET catalog key when params present)."
+        },
+        {
           "name": "wait-tgw-active-before-firewall-connection",
           "service": "vpc",
           "method": "GET",
@@ -3204,6 +3215,17 @@
           ],
           "_note": "id-bound read (show a privatelink-endpoint). Closes showprivatelinkendpoint. Keys off create-captured privatelink_endpoint_id; tolerant because create uses a {unique} service_id and 4xx, leaving id as placeholder normalizing to catalog key. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
           "params": {}
+        },
+        {
+          "name": "list-privatelink-endpoints",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/privatelink-endpoints",
+          "expect_status": [
+            200
+          ],
+          "params": {},
+          "_note": "2026-07-08 완전성 편입(COMPLETENESS-AUDIT-2026-07-08, vpc gap listprivatelinkendpoints): 전역 bare list — live 200 2026-07-08 (빈 목록 200도 실검증). 전역 read라 부모 불필요 — 의도적으로 group 'ple' 미지정(PLE 그룹 실패에도 실행) + strict [200]. 기존 read 스텝(show-privatelink-endpoint) 이웃 배치. params:{} forces catalog-key recording (engine only records GET catalog key when params present)."
         },
         {
           "name": "request-privatelink-endpoint",

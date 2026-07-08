@@ -212,6 +212,28 @@
           "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): vpc-port 은퇴분 (setport)."
         },
         {
+          "name": "list-ports",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/ports",
+          "expect_status": [
+            200
+          ],
+          "params": {},
+          "_note": "2026-07-08 완전성 편입(COMPLETENESS-AUDIT-2026-07-08, vpc gap listports): 전역 bare list — live 200 2026-07-08 (빈 목록 200도 실검증). 전역 read라 group 없음(port 그룹 실패와 무관하게 실행). params:{} forces catalog-key recording (engine only records GET catalog key when params present)."
+        },
+        {
+          "name": "list-nat-gateways",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/nat-gateways",
+          "expect_status": [
+            200
+          ],
+          "params": {},
+          "_note": "2026-07-08 완전성 편입(COMPLETENESS-AUDIT-2026-07-08, vpc gap listnatgateways): 전역 bare list — live 200 2026-07-08 (빈 목록 200도 실검증). 이 lifecycle은 NAT를 만들지 않지만 전역 read라 부모 불필요(감사 host 제안: gen-pilot-net-basics, light). group 없음. params:{} forces catalog-key recording (engine only records GET catalog key when params present)."
+        },
+        {
           "name": "create-internet-gateway",
           "service": "vpc",
           "method": "POST",
