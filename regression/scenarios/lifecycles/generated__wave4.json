@@ -4,7 +4,9 @@
     {
       "id": "gen-wave4-asg",
       "service": "compute/virtualserver",
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_disabled_reason": "2026-07-08 owner 결정: 표면이 heavy-asg-full-coverage(전 24 ASG endpoint + notifications/목록/PUT)에 완전 포함 — 유일 커버였던 showlaunchconfiguration 은 full-coverage 로 이관. VS 풀런 중복 제거(자원 6개 생성·삭제 왕복 절약). 재활성화하려면 이 사유와 함께 enabled:true",
       "_note": "ASG bodies rebuilt from V1Dot2 DTOs (old bodies mismatched); policy enums are documented-absent guesses — live 400 bodies will correct them || run 27452095757 fix: LC volume size 104 (÷8) || run 27466988779 fix: create-asg-policy comparison_operator GREATER_THAN_OR_EQUAL_TO -> ge (live 400: must match ^(ge|gt|le|lt)$). Other enums (metric_type CPU, metric_method AVG, scale_type SCALE_OUT, scale_method AMOUNT) unverified — API validated comparison_operator first; may need short-codes too, error-driven next run.",
       "steps": [
         {

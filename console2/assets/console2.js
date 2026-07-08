@@ -2346,48 +2346,17 @@ function reportR1() {
     if (r1Scene) r1Scene.refresh();   // 팝업이 열려 있을 때만 존재
   }
   const st = lifecycleStates();
-  // wave progress under the canvas. SIMULATE emits explicit wave-start events; a
-  // LIVE run does NOT (it emits lifecycle-start/-end only) — so when there are no
-  // wave-start events we DERIVE the structure from the lifecycles that actually
-  // started, one row per lifecycle, in start order. Either way the section reflects
-  // live progress and never sits on "대기 중…" once the run has events.
-  const waves = {};
-  let derived = false;
-  runEvents.forEach(e => { if (e.kind === "wave-start") waves[e.wave] = { kind: e.wave_kind, lcs: e.lifecycles || [] }; });
-  if (!Object.keys(waves).length) {
-    // derive from lifecycle-start (live). Group each started lifecycle as its own
-    // row so a single-lifecycle run shows that one lifecycle with its live state.
-    derived = true;
-    const seen = [];
-    runEvents.forEach(e => { if (e.kind === "lifecycle-start" && !seen.includes(e.lifecycle)) seen.push(e.lifecycle); });
-    // fall back to the known lifecycle set if a wave shows before any start arrives
-    const lcs = seen.length ? seen : Object.keys(st);
-    lcs.forEach((lc, i) => { waves[i] = { kind: (N[lc] && N[lc].lifecycle) || "lifecycle", lcs: [lc], single: true }; });
-  }
   const counts = k => Object.values(st).filter(v => v === k).length;
   const total = Object.keys(st).length || (g ? g.nodes.filter(n => n.is_target).length : 0);
-  const waveLines = Object.keys(waves).sort((a, b) => a - b).map(i => {
-    const w = waves[i];
-    const done = w.lcs.filter(l => st[l] === "done").length;
-    const running = w.lcs.some(l => st[l] === "running");
-    const failed = w.lcs.some(l => st[l] === "fail");
-    const pct = w.lcs.length ? Math.round(100 * done / w.lcs.length) : 0;
-    // for a derived single-lifecycle row, label it with the lifecycle id itself.
-    const label = w.single ? esc(w.lcs[0]) : `웨이브 ${i} <span class="muted small">${esc(w.kind || "")} · ${w.lcs.length}개</span>`;
-    const mark = running ? "⏳" : failed ? "✕" : (done === w.lcs.length && w.lcs.length) ? "✓" : "·";
-    return `<div class="kv"><span>${mark} ${label}</span><b>${done}/${w.lcs.length}</b></div>
-      <div class="pbar ${done === w.lcs.length && w.lcs.length ? "done" : ""}"><i style="width:${pct}%"></i></div>`;
-  }).join("");
-  const waveHdr = derived ? "라이프사이클 진행 (실행 순서)" : "웨이브 진행 (실행 순서)";
+  // 진행 표시는 요약 KPI 한 줄만 — 라이프사이클별 진행 바(웨이브 목록)는 제거
+  // (owner 2026-07-08: 바로 아래 카드 리스트가 상태·API·soft 까지 다 보여줘
+  // 완전 중복 — "둘 다 보여줄 필요는 없을 것 같은데").
   $("r1-prog").innerHTML = `<div class="kpi">
       <div class="s"><b>${counts("done")}/${total}</b><span>완료</span></div>
       <div class="s"><b style="color:var(--run)">${counts("running")}</b><span>실행중</span></div>
       <div class="s" title="lifecycle 실패 수 — 하나 이상의 스텝이 fail(5xx/HMAC-401/timeout)"><b style="color:var(--fail)">${counts("fail")}</b><span>fail</span></div>
       <div class="s"><b>${esc(runStatus === "aborted" ? "중단됨" : runStatus)}</b><span>상태</span></div>
-    </div>
-    <h3>${waveHdr}</h3>${waveLines || (runEvents.length
-      ? '<p class="muted small">진행 정보 집계 중…</p>'
-      : '<p class="muted small">실행 시작을 기다리는 중…</p>')}`;
+    </div>`;
   renderRunOrderTable(g);   // 팝업이 닫혀 있으면 r1-order-tbl 부재로 no-op
 }
 

@@ -85,6 +85,14 @@
           }
         },
         {
+          "name": "show-launch-configuration",
+          "_note": "2026-07-08 owner: gen-wave4-asg 은퇴로 이 유일-커버 endpoint(showlaunchconfiguration)를 full-coverage 로 이관 — 방금 만든 LC 단건조회 strict 200.",
+          "method": "GET",
+          "path": "/v1/launch-configurations/{launch_configuration_id}",
+          "service": "virtualserver",
+          "expect_status": [200]
+        },
+        {
           "name": "create-security-group",
           "_note": "Create a throwaway SG for the ASG. Returns $.security_group.id.",
           "method": "POST",
