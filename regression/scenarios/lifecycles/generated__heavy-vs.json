@@ -429,7 +429,7 @@
           ],
           "optional": true,
           "group": "custom-image",
-          "_note": "400 VirtualServer.BadRequest (vague): custom-image create needs specific server/volume state (e.g. stopped server, no in-flight attach). Coverage-only (C2); R3 to drive the server into a valid image-from state to make it 2xx.",
+          "_note": "400 VirtualServer.BadRequest (vague): custom-image create needs specific server/volume state (e.g. stopped server, no in-flight attach). Coverage-only (C2); R3 to drive the server into a valid image-from state to make it 2xx. | 2026-07-08 재조사(PF-27): 07-08 재현 2회 모두 소스 서버가 Windows 2016 (blind images[0]) — Windows 게스트 이미징 거부(미문서) 추정이 vague-400 의 유력 원인. ubuntu 핀(3e3c6e24) 후 다음 런에서 2xx 복귀 기대.",
           "capture": {
             "custom_image_id": "$.image_id"
           },
@@ -703,7 +703,10 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "custom-image",
+          "optional": true,
+          "_note": "2026-07-08 owner '이건 왜 실패야?' 근본원인: 이 스텝만 custom-image 그룹 밖이라, create-custom-image 가 400(PF-27, Windows 소스 거부)으로 그룹이 죽어도 혼자 실행돼 리터럴 {custom_image_id} 로 DELETE → 404 → strict expect 가 lifecycle 전체를 실패시켰다 (E2E 20260708-010208 rc=1 + owner 런 140335 동일). 그룹 합류로 create 실패 시 스킵(유령 404 소멸), create 성공 시 strict teardown 검증 유지 — 실패하면 그룹 경고 + 등록된 cleanup/reconciler 백스톱."
         },
         {
           "name": "delete-server-static-nat",
