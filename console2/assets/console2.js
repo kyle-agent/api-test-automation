@@ -1544,7 +1544,9 @@ function pfRender(plan, capacity, sel, opts) {
   let tCreates = 0, tDeletes = 0, tDur = 0, tMeasured = 0, tN = 0;
   Object.keys(plan.preview || {}).sort().forEach(lid => {
     const p = plan.preview[lid] || {};
-    const svc = p.service || "?";
+    // 그룹 키는 짧은 이름으로 정규화 — 태그 표기가 "virtualserver" 와
+    // "compute/virtualserver" 로 갈려도 한 서비스는 한 행이어야 한다.
+    const svc = shortName(p.service || "?");
     const a = bySvc[svc] = bySvc[svc] || { n: 0, creates: 0, deletes: 0, dur: 0, measured: 0, heavy: 0 };
     a.n++; tN++;
     a.creates += p.est_creates || 0; tCreates += p.est_creates || 0;
@@ -1814,7 +1816,14 @@ function renderNowPlaying() {
   }
   const prog = liveProgress();
   if (!prog.active) {
-    host.innerHTML = `<span class="np-dot"></span><b>실행 중</b>
+    // 프로비저닝 국면은 이름을 붙여서 — "다음 step 대기…"가 1~3분 얼어 보이던 게
+    // 실은 공유 VPC+서브넷 ACTIVE 대기였다 (진행은 로그 tab에 실시간 스트리밍).
+    const provE = prog.provisioning && prog.provStart && prog.provStart.ts
+      ? fmtElapsed(Date.now() / 1000 - prog.provStart.ts) + " 경과" : "통상 1~3분";
+    host.innerHTML = prog.provisioning
+      ? `<span class="np-dot run"></span><b>공유 인프라 준비 중</b>
+      <span class="muted small">run ${esc(runId)} — VPC+서브넷 ACTIVE 대기 (${esc(provE)}) · 진행은 로그 tab</span>${abortBtn}`
+      : `<span class="np-dot"></span><b>실행 중</b>
       <span class="muted small">run ${esc(runId)} — 다음 step 대기…</span>${abortBtn}`;
     wireAbortBtn();
     return;
@@ -1915,6 +1924,10 @@ function groupEventsByLifecycle(events) {
   };
   (events || []).forEach(e => {
     const id = e.lifecycle;
+    // lifecycle 귀속이 없는 이벤트(공유 인프라 프로비저닝의 poll-progress 등,
+    // lifecycle:"")가 유령 빈 행(ensure(""))을 만들지 않게 건너뛴다 — run-meta/
+    // wave-start 만 리스트 필드로 행을 만든다 (2026-07-08 "빈 카드" 목격).
+    if (!id && e.kind !== "run-meta" && e.kind !== "wave-start") return;
     if (e.kind === "run-meta") (e.runnable || []).forEach(ensure);
     else if (e.kind === "wave-start") (e.lifecycles || []).forEach(ensure);
     else if (e.kind === "lifecycle-start") { const b = ensure(id); b.status = "running";
@@ -1948,7 +1961,7 @@ function groupEventsByLifecycle(events) {
     }
     else if (e.kind === "resource-tracked") { const b = ensure(id);
       const r = { id: e.resource_id, type: e.resource_type, lifecycle: id, path: e.path,
-        created: true, deleted: false }; b.resources.push(r); b.createN++; }
+        name: e.name || "", created: true, deleted: false }; b.resources.push(r); b.createN++; }
     else if (e.kind === "resource-deleted") { const b = ensure(id);
       const cand = b.resources.filter(r => r.type === e.resource_type && !r.deleted);
       if (cand.length) cand[cand.length - 1].deleted = true; }
@@ -2146,15 +2159,21 @@ function liveProgress() {
   const running = runStatus === "running" && !runEvents.some(e => e.kind === "run-end");
   const openSteps = {};        // key -> step event still open
   let lastStart = null, lastTrack = null, lastDelete = null;
+  let provStart = null, provEnd = null;   // 공유 인프라 프로비저닝 국면 (서버 narrator)
   runEvents.forEach(e => {
     if (e.kind === "step-start") { openSteps[e.lifecycle + "|" + e.step] = e; lastStart = e; }
     if (e.kind === "step-end") delete openSteps[e.lifecycle + "|" + e.step];
     if (e.kind === "resource-tracked") lastTrack = e;
     if (e.kind === "resource-deleted") lastDelete = e;
+    if (e.kind === "provision-start") { provStart = e; provEnd = null; }
+    if (e.kind === "provision-end") provEnd = e;
   });
   // the active step = the most recent still-open step-start (fallback: lastStart)
   const openList = Object.values(openSteps);
   const active = running ? (openList[openList.length - 1] || lastStart) : null;
+  // 프로비저닝 중 = provision-start 후 provision-end 전이고 아직 어떤 step도 없음
+  // ("실행 중 — 다음 step 대기…" 로 얼어 보이던 1~3분의 정체를 이름 붙인다).
+  const provisioning = running && !active && !!provStart && !provEnd && !lastStart;
   let phase = null, phaseLabel = "";
   if (active) {
     const m = (active.method || "").toUpperCase();
@@ -2162,10 +2181,12 @@ function liveProgress() {
     else if (m === "DELETE") { phase = "delete"; phaseLabel = "삭제 중"; }
     else if (m === "PUT" || m === "PATCH") { phase = "update"; phaseLabel = "설정 중"; }
     else { phase = "test"; phaseLabel = "테스트 중"; }
+  } else if (provisioning) {
+    phase = "provision"; phaseLabel = "공유 인프라 준비 중";
   } else if (!running) {
     phaseLabel = "완료";
   }
-  return { running, active, phase, phaseLabel,
+  return { running, active, phase, phaseLabel, provisioning, provStart,
            activeLifecycle: active ? active.lifecycle : null,
            lastTrack, lastDelete };
 }
@@ -2455,7 +2476,7 @@ function reportR2() {
   const ncol = d.agg ? 7 : 6;
   const body = list.length ? list.map(r => `<tr class="${r.id === cursorId ? "rowact" : ""}">
       <td>${esc(rowKind(r))}</td>
-      <td><code>${esc(r.id)}</code></td>
+      <td><code class="resid" title="${esc(r.id || r.name || "")}">${esc(r.id || r.name || "")}</code></td>
       ${d.agg ? `<td>${esc(r._lc || r.lifecycle || "")}</td>` : ""}
       <td class="${r.created ? "tick" : "tickno"}">${r.created ? "✓" : "—"}</td>
       <td class="${r.tested ? "tick" : "tickno"}">${r.tested ? "✓" : "—"}</td>
@@ -2467,7 +2488,7 @@ function reportR2() {
            : "이 라이프사이클에는 추적된 자원이 없습니다.")}</td></tr>`;
   const nowLine = prog.running && cursorId
     ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
-        <b>${esc(prog.phaseLabel)}</b> · <code>${esc(cursorId)}</code></div>` : "";
+        <b>${esc(prog.phaseLabel)}</b> · <code class="resid">${esc(cursorId)}</code></div>` : "";
   $("detail-body").innerHTML = `<h3 class="detail-h">자원 <span class="muted small">· ${d.agg ? "런 전체" : "이 라이프사이클"} — 생성 · 테스트 · 삭제 + id</span></h3>
     ${nowLine}
     <table class="tbl">

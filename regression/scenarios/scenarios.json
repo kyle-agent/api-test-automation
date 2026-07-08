@@ -2762,7 +2762,7 @@
     },
     {
       "id": "compute-virtualserver-full",
-      "service": "virtualserver",
+      "service": "compute/virtualserver",
       "enabled": true,
       "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. The field is volume_type NOT type. COVERAGE EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): (a) server-group create->show(probe via server_group_id)->delete; (b) probe-reads now exercises server_group_id so showservergroup joins the ~13 path-param GETs (showvirtualserver/console-log/interfaces/ips/security-groups/volumes + show* by id) driven off the live server; (c) image PUT updateimage (min_disk/min_ram/protected/visibility) added to the image group; (d) block-volume writes on the extra attached volume: updatevolume (name), updateservervolume (attachment), setvolumeqos, extendvolume (104->112); (e) attach/detach a 2nd security group to the running server; (f) SOFT reboot + wait ACTIVE. Every NEW write is optional+grouped so a rejection isolates to its group (tears down just that group) and never fails the expensive VM run; the validated create->...->delete spine is unchanged. lock/unlock intentionally omitted (risk of stranding a billable VM if unlock fails).",
       "steps": [

@@ -751,10 +751,17 @@ def _resolve_lifecycle_ids(sel: dict) -> list[str]:
     # lifecycle 전부를 포함한다 (§2 "서비스 풀 테스트") — 어떤 노드도 가리키지 않는
     # 합성/추가 lifecycle(예: vs-server-actions-verify)이 빠지지 않도록.
     if svcs or cats:
+        # 표기 정규화: lifecycle 태그는 "virtualserver"/"compute/virtualserver"
+        # 두 형태가 혼재할 수 있다 — 서비스 코드는 카탈로그 전역에서 유일하므로
+        # 짧은 이름 비교가 안전하고, 태그 표기 차이로 union 에서 조용히 빠지는
+        # 일이 없어야 한다 (2026-07-08 모달 2행 분리의 원인).
+        svcs_short = {s.split("/")[-1] for s in svcs}
         for lid, lc in lcs.items():
             svc = lc.get("service") or ""
+            if not svc:
+                continue
             cat = svc.split("/", 1)[0] if "/" in svc else ""
-            if svc in svcs or cat in cats:
+            if svc in svcs or svc.split("/")[-1] in svcs_short or cat in cats:
                 scoped.add(lid)
     scoped = {lid for lid in scoped
               if lid in lcs and lcs[lid].get("enabled")
@@ -1798,27 +1805,13 @@ def _on_run_finish(rid: str) -> None:
 
 def _provision_shared(env: dict, f) -> dict:
     """Provision ONE session-shared VPC+subnet so adopter lifecycles don't skip under
-    -n (identical to console_server / chat-heavy). Best-effort: on failure adopters
-    self-skip and self-creators still run."""
-    f.write("\n=== provision shared VPC (adopters need this under -n) ===\n")
-    f.flush()
-    out = subprocess.run([sys.executable, "-m", "regression.scenarios.shared_infra", "--provision"],
-                         cwd=str(ROOT), env=env, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, text=True)
-    f.write(out.stdout or "")
-    shared = {}
-    for line in (out.stdout or "").splitlines():
-        if line.startswith("SCP_SHARED_") and "=" in line:
-            k, _, v = line.partition("=")
-            if v.strip():
-                shared[k.strip()] = v.strip()
-    if shared.get("SCP_SHARED_VPC_ID"):
-        shared["SCP_VPC_SHARED_RESERVED"] = "1"
-        f.write(f"\n[provision] shared VPC ready: {shared['SCP_SHARED_VPC_ID']}\n")
-    else:
-        f.write("\n[provision] no shared VPC id — adopters will skip (self-creators still run)\n")
-    f.flush()
-    return shared
+    -n. Delegates to the SHARED pipeline (regression.scenarios.local_run) — one
+    implementation for this dev server and the controlplane 'local' executor. That
+    version streams the provision output line-by-line into the log (no more frozen
+    '=== provision shared VPC ===' header for the whole ACTIVE wait) and narrates
+    provision-start/-end into the run's live-event stream."""
+    from regression.scenarios import local_run
+    return local_run.provision_shared(env, f)
 
 
 def _teardown_shared(env: dict, shared: dict, f) -> None:
@@ -1898,7 +1891,7 @@ def _run_worker(rec: dict) -> None:
                 # keep the shared VPC under '내 실행' (신규10), never '기존'.
                 with _LOCK:
                     rec["shared_vpc_id"] = shared["SCP_SHARED_VPC_ID"]
-            f.write("\n=== pytest ===\n")
+            f.write("\n=== pytest === (수집 → xdist 워커 기동 — 첫 step 로그까지 보통 수십 초)\n")
             f.flush()
             pos = f.tell()      # remember where the pytest output begins
             if rec.get("abort_requested"):

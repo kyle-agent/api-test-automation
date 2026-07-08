@@ -632,13 +632,22 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         # ⏳ run 행이 "멈춤"이 아니라 "N회차 · CREATING · 7분째"로 읽히게. env-gated
         # no-op라 headless 런 비용 0.
         _poll_n += 1
-        if _cev:
+        if _cev or poll.get("verbose"):
             _val = _jsonpath_get(resp.body, field) if (field and resp.body) else None
-            _cev.emit("poll-progress", lifecycle=lifecycle_id,
-                      step=step.get("name"), attempt=_poll_n,
-                      state=(_val if isinstance(_val, str) else resp.status),
-                      elapsed_s=round(time.monotonic() - _poll_t0, 1),
-                      timeout_s=timeout)
+            _state = _val if isinstance(_val, str) else resp.status
+            if _cev:
+                _cev.emit("poll-progress", lifecycle=lifecycle_id,
+                          step=step.get("name"), attempt=_poll_n,
+                          state=_state,
+                          elapsed_s=round(time.monotonic() - _poll_t0, 1),
+                          timeout_s=timeout)
+            if poll.get("verbose"):
+                # 비-pytest 경로(공유 인프라 프로비저닝)의 로그 생존 신호 — pytest
+                # 아래 lifecycle step은 stdout이 캡처되므로 poll-progress 이벤트가
+                # 그 역할을 하고, 이 print는 스트리밍되는 provision 로그용이다.
+                print(f"    ⏳ {step.get('name')}: {_poll_n}회차 state={_state} "
+                      f"({round(time.monotonic() - _poll_t0)}s/{timeout:.0f}s)",
+                      flush=True)
         time.sleep(interval)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
@@ -1298,12 +1307,22 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                         vpc_tokens_by_id[_vid] = _pending_vpc_tok.pop()
                     else:   # unbindable cleanup shape — free it rather than leak
                         _release_pending_vpc_tok()
-                # crash-safe manifest entry for the reconciler
+                # crash-safe manifest entry for the reconciler. rid = the first
+                # capture that is PLAUSIBLY an id — a keypair create captures only
+                # private_key, and that PEM blob became the tracked resource_id in
+                # the manifest/live-event/oplog (2026-07-08 자원 탭 목격: 키 원문
+                # 노출). Multiline or huge values are never ids → skip them; when
+                # no id-like capture exists fall back to the create body's name
+                # (the actual identity of name-addressed resources like keypair).
                 rid = ""
                 for v in step.get("capture", {}):
-                    if v in ctx:
-                        rid = ctx[v]
-                        break
+                    val = ctx.get(v, "")
+                    if not val or "\n" in val or len(val) > 200:
+                        continue
+                    rid = val
+                    break
+                if not rid and isinstance(body, dict):
+                    rid = str(body.get("name") or "")
                 reg.track(ResourceRecord(
                     service=cu_svc or "", delete_path=cu_path, resource_id=rid,
                     kind=bkind or step["name"], parent=grp))
@@ -1459,76 +1478,69 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     if not vpc_id:
         return noop
     vpc_id = str(vpc_id)
-    # poll to ACTIVE so adopters can build under it immediately
+    # poll to ACTIVE so adopters can build under it immediately. interval 5 (not
+    # 10) + verbose: this wait sits on the run's CRITICAL start path and its log
+    # is streamed live — heartbeat lines + a tighter residual wait (2026-07-08
+    # "시작까지 너무 오래걸려").
     wait = {"name": "wait-shared-vpc", "method": "GET", "service": "vpc",
             "poll": {"field": "$.vpc.state",
                      "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
-                     "timeout": 300, "interval": 10}}
+                     "timeout": 300, "interval": 5, "verbose": True}}
     _run_step(client, wait, f"{_VPC_CREATE_PATH}/{vpc_id}", None, "vpc", {})
     reg.track(ResourceRecord(service="vpc",
                              delete_path=f"{_VPC_CREATE_PATH}/{vpc_id}",
                              resource_id=vpc_id, kind="vpc", parent="shared"))
     print(f"  shared VPC provisioned: {vpc_id} ({_SHARED_VPC_CIDR})")
 
-    # 2) shared SUBNET under the shared VPC (mirrors a create-subnet step body in
-    #    scenarios.json: name/description/cidr/type=GENERAL/vpc_id/tags). Carved
-    #    from the first /24 of the VPC's /20.
-    subnet_id = None
-    sub_body = _inject_owner_tags({
-        # IB-051: subnet name length 3..20 too; 'regrsubsh'+8-hex == 17 chars,
-        # keeps the 'regrsub' prefix the reconciler's subnet sweep matches on.
-        "name": f"regrsubsh{uniq}", "description": "API regression shared subnet",
-        "cidr": _SHARED_SUBNET_CIDR, "type": "GENERAL", "vpc_id": vpc_id, "tags": [],
-    }, axis="regression")
-    sub_create = {"name": "create-shared-subnet", "method": "POST", "service": "vpc"}
-    sresp = _run_step(client, sub_create, _SUBNET_CREATE_PATH, sub_body, "vpc", {})
-    if sresp.status in (200, 201, 202) and sresp.body:
-        subnet_id = _capture(sresp.body, "$.subnet.id")
-        if subnet_id:
-            subnet_id = str(subnet_id)
-            swait = {"name": "wait-shared-subnet", "method": "GET", "service": "vpc",
+    # 2)+3) shared SUBNETs under the shared VPC — the general one (mirrors a
+    #    create-subnet step body: name/description/cidr/type=GENERAL/vpc_id/tags,
+    #    carved from the first /24 of the VPC's /20) and the DB-lane one (the DB
+    #    cluster lifecycles adopt THIS one via adopt: "subnet#db" so their slow
+    #    provisioning is isolated from the VM/SKE/networking adopters).
+    #    Both creates FIRST, then both ACTIVE waits: they only need the VPC, so
+    #    the DB subnet turns ACTIVE while the main-subnet wait runs and its own
+    #    wait usually returns on the first GET (start-latency shave 2026-07-08).
+    def _subnet_create(step_name: str, name: str, cidr: str, desc: str):
+        body = _inject_owner_tags({
+            # IB-051: subnet name length 3..20 ('regrsubsh(db)'+8-hex ≤ 19 chars,
+            # 'regrsub'-prefixed so the reconciler's subnet sweep reclaims them).
+            "name": name, "description": desc,
+            "cidr": cidr, "type": "GENERAL", "vpc_id": vpc_id, "tags": [],
+        }, axis="regression")
+        create = {"name": step_name, "method": "POST", "service": "vpc"}
+        resp = _run_step(client, create, _SUBNET_CREATE_PATH, body, "vpc", {})
+        sid = None
+        if resp.status in (200, 201, 202) and resp.body:
+            sid = _capture(resp.body, "$.subnet.id")
+        return (str(sid) if sid else None), resp
+
+    def _subnet_wait_track(step_name: str, sid: str, cidr: str, label: str):
+        wait_step = {"name": step_name, "method": "GET", "service": "vpc",
                      "poll": {"field": "$.subnet.state",
                               "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
-                              "timeout": 300, "interval": 10}}
-            _run_step(client, swait, f"{_SUBNET_CREATE_PATH}/{subnet_id}",
-                      None, "vpc", {})
-            reg.track(ResourceRecord(service="vpc",
-                                     delete_path=f"{_SUBNET_CREATE_PATH}/{subnet_id}",
-                                     resource_id=subnet_id, kind="subnet",
-                                     parent=vpc_id))
-            print(f"  shared subnet provisioned: {subnet_id} ({_SHARED_SUBNET_CIDR})")
-    if not subnet_id:
+                              "timeout": 300, "interval": 5, "verbose": True}}
+        _run_step(client, wait_step, f"{_SUBNET_CREATE_PATH}/{sid}", None, "vpc", {})
+        reg.track(ResourceRecord(service="vpc",
+                                 delete_path=f"{_SUBNET_CREATE_PATH}/{sid}",
+                                 resource_id=sid, kind="subnet", parent=vpc_id))
+        print(f"  {label} provisioned: {sid} ({cidr})")
+
+    subnet_id, sresp = _subnet_create(
+        "create-shared-subnet", f"regrsubsh{uniq}", _SHARED_SUBNET_CIDR,
+        "API regression shared subnet")
+    db_subnet_id, dresp = _subnet_create(
+        "create-shared-db-subnet", f"regrsubshdb{uniq}", _SHARED_DB_SUBNET_CIDR,
+        "API regression shared DB subnet")
+    if subnet_id:
+        _subnet_wait_track("wait-shared-subnet", subnet_id, _SHARED_SUBNET_CIDR,
+                           "shared subnet")
+    else:
         print(f"  shared-subnet provision failed ({sresp.status}); adopters will "
               f"self-create a subnet under the shared VPC.")
-
-    # 3) DB-lane shared subnet — the DB cluster lifecycles adopt THIS one
-    #    (adopt: "subnet#db") so their slow provisioning is isolated from the
-    #    VM/SKE/networking adopters on the main shared subnet.
-    db_subnet_id = None
-    db_body = _inject_owner_tags({
-        # IB-051: 'regrsubshdb'+8-hex == 19 chars, under the 20-char cap; still
-        # 'regrsub'-prefixed so the reconciler's subnet sweep reclaims it.
-        "name": f"regrsubshdb{uniq}", "description": "API regression shared DB subnet",
-        "cidr": _SHARED_DB_SUBNET_CIDR, "type": "GENERAL", "vpc_id": vpc_id, "tags": [],
-    }, axis="regression")
-    db_create = {"name": "create-shared-db-subnet", "method": "POST", "service": "vpc"}
-    dresp = _run_step(client, db_create, _SUBNET_CREATE_PATH, db_body, "vpc", {})
-    if dresp.status in (200, 201, 202) and dresp.body:
-        db_subnet_id = _capture(dresp.body, "$.subnet.id")
-        if db_subnet_id:
-            db_subnet_id = str(db_subnet_id)
-            dwait = {"name": "wait-shared-db-subnet", "method": "GET", "service": "vpc",
-                     "poll": {"field": "$.subnet.state",
-                              "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
-                              "timeout": 300, "interval": 10}}
-            _run_step(client, dwait, f"{_SUBNET_CREATE_PATH}/{db_subnet_id}",
-                      None, "vpc", {})
-            reg.track(ResourceRecord(service="vpc",
-                                     delete_path=f"{_SUBNET_CREATE_PATH}/{db_subnet_id}",
-                                     resource_id=db_subnet_id, kind="subnet",
-                                     parent=vpc_id))
-            print(f"  shared DB subnet provisioned: {db_subnet_id} ({_SHARED_DB_SUBNET_CIDR})")
-    if not db_subnet_id:
+    if db_subnet_id:
+        _subnet_wait_track("wait-shared-db-subnet", db_subnet_id,
+                           _SHARED_DB_SUBNET_CIDR, "shared DB subnet")
+    else:
         print(f"  shared-DB-subnet provision failed ({dresp.status}); DB adopters "
               f"fall back to the main shared subnet.")
 

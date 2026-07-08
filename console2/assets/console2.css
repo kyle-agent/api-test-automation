@@ -680,3 +680,12 @@ g.rg-selbox{cursor:pointer}
 /* soft 분류 확장 (2026-07-08 owner): 삭제확인(초록) · 과거 기록(보라 — 이번 런 미확인) */
 .schip.cfm{color:var(--ok);border-color:rgba(45,164,78,.45);background:rgba(45,164,78,.08)}
 .schip.dups{color:#8250df;border-color:rgba(130,80,223,.45);background:rgba(130,80,223,.08)}
+
+/* 자원 id 셀 clamp (2026-07-08 owner): keypair create가 private key 원문을 id로
+   흘리던 화면 — 셀은 고정 폭 말줄임, 마우스 오버 시에만 스크롤 박스로 전체 표시.
+   (소스 쪽도 수정: engine이 여러 줄/초장문 캡처를 id로 쓰지 않게 — 과거 런 이벤트
+   재생 시에도 이 clamp가 레이아웃을 지킨다.) */
+.resid{display:inline-block;max-width:340px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;vertical-align:bottom}
+.resid:hover{white-space:pre-wrap;word-break:break-all;max-width:none;
+  max-height:180px;overflow:auto}

@@ -22,10 +22,12 @@ The **live** pipeline (provision→pytest→teardown) is the next slice; it stay
 from __future__ import annotations
 
 import itertools
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -159,29 +161,74 @@ def build_plan(lifecycle_ids: Sequence[str]) -> dict:
 # The engine emits fine console-events to events_path during pytest, so the live view
 # is identical to simulate. Needs SCP creds + egress (real cloud calls).
 # --------------------------------------------------------------------------- #
+def _events_note(env: Mapping, kind: str, **fields) -> None:
+    """Append one server-side event line to the run's live-event stream (the
+    ``SCP_CONSOLE_EVENTS`` path in ``env``; same line shape as
+    ``core.console_events``) so the live view can narrate run phases that happen
+    OUTSIDE pytest — today: shared-infra provisioning. Best-effort: no sink
+    configured → silent no-op; narration must never break a run."""
+    path = (env or {}).get("SCP_CONSOLE_EVENTS")
+    if not path:
+        return
+    try:
+        rec = {"ts": round(time.time(), 3), "kind": kind}
+        rec.update(fields)
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _stream_cmd(cmd: Sequence[str], env: Mapping, f) -> tuple[int, list[str]]:
+    """Run ``cmd`` with merged stdout/stderr STREAMED line-by-line into the open
+    log file ``f`` (flush per line). ``subprocess.run(stdout=PIPE)`` held the
+    ENTIRE provision output until process exit, so the 로그 tab froze at the
+    ``=== provision shared VPC ===`` header for the full VPC+서브넷 ACTIVE wait
+    (1~3분) — owner report 2026-07-08 "실제 리소스 생성 시작까지가 너무 오래걸려".
+    Returns ``(rc, lines)`` so callers can parse KEY=VALUE output."""
+    proc = subprocess.Popen(list(cmd), cwd=str(_ROOT),
+                            env={**env, "PYTHONUNBUFFERED": "1"},
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1)
+    lines: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        lines.append(line)
+        f.write(line)
+        f.flush()
+    return proc.wait(), lines
+
+
 def provision_shared(env: dict, f) -> dict:
     """Provision ONE session-shared VPC+subnet so adopter lifecycles don't skip under
     ``-n``. Best-effort: on failure adopters self-skip and self-creators still run.
-    ``f`` is the run's open log file. Returns the ``SCP_SHARED_*`` env to merge into
-    the pytest env."""
+    ``f`` is the run's open log file (output streams into it line-by-line, so the
+    ACTIVE waits read as heartbeats, not a frozen header). Returns the
+    ``SCP_SHARED_*`` env to merge into the pytest env."""
     f.write("\n=== provision shared VPC (adopters need this under -n) ===\n")
     f.flush()
-    out = subprocess.run([sys.executable, "-m", "regression.scenarios.shared_infra", "--provision"],
-                         cwd=str(_ROOT), env=env, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, text=True)
-    f.write(out.stdout or "")
+    t0 = time.monotonic()
+    _events_note(env, "provision-start",
+                 note="공유 인프라(VPC+서브넷) 준비 — ACTIVE 대기 포함, 통상 1~3분")
+    _, lines = _stream_cmd([sys.executable, "-m", "regression.scenarios.shared_infra",
+                            "--provision"], env, f)
     shared: dict = {}
-    for line in (out.stdout or "").splitlines():
+    for line in lines:
+        line = line.strip()
         if line.startswith("SCP_SHARED_") and "=" in line:
             k, _, v = line.partition("=")
             if v.strip():
                 shared[k.strip()] = v.strip()
+    elapsed = round(time.monotonic() - t0, 1)
     if shared.get("SCP_SHARED_VPC_ID"):
         shared["SCP_VPC_SHARED_RESERVED"] = "1"
-        f.write(f"\n[provision] shared VPC ready: {shared['SCP_SHARED_VPC_ID']}\n")
+        f.write(f"\n[provision] shared VPC ready: {shared['SCP_SHARED_VPC_ID']} "
+                f"({elapsed:.0f}s)\n")
     else:
         f.write("\n[provision] no shared VPC id — adopters will skip (self-creators still run)\n")
     f.flush()
+    _events_note(env, "provision-end",
+                 vpc=shared.get("SCP_SHARED_VPC_ID", ""), elapsed_s=elapsed)
     return shared
 
 
@@ -215,6 +262,8 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
     run). Returns ``{rc, runner_missing}``; everything else surfaces in ``log_path``."""
     ids = list(lifecycle_ids)
     env = {**os.environ, "PYTHONPATH": str(_ROOT),
+           # line-buffer children so the 로그 tail sees lines, not block bursts
+           "PYTHONUNBUFFERED": "1",
            "SCP_CRUD_IDS": ",".join(ids), "SCP_CONSOLE_EVENTS": events_path,
            "SCP_ALLOW_MUTATIONS": "true" if mutations else "false",
            "SCP_ALLOW_DESTRUCTIVE": "true" if destructive else "false",
@@ -225,7 +274,7 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
                 f"# gates: mutations={mutations} destructive={destructive} heavy={heavy}  parallel={n}\n")
         f.flush()
         shared = provision_shared(env, f) if heavy else {}
-        f.write("\n=== pytest ===\n")
+        f.write("\n=== pytest === (수집 → xdist 워커 기동 — 첫 step 로그까지 보통 수십 초)\n")
         f.flush()
         pos = f.tell()
         rc = subprocess.run(
