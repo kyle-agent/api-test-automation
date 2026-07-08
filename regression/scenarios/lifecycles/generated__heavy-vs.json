@@ -418,6 +418,96 @@
           "_note": "공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)"
         },
         {
+          "name": "create-image-member",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images/{custom_image_id}/members",
+          "json": {"member": "ec11538abf8f46d2953539521f745366"},
+          "capture_soft": {"member_id": "$.member_id"},
+          "expect_status": [200, 201, 202, 400, 403, 409, 422],
+          "_note": "2026-07-08 25-편입(owner GO): createimagemember — 자기 계정으로 share (asg notification user_ids 선례의 계정 고정값). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "show-image-member",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/images/{custom_image_id}/members/{member_id}",
+          "expect_status": [200, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): showimagemember."
+        },
+        {
+          "name": "update-image-member",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/images/{custom_image_id}/members/{member_id}",
+          "json": {"status": "accepted"},
+          "expect_status": [200, 202, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): updateimagemember — status 값 추정(glance 계열). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "delete-image-member",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "destructive": true,
+          "method": "DELETE",
+          "path": "/v1/images/{custom_image_id}/members/{member_id}",
+          "expect_status": [200, 202, 204, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): deleteimagemember."
+        },
+        {
+          "name": "create-sharing-image",
+          "service": "virtualserver",
+          "group": "image-extras",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images/{custom_image_id}/share",
+          "json": {"account_id": "ec11538abf8f46d2953539521f745366"},
+          "expect_status": [200, 201, 202, 400, 403, 409, 422],
+          "_note": "2026-07-08 25-편입(owner GO): createsharingimage — body 스키마 추정. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "create-image-shell",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images",
+          "json": {"container_format": "bare", "disk_format": "qcow2", "min_disk": 100, "min_ram": 0, "name": "regrimgsh{ualpha}", "os_distro": "ubuntu", "protected": false},
+          "capture_soft": {"pending_image_id": "$.id"},
+          "expect_status": [200, 201, 202, 400, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/images/{pending_image_id}", "service": "virtualserver"},
+          "_note": "2026-07-08 25-편입(owner GO): createimage — 업로드 대기 셸 생성 (docs request_example body 그대로, os_distro 만 ubuntu). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "import-image",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images/{pending_image_id}/import",
+          "json": {},
+          "expect_status": [200, 202, 400, 404, 409, 422],
+          "_note": "2026-07-08 25-편입(owner GO): importimage — 소스 URL 스키마 미문서(빈 body 도달+정정 유도). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "delete-image-shell",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "destructive": true,
+          "method": "DELETE",
+          "path": "/v1/images/{pending_image_id}",
+          "expect_status": [200, 202, 204, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): pending 셸 teardown."
+        },
+        {
           "name": "create-volume-attachment",
           "service": "virtualserver",
           "method": "POST",

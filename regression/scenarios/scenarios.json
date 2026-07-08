@@ -1558,6 +1558,24 @@
           "_note": "strict 단건 조회 — '이번 런에서 지금도 200인가'를 이 레시피가 자급자족으로 증명 (2026-07-08 owner: dup_store/CI read-chain 의존 제거). 뒤의 wait-snapshot-gone(삭제확인 404)과는 목적이 다르다."
         },
         {
+          "name": "update-snapshot",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/snapshots/{snap_id}",
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 202, 400, 404],
+          "_note": "2026-07-08 25-편입(owner GO): updatesnapshot — body 필드 추정(description). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "revert-volume-to-snapshot",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/volumes/{vol_id}/revert",
+          "json": {"snapshot_id": "{snap_id}"},
+          "expect_status": [200, 202, 400, 404, 409],
+          "_note": "2026-07-08 25-편입(owner GO): revertvolumetosnapshot — 독립 볼륨(available)이라 되돌리기 안전; body 추정. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "volume_id": "{vol_id}",
@@ -2967,6 +2985,20 @@
           "optional": true
         },
         {
+          "name": "list-server-groups",
+          "method": "GET",
+          "path": "/v1/server-groups",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listservergroups."
+        },
+        {
+          "name": "get-partition-size",
+          "method": "GET",
+          "path": "/v1/server-groups/partition-size",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): getpartitionsize."
+        },
+        {
           "name": "find-image",
           "method": "GET",
           "path": "/v1/images",
@@ -2983,6 +3015,41 @@
             "os_distro": "ubuntu",
             "limit": 50
           }
+        },
+        {
+          "name": "list-default-configs",
+          "method": "GET",
+          "path": "/v1/default-configs",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
+        },
+        {
+          "name": "show-default-volume-type",
+          "method": "GET",
+          "path": "/v1/volume-types/default",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
+        },
+        {
+          "name": "show-quota-set",
+          "method": "GET",
+          "path": "/v1/quota-sets",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
+        },
+        {
+          "name": "show-volume-quota-set",
+          "method": "GET",
+          "path": "/v1/volumes/quota-sets",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
+        },
+        {
+          "name": "list-pending-images",
+          "method": "GET",
+          "path": "/v1/pending-images",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
         },
         {
           "name": "find-server-type",
@@ -3003,6 +3070,13 @@
               "get": "id"
             }
           }
+        },
+        {
+          "name": "show-server-type",
+          "method": "GET",
+          "path": "/v1/server-types/{server_type_id}",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): showservertype — find-server-type 이 고른 실측 id."
         },
         {
           "name": "create-server",
@@ -3061,6 +3135,13 @@
             "timeout": 1200,
             "interval": 15
           }
+        },
+        {
+          "name": "list-virtual-servers",
+          "method": "GET",
+          "path": "/v1/servers",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listvirtualservers."
         },
         {
           "name": "capture-server-port",
@@ -3246,6 +3327,27 @@
           ]
         },
         {
+          "name": "create-private-static-nat",
+          "group": "vs-port",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats",
+          "json": {},
+          "capture_soft": {"pvnat_id": "$.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "2026-07-08 25-편입(owner GO): createserverinterfaceprivatenat — body 스키마 미문서(빈 body로 도달+정정 유도), PF-15 계열 403 관용. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+        },
+        {
+          "name": "delete-private-static-nat",
+          "group": "vs-port",
+          "optional": true,
+          "destructive": true,
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "_note": "2026-07-08 25-편입(owner GO): deleteserverinterfaceprivatenat."
+        },
+        {
           "name": "updateserverinterface",
           "service": "virtualserver",
           "method": "PUT",
@@ -3395,6 +3497,14 @@
             "path": "/v1/servers/{server_id}/volumes/{vol_id}",
             "service": "virtualserver"
           }
+        },
+        {
+          "name": "show-server-volume",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/volumes/{vol_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "_note": "2026-07-08 25-편입(owner GO): showservervolume — attach 202 직후라 404 관용. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
           "name": "wait-volume-attached",

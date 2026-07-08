@@ -93,6 +93,14 @@
           "expect_status": [200]
         },
         {
+          "name": "list-launch-configurations",
+          "method": "GET",
+          "path": "/v1/launch-configurations",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listlaunchconfigurations."
+        },
+        {
           "name": "create-security-group",
           "_note": "Create a throwaway SG for the ASG. Returns $.security_group.id.",
           "method": "POST",

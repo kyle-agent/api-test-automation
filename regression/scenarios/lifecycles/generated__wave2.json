@@ -664,6 +664,14 @@
           }
         },
         {
+          "name": "list-volumes",
+          "method": "GET",
+          "path": "/v1/volumes",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listvolumes."
+        },
+        {
           "name": "verify-block-volume",
           "service": "virtualserver",
           "method": "GET",
@@ -724,6 +732,7 @@
             202,
             500
           ],
+          "capture_soft": {"transfer_auth_key": "$.auth_key"},
           "capture": {
             "transfer_id": "$.id"
           },
@@ -746,6 +755,24 @@
           ],
           "group": "volume-transfer",
           "_note": "downstream of PF-21 create 500 → no transfer_id captured; the optional create is group-skipped so this read runs with the literal {transfer_id} → 404. Tolerate 404 so the cascade is not a TEST FAILURE; run 27593608514"
+        },
+        {
+          "name": "list-volume-transfers",
+          "method": "GET",
+          "path": "/v1/volume-transfer",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "_note": "2026-07-08 25-편입(owner GO): listvolumetransfer."
+        },
+        {
+          "name": "accept-volume-transfer",
+          "service": "virtualserver",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/volume-transfer/{transfer_id}/accept",
+          "json": {"auth_key": "{transfer_auth_key}"},
+          "expect_status": [200, 202, 400, 404, 409],
+          "_note": "2026-07-08 25-편입(owner GO): acceptvolumetransfer — create 가 PF-21(500 baselined)이라 auth_key 는 soft 캡처; 미해결 시 관용 도달 기록. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
           "name": "delete-volume-snapshot",
