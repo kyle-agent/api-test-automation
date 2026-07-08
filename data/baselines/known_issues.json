@@ -1,5 +1,32 @@
 {
   "_comment": "Baseline of known/expected failures so the dashboard separates NEW regressions from already-tracked backend bugs. A smoke 'fail' whose key matches an entry here is shown as 'known-red' (muted), not a new regression. Type follows the ReportPortal taxonomy: Product Bug | Automation Bug | System Issue.",
+  "_stuck_comment": "stuck_resources = documented, currently-undeletable OWNED leftovers. The /testing/resources owned-scan folds matching rows into a collapsed '기지 항목 (문서화된 잔존)' group instead of alarming. Remove an entry when the resource finally deletes.",
+  "stuck_resources": [
+    {
+      "id": "47fabeca13f24958a0344a00011a274d",
+      "service": "servicewatch",
+      "name": "/scp/ske/regrske4936128d-0325b",
+      "reason": "IAM-gated log-group — its log-stream delete needs an IAM action our key lacks, so the group cannot be emptied/deleted via API.",
+      "since": "2026-06-25",
+      "ref": "knowledge/validated-facts.md (servicewatch log-group IAM gate)"
+    },
+    {
+      "id": "9e231b01e2394d7aaa8dcca218e770cb",
+      "service": "scf",
+      "name": "regrw5trg57f68be7",
+      "reason": "SCF PrivateLink Service stuck CREATING (PLS deadlock): PLS can't be disabled while Creating, function can't delete while PLS enabled — un-teardownable via API. Auto-expire eots 2026-07-31.",
+      "since": "2026-06-24",
+      "ref": "known_issues: compute/scf/updateprivatelinkservice+deletecloudfunction"
+    },
+    {
+      "id": "3aac2e34203a42cab56b089336bbd18d",
+      "service": "scf",
+      "name": "regrw5trgd7ff680d",
+      "reason": "SCF PrivateLink Service stuck CREATING (PLS deadlock): PLS can't be disabled while Creating, function can't delete while PLS enabled — un-teardownable via API. Auto-expire eots 2026-07-31.",
+      "since": "2026-06-24",
+      "ref": "known_issues: compute/scf/updateprivatelinkservice+deletecloudfunction"
+    }
+  ],
   "issues": [
     {
       "key": "financial-management/billingplan/listplannedcomputeservertypes",

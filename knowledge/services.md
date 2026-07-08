@@ -22,6 +22,80 @@ duplicating. Add a new `##` section when you take on a new service.
   not `type`, `$.servers[0].id`, rename regex, stop/start, attach volume).
 - **Lookups:** images `/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50`;
   server-types `/v1/server-types` (pick id starting with `s`).
+- **createport `fixed_ip_address`** (HB3, run 28723287734, 2026-07-05):
+  `data/api_docs.json` networking/vpc/portcreaterequest documents this field
+  as optional `any of [string, null]` default `""`, and the doc's OWN
+  request_example sends `"fixed_ip_address":""` — but live it 400s
+  `scp-network.port.fixed_ip.format-error` ("The requested Fixed IP() is
+  invalid IP format.") on that exact documented default. Fix: **omit the key
+  entirely** (let the backend auto-assign from the subnet) rather than send
+  `""`. Fixed in `compute-virtualserver-full`'s `create-port` step
+  (`regression/scenarios/scenarios.json`); unblocks the whole `vs-port` group
+  (map-sg-to-port/attach-port-to-server/read-attached-port/
+  detach-port-from-server/delete-port). Not yet re-verified live.
+- **delete-server `InvalidVirtualServerState.DeleteImpossible`** (HB3, run
+  28723287734, 2026-07-05): reproduced 3x in the SAME run, right after
+  image-delete/detach-volume/detach-security-group — a transient post-mutation
+  settle window, not a hard block: `cleanup/reconciler.py`'s later sweep
+  deletes the exact same server successfully with no special handling beyond
+  elapsed time (it just retries across sweep rounds). The doc-visible
+  `$.server.state` field doesn't appear to expose an in-between task_state, so
+  a fixed pre-delay is the load-bearing fix, not a value-based poll. Fixed in
+  `compute-virtualserver-full` (`regression/scenarios/scenarios.json`): added
+  a `wait-server-settled` step (20s fixed wait + up-to-120s poll top-up)
+  before `delete-server`, plus `retry_on_status:[400,409]` (6×20s) on
+  `delete-server` itself as a second line of defense. Not yet re-verified
+  live.
+- **image-update (`PUT /v1/images/{id}`) `Image.InvalidVolumeOnMinDiskUpdate`**
+  (HB3, run 28723287734, 2026-07-05): `min_disk` must be >= the size of the
+  volume the custom image was created from (the server's boot volume).
+  `compute-virtualserver-full` creates its boot volume at `size:104` but the
+  `image-update` step sent `min_disk:100` — bumped to `104` to match. Not yet
+  re-verified live.
+- **image-update `min_disk` is CATEGORICALLY rejected, not value-tunable**
+  (HB3b-2, 2026-07-06, run 28766151214): the `min_disk:104` fix above (matched
+  to the source volume size) still 400s, but with a DIFFERENT message this
+  time: `Image with volumes cannot update min disk` — an outright rejection
+  of the `min_disk` field on any image whose source had attached volumes (this
+  lifecycle's custom image is such a snapshot), independent of the value sent.
+  `data/api_docs.json` `compute/virtualserver/imagesetrequest` (the PUT body
+  model) has exactly 4 fields — `min_disk`, `min_ram`, `protected`,
+  `visibility` — no `description` field exists on this model (unlike some
+  other services' update bodies). Fixed `compute-virtualserver-full`'s
+  `image-update` step (`regression/scenarios/scenarios.json`) to drop
+  `min_disk` entirely and send `{min_ram, protected, visibility:"private"}`
+  instead. Not yet re-verified live.
+- **attach-port `VirtualServer.CreateInterface.Duplicated`** (HB3b-2,
+  2026-07-06, run 28766151214): `compute-virtualserver-full`'s standalone
+  `create-port`/`attach-port-to-server` steps pointed the new port at
+  `{subnet_id}` — the SAME subnet the server's own boot NIC already lives on
+  (`create-server`'s `networks[].subnet_id`) — so attaching a second interface
+  there is a genuine duplicate, not a param bug. This lifecycle has no
+  existing second/shared subnet (checked — no `adopt: subnet#db` pattern here,
+  unlike the DB-engine `-full` lifecycles). Fix: added a dedicated
+  `create-port-subnet` step (own subnet in the same VPC, `10.135.3.0/24`,
+  scoped to the `vs-port` group with its own cleanup) and repointed
+  `create-port`/`attach-port-to-server`'s `subnet_id` at the new
+  `{port_subnet_id}`. Not yet re-verified live.
+- **Boot volume TTL-survives the final sweep** (HB3b-2, 2026-07-06, run
+  28766151214): `compute-virtualserver-full`'s server (`delete_on_termination:
+  true` on its boot volume) left the boot volume behind after `delete-server`
+  succeeded — the account-wide sweep at the end of the chat-heavy job could not
+  reclaim it TWICE in a row (needed a manual `SCP_SWEEP_IGNORE_TTL=true` rescue
+  both times), meaning `delete_on_termination`'s async cascade doesn't reliably
+  finish before that final sweep pass runs. `capture-server-volume`
+  (`$.volumes[0].id` → `boot_vol_id`) was already in the lifecycle but was a
+  DEAD capture (nothing consumed it). Fixed: added an explicit
+  `delete-boot-volume` step right after `wait-server-gone` (404-confirmed)
+  using `{boot_vol_id}`, `optional:true` + `expect_status` including 400/404 so
+  a volume the cascade already reaped, or one still mid-detach, never fails
+  the lifecycle. Considered (and rejected) forcing the workflow's *final*
+  sweep to `SCP_SWEEP_IGNORE_TTL=true` unconditionally instead — rejected
+  because the TTL is exactly what protects OTHER concurrently-running agents'
+  still-live resources from a cross-run reap (`core.registry`/
+  `cleanup/reconciler.py _is_deletable`); an explicit in-lifecycle delete is
+  the safe fix, a blanket IGNORE_TTL sweep is not. `.github/` workflow files
+  were not touched (out of scope). Not yet re-verified live.
 
 ## compute / virtualserver — autoscaling
 
@@ -130,6 +204,45 @@ lifecycle `heavy-asg-full-coverage` in
   `?backup_name=regrtest` → `{"result":false}`.
 - **listbackups** list envelope: `{contents:[], count}` (NOT `{backups:[], ...}`).
 - **createbackup** returns 500 `ContactAdminForAssistance` — product-bug (baselined).
+- **getbackuptargetlist EMPTY for FILESYSTEM is NOT a timing lag — REVISED
+  2026-07-06 (HB3b-2, run 28766151214 job log)**: the HB3b (2026-07-05)
+  hypothesis below ("inventory-registration lag", fixed with a `$.count until
+  1` poll) was tested live in run 28766151214 and FALSIFIED — the poll ran
+  its full 300s budget (confirmed via the ~303s gap between `wait-server`'s
+  and `create-backup-target`'s timestamps in
+  `reports/results/hb3b/observations-gw0.jsonl`, vs. the step's own last-call
+  `elapsed_ms` of only ~828ms) and `count` never left 0. Root cause per
+  `knowledge/formal/resources/storage__backup.yaml` line 40 (already
+  documented, just not connected to this symptom until now): `policy_type=
+  FILESYSTEM` is the **Agent-type** backup category — a server only appears
+  in that list once a Backup Agent is installed/configured on it ("Agent
+  backups require prior agent creation and configuration on target
+  servers", userguide overview). The agent family (8 ops, incl.
+  createbackupagent) is an **owner WAIVER** (2026-06-10, "agent 없는 백업으로만"
+  — `data/baselines/coverage_waivers.json`), so this account/run deliberately
+  never installs an agent on the test VM — `contents:[]` for FILESYSTEM is
+  therefore the CORRECT, expected response, not a bug or a race. The
+  semantically-right query for our AGENTLESS goal is `policy_type=VM_IMAGE`,
+  which is blocked by a separate, already-baselined product bug (500
+  `ContactAdminForAssistance`, `data/baselines/known_issues.json`
+  `storage/backup/getbackuptargetlist`, confirmed 2026-06-20). **Net: there is
+  currently no live query-parameter combination that returns non-empty
+  contents for our agentless-VM backup chain** — this is a genuine
+  product-bug + owner-waiver double-block, not a fixable param/timing issue.
+  Do not re-attempt a param tweak here without new evidence (e.g. the
+  VM_IMAGE 500 clearing, or the agent waiver being lifted). The `$.count
+  until 1` poll in `generated__heavy-backup.json`'s `create-backup-target`
+  step is left in place (harmless — it still returns the correct 200/empty
+  response after its timeout, and would self-heal for free if the VM_IMAGE
+  bug is ever fixed and the step's `policy_type` is swapped back to
+  VM_IMAGE) but is NOT the actual fix for this gap.
+- **(superseded) getbackuptargetlist inventory-registration lag** (HB3, run
+  28723287734, 2026-07-05): even with `policy_type=FILESYSTEM`, `GET
+  /v1/backups/backup-targets?...&server_name=<own server>` right after the
+  server flips ACTIVE can still return 200 with `contents:[]`. HB3b guessed
+  this was a registration-lag race and added a `$.count until 1` poll — HB3b-2
+  above shows the real cause is the FILESYSTEM/agent-waiver interaction, not
+  timing. Kept here for history only.
 
 ## storage / archivestorage
 
@@ -270,6 +383,201 @@ lifecycle `heavy-asg-full-coverage` in
   - Subnet create: POST /v1/subnets (NOT /v1/vpcs/{id}/subnets); body: top-level fields
     `{name, cidr, type: GENERAL, vpc_id, tags: []}`. Returns 202; poll $.subnet.state → ACTIVE.
   - Response fields: `$.privatelink_service.id`, `$.privatelink_endpoint.id`.
+- **Transit gateway CREATING → ACTIVE settle timing (CONFIRMED, HB4 run 28738115294, 2026-07-05):**
+  `POST /v1/transit-gateways` returns 202 (async) and the TGW sits in `CREATING` for a while — any
+  child call issued immediately (vpc-connection/firewall/firewall-connection/routing-rule/
+  uplink-routing-rule create, `setTransitGateway`, even `deletetransitgateway`) 400s with
+  `scp-network.transit-gateway.not-active-state` ("Transit Gateway state is not
+  Active.:(CREATING)") / on delete, `scp-network.transit-gateway.invalid-state` ("... not
+  deletable state(Active, Error)"). Poll `$.transit_gateway.state` (`GET
+  /v1/transit-gateways/{id}`, field confirmed from `data/api_docs.json`
+  createtransitgateway/showtransitgateway `response_example`) until `ACTIVE` before EVERY child
+  op AND again right before delete (children can re-transition the TGW). Fixed OFFLINE
+  2026-07-06 in `vpc-transit-gateway-children` (`networking__vpc.json`) — UNVERIFIED LIVE.
+- **`create-tgw-vpc-connection` ALSO re-transitions the TGW to EDITING (CONFIRMED by observation
+  timestamps, HB4b run 28827996068, 2026-07-06):** even after the `wait-tgw-active` settle-poll
+  above, `POST .../vpc-connections` (202) is followed ~7s later (after 3 read-only GETs) by
+  `create-tgw-firewall` 400 `not-active-state:(EDITING)` — the connection create itself flips an
+  ACTIVE TGW back to EDITING for another settle window, same as the initial CREATING one. Fixed
+  OFFLINE 2026-07-07: added `wait-tgw-active-after-connection` (same field/until/give_up_status
+  poll) right after `create-tgw-vpc-connection`, before any further child create.
+- **`createtransitgatewayvpcconnection` / `createtransitgatewayrule` / `createtransitgatewayuplinkrule`
+  response envelopes are NOT `vpc_connection`/`routing_rule` (CONFIRMED from `data/api_docs.json`
+  response_example, 2026-07-07):** the actual wrapper keys are `transit_gateway_vpc_connection.id`
+  and `transit_gateway_rule.id` respectively. The `vpc-transit-gateway-children` lifecycle's
+  `capture_soft` used the wrong keys (`$.vpc_connection.id` / `$.routing_rule.id`), so
+  `vpc_connection_id`/`routing_rule_id`/`uplink_routing_rule_id` never resolved even when the
+  create itself succeeded — DIRECT ROOT CAUSE of `delete-tgw-vpc-connection`'s 400
+  `not-in-vpc-connection` showing a literal unresolved `{vpc_connection_id}` placeholder in its
+  error body (proof of a missed capture, not a TGW-state issue as first hypothesized). Fixed
+  OFFLINE 2026-07-07 (all three capture paths corrected in `networking__vpc.json`).
+- **`createtransitgatewayfirewall` REQUIRES an already-ACTIVE firewall-connection — the
+  create ORDER was backwards (CONFIRMED, HB4d run 28835929967, 2026-07-07):** 400
+  `scp-network.transit-gateway.firewall-connection-active-state` ("Transit Gateway Firewall
+  connection state is not Active: (INACTIVE)") — `createtransitgatewayfirewall` was being called
+  BEFORE `createtransitgatewayfirewallconnection` in `vpc-transit-gateway-children`. Both
+  endpoints' `response_example` (`data/api_docs.json`) wrap as `transit_gateway` and carry a
+  shared `firewall_connection_state` field — this is a TGW-level gate, not a per-firewall
+  resource. ALSO: `createtransitgatewayfirewall`'s response has NO top-level `firewall` key (the
+  `capture_soft` `$.firewall.id` never resolved); the firewall id lives in `transit_gateway.
+  firewall_ids[0]`. Fixed OFFLINE 2026-07-07: `create-tgw-firewall-connection` (+ a new
+  `wait-firewall-connection-active` settle-poll on `$.transit_gateway.firewall_connection_state`)
+  moved to run BEFORE `create-tgw-firewall`; capture fixed to
+  `$.transit_gateway.firewall_ids[0]`; delete order also swapped (firewall before connection,
+  child-first) though that side is inferred, not directly observed. UNVERIFIED LIVE.
+- **`createtransitgatewayrule` destination_cidr must be inside the CONNECTED VPC's own cidr, not
+  this lifecycle's OWN (non-adopted) fallback cidr (CONFIRMED, HB4d run 28835929967,
+  2026-07-07):** 400 `scp-network.routing-rule.destination-cidr-include-vpc-cidr` echoing back our
+  own bad `destination_cidr` (`10.131.0.0/20` — copied from `vpc-transit-gateway-children`'s own
+  local `create-vpc` fallback body, only used in the rare non-xdist path). Under real heavy-dispatch
+  (xdist), `{vpc_id}` instead resolves to the session-shared VPC (`_SHARED_VPC_CIDR =
+  10.124.0.0/20`, same fact as the vpc-endpoint subnet-cidr fix below) — a destination_cidr from
+  the wrong VPC's range. Fixed OFFLINE 2026-07-07: `destination_cidr` → `10.124.0.0/24` (valid
+  sub-range of the shared VPC's `/20`). RESIDUAL: the local (non-adopted) fallback path's own cidr
+  match is still unaddressed (dead code under xdist, same class as the vpc-endpoint gap below).
+  UNVERIFIED LIVE.
+- **VPC Peering: same-account peering NEVER needs approval (CONFIRMED, HB5 run 28831560635,
+  2026-07-07):** `PUT /v1/vpc-peerings/{id}/approval` 400s every time with
+  `scp-network.vpc-peering.approval-same-account-type` / "Approval is not required for Same
+  Account VPC peering" whenever both the requester and approver VPC belong to the same account
+  (our `vpc-peering` lifecycle always creates both VPCs itself, so this is a PERMANENT 400 for
+  it, not a transient CREATING-state error). `data/api_docs.json` `showvpcpeering`
+  `response_example` documents `account_type: SAME` + `state: CREATING` as its own baseline
+  case, confirming SAME-account is the default/expected shape. The peering still auto-progresses
+  CREATING → ACTIVE without any approval call for the SAME-account case; the earlier
+  `retry_on_status:[400]` x8x15s on the approve step (2026-06-11) was wasting ~120s chasing a
+  permanent error, which pushed the downstream `wait-peering-active` settle-poll to start late
+  and time out before the peering actually reached ACTIVE (set/delete/create-routing-rule then
+  400 `invalid-changeable-state`/`invalid-deletable-state`/`not-active-state` all `(CREATING)`).
+  Fixed OFFLINE 2026-07-07 in `networking__vpc.json`: `wait-peering-active` moved to run
+  immediately after `create-vpc-peering` (full fresh 300s budget); `approve-vpc-peering`'s retry
+  removed (kept as a documented-400 coverage probe only); two more short settle-polls added
+  before `set-vpc-peering`/`delete-vpc-peering` (child routing-rule create/delete can flip the
+  parent peering back to a transitional state, same precedent as TGW's
+  `wait-tgw-active-after-connection`). **If a genuine cross-account approver is ever added**
+  (a real second account), the approval flow becomes real and transient-400 retry should be
+  restored for that variant only. Live re-validation still pending (offline repair pass).
+- **VPC Peering re-repair: the HB5 placement fix did NOT resolve it — same-account peering can
+  stay CREATING for 500+ seconds, NOT a wrong-response-key bug (CONFIRMED/REFUTED, HB4d run
+  28835929967, 2026-07-07):** the SAME run this session investigated shows `wait-peering-active`
+  (already correctly placed right after `create-vpc-peering` per the HB5 fix) STILL returning at
+  create+~309s with the cascade repeating (`set`/`delete`/`create-routing-rule` all 400 CREATING).
+  **Ruled out** the "wrong response-wrapper-key" hypothesis (the TGW-capture-key class of bug):
+  `data/api_docs.json` `showvpcpeering` `response_example` confirms the wrapper genuinely IS
+  `$.vpc_peering.state` — the field was already correct. Timestamp math instead shows the peering
+  never observed ACTIVE across ~540s of cumulative settle/retry budget (300s `wait-peering-active`
+  + 60s `wait-peering-active-before-set` + 120s of `delete-vpc-peering`'s own 8×15s retries, all
+  exhausted) — a genuine timeout-too-short (or possibly a stuck-CREATING product defect), not a
+  field/key mistake. Fixed OFFLINE 2026-07-07 as the evidence-based next step (NOT claimed as a
+  proven fix): `wait-peering-active` timeout 300→900s; `wait-peering-active-before-set`/
+  `-before-delete` timeout 60→300s each. **If 900s still never reaches ACTIVE, reclassify as a
+  genuine backend stuck-CREATING defect** (baseline-worthy) rather than continuing to bump
+  timeouts — this session did not have the live data to make that call. UNVERIFIED LIVE.
+- **VPC Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet, not `GENERAL` (CONFIRMED —
+  already VALIDATED via `knowledge/formal/resources/networking__vpc.yaml` endpoint-subnet node,
+  live-validated run 27583285457 2026-06-15; re-confirmed by HB4 run 28738115294, 2026-07-05):**
+  `POST /v1/vpc-endpoints` with `subnet_id` pointing at a `GENERAL` subnet 400s
+  `scp-network.vpc-endpoint.subnet-not-found` ("VPC Endpoint Type Subnet not found"). Subnet
+  `type` enum is `(GENERAL, LOCAL, VPC_ENDPOINT)` (`data/api_docs.json`
+  `subnetcreaterequest`). The `vpc-endpoint` lifecycle in `networking__vpc.json` had not applied
+  this already-known fix (was still sending `type:GENERAL`, and adopting the shared/GENERAL
+  subnet) — fixed OFFLINE 2026-07-06 (self-creates its own `VPC_ENDPOINT`-type subnet every run,
+  no longer adopts the shared subnet). Separately, `resource_key` still needs a REAL
+  target-service resource id (e.g. an actual filestorage `volume_id` when `resource_type: FS`) —
+  this axis remains synthetic/UNPROVEN in `networking__vpc.json` (a disabled composed
+  `gen-wave5-vpce` lifecycle in `generated__wave5-net.json` models the real-FS-volume wiring but
+  is itself not live-validated).
+- **`endpoint_ip_address` must be inside the ENDPOINT'S OWN dedicated subnet cidr, not a leftover
+  address from a previous cidr scheme (CONFIRMED residual bug, HB4d run 28835929967,
+  2026-07-07):** 400 `scp-network.vpc-endpoint.check-ip-address-overlap` ("The requested IP
+  Address (10.124.0.20) does not overlap with the requested subnet CIDR") — when the HB4c session
+  fixed `create-subnet`'s cidr (`10.129.8.0/24` → `10.124.9.0/24`, see the shared-VPC-cidr note
+  above), it did not also update `create-vpc-endpoint`'s `endpoint_ip_address`, which was still
+  `10.124.0.20` (inside the session-shared GENERAL subnet's `10.124.0.0/24`, not this endpoint's
+  own dedicated `10.124.9.0/24`). Fixed OFFLINE 2026-07-07: `endpoint_ip_address` →
+  `10.124.9.20` (inside the dedicated subnet's own range). UNVERIFIED LIVE.
+
+## networking / loadbalancer
+
+- **Host:** regional. 34 endpoints. Base LB stack (subnet → health-check → LB → server-group) is
+  `heavy: true`; light collection GETs (`networking-loadbalancer-reads`) are read-only.
+- **Health-check ↔ load-balancer creation ORDER constraint (CONFIRMED, HB4 run 28738115294,
+  2026-07-05):** `POST /v1/lb-health-checks` requires a Load Balancer to ALREADY exist in the
+  target `subnet_id` — live 400 `scp-loadbalancer.lb-health-checks.SubnetNotAssociatedWithLoadBalancer`
+  ("... the chosen subnet does not contain a Load Balancer ... Please ensure a Load Balancer
+  exists within the subnet before attempting again"). This is in tension with the earlier
+  (2026-06) fix that made `lb-server-group-create` need a PRE-CREATED health check (to avoid
+  `LbHealthCheckNotFoundError`). Resolution: create the LB FIRST (wait ACTIVE), THEN the health
+  check (subnet now has an LB), THEN the server group (health check now exists) — one order
+  satisfies both constraints. Fixed OFFLINE 2026-07-06 in `networking-loadbalancer-members-nat`
+  (`networking__loadbalancer.json`) — UNVERIFIED LIVE.
+- **Public static-NAT requires an Internet Gateway attached to the LB's VPC (CONFIRMED, same
+  run):** `POST /v1/loadbalancers/{id}/static-nats` 400s `scp-loadbalancer.loadbalancers.igw-required-for-static-nat`
+  ("Cannot create Public NAT: No Internet Gateway (IGW) found in the VPC") when the VPC has no
+  IGW — same precondition as NAT gateways (`networking/vpc` NAT-gateway note above: create IGW,
+  wait ACTIVE, PUT/set it, THEN the NAT-family create). Fixed OFFLINE 2026-07-06 (IGW
+  create/wait/set steps added before `static-nat-create`, delete added after `static-nat-delete`,
+  before VPC/subnet teardown) — UNVERIFIED LIVE.
+- **Private static-NAT is an entitlement wall, not a body bug (CONFIRMED, same run):**
+  `POST /v1/loadbalancers/{id}/private-static-nats` → 403
+  `scp-loadbalancer.loadbalancers.PrivateNatIpForbidden` ("You do not have permission to access
+  the private NAT IP resource") regardless of body content — WAIVER CANDIDATE (entitlement), do
+  not chase with body changes.
+- **Public static-NAT ALSO needs a real `publicip_id`, not just the IGW precondition (CONFIRMED
+  live error, HB4b run 28827996068, 2026-07-06):** even after the IGW fix above, `static-nat-create`
+  404s `scp-loadbalancer.loadbalancers.PublicIpNotFound` ("Public IP '' is not found") — the
+  lifecycle body sent `publicip_id:""` BY DESIGN (no real public IP was available at the time the
+  IGW fix was written). `data/api_docs.json` `staticnatcreaterequestdetail` confirms `publicip_id`
+  is the ONLY field and `required:true`. Fixed OFFLINE 2026-07-07: added
+  `create-publicip-for-static-nat` (verbatim `type:IGW` pattern from `networking/vpc`'s proven
+  `create-publicip-for-nat`/`create-publicip-for-vip`), feeding its `$.publicip.id` into
+  `static-nat-create`; teardown deletes it after `static-nat-delete`. UNVERIFIED LIVE.
+- **`addlbservergroupmembers` needs a REAL VM object_id, not an arbitrary IP (CONFIRMED live error,
+  HB4b run 28827996068, 2026-07-06):** `members-add` → 403
+  `scp-loadbalancer.members.InvalidVmInMember` ("Member VM object_id is invalid. (object_id: '',
+  ip: '10.124.0.31')") — the lifecycle sends `object_id:""` (no VM ever created in this
+  lifecycle). This is a cross-service prerequisite (a live `compute/virtualserver` instance's id),
+  not a body/param bug — **investigated, NOT fixed this session (2026-07-07):**
+  1. **Cross-lifecycle capture is NOT feasible today.** The engine's only cross-test resource
+     sharing is `regression/scenarios/shared_infra.py`'s OUT-OF-BAND provisioning (before pytest
+     starts, driven by the `.github/workflows/api-test.yml` step that exports
+     `SCP_SHARED_VPC_ID`/`SCP_SHARED_SUBNET_ID`), and the lifecycle-side `"adopt"` key only ever
+     appears as `"vpc"` / `"subnet"` / `"subnet#db"` across the whole repo (grep-confirmed, 2026-07-07)
+     — there is no `"adopt": "server"` precedent, and adding one would need both an engine change
+     AND a `.github/` workflow change (forbidden this session, and a bigger ask than "coordinate
+     via a peer" — it needs a NEW shared out-of-band VM the whole campaign would depend on).
+  2. **Embedding a self-contained VM closure directly in this LB lifecycle is technically
+     possible** (mirrors `compute-virtualserver-full`'s own create-server/wait-active/delete
+     chain) but was judged NOT worth it this session: `compute-virtualserver-full` itself needed
+     3 separate offline repair rounds (HB3/HB3b/HB3b-2) for port/volume/image edge cases even
+     with a dedicated owner, so duplicating that create-server body here would import the same
+     fragility class into an already-large 34-endpoint LB lifecycle for a payoff of only 4
+     endpoints (members-add/set/remove-single/remove-bulk cascade) — plus real compute billing
+     and multi-minute wall time this offline session cannot live-verify.
+  3. **Recommendation to the orchestrator:** either (a) approve a follow-up session to extend
+     `shared_infra.py` + `.github/workflows/api-test.yml` with an `SCP_SHARED_VM_ID` (mirroring
+     the existing shared-VPC pattern) so `"adopt": "server"` becomes a real engine feature reused
+     by every LB/member-needing lifecycle, or (b) schedule `networking-loadbalancer-members-nat`
+     in the SAME heavy batch as `compute-virtualserver-full` and — once that run's `server_id`
+     capture pattern is proven live — do a small follow-up offline session that adds the engine's
+     `"adopt": "server"` support the same way `"vpc"`/`"subnet"` already work, instead of
+     re-solving VM creation flakiness a second time inside the LB lifecycle. Not implemented this
+     session; `members-add`/`members-set`/`members-remove-single`/`members-remove-bulk` remain a
+     reach-only (403/404) soft-coverage gap.
+- **Static-NAT is async — deleting immediately after create 400s `StaticNatNotDeletableState`
+  (CONFIRMED, HB4d run 28835929967, 2026-07-07):** `static-nat-create` (201) followed immediately
+  by `static-nat-delete` 400s `scp-loadbalancer.loadbalancers.StaticNatNotDeletableState` ("...
+  state: CREATING") — same async-create-not-settled class already fixed for VPN gateway/tunnel and
+  TGW. If this leaks (interrupted run), the NAT then 409-blocks the LB delete, which strands the
+  LB's publicip (ATTACHED, not deletable) and transitively the VPC. `GET
+  /v1/loadbalancers/{id}/static-nats` (`showloadbalancerpublicnatip`) wraps `$.static_nat.state` —
+  poll it to `ACTIVE` before deleting. The DELETE itself takes **no request body** (the manual
+  unwind that discovered this used a bare `DELETE .../static-nats` -> 204; the documented endpoint
+  has no body parameters). Fixed OFFLINE 2026-07-07: `wait-static-nat-active` settle-poll added to
+  `networking__loadbalancer.json` + `retry_on_status:[400]` on `static-nat-delete`; a NEW
+  reconciler pass (`cleanup/reconciler.py::_reap_lb_static_nat`) GETs+DELETEs any owned LB's
+  static-NAT before the LB delete itself, for the account-wide-sweep case where a lifecycle's own
+  teardown was interrupted. UNVERIFIED LIVE.
 
 ## networking / firewall
 
@@ -413,6 +721,32 @@ lifecycle `heavy-asg-full-coverage` in
   (+SCP_ALLOW_DESTRUCTIVE); check circuit-provisioning entitlement first.
 - **Note:** doc_url fetches returned 503 during the 2026-06-19 run (docs server down, transient).
 - **Coverage 2026-06-19:** 0→1/8 (listdirectconnects).
+- **`createdirectconnect` 400 `not-exist-log-storage` is an ACCOUNT-LEVEL cross-service
+  prerequisite, NOT a direct-connect-lifecycle body bug (investigated OFFLINE, HB5 run
+  28831560635, 2026-07-07):** error detail `"FIREWALL Logging storage does not exists in this
+  account(...)"`, triggered because our create body sends `firewall_enabled: true,
+  firewall_loggable: true`. `data/api_docs.json` has the fix-shaped API —
+  `management/network-logging/{create,list,delete}networkloggingstorage`
+  (`POST/GET/DELETE /v1/network-logging/storages`, `resource_type` enum
+  `FIREWALL|SECURITY_GROUP|NAT`) — but `createnetworkloggingstorage`'s ONLY body field besides
+  `resource_type` is `bucket_name` (required), which itself needs a REAL object-storage bucket —
+  i.e. this is a SECOND cross-service dependency (object-storage), and the storage registration
+  is account-global (not scoped to one direct-connect), so create/teardown per-lifecycle-run risks
+  either colliding with another concurrent DC-family test (`vpc-private-nat` also references
+  `service_type: DIRECT_CONNECT`) or, if torn down mid-account, breaking any other consumer of
+  FIREWALL logging that may exist. **Classified as a heavy cross-service prereq, NOT repaired
+  in this (networking-scoped, offline) session** — recommend the orchestrator provision ONE
+  account-wide FIREWALL network-logging-storage (with its own object-storage bucket) as shared
+  session infra (like the shared VPC), never torn down per-DC-run, so `createdirectconnect` can
+  then be re-tried live. Do not attempt a private per-lifecycle rebuild of this (crosses into
+  management/network-logging + object-storage, out of this service's scope).
+- **`vpc-private-nat`'s `create-private-nat` 404 is INDEPENDENT of direct-connect, not a
+  cascade (checked OFFLINE 2026-07-07):** `networking__vpc.json`'s `vpc-private-nat` lifecycle
+  sends a synthetic `{unique}` placeholder as `service_resource_id` (it does not adopt or capture
+  a real direct-connect id from `networking-direct-connect-routing` — the two lifecycles share no
+  ctx/state), so this 404 is unrelated to and unaffected by the log-storage prereq above; it will
+  keep 404ing until `vpc-private-nat` is wired to a REAL direct-connect id (separate, larger
+  cross-lifecycle change, out of scope here — not touched this session).
 
 ## networking / vpn
 
@@ -433,6 +767,38 @@ lifecycle `heavy-asg-full-coverage` in
   (2 id-bound GETs + 6 writes). Needs SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE + SCP_RUN_HEAVY,
   with VPC + public-ip prereqs provisioned first.
 - **Coverage 2026-06-19:** 0→2/10 (both list GETs).
+- **`createvpngateway` requires `ip_address` (CONFIRMED, docs — HB4 run 28738115294, 2026-07-05):**
+  `vpngatewaycreaterequest` (`data/api_docs.json`) lists `ip_address` as `required:true` alongside
+  `ip_id`/`ip_type`/`name`/`vpc_id` — the lifecycle body was missing it and got a generic 400
+  `ValidationError ["Field required"]` (no field name in the error body). Fix (OFFLINE repair,
+  2026-07-06, UNVERIFIED LIVE): capture `$.publicip.ip_address` from the preceding `create-publicip`
+  step (real IP, e.g. `192.167.0.5`) and send it as the gateway's `ip_address` (paired with the
+  same publicip's `ip_id`). Blocks the whole chain including the official phase1/phase2 tunnel
+  values (`data/api_docs.json` request_example) from ever being tried live.
+- **`createvpngateway` ALSO requires the VPC to already have an Internet Gateway (CONFIRMED live
+  error, HB4b run 28827996068, 2026-07-06):** even with `ip_address` fixed, the create 404s
+  `scp-network.vpn-gateway.internet-gateway-not-found` ("Cannot found the Internet Gateway on
+  VPC(...)") — same precondition class as LB static-NAT and NAT gateway (see `networking/vpc` and
+  `networking/loadbalancer` sections). Fixed OFFLINE 2026-07-07 (`networking__vpn.json`
+  `networking-vpn-gateway-tunnel`): added `create-igw-for-vpn`/`wait-igw-for-vpn-active`/
+  `set-igw-for-vpn` (verbatim pattern from the proven `create-internet-gateway-for-nat` /
+  `create-igw-for-static-nat`) before `create-vpn-gateway`, + `delete-igw-for-vpn` in teardown.
+  **Shared-VPC IGW collision check:** this lifecycle ADOPTS the session-shared VPC (does not
+  self-create one, to conserve the cap-5 VPC budget); `data/api_docs.json` documents no 1-IGW-
+  per-VPC cardinality limit, and two other lifecycles already attach an IGW to this same shared
+  VPC (`networking/vpc` NAT-gateway, `networking/loadbalancer` static-NAT) without a reported hard
+  collision, so the new step follows the same convention (group+optional+broad expect_status,
+  degrading to a soft-fail of just the `vpn` family on a genuine 409) rather than switching to a
+  self-created VPC. UNVERIFIED LIVE — watch for a concurrent-IGW 409 if this lifecycle is
+  scheduled in the same batch as the NAT-gateway or LB static-nat lifecycles.
+- **`createvpntunnel` is also async — a `set-vpn-tunnel` fired right after 400s (CONFIRMED,
+  HB4d run 28835929967, 2026-07-07):** `create-vpn-tunnel` (202) immediately followed by
+  `set-vpn-tunnel` 400 `scp-network.vpn-tunnel.invalid-state` ("Unable to modify or delete VPN
+  Tunnel in CREATING state") — same settle-poll gap already fixed for the gateway
+  (`wait-vpn-gateway-active`, HB4c) but not yet applied to the tunnel. `showvpntunnel`
+  response wraps `$.vpn_tunnel.state` (`data/api_docs.json`). Fixed OFFLINE 2026-07-07: added
+  `wait-vpn-tunnel-active` settle-poll right after `create-vpn-tunnel`, mirroring the gateway
+  pattern exactly. UNVERIFIED LIVE.
 
 ## management / cloudcontrol
 
@@ -670,6 +1036,15 @@ lifecycle `heavy-asg-full-coverage` in
   capture is `$.private_dns.id`. private-dns must reach `state: ACTIVE` before
   setters work (400 invalid-state while CREATING). All encoded in
   `regression/scenarios/lifecycles/networking__dns.json`.
+- **`disconnect-vpc-from-private-dns` re-triggers the SAME invalid-state pattern as the
+  initial create (CONFIRMED, HB5 run 28831560635, 2026-07-07):** `PUT /v1/private-dns/{id}`
+  (disconnecting the VPC, `connected_vpc_ids: []`) puts private-dns back into a transitional
+  `EDITING` state — the very next `delete-private-dns` 400s `scp-network.private-dns.invalid-state`
+  `"The state is invalid.:(EDITING)"` (same error family as the already-known CREATING→setter-400
+  behaviour, just re-triggered by an edit instead of the initial create). Fixed OFFLINE 2026-07-07
+  in `networking__dns.json`: added `wait-private-dns-stable-after-disconnect` settle-poll
+  (`$.private_dns.state` until `ACTIVE`, 300s/15s, give_up_status 400/403/404) between
+  `disconnect-vpc-from-private-dns` and `delete-private-dns`. Live re-validation still pending.
 - **Coverage 2026-06-19:** 3 → **6 / 22** observed (the 3 list GETs newly live-200;
   the public-domain 500 + 2 record-write probes were already observed). Remaining
   16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind

@@ -1,7 +1,15 @@
 ---
-status: active
+status: superseded (내구 결정은 ARCHITECTURE.md §Autonomy design으로 병합 — 2026-07-04)
 for: all
+superseded_by: ARCHITECTURE.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 이 설계의 티켓(T1~T8)은 구현됐고
+> (`tools/new_service.py` · `regression/scenarios/targets.py` ·
+> `core/oplog.py emit_plan` · 발행 rebase 통일 · IMPROVEMENT-BACKLOG),
+> 내구 결정 요약은 [`ARCHITECTURE.md`](ARCHITECTURE.md) § "Autonomy design"으로
+> 병합됐다. 운영 루프 정본은 `docs/agent-team.md`. 아래는 설계 당시(2026-06-13,
+> 245노드 시점) 전문의 역사 기록.
 
 # M6 설계 — 자율 운영 가능한 SCP API 회귀 테스트 플랫폼
 

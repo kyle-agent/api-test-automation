@@ -1,0 +1,1152 @@
+{
+  "_note": "light-batch-2 (2026-07-03) — light-35 docs nodes WITHOUT an existing enabled gen-* lifecycle, materialized via composer.compose() (composer emits enabled:false by design; flipped true for dispatch). Targets: vpc-endpoint (IB-013 endpoint-subnet fix, re-validation ready) · private-nat via the tgw-vpc-connection branch (IB-012 Connectable-TGW fix — covers BOTH docs nodes) · direct-connect (own VPC, 1:1 rule) · cm-event-policy (nested EventPolicyCreateRequest body; parent cm-account-resource VALIDATED 2026-07-03) · gen-lb-members-light (lb-member + lb-member-bulk off a standalone lb-server-group — the light mirror of gen-heavy-lb-members, no load-balancer). Non-billable-light; closures VALIDATED-light. Dispatch: crud_ids block in docs/working/CONTEXT.md handoff.",
+  "lifecycles": [
+    {
+      "id": "gen-vpc-endpoint",
+      "service": "networking/vpc",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: vpc-endpoint",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-endpoint-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrvpces{unique}",
+            "description": "API regression endpoint subnet",
+            "cidr": "10.160.8.0/24",
+            "type": "VPC_ENDPOINT",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-endpoint-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-filestorage-volume",
+          "service": "filestorage",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrfs{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "volume_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-filestorage-volume",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-vpc-endpoint",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpc-endpoints",
+          "json": {
+            "name": "regrvpce{unique}",
+            "description": "API regression vpc endpoint",
+            "endpoint_ip_address": "10.160.8.20",
+            "resource_info": "regrfs{unique}",
+            "resource_key": "{volume_id}",
+            "resource_type": "FS",
+            "subnet_id": "{subnet_id}",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_endpoint_id": "$.vpc_endpoint.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "verify-vpc-endpoint-read",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "_note": "id-bound GET getid 갭. vpc_endpoint_id가 create에서 잡히나 resource_key가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status"
+        },
+        {
+          "name": "delete-vpc-endpoint",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-filestorage-volume",
+          "service": "filestorage",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-endpoint-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "gen-private-nat",
+      "service": "networking/vpc",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: private-nat; branches: {\"private-nat\": \"tgw-vpc-connection\"} | 2026-07-04 pacing fix (incident run 28648339307): wait-transit-gateway until 실enum 정정 + wait-tgw-vpc-connection 600s/terminal-bad/give_up_status + NEW wait-transit-gateway-active (TGW EDITING→ACTIVE 재확인) before create-private-nat. 모델 정본: knowledge/formal/resources/networking__vpc.yaml transit-gateway/tgw-vpc-connection ready (recompose 보존).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-transit-gateway",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways",
+          "json": {
+            "name": "regrtgw{ualpha}",
+            "description": "API regression transit gateway",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "transit_gateway_id": "$.transit_gateway.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/transit-gateways/{transit_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-transit-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ERROR",
+              "DELETED"
+            ],
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "TGW state enum = CREATING/ACTIVE/DELETING/DELETED/ERROR/EDITING (api_docs transitgateway) — 구 until의 CREATED/RUNNING/AVAILABLE 는 실재하지 않는 값. run 28648339307: TGW ACTIVE 도달에 ~3.5분. ERROR/DELETED = terminal-bad (즉시 종료), give_up_status 400/404 = create 거부 시 타임아웃 소진 방지 (database__subops-full 패턴)."
+        },
+        {
+          "name": "create-tgw-vpc-connection",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+          "json": {
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_connection_id": "$.transit_gateway_vpc_connection.id",
+            "transit_gateway_id": "$.transit_gateway_vpc_connection.transit_gateway_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-tgw-vpc-connection",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway_vpc_connections[0].state",
+            "until": [
+              "ACTIVE",
+              "ERROR",
+              "DELETED"
+            ],
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "run 28648339307: connection 이 300s 내 ACTIVE 미도달 → 구 poll 이 조용히 타임아웃 (expect_status 200 충족) → create-private-nat 400 active-transit-gateway-not-found. 600s 로 연장 + terminal-bad/give_up. NESTED per-TGW list 는 200 (라이브 확인 2026-07-04); flat /v1/transit-gateway-vpc-connections 는 이 계정에서 403."
+        },
+        {
+          "name": "wait-transit-gateway-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ERROR",
+              "DELETED"
+            ],
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "create-private-nat 의 실제 전제조건은 'TGW state == ACTIVE' (run 28648339307: 400 scp-network.private-nat.active-transit-gateway-not-found 'Cannot found the Transit Gateway(...) in ACTIVE state'). TGW 는 vpc-connection 부착/해제 중 EDITING 으로 전이 (라이브 관측 2026-07-04) — connection ACTIVE 대기만으로는 부족하여 TGW show 를 ACTIVE 까지 재확인. DBaaS ExistInprogress 와 같은 pacing 계열."
+        },
+        {
+          "name": "create-private-nat",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/private-nats",
+          "json": {
+            "name": "regrpnat{unique}",
+            "description": "API regression private-nat",
+            "cidr": "192.167.0.0/24",
+            "service_resource_id": "{transit_gateway_id}",
+            "service_type": "TRANSIT_GATEWAY",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "private_nat_id": "$.private_nat.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/private-nats/{private_nat_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "verify-private-nat-read",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/private-nats/{private_nat_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "_note": "id-bound GET getid 갭. private_nat_id가 create에서 잡히나 service_resource_id가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status"
+        },
+        {
+          "name": "verify-private-nat-read-ips",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/private-nats/{private_nat_id}/private-nat-ips",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "_note": "id-bound GET getid 갭 (private-nat IP 목록). 동일 관용 근거"
+        },
+        {
+          "name": "delete-private-nat",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/private-nats/{private_nat_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-tgw-vpc-connection",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-transit-gateway",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "gen-direct-connect",
+      "service": "networking/direct-connect",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: direct-connect",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-direct-connect",
+          "service": "direct-connect",
+          "method": "POST",
+          "path": "/v1/direct-connects",
+          "json": {
+            "name": "regrdc{ualpha}",
+            "description": "API regression suite",
+            "bandwidth": 1,
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "tags": [],
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "direct_connect_id": "$.direct_connect.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/direct-connects/{direct_connect_id}",
+            "service": "direct-connect"
+          }
+        },
+        {
+          "name": "verify-direct-connect",
+          "service": "direct-connect",
+          "method": "GET",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-direct-connect",
+          "service": "direct-connect",
+          "method": "DELETE",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "gen-cm-event-policy",
+      "service": "management/cloudmonitoring",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: cm-event-policy",
+      "steps": [
+        {
+          "name": "create-cm-account-resource",
+          "service": "cloudmonitoring",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "product_resource_id": {
+              "list": "$.contents",
+              "where_prefix": {
+                "productResourceId": "INSTANCE-"
+              },
+              "get": "productResourceId"
+            }
+          }
+        },
+        {
+          "name": "create-cm-event-policy",
+          "service": "cloudmonitoring",
+          "method": "POST",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies",
+          "json": {
+            "eventPolicyRequest": {
+              "disableYn": "N",
+              "eventLevel": "WARNING",
+              "eventThreshold": {
+                "thresholdType": "SINGLE_VALUE",
+                "singleThreshold": {
+                  "comparisonOperator": "GT",
+                  "value": 95
+                }
+              },
+              "ftCount": 3,
+              "isLogMetric": "N",
+              "metricKey": "system.cpu.system.pct"
+            },
+            "productResourceId": "{product_resource_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "eventPolicyId": "$.eventPolicyId"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+            "service": "cloudmonitoring"
+          }
+        },
+        {
+          "name": "verify-cm-event-policy-read",
+          "service": "cloudmonitoring",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-cm-event-policy-read-histories",
+          "service": "cloudmonitoring",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ]
+        },
+        {
+          "name": "verify-cm-event-policy-read-notifications",
+          "service": "cloudmonitoring",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ]
+        },
+        {
+          "name": "delete-cm-event-policy",
+          "service": "cloudmonitoring",
+          "method": "DELETE",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "gen-lb-members-light",
+      "service": "networking/loadbalancer",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: lb-member, lb-member-bulk",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-lb-health-check",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "json": {
+            "lb_health_check": {
+              "name": "regrhc{ualpha}",
+              "description": "API regression suite",
+              "protocol": "TCP",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "subnet_id": "{subnet_id}",
+              "vpc_id": "{vpc_id}",
+              "tags": []
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "lb_health_check_id": "$.lb_health_check.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-health-checks/{lb_health_check_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "create-lb-server-group",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-server-groups",
+          "json": {
+            "lb_server_group": {
+              "name": "regrsg{ualpha}",
+              "description": "API regression suite",
+              "lb_health_check_id": "{lb_health_check_id}",
+              "lb_method": "ROUND_ROBIN",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "vpc_id": "{vpc_id}",
+              "tags": []
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "lb_server_group_id": "$.lb_server_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-server-groups/{lb_server_group_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "create-lb-member",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "json": {
+            "members": [
+              {
+                "name": "regrmember1",
+                "member_ip": "10.124.0.101",
+                "member_port": 80,
+                "member_state": "ENABLE",
+                "member_weight": 100,
+                "object_id": "",
+                "object_type": "VM"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "member_id": "$.members[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-member-show",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-member"
+        },
+        {
+          "name": "verify-lb-member-set",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+          "json": {
+            "member": {
+              "member_port": 80,
+              "member_state": "ENABLE",
+              "member_weight": 100
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "lb-member"
+        },
+        {
+          "name": "create-lb-member-bulk",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "json": {
+            "members": [
+              {
+                "name": "regrmember2",
+                "member_ip": "10.124.0.102",
+                "member_port": 80,
+                "member_state": "ENABLE",
+                "member_weight": 100,
+                "object_id": "",
+                "object_type": "VM"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "member_bulk_id": "$.members[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+            "json": {
+              "member_id_list": [
+                "{member_bulk_id}"
+              ]
+            },
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-member-bulk",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-member-bulk"
+        },
+        {
+          "name": "delete-lb-member",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-lb-member-bulk",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "json": {
+            "member_id_list": [
+              "{member_bulk_id}"
+            ]
+          }
+        },
+        {
+          "name": "delete-lb-server-group",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-lb-health-check",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
+    }
+  ]
+}

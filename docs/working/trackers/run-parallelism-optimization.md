@@ -1,7 +1,13 @@
 ---
-status: active
+status: superseded (2026-06-19 run 최적화 스냅샷 — DAG 스케줄러 정본으로 흡수)
 for: all
+superseded_by: ../../scheduler-system.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04, 일자 스냅샷).** 병렬화/스케줄링의 설계·측정 정본은
+> [`docs/scheduler-system.md`](../../scheduler-system.md)(1.0 의존-DAG 스케줄러 +
+> `schedule_optimizer` 자기학습 층)다. run별 최적화 리포트는 매 run
+> `tools.analyze_run`이 재생성한다. 아래는 2026-06-19 당시 측정의 역사 기록.
 
 # Heavy-run wall-clock optimization (2026-06-19)
 

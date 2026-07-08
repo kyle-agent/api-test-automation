@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,6 +36,12 @@ _BILLABLE_KINDS = {"cluster", "virtual-server", "loadbalancer", "baremetal",
                    "cachestore", "sqlserver", "vertica", "searchengine", "eventstreams"}
 HEAVY_STALL_MIN = 12     # heavy batch running this long with 0 billable creates == stalled
 QUIET_MIN = 10           # owned infra up but no create/delete activity this long == orphan-ish
+SHARED_VPC_GRACE_MIN = 120  # regrvpcsh* younger than this = presumed in-use by a live run
+
+# The engine names the shared VPC 'regrvpcsh' + creation-epoch-seconds in hex
+# (regression/scenarios/engine.py: format(int(time.time()), "x") — 8 hex chars
+# for current epochs; allow a little slack either side).
+_SHARED_VPC_NAME = re.compile(r"^regrvpcsh([0-9a-f]{7,12})$")
 
 
 def _load_events(path: Path) -> list[dict]:
@@ -57,6 +64,46 @@ def _heavy_active() -> tuple[bool, float, float]:
         return (mins < 120, mins, t.timestamp())   # a heavy batch is "active" for up to 2h
     except Exception:
         return (False, 1e9, 0.0)
+
+
+def _vpc_age_min(name: str, now_ts: float) -> float:
+    """Age (minutes) of an owned shared VPC, decoded from its NAME alone.
+
+    'regrvpcsh<hex>' embeds the creation epoch (see _SHARED_VPC_NAME above), so
+    the age needs no extra API call and no local state. Names that don't carry
+    a decodable, sane epoch return a huge age, i.e. they are treated as OLD —
+    the grace filter below can only ever *suppress* a fresh shared VPC, never
+    hide a genuine long-lived orphan or a non-shared owned VPC."""
+    m = _SHARED_VPC_NAME.match(name or "")
+    if not m:
+        return 1e9
+    try:
+        born = int(m.group(1), 16)
+    except ValueError:
+        return 1e9
+    if not (1_500_000_000 <= born <= now_ts + 300):  # sane epoch: 2017..now(+5m skew)
+        return 1e9
+    return (now_ts - born) / 60
+
+
+def _survivor_vpcs(owned_vpc: list[dict], now_ts: float) -> list[dict]:
+    """P2C-13 grace filter: owned VPCs old enough to call BILLABLE_SURVIVOR.
+
+    The HEAVY_START marker is written only by the LOCAL orchestrator, so a
+    GitHub-runner-driven heavy run has heavy=False here, and the run's
+    legitimately-owned shared VPC (regrvpcsh*) was false-flagged as a survivor
+    every cycle (recurring in the 2026-07-04..06 watch logs). Fix — option (b):
+    withhold the SURVIVOR verdict while a shared VPC's name-decoded age is
+    under SHARED_VPC_GRACE_MIN (2h — the same window a local heavy batch counts
+    as "active" in _heavy_active). Chosen over option (a) (recent owned-create
+    activity in the loggingaudit view) because _live_view.jsonl is documented
+    above as transiently partial/volatile — a stale or momentarily-empty
+    harvest would re-open the exact same false positive — while the name-age
+    signal is deterministic, offline-testable, and free. True orphans age past
+    the grace window and are still flagged (e.g. the ~1-day regrvpcsh leak in
+    knowledge/validated-facts.md)."""
+    return [v for v in owned_vpc
+            if _vpc_age_min(str(v.get("name") or ""), now_ts) >= SHARED_VPC_GRACE_MIN]
 
 
 def _recent_db_activity(start_ts: float) -> bool:
@@ -137,11 +184,14 @@ def detect(events: list[dict]) -> dict:
                                 f"observations — lifecycles aren't running (check shared-VPC env, "
                                 f"host DNS, pytest selection).")
 
-    # A2 — owned billable survivors when NO heavy batch is active == leak
+    # A2 — owned billable survivors when NO heavy batch is active == leak.
+    # Runner-driven runs leave no local heavy marker, so fresh shared VPCs get
+    # a name-age grace before the verdict (P2C-13 — see _survivor_vpcs).
     try:
-        if owned_vpc and not heavy:
-            found["BILLABLE_SURVIVOR"] = (f"{len(owned_vpc)} owned VPC(s) still ACTIVE with no heavy "
-                                          f"batch running ({[v.get('name') for v in owned_vpc]}) — "
+        survivors = _survivor_vpcs(owned_vpc, now.timestamp()) if owned_vpc else []
+        if survivors and not heavy:
+            found["BILLABLE_SURVIVOR"] = (f"{len(survivors)} owned VPC(s) still ACTIVE with no heavy "
+                                          f"batch running ({[v.get('name') for v in survivors]}) — "
                                           f"possible leak / orphaned shared infra.")
         # A3 — owned infra up but the run went quiet (no events) for a while.
         # Require real event data (last_evt set) so an empty/mid-write events file

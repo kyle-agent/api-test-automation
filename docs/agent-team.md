@@ -155,9 +155,31 @@ of known/muted backend bugs: `data/baselines/known_issues.json`.
 reason over trends and deliver a ranked improvement list.
 
 **CI:** `api-test.yml` is one job graph — **spec** → **regression** → **sweep**
-(`cleanup.reconciler`) + **conformance** → **dashboard** (publish to `dashboard-data`).
-Live CRUD/heavy/destructive only via `workflow_dispatch` with gates set. One run
-at a time; every job exports `APITEST_RUN_ID` for owner-tagged reclaim.
+(`cleanup.reconciler`) + **conformance** → **dashboard** (publish to `dashboard-data`)
+→ **snapshot**. One run at a time (sweep included); every job exports
+`APITEST_RUN_ID` for owner-tagged reclaim.
+
+**Run triggers (canonical — on-demand only; no cron, no per-push runs).**
+`api-test.yml`'s automatic push trigger is **owner-DISABLED (2026-06-18)** — the
+`push:` block is commented out, so pushing `.github/run-request` no longer
+starts a run. Ways a run actually starts today:
+
+1. **Chat-heavy lane** — push `.github/chat-heavy-request` (or drop a new file
+   in `.github/chat-heavy-request.d/`) → `chat-heavy.yml`; the file carries
+   `KEY=VALUE` options (`mutations/destructive/heavy/crud_ids/dag/…`).
+2. **Local platform console** — controlplane + console2 Testing (worker
+   executor `PLATFORM_EXECUTOR=worker`, or the console2 local run path) — runs
+   execute on the host, behind the pre-flight confirm.
+3. **`workflow_dispatch`** on `api-test.yml` — MANUAL-ONLY fallback: named
+   `suite` (`suites/*.yaml`) × `profile` (`environments/*.yaml`) expand to gate
+   defaults, explicit inputs override; the control plane's `actions` executor
+   drives it when `PLATFORM_GITHUB_TOKEN` is set.
+
+Ordinary pushes/PRs run only the cheap offline gate `validate.yml`.
+**Conformance** is further gated: only when the spec actually changed, on
+`claude/run-conformance`/`run-schema-live` pushes, with dispatch
+`run_conformance=true`, or repo var `SCP_RUN_CONFORMANCE=true` — when skipped,
+the dashboard reuses the last committed conformance data.
 
 **Safety rails (never bend):**
 1. Never set `SCP_ALLOW_MUTATIONS` / `SCP_ALLOW_DESTRUCTIVE` / `SCP_RUN_HEAVY` to

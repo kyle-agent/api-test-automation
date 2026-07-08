@@ -14,7 +14,8 @@ sitting on one shared **kernel**.
 
 ```
 ┌────────────────────────── Control Plane (controlplane/) ─────────────────────┐
-│  FastAPI + htmx + SQLite — Overview · Plan · Run · Report (+ Knowledge) IA    │
+│  FastAPI + htmx + SQLite — Catalog · Modeling · Testing · Reporting (+K) IA   │
+│  (IA 정본: docs/working/plans/PLATFORM-IA-DIRECTION.md §확정 IA 2026-06-26)    │
 │  ├─ dispatch: suite × environment profile → Actions workflow_dispatch         │
 │  │            (or the worker queue when PLATFORM_EXECUTOR=worker, M4)         │
 │  ├─ scheduler: cron(UTC) × suite × profile (30s polling daemon)               │
@@ -26,7 +27,7 @@ sitting on one shared **kernel**.
 │  ├─ reporting: run history, per-run snapshot restore, run-A-vs-B compare      │
 │  ├─ AI seams (ai_pipelines.py): triage (B1), summaries (B2), spec-impact (A1),│
 │  │            scenario/task drafts (A2), fact extraction (A3) — draft-only    │
-│  └─ static_export.py → Pages /platform/ (~199 read-only pages, all clickable) │
+│  └─ static_export.py → Pages /platform/ (read-only static export of the UI)   │
 └──────────────┬───────────────────────────────────────────────┬───────────────┘
                │ dispatch / commands                 heartbeat / │ results
 ┌──────────────▼────────────── Execution Plane ──────────────────▼──────────────┐
@@ -110,7 +111,8 @@ deterministic (AI sits at authoring time and post-run only).
 ## The M5 composer layer (resource model → scenarios)
 
 Axis-1 scenarios are no longer only hand-written. The **resource-task model**
-(`knowledge/formal/resources/*.yaml` — 128 nodes, readable codes
+(`knowledge/formal/resources/*.yaml` — 275 nodes / 60 YAML files (59 services +
+`_groups.yaml`), readable codes
 `<cat>-<group>-<resource>` such as `nw-vpc-vpc`, groups in `_groups.yaml`)
 declares per resource: its dependency requirements (`requires`, incl. `one_of`
 branches, `count` multiplicity and console-issued `credential` prerequisites),
@@ -220,6 +222,48 @@ data/        spec/{catalog,bodies,docs}  baselines/{known_issues,coverage_waiver
 reports/     per-run output (gitignored): results/*.jsonl, registry/*.jsonl, dashboard/
 .github/workflows/  one orchestrator (api-test.yml) + offline gate (validate.yml)
 ```
+
+## Direction — phases (ROADMAP.md 병합, 2026-07-04)
+
+> Merged from `docs/ROADMAP.md` + `docs/M6-DESIGN.md` (both superseded by this
+> section). **Numbers are never read from this file** — re-measure with
+> `python -m spec.summary` / `python -m spec.coverage_gap`; current state lives
+> in `docs/working/CONTEXT.md`. Platform milestones (M0–M5): `docs/PLATFORM-PLAN.md`.
+
+| Phase | Done when | Status / canonical doc |
+|---|---|---|
+| **1 · Coverage → 100%** | every catalog endpoint is exercised by a real run — measured C3 reads 100%, or every residual endpoint carries a triaged blocker/waiver | **CURRENT** — campaign canonical: `docs/working/plans/CAMPAIGN-C3-100.md`; coverage definitions: `docs/COVERAGE-CRITERIA.md` |
+| **2 · Scheduled regression fence** | a scheduled run needs no human babysitting: only NEW breakage alarms (baseline + known-issues muting), quota skips + tag-scoped cleanup keep it green | mechanics BUILT — suites × profiles (`suites/`, `environments/`), scheduler in `controlplane/scheduler.py` (Actions cron deliberately removed), per-profile baselines (`core/baselines.py`); the fence engages after Phase 1 |
+| **3 · Run beyond GitHub Actions** | one documented command provisions a fresh server to run the schedule and publish the dashboard | BUILT — `runner/worker.py` + Docker Compose (`docs/DEPLOY.md`), executor switch `PLATFORM_EXECUTOR=actions\|worker`; **cutover deliberately LAST** (`docs/PLATFORM-PLAN.md` M4) |
+
+**End state** (all phases serve it): read the entire userguide and from it author
+① per-service scenarios ② multi-service combos ③ option/parameter variants (C4).
+Ingestion backlog + priorities: `knowledge/formal/INGESTION.md`. Domain knowledge
+is **data, not code**: narrative in `knowledge/*.md`, formal YAML in
+`knowledge/formal/` (validator-gated), engine JSON generated from it.
+
+### Autonomy design (M6-DESIGN.md 병합 — durable decisions, now implemented)
+
+M6 (2026-06-13) closed the loop "agents build and operate the platform; humans
+provide domain knowledge and gate approvals". Its decisions, all landed:
+
+- **YAML-first onboarding** — a new service is ONE file
+  `knowledge/formal/resources/<cat>__<svc>.yaml`, gated by
+  `knowledge/formal/validate.py` (R1) and scaffolded by `tools/new_service.py`;
+  web forms are viewers/editors, never the source of truth.
+- **Selector → compose** — run units are declared as selectors
+  (`service:` / `group:` / `theme:` / `all`, `regression/scenarios/targets.py`)
+  expanded onto `composer.plan()/compose()`; closure, dedup, ordering and
+  peak-quota math stay in the composer (one compile path).
+- **Intended vs actual** — a run publishes its plan manifest
+  (`core/oplog.py emit_plan` → `runs/<id>/plan.json`); `dashboard/ops.html`
+  overlays live resource events on the intended chain.
+- **One publish pipeline** — `dashboard-data` publishing is clone+rebase with
+  disjoint file ownership (the historical force-push race is fixed in
+  `api-test.yml`); the UI faces converged on the confirmed IA (above).
+- **3-tier agent loop** — Planner → Coordinator → Executors; human touch points
+  are gate approvals + credentials only. Operating canonical:
+  `docs/agent-team.md` (+ `docs/working/trackers/IMPROVEMENT-BACKLOG.md` queue).
 
 ## Migration (done — kept for history)
 

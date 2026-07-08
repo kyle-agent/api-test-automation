@@ -55,5 +55,6 @@ resources:
     delete: {endpoint: "DELETE /v1/configinspection/diagnosis/terminate/{diagnosis_id}",
              destructive: true}
     provenance: docs
+    gated: credential  # 진단 대상 계정 auth_key 콘솔 발급 — KNOWN-UNSATISFIABLE
     source: {lifecycle: security-configinspection-diagnosis, steps: [save, terminate]}
     notes: "body의 account/auth_key/diagnosis id들은 doc-sample 값 — 진단 가능한 throwaway 계정+인증키가 없어 KNOWN-UNSATISFIABLE, create는 4xx 예상 (소스는 coverage-only guarded). capture는 FLAT $.diagnosis_id (configinspectioncreateresponse) — 소스에서 capture_soft, UNPROVEN. diagnosis_name 규칙 ^[a-zA-Z0-9-_]+$. teardown verb는 DELETE .../terminate/{diagnosis_id}. 진단 결과 per-item ERROR는 인증키 권한 부족 신호 (services/security__configinspection.yaml error-status-means-auth)."

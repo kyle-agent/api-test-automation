@@ -4,7 +4,11 @@ FastAPI + SQLite + htmx로 구현된 SCP API Regression Test Platform의 control
 plane입니다 (docs/PLATFORM-PLAN.md M1~M4). 실행기는
 `PLATFORM_EXECUTOR`로 전환합니다 (controlplane/dispatch.py):
 
-- `actions` (기본, 개발 기간) — `api-test.yml`을 `workflow_dispatch`로 트리거
+- `actions` (기본) — `api-test.yml`을 `workflow_dispatch`로 트리거.
+  **주의**: `api-test.yml`의 자동(push) 트리거는 오너가 비활성화했고(2026-06-18)
+  `workflow_dispatch`는 수동 전용 폴백이다 — 이 경로는 `PLATFORM_GITHUB_TOKEN`
+  이 있어야 동작하며, 현재 실운영 라이브 레인은 **로컬 콘솔(worker/console2)
+  또는 chat-heavy 레인**(`.github/chat-heavy-request` → `chat-heavy.yml`)이다.
 - `worker` (배포 모드) — run 레코드(status `dispatched`)가 곧 큐이고, 동일
   호스트의 `runner/worker.py`가 claim해 같은 스테이지 시퀀스를 실행
 
@@ -13,29 +17,35 @@ run 레코드/스케줄/UI는 두 모드에서 동일합니다. Docker Compose �
 
 ## IA — 두 런타임 (2026-06-17 reorg)
 
-정보 구조(IA)의 단일 소스는 **`docs/IA.md`** 입니다. 두 런타임으로 깔끔히
-분리됩니다:
+정보 구조(IA)의 단일 소스는 **`docs/working/plans/PLATFORM-IA-DIRECTION.md`**
+§"✅ 확정 IA (2026-06-26)" + **§"개정 (2026-07-07)"** 입니다 (오너 확정 후 개정:
+Catalog는 네비 단계에서 우측 유틸 링크로, Modeling이 흡수; 구 `docs/IA.md`는
+SUPERSEDED). 두 런타임으로 깔끔히 분리됩니다:
 
-- **정적 대시보드** (GitHub Pages) — 정식 **Results + Ops**. `dashboard/build.py`가
-  커버리지 래더·conformance를 한 번만 렌더하고, `ops.html`이 라이브 ops를 보여줌.
-- **라이브 control plane** (이 서버) — 인터랙티브 **Plan + Run + 저작/개입**.
+- **정적 대시보드** (GitHub Pages, 면②) — 공개 커버리지·conformance.
+  `dashboard/build.py`가 한 번만 렌더하고, `ops.html`이 라이브 ops를 보여줌.
+- **라이브 control plane** (이 서버, 면①) — 3단계 작업 콘솔.
 
-상단 네비게이션은 **`Overview · Plan · Run · Report · Knowledge`** 입니다. 헤더의
-장식용 환경/스위트 선택 셀렉트는 제거됐고(ctxbar는 발행 스냅샷 상태만 표시),
-`/ai/*`는 top-nav 섹션이 아니라 Plan(Model/Compose) 안의 **인라인 어시스트**입니다.
-정식 Report가 표준이라 bare `/runs` 리디렉트는 **제거**됐습니다(`/runs/{id}` 상세는
-유지).
+상단 네비게이션은 **`Modeling · Testing · Reporting (+ Knowledge · 🤖AI ·
+📖 카탈로그 · 📊 대시보드)`** 입니다 — ① 테스트 모델 저작(모델 지도·노드 편집,
+서비스 그룹 행에 카탈로그 엔드포인트 인라인: "API N (모델됨 M · 미모델 K)" 집계
++ 드로어) → ② 실행(Test Planning · Test Execution = console2) → ③ 평가
+(커버리지·runs·triage, 면② 링크아웃). 엔드포인트 인벤토리(`/catalog`, RO)는
+우측 유틸 **📖 카탈로그** 링크의 참조 화면으로 유지됩니다.
+헤더의 장식용 환경/스위트 셀렉트는 제거됐고(ctxbar는 발행
+스냅샷 상태만 표시), 정식 Report가 표준이라 bare `/runs` 리디렉트는 **제거**
+됐습니다(`/runs/{id}` 상세는 유지).
 
 ## 기능
 
 | 영역 | 내용 |
 |---|---|
-| 수동 실행 | suite × 환경 프로파일 선택 → `api-test.yml` dispatch |
+| 수동 실행 | suite × 환경 프로파일 선택 → `api-test.yml` dispatch (actions 실행기 — 수동 전용 폴백, 위 주의 참조) 또는 worker 큐잉 |
 | 스케줄 | cron(UTC) × suite × profile — 30초 폴링 데몬이 발화 |
 | 라이브 추적 | `core/oplog.py`의 `APITEST_PLATFORM_URL` 미러를 `/api/ingest/events`로 수신 → run 상태/마일스톤 타임라인 |
 | Run 히스토리 | DB 기록 + oplog 버킷 `index.json` 아카이브 병합 |
 | 스냅샷 복원 | `runs/<id>/snapshot/`(core/snapshot.py)을 프록시해 **과거 run의 대시보드를 그대로 다시 열기** |
-| Plan 스테퍼 | `/planning?step=…` 단일 선형 흐름 **① Catalog → ② Model → ③ Compose → ④ Validate**. Catalog의 커버리지 수치는 정식 대시보드로 **링크**(재렌더 없음), Model에 의존 그래프(`/planning/dependencies`)가 접혀 들어감, AI 초안은 Model/Compose 인라인 어시스트 |
+| Modeling (구 Plan 스테퍼는 은퇴) | 구 `/planning?step=…` 스테퍼는 301 → `/planning/resources/map` (확정 IA 4단계가 대체). 의존 그래프는 `/planning/dependencies`. **AI 초안은 독립 `/ai` 파이프라인**(A1 spec-diff 영향 · A2 시나리오 초안 · A3 fact 추출 · task-draft) — 인라인이 아니라 상단 네비 `🤖 AI` + Modeling 지도/노드 폼·compose의 "AI 초안 →" 딥링크로 진입, 결과는 전부 `drafts/` 검토용 |
 | Validate 패널 | `/planning/validate` — **신규 패널**: `python -m regression.scenarios.validate`를 가드된 서브프로세스로 실행해 clean/오류 표시 (이전엔 UI 없던 단계) |
 | Report (대시보드 임베드) | `/reporting?tab=…` — `summary` / `dashboard`(정식 커버리지·conformance 대시보드 **임베드**) / `runs`(목록·아카이브) / `triage`. 옛 coverage/conformance/trends 재렌더 탭은 제거 |
 | AI triage (B1) | run 종료 후 baseline 외 신규 fail을 Claude가 environment / spec_change / test_bug / real_regression으로 분류 + 조치 제안 |
@@ -76,6 +86,18 @@ uvicorn controlplane.app:app --host 0.0.0.0 --port 8800
 
 레포 루트에서 실행해야 합니다 — suites/, environments/, data/baselines/를
 직접 읽습니다.
+
+의존성은 의도적으로 가볍게 분리돼 있습니다: `controlplane/requirements.txt`
+(FastAPI/uvicorn/jinja2/croniter) + 선택적 `controlplane/requirements-ai.txt`
+(`anthropic` — AI 기능용; 없어도 서버는 완전 동작, AI 섹션만 비활성 표시).
+
+**worker 실행기 로컬 runbook** (M4 경로 — 상세: `docs/DEPLOY.md`):
+
+```sh
+PLATFORM_EXECUTOR=worker uvicorn controlplane.app:app --port 8800   # 트리거 = 큐잉만
+python -m runner.worker --once        # 큐에서 1건 claim → 같은 스테이지 시퀀스 실행
+python -m runner.worker --poll 15     # 상주 폴링 모드
+```
 
 ## 환경 변수
 

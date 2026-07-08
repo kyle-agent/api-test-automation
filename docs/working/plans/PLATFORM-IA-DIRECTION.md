@@ -1,5 +1,5 @@
 ---
-status: CONFIRMED (오너 확정 — 2026-06-26 · IA = Catalog · Modeling · Testing · Reporting)
+status: CONFIRMED (오너 확정 — 2026-06-26 · IA = Catalog · Modeling · Testing · Reporting · **2026-07-07 개정: Catalog→우측 유틸 링크, Modeling이 흡수 — §개정 참조**)
 for: owner + platform
 ---
 
@@ -43,6 +43,7 @@ API 1,372    ─✏️→  노드편집 = 모델 지도    ┌ Test Planning  (�
 | **Modeling** | ② 레시피 저작 | 리소스 노드 저작: 의존·생성바인딩·옵션·캡처·검증·삭제 | **모델 지도 · 편집** | RW | `resource_form`+`resource_model`+`authoring` → `knowledge/formal/resources/*.yaml` |
 | **Testing** | ③ 요리 | `Test Planning`(선택→합성DAG→큐) ∣ `Test Execution`(실행·실시간·중단·런 리포트) | **합성 + 라이브** | RW | **console2 흡수** → `console_api.py` + console2 프론트 |
 | **Reporting** | ④ 평가 | 커버리지 색칠지도(서비스→리소스) · 2축(regression+conformance) · 추세 · 공개본 링크 | **색칠** | RO | `reporting` / `dashboard` |
+| **+Knowledge** | 참조 (5번째 항목 — 단계 흐름 밖) | 지식 파일 브라우저: `knowledge/*.md` · `knowledge/formal/*` · suites · environments | (그래프 없음 — 목록) | **RO** | `/knowledge` — *2026-07-03 owner 확정 보강* |
 
 **핵심 원칙 — "그림 하나, 여러 얼굴":** 중심 위젯은 `composer.graph_view` + scene 렌더러
 **하나**. Modeling(모델지도·편집) · Testing(합성+라이브) · Reporting(색칠) 셋이 **같은
@@ -67,6 +68,27 @@ API 1,372    ─✏️→  노드편집 = 모델 지도    ┌ Test Planning  (�
 **수렴 매핑(앱 3개 → 메뉴 4개):** controlplane Catalog → **Catalog** · controlplane
 Model(`resource_form`) → **Modeling** · console2(구성 + 실행&리포트) → **Testing** ·
 dashboard + reporting → **Reporting**(+ 면② 공개본).
+
+### 개정 (2026-07-07 오너 결정) — Catalog를 유틸 링크로 강등, Modeling이 흡수
+
+> 위 2026-06-26 확정 본문은 역사로 그대로 두고, 이 절이 네비 배치의 **최신 정본**이다.
+
+- **상단 네비 = 3단계**: `Modeling → Testing → Reporting (+Knowledge · 🤖AI)`.
+  **Catalog는 최상위 네비 단계에서 내려와** 우측 유틸 영역(📊 대시보드 옆)의
+  **📖 카탈로그** 링크가 된다. `/catalog` 라우트·딥링크는 전부 유지(제거 없음) —
+  전체 인벤토리 **참조 화면**으로 남는다.
+- **Modeling이 서비스별 엔드포인트를 인라인으로 품는다**: Modeling 표의 각 서비스
+  그룹 행에 **"API N (모델됨 M · 미모델 K)"** 집계 + 엔드포인트 드로어(htmx lazy
+  파셜 `/planning/resources/map/endpoints?service=…`) — 모델됨 칩은 그 노드 편집
+  딥링크. 매핑이 애매한 엔드포인트(리터럴 vs 자리표시자 호환 케이스)는 미모델로
+  과대계상하지 않고 **미매핑** 버킷으로 분리(분류 규칙 정본:
+  `controlplane/resource_routes.py` "카탈로그 인라인" 주석).
+- **근거**: Catalog는 데이터로는 필수(커버리지 **분모** · "이 서비스에서 뭐가
+  미모델인가" 질의 · conformance 단위)지만 **워크플로 단계로는 약하다** — 사용자는
+  "목록을 훑자"가 아니라 "무엇을 모델링/검증하자"에서 시작하므로, 그 데이터를
+  Modeling의 작업 맥락 안으로 옮기고 단계는 셋으로 줄인다.
+- 홈 파이프라인 스트립도 4칸 → 3칸 (Modeling 칸 부제 "전체 {N} API의 테스트 모델
+  저작"으로 분모 표기 유지).
 
 ---
 
@@ -119,6 +141,13 @@ subnet:
    집계되어 **대시보드 커버리지 %**.
 2. **노드 단위 증거** → 위 yaml의 `provenance`가 **`docs`(문서 추정) → `VALIDATED`(실제 2xx
    검증)**로 승급. = "이 리소스는 커버됐다".
+
+> **(2026-07-03 보강 — gated 정본 명기)** provenance 정본 = **`VALIDATED | docs`**,
+> 여기에 **부가 상태 `gated: <reason>`** (예: `docs` + `gated: license`). 계정
+> 게이트(라이선스 · entitlement-403 · org-master · credential)로 **이 계정에선
+> 검증 자체가 불가능**한 노드 표시이며, `gated`는 provenance를 바꾸지 않는다
+> (노드는 `docs` 유지) — UI/작업 큐에서 "할 일(docs)"과 "할 수 없음(gated)"을
+> 분리하는 근거. 표기 규약 정본: `knowledge/formal/FORMAT.md` §Account-gate marker.
 
 **AI가 높이고, 막히면 사람이 저작 — 이 과정도 이미 정의돼 있다:**
 - AI(`coverage-service` 에이전트)가 위 yaml을 채우고/고쳐 커버리지를 올린다.

@@ -1,0 +1,26 @@
+{# 서비스 엔드포인트 드로어 파셜 — resource_map.html 의 svc 행에서 htmx 로 lazy 로드.
+   base.html 을 상속하지 않는 fragment (스타일은 resource_map.html 의 .epdrawer 계열).
+   상태: 모델됨→그 노드 편집 딥링크 · 미매핑→호환 참조는 있으나 단정 불가(회색-주황) ·
+   미모델→회색. 분류 규칙 정본: resource_routes.py "카탈로그 인라인" 주석. #}
+{% if error %}
+<div class="muted small">{{ error }}</div>
+{% else %}
+<table class="eplist">
+  {% for ep in endpoints %}
+  <tr>
+    <td style="width:70px"><span class="tag {{ 'read' if ep.method == 'GET' else ('destructive' if ep.method == 'DELETE' else 'mutation') }}">{{ ep.method }}</span></td>
+    <td><code>{{ ep.path }}</code>{% if ep.name %} <span class="muted small">{{ ep.name }}</span>{% endif %}</td>
+    <td style="width:190px;text-align:right">
+      {% if ep.status == 'modeled' %}
+      <a class="epchip ok" href="/planning/resources/{{ ep.node }}"
+         title="모델 노드 {{ ep.node }} 가 이 endpoint 를 참조 — 클릭=노드 편집">모델됨 · {{ ep.node }}</a>
+      {% elif ep.status == 'unmapped' %}
+      <span class="epchip q" title="노드 {{ ep.node }} 의 참조와 method·경로 모양은 호환되지만 일부 자리가 구체값이라 이 endpoint 인지 단정 불가 — 미모델로 세지 않음">미매핑</span>
+      {% else %}
+      <span class="epchip no" title="이 endpoint 를 참조하는 모델 노드가 아직 없음">미모델</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}

@@ -3,8 +3,8 @@
 {% block content %}
 
 <style>
-  /* Modeling — 테스트 '레시피' 저작 뷰. Catalog(읽기전용 엔드포인트 인벤토리)와 달리
-     여기는 노드=레시피(의존·완성도·검증상태) 를 category▸service 로 묶어 저작한다. */
+  /* Modeling — 테스트 모델 저작 뷰. Catalog(읽기전용 엔드포인트 인벤토리)와 달리
+     여기는 노드=테스트 모델(의존·완성도·검증상태) 을 category▸service 로 묶어 저작한다. */
   .toolrow{display:flex;gap:12px;align-items:center;margin:0 0 6px;flex-wrap:wrap}
   .tgroup{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
   .tgroup button{padding:6px 13px;border:0;border-right:1px solid var(--border);background:var(--surface);
@@ -26,13 +26,19 @@
       position:sticky;top:0;background:var(--surface);white-space:nowrap;z-index:2}
   table.model td{padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top}
   tr.node:hover td{background:var(--surface2)}
-  /* category / service 그룹 헤더 행 — Catalog 와 다른 '저작 상태' tally 표시 */
-  tr.cat td{background:#eef2f7;border-top:2px solid #d3dae3;padding:8px 10px;font-size:13px;cursor:pointer;
-      position:sticky;top:31px;z-index:1}
+  /* category / service 그룹 헤더 행 — '저작 상태' tally 표시.
+     P2C-15: 접힌 카테고리 행이 colspan 셀 안의 '작은 카드'처럼 떠 보였다 →
+     전폭 그룹 헤더 행으로: 은은한 배경 줄무늬 · 좌측 캐럿 · 집계 우측 정렬
+     (flex 는 셀 내부 .gh 래퍼에만 — 표 문법/colspan 은 그대로 유지). */
+  tr.cat td{padding:0;border-top:2px solid #d3dae3;border-bottom:1px solid #dde3ea;font-size:13px;
+      cursor:pointer;position:sticky;top:31px;z-index:1;
+      background:repeating-linear-gradient(-45deg,#eef2f7 0 12px,#e9eef5 12px 24px)}
+  tr.cat .gh{display:flex;align-items:center;gap:8px;padding:8px 12px}
   tr.cat .catname{font-weight:800;color:var(--text)}
-  tr.svc td{background:var(--surface2);padding:5px 10px 5px 22px;font-size:12px;cursor:pointer}
+  tr.svc td{background:var(--surface2);padding:0;font-size:12px;cursor:pointer}
+  tr.svc .gh{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 22px;flex-wrap:wrap}
   tr.svc .srv{font-weight:700;color:var(--text)}
-  .tally{margin-left:10px;font-size:11.5px;color:var(--muted)}
+  .tally{margin-left:auto;font-size:11.5px;color:var(--muted);white-space:nowrap}
   .tally .v{color:var(--green);font-weight:700}.tally .i{color:#b26a00;font-weight:700}.tally .d{color:var(--amber);font-weight:700}
   .caret{display:inline-block;width:12px;color:var(--muted);font-size:10px}
   .prov{display:inline-block;padding:1px 8px;border-radius:11px;font-size:11px;font-weight:700;border:1.5px solid}
@@ -40,6 +46,21 @@
   .prov.docs{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
   .prov.q{background:var(--grey-bg);color:var(--grey);border-color:var(--grey)}
   .ok{color:var(--green);font-weight:700}.bad{color:#b26a00;font-weight:700}.miss{color:#cf222e}
+  /* 엔드포인트 드로어 (카탈로그 흡수 2026-07-07) — svc 행의 집계 토글 + lazy 파셜 */
+  .epbtn{margin-left:14px;font-size:11.5px;font-weight:600;color:var(--blue);white-space:nowrap;
+      text-decoration:none;cursor:pointer}
+  .epbtn:hover{text-decoration:underline}
+  .epbtn .epu{color:var(--amber)} .epbtn .epq{color:var(--grey)}
+  tr.epdrawer td{background:#fbfcfd;padding:6px 10px 8px 34px;border-bottom:1px solid var(--border)}
+  table.eplist{width:100%;border-collapse:collapse;font-size:12px}
+  table.eplist td{padding:3px 8px;border-bottom:1px solid #eef1f3;vertical-align:middle}
+  table.eplist tr:last-child td{border-bottom:0}
+  .epchip{display:inline-block;padding:1px 8px;border-radius:11px;font-size:10.5px;font-weight:700;
+      white-space:nowrap;text-decoration:none}
+  .epchip.ok{background:var(--green-bg);color:var(--green)}
+  .epchip.ok:hover{text-decoration:underline}
+  .epchip.q{background:var(--amber-bg);color:var(--amber)}
+  .epchip.no{background:var(--grey-bg);color:var(--grey)}
   td.idc a{font-weight:700;color:var(--blue);text-decoration:none}
   td.idc a:hover{text-decoration:underline}
   .editbtn{padding:3px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);
@@ -66,21 +87,25 @@
 </style>
 
 <section>
-  <h2 style="display:flex;align-items:center;gap:12px">Modeling · 테스트 레시피
+  <h2 style="display:flex;align-items:center;gap:12px">Modeling · 테스트 모델
     <span class="tgroup" id="view-toggle">
-      <button data-view="table" class="on">표 (레시피 목록)</button>
-      <button data-view="graph">그림 (의존 그래프)</button>
+      <button data-view="table" class="on">표 (모델 목록)</button>
+      <button data-view="graph">의존 그래프 (영향 파악)</button>
     </span>
     <a href="/planning/resources/worklist" style="font-size:13px;font-weight:600;margin-left:auto">작업 큐 →</a>
+    <a href="/ai/task-draft" style="font-size:13px;font-weight:600"
+       title="모델 공백 서비스의 자원 task 정의를 AI가 초안 — drafts/ 검토용">AI 초안 →</a>
   </h2>
-  <div class="vs"><b>Catalog</b>은 "어떤 <b>API 엔드포인트</b>가 있나"(1,372개·읽기 전용)라면,
-    <b>Modeling</b>은 그 자원을 "어떻게 <b>만들고·검증·삭제</b>하는지" 테스트 <b>레시피 노드</b>(273개)로
-    저작한다 — 의존관계·완성도·검증상태(provenance)를 <b>편집</b>. 행 클릭 = 그 노드 정의 편집.</div>
+  <div class="vs"><b>Modeling</b>은 전체 <b>API 엔드포인트</b>(카탈로그, 서비스 그룹 행에
+    "API N" 집계로 인라인 — 클릭=목록 펼침)를 "어떻게 <b>만들고·검증·삭제</b>하는지" 테스트
+    <b>모델 노드</b>로 저작한다 — 의존관계·완성도·검증상태를 <b>편집</b>. 행 클릭 = 그 노드
+    정의 편집. 전체 인벤토리 참조는 상단 <a href="/catalog">📖 카탈로그</a>.</div>
 
   <div class="cards" style="margin-bottom:12px">
-    <div class="card"><div class="num">{{ total }}</div><div class="lbl">레시피 노드</div></div>
+    <div class="card"><div class="num">{{ total }}</div><div class="lbl">모델 노드</div></div>
     <div class="card"><div class="num">{{ validated }}</div><div class="lbl" style="color:var(--green)">VALIDATED (2xx 검증)</div></div>
     <div class="card"><div class="num">{{ docs }}</div><div class="lbl" style="color:var(--amber)">docs (모델만·미검증)</div></div>
+    <div class="card"><div class="num">{{ gated }}</div><div class="lbl" style="color:var(--grey)">게이트 (이 계정에선 불가)</div></div>
     <div class="card"><div class="num">{{ incomplete }}</div><div class="lbl" style="color:#b26a00">불완전 (endpoint/requires 결손)</div></div>
   </div>
 
@@ -89,7 +114,7 @@
   <!-- ========== 표 (기본) : category ▸ service 그룹 ========== -->
   <div id="pane-table">
     <div class="fbar">
-      <input type="text" id="f-search" placeholder="검색: id 또는 service…" autocomplete="off">
+      <input type="text" id="f-search" placeholder="검색: id · code · service…" autocomplete="off">
       <select id="f-service"><option value="">서비스 전체</option>
         {% for s in services %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
       </select>
@@ -100,36 +125,62 @@
       <button class="minibtn" id="collapse-all" style="margin-left:4px">카테고리 접기/펴기</button>
       <span class="fcount" id="f-count"></span>
     </div>
+    {# P2C-16: code 컬럼은 id 셀 툴팁으로, opt 컬럼은 편집 화면에 이미 있어 숨김.
+       provenance → '검증상태' + 헤더 title 툴팁, 아래 한 줄 범례. #}
+    <div class="muted small" style="margin:0 0 8px">범례:
+      <span class="ok">✓ 완성</span> = endpoint·의존이 해결돼 실행 가능 ·
+      <span class="prov val">VALIDATED</span> = 실제 2xx로 검증됨 ·
+      <span class="prov docs">docs</span> = 문서로만 저작(미검증) ·
+      <span class="bad">⚠</span> = 정의 결손 ·
+      🔒 = 계정 게이트(이 계정에선 검증 불가) ·
+      ←deps = 이 노드를 필요로 하는 노드 수(영향 범위)</div>
     <div style="max-height:660px;overflow:auto;border:1px solid var(--border);border-radius:10px">
     <table class="model" id="model-table">
       <thead><tr>
-        <th style="width:150px">code</th><th style="width:170px">id</th>
-        <th style="width:150px">완성도</th><th style="width:120px">provenance</th>
-        <th>requires (의존)</th><th style="width:60px" title="이 노드를 require 하는 노드 수">←deps</th>
-        <th style="width:44px">opt</th><th style="width:60px"></th>
+        <th style="width:190px">id</th>
+        <th style="width:150px" title="완성도 — 모델 정의가 실행 가능한가: endpoint·의존 해결 여부">완성도</th>
+        <th style="width:120px" title="검증상태(provenance) — docs=문서로만 저작 · VALIDATED=실제 2xx로 검증됨">검증상태</th>
+        <th title="requires — 이 자원을 만들기 전 필요한 노드">requires (의존)</th>
+        <th style="width:60px" title="←deps — 이 노드를 필요로 하는 노드 수(영향 범위)">←deps</th>
+        <th style="width:60px"></th>
       </tr></thead>
       <tbody>
       {% for cat in tree %}
         <tr class="cat" data-cat="{{ cat.category }}">
-          <td colspan="8"><span class="caret">▾</span>
+          <td colspan="6"><div class="gh"><span class="caret">▾</span>
             <span class="catname">{{ cat.category }}</span>
             <span class="tally">{{ cat.services|length }} 서비스 · {{ cat.n }} 노드 ·
-              <span class="v">✓{{ cat.val }}</span> <span class="i">⚠{{ cat.inc }}</span> <span class="d">docs {{ cat.docs }}</span></span></td>
+              <span class="v">✓{{ cat.val }}</span> <span class="i">⚠{{ cat.inc }}</span> <span class="d">docs {{ cat.docs }}</span>{% if cat.gated %} <span class="g" title="계정 게이트 — 할 수 없음">🔒{{ cat.gated }}</span>{% endif %}</span></div></td>
         </tr>
         {% for svc in cat.services %}
         <tr class="svc" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}">
-          <td colspan="8"><span class="caret">▾</span>
+          <td colspan="6"><div class="gh"><span class="caret">▾</span>
             <span class="srv">{{ svc.service }}</span>
+            {%- if svc.ep %}
+            <a class="epbtn" href="#"
+               hx-get="/planning/resources/map/endpoints?service={{ svc.service|urlencode }}"
+               hx-target="#epd-{{ svc.service|replace('/','--') }}" hx-trigger="click once"
+               hx-swap="innerHTML"
+               title="이 서비스의 카탈로그 엔드포인트 펼치기 — 모델됨=노드 편집 링크 · 미모델=참조 없음 · 미매핑=참조가 구체값이라 단정 불가(미모델로 세지 않음)">API {{ svc.ep.api }}
+              (모델됨 {{ svc.ep.modeled }} · <span class="epu">미모델 {{ svc.ep.unmodeled }}</span>{% if svc.ep.unmapped %} · <span class="epq">미매핑 {{ svc.ep.unmapped }}</span>{% endif %}) ▸</a>
+            {%- endif %}
             <span class="tally">{{ svc.n }} 노드 · <span class="v">✓{{ svc.val }}</span>
-              <span class="i">⚠{{ svc.inc }}</span> <span class="d">docs {{ svc.docs }}</span></span></td>
+              <span class="i">⚠{{ svc.inc }}</span> <span class="d">docs {{ svc.docs }}</span>{% if svc.gated %} <span class="g" title="계정 게이트 — 할 수 없음">🔒{{ svc.gated }}</span>{% endif %}</span></div></td>
         </tr>
+        {% if svc.ep %}
+        <tr class="epdrawer" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}"
+            style="display:none">
+          <td colspan="6"><div id="epd-{{ svc.service|replace('/','--') }}"
+              class="muted small">엔드포인트 목록 로딩…</div></td>
+        </tr>
+        {% endif %}
           {% for r in svc.nodes %}
           <tr class="node" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}"
               data-prov="{{ r.provenance }}" data-complete="{{ '1' if r.complete else '0' }}"
-              data-search="{{ (r.id ~ ' ' ~ r.service)|lower }}" data-deps="{{ r.dependents }}" data-opt="{{ r.options }}">
-            <td class="muted">{{ r.code }}</td>
-            <td class="idc"><a href="/planning/resources/{{ r.id }}">{{ r.id }}</a></td>
-            <td>{% if r.complete %}<span class="ok">✓ 완성</span>{% else %}<span class="bad">⚠</span>
+              data-search="{{ (r.id ~ ' ' ~ r.code ~ ' ' ~ r.service)|lower }}" data-deps="{{ r.dependents }}">
+            <td class="idc"><a href="/planning/resources/{{ r.id }}"
+                title="code: {{ r.code or '(없음)' }}">{{ r.id }}</a></td>
+            <td>{% if r.complete %}<span class="ok">✓ 완성</span>{% if r.no_api %} <span class="miss" title="API 생성 없음 — docker push 등 외부 수단 산물">no-API</span>{% endif %}{% if r.gated %} <span class="miss" title="계정 게이트 — 이 계정에선 검증 불가">🔒{{ r.gated }}</span>{% endif %}{% else %}<span class="bad">⚠</span>
               {% if not r.has_endpoint %}<span class="miss">endpoint 없음</span>{% endif %}
               {% if r.missing %}<span class="miss">미해결 {{ r.missing|join(', ') }}</span>{% endif %}{% endif %}</td>
             <td>{% if r.provenance == 'VALIDATED' %}<span class="prov val">VALIDATED</span>
@@ -137,7 +188,6 @@
               {% else %}<span class="prov q">{{ r.provenance or '?' }}</span>{% endif %}</td>
             <td class="muted">{{ r.requires }}</td>
             <td class="muted" style="text-align:center">{{ r.dependents or '' }}</td>
-            <td class="muted" style="text-align:center">{{ r.options or '' }}</td>
             <td><a class="editbtn" href="/planning/resources/{{ r.id }}">편집 →</a></td>
           </tr>
           {% endfor %}
@@ -148,8 +198,10 @@
     </div>
   </div>
 
-  <!-- ========== 그림 (토글) ========== -->
+  <!-- ========== 의존 그래프 (토글) ========== -->
   <div id="pane-graph" hidden>
+    <div class="muted small" style="margin:0 0 6px">노드를 건드리기 전 <b>영향 범위</b>를
+      보는 뷰 — 편집은 표에서.</div>
     <div class="leg">
       <span><i class="sw" style="background:var(--green-bg);border-color:var(--green)"></i>VALIDATED</span>
       <span><i class="sw" style="background:var(--amber-bg);border-color:var(--amber)"></i>docs (모델만)</span>
@@ -187,9 +239,20 @@
   var nodeRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.node"));
   var catRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.cat"));
   var svcRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.svc"));
+  var epRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.epdrawer"));
   var fSearch = document.getElementById("f-search"), fService = document.getElementById("f-service");
   var fCount = document.getElementById("f-count");
-  var status = "all", collapsedCats = {}, collapsedSvcs = {};
+  var status = "all", collapsedCats = {}, collapsedSvcs = {}, openDrawers = {};
+  // P2-7: 카테고리 기본 접힘 (17k px 방지) — 펼침 상태는 세션 동안 기억.
+  // 검색/필터 중에는 apply()가 접힘을 무시하므로 매치는 항상 보인다.
+  var SS = "modeling.collapsed", stored = null;
+  try { stored = JSON.parse(sessionStorage.getItem(SS) || "null"); } catch (e) {}
+  if (stored && stored.cats) { collapsedCats = stored.cats; collapsedSvcs = stored.svcs || {}; }
+  else { catRows.forEach(function (tr) { collapsedCats[tr.dataset.cat] = true; }); }
+  function persist() {
+    try { sessionStorage.setItem(SS, JSON.stringify({cats: collapsedCats, svcs: collapsedSvcs})); }
+    catch (e) {}
+  }
 
   function apply() {
     var q = (fSearch.value || "").trim().toLowerCase(), svc = fService.value;
@@ -212,6 +275,14 @@
       tr.style.display = vis ? "" : "none";
       var car = tr.querySelector(".caret"); if (car) car.textContent = collapsedSvcs[key] ? "▸" : "▾";
     });
+    // 엔드포인트 드로어: 열림 상태 + 소속 svc 행이 보이고 접히지 않았을 때만
+    // (검색/필터 중엔 숨김 — 매치 대상은 노드 행이지 카탈로그 목록이 아니다)
+    epRows.forEach(function (tr) {
+      var key = tr.dataset.cat + "/" + tr.dataset.svc;
+      var vis = openDrawers[key] && !filtering && svcVis[key] &&
+                !collapsedCats[tr.dataset.cat] && !collapsedSvcs[key];
+      tr.style.display = vis ? "" : "none";
+    });
     catRows.forEach(function (tr) {
       tr.style.display = catVis[tr.dataset.cat] ? "" : "none";
       var car = tr.querySelector(".caret"); if (car) car.textContent = collapsedCats[tr.dataset.cat] ? "▸" : "▾";
@@ -228,14 +299,24 @@
   });
   // 그룹 헤더 클릭 = 접기/펴기 (필터 없을 때)
   catRows.forEach(function (tr) { tr.addEventListener("click", function () {
-    collapsedCats[tr.dataset.cat] = !collapsedCats[tr.dataset.cat]; apply(); }); });
+    collapsedCats[tr.dataset.cat] = !collapsedCats[tr.dataset.cat]; persist(); apply(); }); });
   svcRows.forEach(function (tr) { tr.addEventListener("click", function () {
-    var k = tr.dataset.cat + "/" + tr.dataset.svc; collapsedSvcs[k] = !collapsedSvcs[k]; apply(); }); });
-  var allCollapsed = false;
+    var k = tr.dataset.cat + "/" + tr.dataset.svc; collapsedSvcs[k] = !collapsedSvcs[k]; persist(); apply(); }); });
+  // 엔드포인트 집계 토글 — svc 행 접기 클릭과 분리(stopPropagation). 첫 클릭은
+  // htmx(hx-trigger="click once")가 파셜을 lazy 로드하고, 이후엔 열림/닫힘만.
+  document.querySelectorAll(".epbtn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var tr = btn.closest("tr");
+      var key = tr.dataset.cat + "/" + tr.dataset.svc;
+      openDrawers[key] = !openDrawers[key]; apply();
+    });
+  });
+  var allCollapsed = catRows.every(function (tr) { return !!collapsedCats[tr.dataset.cat]; });
   document.getElementById("collapse-all").addEventListener("click", function () {
     allCollapsed = !allCollapsed; collapsedCats = {};
     if (allCollapsed) catRows.forEach(function (tr) { collapsedCats[tr.dataset.cat] = true; });
-    apply();
+    persist(); apply();
   });
   apply();
 

@@ -581,6 +581,12 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         return resp
     until_status = _as_status_list(poll.get("until_status")) or None
     field, until = poll.get("field"), _as_status_list(poll.get("until"))
+    # give_up_status: statuses that END the poll immediately (resp returned as-is).
+    # For settle-polls (wait-after-<mutation> GETs) a 4xx means the polled resource
+    # never existed (create failed / placeholder unresolved) — without this, each
+    # such poll burns its FULL timeout against a 404 (observed: epas in run
+    # 28602725440 burned 900s x ~15 waits after a rejected create).
+    give_up_status = _as_status_list(poll.get("give_up_status")) or None
     timeout, interval = float(poll.get("timeout", 300)), float(poll.get("interval", 10))
     # Optional refire: while polling for a teardown to complete, a resource can
     # wedge in a FAILED-delete state (field report: a console delete of a
@@ -591,6 +597,8 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     refire_left = int(refire.get("max", 3)) if refire else 0
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        if give_up_status is not None and resp.status in give_up_status:
+            return resp
         if until_status is not None:
             if resp.status in until_status:
                 return resp
@@ -1291,9 +1299,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # a single os.environ.get + return when SCP_CONSOLE_EVENTS unset,
                 # so this is a no-op (zero behaviour change) outside console2.
                 if _cev:
+                    # name included (same value the oplog 'created' event carries)
+                    # so console2's /runtime mine-attribution can fall back to
+                    # name-matching loggingaudit spans whose resource_id is absent.
                     _cev.emit("resource-tracked", lifecycle=lifecycle["id"],
                               resource_id=rid, resource_type=(cu_svc or ""),
-                              service=(cu_svc or ""), path=cu_path)
+                              service=(cu_svc or ""), path=cu_path,
+                              name=(body or {}).get("name", "")
+                              if isinstance(body, dict) else "")
                 if _oplog:
                     _parent = ""
                     if isinstance(body, dict):

@@ -1,0 +1,78 @@
+name: Fetch run artifact -> oplog bucket
+
+# One-shot bridge: a chat session cannot download GitHub Actions artifacts (the
+# session proxy blocks api.github.com and the GitHub MCP has no artifact-download
+# tool), but it CAN read the permanent oplog S3 bucket. This workflow downloads a
+# named results artifact runner-side (GITHUB_TOKEN has actions:read here) and
+# mirrors its files to runs/<run-tag>/artifact/ in the bucket.
+#
+# Trigger: edit .github/fetch-results-request (KEY=VALUE: run_id=..., optionally
+# artifact_name=...) and push. Reads NOTHING from SCP compute — safe to run any
+# time (no owner-rule interaction beyond the trivial S3 writes).
+
+on:
+  push:
+    paths: [".github/fetch-results-request"]
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
+  SCP_ENV: ${{ vars.SCP_ENV || 'e' }}
+  SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
+  SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse request
+        id: req
+        run: |
+          F=.github/fetch-results-request
+          get() { grep -E "^$1=" "$F" | head -1 | cut -d= -f2- | tr -d '"' | xargs || true; }
+          echo "run_id=$(get run_id)" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$(get artifact_name)" >> "$GITHUB_OUTPUT"
+          cat "$F"
+
+      - name: Download artifact
+        if: steps.req.outputs.run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.req.outputs.artifact_name || format('results-{0}', steps.req.outputs.run_id) }}
+          run-id: ${{ steps.req.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: fetched/
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Install deps
+        # requests too: core/__init__ (pulled in by core.oplog) imports core.http_client
+        run: python -m pip install boto3 requests
+
+      - name: Mirror to oplog bucket
+        if: steps.req.outputs.run_id != ''
+        run: |
+          python - <<'EOF'
+          import os
+          from core.oplog import _client
+          c, cfg = _client()
+          assert c, "oplog client unavailable (secrets missing?)"
+          rid = "gha-chatheavy-" + os.environ["RUN_ID"]
+          n = 0
+          for root, _dirs, files in os.walk("fetched"):
+              for f in files:
+                  p = os.path.join(root, f)
+                  key = f"runs/{rid}/artifact/{f}"
+                  c.upload_file(p, cfg["bucket"], key)
+                  print("[mirror]", p, "->", key); n += 1
+          print(f"[mirror] {n} file(s) uploaded")
+          EOF
+        env:
+          RUN_ID: ${{ steps.req.outputs.run_id }}

@@ -23,6 +23,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/cloud-ml/images", expect_status: [200]}
     provenance: docs
+    gated: credential  # SCR-credential-gated — GET /v1/cloud-ml/images 404
     source: {lifecycle: cloud-ml-write-coverage, steps: [list-images]}
     notes: "소스 list-images는 capture_soft probe — envelope $.images[0].id UNPROVEN, 라이브 200 후 승격."
 
@@ -63,6 +64,7 @@ resources:
          note: "id-bound show off cloud_ml_id (getcloudml). optional+capture_soft-origin: a 4xx create yields no $.id -> literal {cloud_ml_id} 404s harmlessly. UNPROVEN until first live 2xx."}
     delete: {endpoint: "DELETE /v1/cloud-ml/{cloud_ml_id}", destructive: true}
     provenance: docs
+    gated: credential  # SCR-credential-gated (scr-auth-key 미보유 → 404)
     cluster_precondition_reads: "Complete-lifecycle (FORMAT.md): cloud-ml has 3 id-bound GETs that key off the ske-cluster PREREQUISITE's cluster_id (NOT cloud_ml_id) — GET /v1/cloud-ml/clusters/{cluster_id} + /check-releasable + /estimate — so they are precondition reads on the cluster, not verify reads on this node (the composer grafts verify off the node's OWN capture only). They are wired explicitly in the lifecycle JSONs: gen-cloudml-chain hits them against the REAL RUNNING cluster_id (expect 200, tolerate 4xx); cloud-ml-write-coverage hits them against a NONEXISTENT cluster_id literal (offline-safe coverage). These close coverage_gap GAP-get-id x3 (free-text doc key, mirrors aimlops live_preconditions)."
     source: {lifecycle: cloud-ml-write-coverage,
              steps: [list-images, create-cloud-ml, update-cloud-ml, delete-cloud-ml]}

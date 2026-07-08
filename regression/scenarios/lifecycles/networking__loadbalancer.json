@@ -85,30 +85,6 @@
           "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 300, "interval": 10}
         },
         {
-          "name": "lb-healthcheck-create",
-          "method": "POST",
-          "path": "/v1/lb-health-checks",
-          "group": "lb",
-          "optional": true,
-          "json": {
-            "lb_health_check": {
-              "description": "API regression suite",
-              "health_check_count": 3,
-              "health_check_interval": 5,
-              "health_check_port": 80,
-              "health_check_timeout": 5,
-              "name": "regrhc{ualpha}",
-              "protocol": "TCP",
-              "subnet_id": "{subnet_id}",
-              "tags": [],
-              "vpc_id": "{vpc_id}"
-            }
-          },
-          "capture_soft": {"lb_health_check_id": "$.lb_health_check.id"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "cleanup": {"method": "DELETE", "path": "/v1/lb-health-checks/{lb_health_check_id}", "service": "loadbalancer"}
-        },
-        {
           "name": "lb-create",
           "method": "POST",
           "path": "/v1/loadbalancers",
@@ -141,6 +117,31 @@
           "optional": true,
           "expect_status": [200, 404],
           "poll": {"field": "$.loadbalancer.state", "until": ["ACTIVE", "CREATED", "RUNNING", "AVAILABLE"], "timeout": 600, "interval": 20}
+        },
+        {
+          "name": "lb-healthcheck-create",
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "group": "lb",
+          "optional": true,
+          "json": {
+            "lb_health_check": {
+              "description": "API regression suite",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "name": "regrhc{ualpha}",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture_soft": {"lb_health_check_id": "$.lb_health_check.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/lb-health-checks/{lb_health_check_id}", "service": "loadbalancer"},
+          "_note": "REPAIR 2026-07-06 (HB4 400 SubnetNotAssociatedWithLoadBalancer, run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): live error was 'Unable to process the request because the chosen subnet does not contain a Load Balancer ... Please ensure a Load Balancer exists within the subnet before attempting again' for THIS SAME {subnet_id} (own subnet, not a mismatched reference — both lb-create and lb-healthcheck-create already read the identical {subnet_id} captured by this lifecycle's own create-subnet step). Root cause was ORDERING, not a wrong subnet reference: the prior 2026-06-xx fix moved lb-healthcheck-create BEFORE lb-create so lb-servergroup-create could select a PRE-CREATED health check (avoiding LbHealthCheckNotFoundError) — but that made lb-healthcheck-create run before any LB existed in the subnet, which the health-check API requires. Fix: lb-create + lb-wait now run FIRST (LB lands in {subnet_id}), THEN lb-healthcheck-create (subnet now has an LB), THEN lb-servergroup-create (health check already exists) — satisfies both constraints in one order. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx."
         },
         {
           "name": "lb-servergroup-create",
@@ -221,14 +222,89 @@
           "expect_status": [200, 202, 204, 400, 403, 404, 409]
         },
         {
+          "name": "list-igw-for-static-nat",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways",
+          "group": "staticnat",
+          "optional": true,
+          "params": {"vpc_id": "{vpc_id}"},
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {"igw_id": "$.internet_gateways[0].id"},
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 2): create-igw-for-static-nat 400 `scp-network.internet-gateway.already-associated` (\"The VPC(...) is already associated with an Internet Gateway(...)\") — CONFIRMED from the observation's own error body: at most ONE IGW per VPC is permitted, and this SAME shared VPC is ALSO targeted by networking__vpn.json's own create-igw-for-vpn in the SAME concurrent run (both adopt the one session-shared VPC, do not self-create) — whichever family's create runs SECOND now 400s. Fix: adopt-or-create — list existing IGWs on `{vpc_id}` first (`networking/vpc/listinternetgateways`, response_example wraps as `internet_gateways[]`); if one already exists (created by the VPN family, or a prior run) capture its id into `igw_id` so wait/set-igw and the static-nat family proceed against a real IGW either way. If none exists yet this finds nothing and the following create-igw-for-static-nat step makes one. See that step's note for why the DELETE step must NOT reuse this adopted `igw_id`."
+        },
+        {
+          "name": "create-igw-for-static-nat",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "group": "staticnat",
+          "optional": true,
+          "json": {
+            "description": "API regression IGW for LB static-nat",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "tags": [],
+            "type": "IGW",
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"igw_id": "$.internet_gateway.id", "owned_igw_id": "$.internet_gateway.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/internet-gateways/{owned_igw_id}", "service": "vpc"},
+          "_note": "REPAIR 2026-07-06 (HB4 400 igw-required-for-static-nat, run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): static-nat-create failed 'Cannot create Public NAT: No Internet Gateway (IGW) found in the VPC'. Pattern lifted verbatim from the proven networking__vpc.json create-internet-gateway-for-nat fix (CONFIRMED live 2026-06-23: nat-gateway also requires an attached IGW) — create IGW on the same VPC, wait ACTIVE, PUT/set it (the set call is what the NAT-gateway precedent found necessary to mark the VPC's IGW as attached/active before the NAT-family create), THEN attempt static-nat-create. Grouped+optional (staticnat) so a shared-VPC IGW collision with another concurrent adopter (409/quota) only skips this NAT family, not the whole LB lifecycle; teardown deletes the IGW after static-nat-delete, before the VPC/subnet teardown. UPDATE 2026-07-07 (HB4c): this WAS observed as a genuine collision in run 28833316852 (400 already-associated, VPN family created the IGW first) — added the list-igw-for-static-nat adopt-or-create bootstrap above, so this 400 (this family running second) is now a non-event. `owned_igw_id` is captured ONLY here (from OUR OWN create response), separately from the adoption-tolerant `igw_id`, so the cleanup dict above and the explicit `delete-igw-for-static-nat` teardown step below key off `owned_igw_id` — if this create 400s (adopted, not owned), `owned_igw_id` stays unset and both those DELETE calls hit an unresolved literal path (safe 404), NEVER the VPN family's real IGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx AND that a concurrent run with networking-vpn-gateway-tunnel no longer 400s on either side's create."
+        },
+        {
+          "name": "wait-igw-for-static-nat-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{igw_id}",
+          "group": "staticnat",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"field": "$.internet_gateway.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10, "give_up_status": [400, 403, 404]}
+        },
+        {
+          "name": "set-igw-for-static-nat",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/internet-gateways/{igw_id}",
+          "group": "staticnat",
+          "optional": true,
+          "json": {"description": "IGW for LB static-nat (API regression)", "loggable": false},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-publicip-for-static-nat",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "group": "staticnat",
+          "optional": true,
+          "json": {"description": "API regression public IP for LB static-nat", "type": "IGW", "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"static_nat_publicip_id": "$.publicip.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/publicips/{static_nat_publicip_id}", "service": "vpc"},
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 4): static-nat-create 404s `scp-loadbalancer.loadbalancers.PublicIpNotFound` (\"Public IP '' is not found\") even AFTER the HB4b IGW fix — CONFIRMED from the observation: the body sent `publicip_id:\"\"` BY DESIGN (see this lifecycle's top-level _note, written when there was no real publicip_id available), and `data/api_docs.json` models['networking/loadbalancer/staticnatcreaterequestdetail'] confirms `publicip_id` is the ONLY field and is required:true — so an empty string was always going to 404, independent of IGW timing (the IGW fix was still necessary — it's a separate precondition — but not sufficient on its own). Fix: create a real public IP (pattern lifted verbatim from networking__vpc.json's proven create-publicip-for-nat / create-publicip-for-vip, both `type:IGW` -> `$.publicip.id`), feed its id into static-nat-create. Own capture name (`static_nat_publicip_id`) to avoid clashing with lb-create's own (intentionally empty) `publicip_id` field elsewhere in this file. Grouped+optional (staticnat) — a quota-limited publicip create only skips this NAT family. Teardown deletes the public IP after static-nat-delete (children-first, alongside delete-igw-for-static-nat). UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx."
+        },
+        {
           "name": "static-nat-create",
           "method": "POST",
           "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
           "group": "staticnat",
           "optional": true,
-          "json": {"static_nat": {"publicip_id": ""}},
+          "json": {"static_nat": {"publicip_id": "{static_nat_publicip_id}"}},
           "capture_soft": {"static_nat_id": "$.static_nat.id"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "wait-static-nat-active",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+          "group": "staticnat",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"field": "$.static_nat.state", "until": ["ACTIVE"], "timeout": 300, "interval": 15, "give_up_status": [400, 403, 404]},
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 2): static-nat-create (201) was immediately followed by static-nat-delete 400 `scp-loadbalancer.loadbalancers.StaticNatNotDeletableState` (\"The static NAT is not in a deletable state (id: ..., state: CREATING)\") — the orchestrator had to manually unwind this (GET static-nats -> confirm ACTIVE -> DELETE) because the leftover CREATING NAT then blocked lb-delete (409 associated) which in turn stranded the publicip (ATTACHED) and the shared VPC. Same async-create-not-settled class as wait-vpn-gateway-active/wait-tgw-active. Fix: settle-poll `$.static_nat.state` (field CONFIRMED from `data/api_docs.json` networking/loadbalancer/showloadbalancerpublicnatip response_example: `{\"static_nat\":{\"state\":\"\"}}`) until ACTIVE before static-nat-delete fires. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm static-nat-delete clears without the 400/409/stranding cascade."
         },
         {
           "name": "static-nat-delete",
@@ -238,7 +314,39 @@
           "optional": true,
           "destructive": true,
           "json": {"static_nat_id_list": ["{static_nat_id}"]},
-          "expect_status": [200, 202, 204, 400, 403, 404, 409]
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [400],
+          "retries": 10,
+          "retry_interval": 15,
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 2): belt-and-suspenders alongside the new wait-static-nat-active settle-poll above — retry on 400 (StaticNatNotDeletableState) so a still-CREATING NAT (e.g. poll gave up early, or state flaps) doesn't strand this NAT/publicip/lb/VPC chain a second time."
+        },
+        {
+          "name": "delete-publicip-for-static-nat",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/publicips/{static_nat_publicip_id}",
+          "group": "staticnat",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [400, 409],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "Delete the public IP created for static-nat-create, children-first (after static-nat-delete releases it, before delete-igw-for-static-nat/delete-subnet/delete-vpc)."
+        },
+        {
+          "name": "delete-igw-for-static-nat",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{owned_igw_id}",
+          "group": "staticnat",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [400, 409],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 2): path changed from `{igw_id}` to `{owned_igw_id}` — `igw_id` may now be an ADOPTED IGW (see list-igw-for-static-nat's note) belonging to a concurrently-running lifecycle (e.g. networking__vpn.json's VPN gateway family), and this suite must never delete another family's live resource. `owned_igw_id` is captured only by create-igw-for-static-nat's own 2xx and stays unset when we adopted instead of created, so an adopted case leaves this DELETE targeting an unresolved literal path (safe 404, matches this codebase's established soft-capture-miss convention) instead of the foreign IGW. Delete the IGW created for static-nat-create, children-first (after static-nat-delete, before delete-subnet/delete-vpc). Retry 400 to ride out the not-deletable-state transition (same quirk CONFIRMED for this endpoint in networking__vpc.json)."
         },
         {
           "name": "private-static-nat-create",
@@ -248,7 +356,8 @@
           "optional": true,
           "json": {"static_nat": {"private_nat_id": "", "private_nat_ip_id": ""}},
           "capture_soft": {"private_static_nat_id": "$.static_nat.id"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "HB4 (run 28738115294, 2026-07-05) live 403 scp-loadbalancer.loadbalancers.PrivateNatIpForbidden ('You do not have permission to access the private NAT IP resource') — WAIVER CANDIDATE (entitlement), not a body/param bug: this account is not entitled to private-NAT-IP resources regardless of body content. 403 already in expect_status so it still records reach-coverage. Deliberately NOT modified this session (CAMPAIGN-C3-100 task instruction: leave entitlement-403 alone, record as waiver candidate — see CAMPAIGN-C3-100-repair-log.md #HB4b)."
         },
         {
           "name": "private-static-nat-delete",

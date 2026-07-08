@@ -29,6 +29,8 @@ Layers / checks:
                        create, no teardown by design) so the create-without-
                        delete warning is suppressed for them; a lookup whose
                        create is NOT a GET is an ERROR (IB-004) ·
+                       `gated: <reason>` marks account-gated nodes (reason ∈
+                       GATED_VALUES, gate documented in notes) ·
                        divergence from the cross-service.yaml requires graph
                        is a WARNING (the two co-exist during R1-R3) ·
                        _groups.yaml = {groups: {"nw-vpc": {label, category}}}
@@ -330,8 +332,22 @@ REQUIRES_MODES = {"existing_or_create"}
 TASK_KEYS = {"code", "service", "group", "requires", "create", "capture",
              "capture_soft", "ready", "verify", "delete", "quota",
              "provenance", "adopt", "heavy", "no_api", "lookup",
-             "needs_cert_material",
+             "needs_cert_material", "gated",
              "notes", "note", "source", "_note"}
+# gated: <reason> — machine-readable ACCOUNT-GATE marker (2026-07-03): this
+# node cannot be validated in THIS account for a documented reason, so the
+# Modeling UI can separate "할 수 없음" from "할 일". Values:
+#   license         engine needs a commercial license (sqlserver/searchengine/
+#                   vertica — owner override 2026-06-16, reachability-only)
+#   entitlement-403 account lacks the service entitlement (401/403 is the
+#                   terminal answer, e.g. archivestorage hmac not in catalog)
+#   console-only    a required input is only issuable in the console UI
+#   org-master      needs the organization master account / Landing Zone
+#   credential      needs an externally-issued credential/material we don't
+#                   hold (SCR auth key, CA-signed cert, assumable role, ...)
+# A gated node MUST document its gate in notes/note (warning otherwise).
+GATED_VALUES = {"license", "entitlement-403", "console-only", "org-master",
+                "credential"}
 _TOKEN_RE_SRC = r"\{([A-Za-z0-9_][A-Za-z0-9_.\-]*)\}"
 
 
@@ -618,6 +634,15 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
         if task.get("provenance") not in PROVENANCE:
             err(f"{where}: provenance must be one of {sorted(PROVENANCE)}")
 
+        gate = task.get("gated")
+        if gate is not None:
+            if gate not in GATED_VALUES:
+                err(f"{where}: gated must be one of {sorted(GATED_VALUES)} "
+                    f"(got {gate!r})")
+            if not (task.get("notes") or task.get("note")):
+                warn(f"{where}: gated node should document its gate in "
+                     "notes/note")
+
         gid = _group_of(nid, task)
         if gid and groups and gid not in groups:
             warn(f"{where}: group '{gid}' is not defined in "
@@ -791,19 +816,36 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
             warn(f"{where}: create without delete.endpoint — composed "
                  "lifecycles will have no teardown for it")
         if ready is not None:
-            if not isinstance(ready, dict) or not ready.get("field") \
-                    or ready.get("until") in (None, "", []):
-                err(f"{where}: ready needs 'field' and 'until'")
-            else:
-                if ready.get("endpoint"):
-                    _check_endpoint(f"{where} ready", ready["endpoint"],
-                                    methods)
-                elif not delete.get("endpoint"):
-                    err(f"{where}: ready without endpoint and without a "
+            # ready may be ONE spec or a LIST of specs (multi-stage readiness,
+            # composer 2026-07-04 — e.g. tgw-vpc-connection: connection ACTIVE
+            # then parent TGW back to ACTIVE). Validate each spec identically.
+            # A spec without its own endpoint falls back to composer's
+            # _read_endpoint(task): the first endpoint-carrying spec, else a
+            # GET on the delete endpoint — mirror that resolution here.
+            _rspecs = ready if isinstance(ready, list) else [ready]
+            if not _rspecs:
+                err(f"{where}: ready list must not be empty")
+            _r_fallback = any(isinstance(_rs, dict) and _rs.get("endpoint")
+                              for _rs in _rspecs) or bool(delete.get("endpoint"))
+            for _ri, _rs in enumerate(_rspecs):
+                _rw = f"{where}: ready" + (f"[{_ri}]" if len(_rspecs) > 1 else "")
+                if not isinstance(_rs, dict) or not _rs.get("field") \
+                        or _rs.get("until") in (None, "", []):
+                    err(f"{_rw} needs 'field' and 'until'")
+                    continue
+                if _rs.get("endpoint"):
+                    _check_endpoint(f"{_rw}", _rs["endpoint"], methods)
+                elif not _r_fallback:
+                    err(f"{_rw} without endpoint and without a "
                         "delete.endpoint to derive a read path from")
                 for k in ("timeout", "interval"):
-                    if k in ready and not isinstance(ready[k], int):
-                        err(f"{where}: ready.{k} must be an integer")
+                    if k in _rs and not isinstance(_rs[k], int):
+                        err(f"{_rw}.{k} must be an integer")
+                if _rs.get("give_up_status") is not None and not (
+                        isinstance(_rs["give_up_status"], list)
+                        and all(isinstance(s, int)
+                                for s in _rs["give_up_status"])):
+                    err(f"{_rw}.give_up_status must be a list of ints")
 
         verify = task.get("verify")
         if verify is not None and not isinstance(verify, list):

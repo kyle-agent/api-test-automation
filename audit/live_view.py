@@ -109,6 +109,8 @@ def build_spans(events: list[dict], now: datetime, ours_only: bool = True,
         key = (rt, _tag_of(e), nm)
         d = inst.setdefault(key, {"rtype": rt, "tag": _tag_of(e), "name": nm,
                                   "start": None, "end": None, "ops": []})
+        if e.get("resource_id") and not d.get("res_id"):
+            d["res_id"] = str(e["resource_id"])      # for the oplog origin join
         ts = e.get("timestamp"); nmn = e.get("event_name") or ""
         d["ops"].append((ts, nmn))
         if "Create" in nmn and d["start"] is None:
@@ -380,9 +382,13 @@ def _state_of(d: dict) -> str:
     with no later Create End and no Delete is a FAILED create — the resource never
     existed (e.g. createpublicdomainname 500). A deferred-delete resource (kms /
     secret) flagged ``terminating`` had its delete accepted (pending-deletion);
-    we show it as scheduled-for-deletion, i.e. effectively deleted."""
+    we show it as scheduled-for-deletion, i.e. effectively deleted. A span the
+    LOCAL console records already deleted (``local_deleted`` — its run's 2xx
+    DELETE step) is deleted regardless of loggingaudit lag (유령 자원 fix)."""
     names = [n for _, n in d["ops"]]
     if any("Delete" in n and "End" in n for n in names):
+        return "deleted"
+    if d.get("local_deleted"):
         return "deleted"
     if d.get("terminating"):
         return "terminating"
@@ -536,6 +542,170 @@ def render_dag(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
     return "".join(P)
 
 
+# --- origin annotation: join loggingaudit spans with the OPLOG bucket ---------
+# loggingaudit events carry NO run id — the oplog bucket does (core.oplog writes
+# runs/<run_id>/res/<ms>-<pid>-<seq>.json batches whose events carry action/res_id/
+# name/lifecycle). Joining the two lets the runtime view say WHO made each span:
+#   origin = "local:<run_id>"  — a run this console started (its run-rec id, or the
+#                                bare "local" fallback core.oplog uses off-CI)
+#          | "ci:<run_id>"     — a CI run (gha-* prefixed, or a bare numeric
+#                                GITHUB_RUN_ID from api-test.yml)
+#          | "unknown"         — no oplog event matched (or the bucket is off)
+# Everything here is best-effort: an unreachable bucket returns None and the
+# caller renders exactly as before (origin stays unset).
+
+def fetch_oplog_res_events(start_ms: int, max_objects: int = 400):
+    """Read runs/*/res/*.json batch objects newer than ``start_ms`` from the oplog
+    bucket; every event is tagged with its run_id (from the key). Returns a list,
+    or **None** when the bucket is unreachable/unconfigured (degrade gracefully)."""
+    try:
+        from core import oplog as _oplog
+        c, cfg = _oplog._client()
+    except Exception:
+        return None
+    if not c:
+        return None
+    out: list[dict] = []
+    keys: list[tuple[int, str, str]] = []   # (ms, run_id, key)
+    try:
+        token = None
+        for _ in range(40):                  # page cap — bounded work
+            kw = {"Bucket": cfg["bucket"], "Prefix": "runs/", "MaxKeys": 1000}
+            if token:
+                kw["ContinuationToken"] = token
+            resp = c.list_objects_v2(**kw)
+            for obj in resp.get("Contents") or []:
+                key = obj.get("Key") or ""
+                parts = key.split("/")
+                # runs/<run_id>/res/<ms>-<pid>-<seq>.json
+                if len(parts) != 4 or parts[2] != "res":
+                    continue
+                try:
+                    ms = int(parts[3].split("-", 1)[0])
+                except ValueError:
+                    continue
+                if ms >= start_ms:
+                    keys.append((ms, parts[1], key))
+            if not resp.get("IsTruncated"):
+                break
+            token = resp.get("NextContinuationToken")
+    except Exception:
+        return None
+    keys.sort()
+    for _ms, rid, key in keys[-max_objects:]:
+        try:
+            body = c.get_object(Bucket=cfg["bucket"], Key=key)["Body"].read()
+            batch = json.loads(body)
+        except Exception:
+            continue
+        for ev in (batch.get("events") or []) if isinstance(batch, dict) else []:
+            if isinstance(ev, dict):
+                ev = dict(ev)
+                ev["_run_id"] = rid
+                out.append(ev)
+    return out
+
+
+def origin_of_run_id(rid: str, local_run_ids=()) -> str:
+    """Classify an oplog run_id: console-local rec ids (and the bare 'local'
+    fallback) -> local:<rid>; gha-* / bare-numeric GITHUB_RUN_ID -> ci:<rid>;
+    anything else is unattributable -> unknown."""
+    rid = str(rid or "")
+    if rid in set(local_run_ids) or rid == "local":
+        return f"local:{rid}"
+    if rid.startswith("gha-") or rid.isdigit():
+        return f"ci:{rid}"
+    return "unknown"
+
+
+def annotate_origins(spans, oplog_events, local_run_ids=()) -> None:
+    """Set ``span['origin']`` from the oplog join — match by res_id first, then by
+    resource name. ``oplog_events=None`` (bucket unreachable) leaves origin unset
+    (None) so the view renders exactly as today."""
+    if oplog_events is None:
+        return
+    by_id: dict[str, str] = {}
+    by_name: dict[str, str] = {}
+    for ev in oplog_events:
+        rid = str(ev.get("_run_id") or ev.get("run_id") or "")
+        if not rid:
+            continue
+        if ev.get("res_id"):
+            by_id[str(ev["res_id"])] = rid
+        if ev.get("name"):
+            by_name[str(ev["name"])] = rid
+    for d in spans.values():
+        rid = by_id.get(str(d.get("res_id") or "")) or by_name.get(d.get("name") or "")
+        d["origin"] = origin_of_run_id(rid, local_run_ids) if rid else "unknown"
+
+
+def annotate_local_origins(spans, local_index) -> None:
+    """Overlay LOCAL attribution from the console's own IN-PROCESS run records —
+    the per-run console-events sink (``resource-tracked``/``resource-deleted``)
+    plus the per-run ``core.registry`` manifest shards. Matches by res_id first,
+    then by resource name, exactly like :func:`annotate_origins`.
+
+    Runs AFTER :func:`annotate_origins` and WINS over it: for runs THIS console
+    started, its in-process record is authoritative — the oplog-bucket join is
+    best-effort and demonstrably lags/misses local runs (defect 2026-07-04:
+    ``scope=mine`` blank during an ACTIVE local run because the bucket had no
+    ``runs/<rec>/res/*`` objects yet). Local attribution must never depend on
+    the bucket; the bucket join remains for CI (``gha-*``) badge attribution.
+
+    ``local_index``: ``{run_id: {"ids": iterable, "names": iterable}}`` — plus
+    optional ``deleted_ids``/``deleted_names`` (resources the run's own 2xx
+    DELETE steps already removed). A span matching a deleted key is flagged
+    ``local_deleted`` so :func:`_state_of` shows it 삭제됨 (and the default
+    ``deleted=hide`` filter drops it) even while loggingaudit still lags the
+    Delete event — the '유령 자원' fix (2026-07-04: already-deleted resources
+    kept rendering as 생성됨/테스트중 in scope=mine).
+    Empty/None index is a no-op (spans render exactly as annotate_origins left
+    them)."""
+    if not local_index:
+        return
+    by_id: dict[str, str] = {}
+    by_name: dict[str, str] = {}
+    del_ids: set = set()
+    del_names: set = set()
+    for rid, idx in local_index.items():
+        for i in (idx.get("ids") or ()):
+            if i:
+                by_id[str(i)] = str(rid)
+        for n in (idx.get("names") or ()):
+            if n:
+                by_name[str(n)] = str(rid)
+        for i in (idx.get("deleted_ids") or ()):
+            if i:
+                del_ids.add(str(i))
+        for n in (idx.get("deleted_names") or ()):
+            if n:
+                del_names.add(str(n))
+    if not (by_id or by_name or del_ids or del_names):
+        return
+    for d in spans.values():
+        rid_s = str(d.get("res_id") or "")
+        name_s = d.get("name") or ""
+        rid = by_id.get(rid_s) or by_name.get(name_s)
+        if rid:
+            d["origin"] = f"local:{rid}"
+        if (rid_s and rid_s in del_ids) or (name_s and name_s in del_names):
+            d["local_deleted"] = True
+
+
+def filter_spans(spans, scope: str = "mine", deleted: str = "hide"):
+    """Scope/visibility filter for the runtime view. ``scope=mine`` keeps only
+    spans whose origin is local:*; ``deleted=hide`` drops spans already in the
+    deleted state. Returns a NEW dict (input untouched)."""
+    out = {}
+    for k, d in spans.items():
+        if scope == "mine" and not str(d.get("origin") or "").startswith("local:"):
+            continue
+        if deleted == "hide" and _state_of(d) == "deleted":
+            continue
+        out[k] = d
+    return out
+
+
 # light-theme per-state palette (fill, border)
 _FLOW = {
     "creating": ("#cfe8ff", "#2b7de9"),  # 생성중 — pulses
@@ -567,8 +737,76 @@ def _dur(d: dict, now: datetime) -> str:
     return f"{s/60:.0f}m" if s >= 60 else f"{s:.0f}s"
 
 
-def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
-    """v3 — per-INSTANCE topology (id shown), light theme, running pulses, deleted greys."""
+_ORIGIN_BADGE = {"local": ("내 실행", "#2b7de9"), "ci": ("CI", "#b5740b"),
+                 "unknown": ("출처?", "#8b95a3")}
+
+
+def _origin_badge(origin) -> tuple[str, str] | None:
+    if not origin:
+        return None
+    kind = str(origin).split(":", 1)[0]
+    return _ORIGIN_BADGE.get(kind, _ORIGIN_BADGE["unknown"])
+
+
+def _runtime_chrome_html(chrome: dict) -> str:
+    """Standalone /runtime page shell: a minimal Testing header (the 4-menu nav +
+    '← Test Execution' back-link), the scope/hours/deleted control bar, the
+    account-wide banner, and the hygiene cross-link. Self-contained (inline CSS/JS;
+    controls navigate by query params so the server re-filters)."""
+    scope = chrome.get("scope", "mine")
+    hours = int(chrome.get("hours", 1) or 1)
+    deleted = chrome.get("deleted", "hide")
+    parts = ['''<style>
+ .rt-shell{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e3e8ef;
+   border-radius:10px;padding:8px 14px;margin-bottom:10px;font-size:12.5px}
+ .rt-shell b{font-size:13.5px} .rt-shell a{color:#2563c9;text-decoration:none;font-weight:600}
+ .rt-shell a:hover{text-decoration:underline} .rt-shell .sep{color:#c3ccd9}
+ .rt-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;
+   border:1px solid #e3e8ef;border-radius:10px;padding:7px 14px;margin-bottom:10px;font-size:12.5px}
+ .rt-ctl .lbl{color:#5b6675;font-weight:700}
+ .rt-ctl a.tgl{border:1px solid #d7dee8;border-radius:16px;padding:3px 11px;color:#5b6675;
+   text-decoration:none;font-weight:600}
+ .rt-ctl a.tgl.on{border-color:#2b7de9;background:#e8f0fd;color:#2563c9}
+ .rt-banner{background:#fdf3e2;border:1px solid #ecd9ae;color:#7a5a10;border-radius:10px;
+   padding:8px 13px;font-size:12.5px;margin-bottom:10px}
+ .rt-note{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;
+   padding:8px 13px;font-size:12.5px;margin-bottom:10px}
+</style>''']
+    parts.append(
+        '<div class="rt-shell"><b>SCP API Regression</b>'
+        '<span><a href="/catalog">Catalog</a> <span class="sep">→</span> '
+        '<a href="/planning/resources/map">Modeling</a> <span class="sep">→</span> '
+        '<a href="/testing/embed">Testing</a> <span class="sep">→</span> '
+        '<a href="/reporting">Reporting</a></span>'
+        '<span style="margin-left:auto"><a href="/testing/embed">← Test Execution</a></span></div>')
+
+    def q(s, h, dl):
+        return f"/runtime?scope={s}&hours={h}&deleted={dl}"
+    hours_opts = "".join(
+        f'<a class="tgl {"on" if hours == h else ""}" href="{q(scope, h, deleted)}">{h}시간</a>'
+        for h in (1, 6, 24))
+    parts.append(
+        '<div class="rt-ctl"><span class="lbl">범위</span>'
+        f'<a class="tgl {"on" if scope == "mine" else ""}" href="{q("mine", hours, deleted)}">내 실행</a>'
+        f'<a class="tgl {"on" if scope == "all" else ""}" href="{q("all", hours, deleted)}">계정 전체</a>'
+        f'<span class="lbl" style="margin-left:8px">윈도우</span>{hours_opts}'
+        f'<label style="margin-left:8px;cursor:pointer"><input type="checkbox" '
+        f'{"checked" if deleted == "show" else ""} '
+        f'onchange="location=\'{q(scope, hours, "show" if deleted != "show" else "hide")}\'"> '
+        '삭제됨 표시</label>'
+        '<span style="margin-left:auto">자원 위생 → <a href="/testing/resources">Testing ▸ 리소스</a></span></div>')
+    if chrome.get("banner"):
+        parts.append(f'<div class="rt-banner">⚠ {html.escape(chrome["banner"])}</div>')
+    if chrome.get("note"):
+        parts.append(f'<div class="rt-note">{html.escape(chrome["note"])}</div>')
+    return "".join(parts)
+
+
+def render_flow(spans, now: datetime, meta: dict, refresh: int = 0,
+                chrome: dict | None = None) -> str:
+    """v3 — per-INSTANCE topology (id shown), light theme, running pulses, deleted greys.
+    ``chrome`` (optional) wraps the page in the standalone /runtime shell: Testing
+    header + scope/hours/deleted controls + banner + per-box origin badges."""
     from collections import defaultdict
     try:
         from dashboard.gen_dep_map import dep_map_dict
@@ -643,6 +881,8 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
  g.n.hi rect{stroke:#2b7de9;stroke-width:2.6}
  .hint{color:#5b6675;font-size:11px;margin:2px 0 8px}
 </style></head><body>''')
+    if chrome:
+        P.append(_runtime_chrome_html(chrome))
     P.append('<h1>SCP 실행 흐름 · 인스턴스 라이브 상태</h1>')
     P.append(f'<div class="sub">왼→오 = 생성 순서(의존 깊이) · 같은 열 = 동시 실행 · 각 박스 = 리소스 1개(id)'
              f' · {html.escape(meta.get("start",""))}→{html.escape(meta.get("end",""))}'
@@ -747,14 +987,19 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
         dur = _dur(d, now)
         myid = nid[id(d)]
         linked = " · 🔗연결" if adj.get(myid) else ""
-        tip = f'{rt} · {html.escape(d["name"] or tag)} · {_STATE_KO[st]} · {d["start"]}→{d["end"] or "LIVE"} · {dur} · {len(d["ops"])} ops{linked}'
+        origin = d.get("origin")
+        otip = f' · 출처 {origin}' if origin else ""
+        tip = f'{rt} · {html.escape(d["name"] or tag)} · {_STATE_KO[st]} · {d["start"]}→{d["end"] or "LIVE"} · {dur} · {len(d["ops"])} ops{otip}{linked}'
         deco = ' text-decoration="line-through"' if st in ("deleted", "terminating") else ""
         txt_gray = st in ("deleted", "terminating")
+        badge = _origin_badge(origin)
+        rtext = (f'<tspan fill="{badge[1]}" font-weight="700">{html.escape(badge[0])}</tspan> {dur}'
+                 if badge else dur)
         P.append(f'<g class="n{run}" id="{myid}" onclick="hi(\'{myid}\')"><title>{html.escape(tip)}</title>'
                  f'<rect x="{x}" y="{y}" width="{BW}" height="{BH}" rx="6" fill="{fill}" stroke="{bd}" stroke-width="1.4"/>'
                  f'<circle cx="{x+10}" cy="{y+BH/2}" r="3.5" fill="{bd}"/>'
                  f'<text x="{x+20}" y="{y+16}" font-size="11" fill="{"#9aa4b2" if txt_gray else "#1f2733"}"{deco}>{html.escape(lab)}</text>'
-                 f'<text x="{x+BW-6}" y="{y+16}" font-size="9.5" text-anchor="end" fill="#7a8493">{dur}</text></g>')
+                 f'<text x="{x+BW-6}" y="{y+16}" font-size="9.5" text-anchor="end" fill="#7a8493">{rtext}</text></g>')
     P.append('</svg>')
     P.append(f'<div class="sub" style="margin-top:8px">{len(insts)} 인스턴스 · {maxc+1} 단계 · {edges} 연관선 '
              f'(공유인프라 채택 {adopt_edges}개 점선) '
@@ -781,6 +1026,13 @@ function clr(){var svg=document.querySelector('svg');if(svg){svg.classList.remov
 document.addEventListener('click',function(e){if(!e.target.closest('g.n'))clr();});
 ''')
     P.append('</script>')
+    if not refresh:
+        # ambient refresh (2026-07-04): an OPEN runtime popup with a fresh cache
+        # never refreshed again, so it silently drifted stale (deleted resources
+        # kept showing as 생성됨/테스트중). A slow JS reload keeps a left-open
+        # window converging without the aggressive 12s meta-refresh cadence the
+        # stale/generating states use.
+        P.append('<script>setTimeout(function(){location.reload();},90000)</script>')
     P.append('</body></html>')
     return "".join(P)
 

@@ -57,15 +57,20 @@ Supports: `spec/` (extract+diff the spec), `dashboard/` (visualize both axes),
 
 ## Safety gates (NON-NEGOTIABLE)
 
-| Operation | Default | Enable with |
-|-----------|---------|-------------|
+Mutations default **ON** (`core/config.py` — the project's purpose is real
+execution; the deliberate opt-in is the run **selection** + the console2
+pre-flight confirm, not an env flag; canonical wording: `CLAUDE.md` Hard Rules):
+
+| Operation | Default | Gate |
+|-----------|---------|------|
 | `GET` (read-only) | runs | always allowed |
-| `POST` / `PUT` / `PATCH` | **blocked** | `SCP_ALLOW_MUTATIONS=true` |
-| `DELETE` | **blocked** | `SCP_ALLOW_DESTRUCTIVE=true` |
-| Heavy/billable lifecycles (VM, K8s, DB) | **skipped** | `SCP_RUN_HEAVY=true` |
+| `POST` / `PUT` / `PATCH` | **allowed** | force read-only: `SCP_ALLOW_MUTATIONS=false` (CI smoke/conformance set it explicitly) or profile veto `SCP_PROFILE_FORBID` |
+| `DELETE` | **allowed** | disable: `SCP_ALLOW_DESTRUCTIVE=false` or profile veto |
+| Heavy/billable lifecycles (VM, K8s, DB) | **skipped** | explicit opt-in: `SCP_RUN_HEAVY=true` or a confirmed heavy selection |
 
 Smoke + read-chains only call `GET`s. Mutations happen exclusively through
-ordered CRUD scenarios. Never relax these as a shortcut.
+ordered CRUD scenarios / composed lifecycles. Never flip a gate just to make a
+test pass.
 
 **Run sequencing (owner rule, 2026-06-10):** one workflow run at a time — before
 pushing anything that triggers `api-test.yml` (any `.github/run-request` touch,
@@ -125,7 +130,242 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   삭제. verified_endpoints **1250 → 1384 (+134)**. rc=1 원인은 기존 `gen-heavy-vs-netops`
   1건 실패(레시피/백엔드 — B와 무관, 추적 필요). 오프라인: validate 234/0, DAG 완전,
   console2 28 + soft 14 + duration 16 + loader/dag 92 green.
-- **PRIOR — ▶ SESSION HANDOFF (2026-06-29 close, branch `claude/ecstatic-tesla-fo1g3b`).**
+- **CAMPAIGN-C3-100 진행 중 (2026-07-04~07, 정본: `docs/working/plans/
+  CAMPAIGN-C3-100.md` 진행 로그 + `CAMPAIGN-C3-100-repair-log.md`).** 방법론이
+  확립됨: **heavy 배치(chat-heavy 레인, 직렬) → fold(derive_verified→promote)
+  → 실패 서명 원인확인(관측 전문+api_docs 대조) → repair 에이전트(오프라인)
+  → 재검증 배치** 루프. 실적: verified store **2252→2344**(+92), 노드 승격 3
+  (vpn-gateway·vpn-tunnel·lb-static-nat → **VALIDATED 168**/275), 배치별
+  +13/+24/+12/+43. 실증된 실패 클래스: ①settle 부재(생성/자식 op가 부모를
+  EDITING 재전이 — TGW는 child마다, VPN/peering/static-NAT/DNS도 동일),
+  ②캡처 래퍼 키 오류, ③필수 필드 누락(모델 대조로 해결), ④선행 자원 요건
+  (IGW는 VPC당 1 — adopt-or-create 필수), ⑤PF/entitlement(waiver행:
+  epas·mysql·pg create-500 · backup 이중차단 · private-NAT 403 · DC 로깅
+  스토리지 계정요건). HB1~HB6 종결, HB7(data-flow/ops)·HB8(iam)·HB4e(repair-8
+  검증)·HB1b/2b(DB 수리 검증)·aimlops 필수필드(repair-9) 잔여. **main 동기
+  26c4f41e+**(UI 개편 포함), 대시보드 dashboard-data `b1d6d621`(C3 71.1%,
+  재발행 예정). 플랫폼: IA 개정(**Modeling이 Catalog 흡수**, 네비 3단계 —
+  PLATFORM-IA-DIRECTION §개정 2026-07-07) + Testing 실행 중심 재배치 +
+  페르소나-2 수정 전체(pre-flight 우회·재스캔 오보 근본수리 등) 반영됨.
+  운영 주의: 배치 fold 후 잔존은 verify_clean → IGNORE_TTL 강제 스윕으로
+  기준선(muted log-group 1) 복귀 확인 후 다음 디스패치; **VPC delete 409의
+  related_resources가 목록 조회에 안 보이는 숨은 subnet을 지목할 수 있음**
+  (2026-07-07 실증). main 반영은 반드시 레인 유휴(request=noop) 시점에 —
+  chat-heavy는 push 경로 트리거 + cancel-in-progress라 실행 중 머지가 run을
+  죽인다.
+- **RUN 관측성 개편 (2026-07-04, branch `claude/upbeat-ritchie-ieus5u` — owner 승인
+  배치 A–F, 페르소나 QA 저널 run `20260704-034346-64b5` 근거; live mutation 없음,
+  .github/ 무변경):** tracker = `docs/working/trackers/UIUX-AUDIT-2026-07-03.md`
+  §2 phase-3 주석 (상세). 핵심: (A) console2 master 흐름 그래프가 **run 에
+  바인딩** — 신규 `GET /api/runs/{id}/graph`(run 의 라이프사이클 폐쇄집합,
+  같은 resource_graph.js/graph_view 계약) + 모드 칩("run 뷰 ↔ 구성 미리보기") +
+  활성 run 자동 재접속 + 기본 선택 빈 상태(sessionStorage 보존) + now-playing
+  바(durations.json 평균); (B) lifecycle-end 시 열린 ⏳ API 행 = `fail
+  (timeout/중단)` 로 즉시 닫힘 + run 종료 토스트/로그 자동 새로고침
+  (`PYTHONUNBUFFERED=1` 라이브 tail); (C) run 종료 후 **+0/+5m/+15m owned
+  재스캔** — 늦출현이면 `late_alert` (64b5 의 이미지×2+스냅샷×4 ~20분 지연
+  실증 대응), run-end 로그는 "teardown 시도 완료 — 실측 재스캔 예약됨";
+  (D) 서버 재시작에도 **run 이력 rehydrate** (`reports/console2-runs/*` →
+  `_RUNS`, '복원됨' 칩) + controlplane runs DB 미러(`db.record_local_run`,
+  gh_run_id=`local-<rec id>`) → Reporting ▸ 실행 기록 & `/runs/{id}` pass/fail
+  요약 (P2-9 완결); (E) /runtime "데이터 기준: N분 전 윈도우" 칩 + stale 자동
+  재수집/새로고침; (F) 클린업 종료 후 재스캔+의존잠금 힌트, genuine-removed
+  실측 삭제 수(reconciler 라운드별 라인 신설), console2 남은 자원 known-stuck
+  folding, '폐포'→'포함 API' 라벨, VPC 용량 '내 실행' 귀속(mine_live — 공유
+  VPC 포함, run 자원 id 키잉). 테스트:
+  `tests/offline/test_console2_run_observability.py` +17 (offline 438) ·
+  controlplane 20/16/18/16 · runner 16/16 · validate 243/0 · Playwright 픽스처
+  스모크(재부착·run 뷰·now-playing·늦출현·fail-closure) ✅.
+- **CLEANUP-ROBUSTNESS pass (2026-07-04, branch `claude/upbeat-ritchie-ieus5u` — the
+  light-batch-2 TGW/VPC leak, run 28648339307; offline+read-only only, no mutations,
+  .github/ untouched):** root causes + fixes in `knowledge/validated-facts.md`
+  2026-07-04 block. (1) reconciler: async-DELETING = **in-progress → 라운드 추가
+  부여** (converge 아님; PF-09 scheduled 수렴은 유지), owned TGW 의 vpc-connection 을
+  NESTED list 로 선삭제 (flat list 는 403), VPC 409 는 holder 탐지 시 1회+`blocked by
+  <holder>` 로 defer (기존 6회 소음 제거); (2) gen-private-nat pacing: 600s waits +
+  terminal-bad until + give_up_status + `wait-transit-gateway-active` (TGW 는
+  connection 부착 중 EDITING; private-nat 는 TGW==ACTIVE 요구) — 모델 정본
+  `networking__vpc.yaml` two-stage `ready:` (composer 가 ready LIST 지원, recompose
+  보존); (3) offline tests +7 (`test_reconciler_convergence.py`).
+  - **운영 규칙 (NEW, 이 leak 이 ~1일 방치된 원인): 결과 fold 를 마칠 때마다, 다음
+    작업으로 넘어가기 전에 `owned==0` 을 재검증하라** (read-only owned 스캔 —
+    `python -m cleanup.verify_clean` / console2 `/api/owned`). fold 후 hygiene 체크가
+    빠지면 leak 이 다음 세션까지 조용히 살아남는다. 디스패치 게이트(owned==0 + ~5min
+    audit silence)와 별개로, **fold 직후에도** 적용.
+  - **✅ RESOLVED — 위 "LIVE NOT CLEAN" 관측은 정리 진행 중의 스냅샷이었음 (2026-07-04
+    후속 재검증):** 그 관측 시점(02:36~02:41Z)은 오케스트레이터가 정확히 그 체인을
+    수동 해체하던 detach 윈도우였다 — nested `DELETE /v1/transit-gateways/{tgw}/
+    vpc-connections/{conn}` 202 → TGW EDITING/invalid-state ~4분 → TGW DELETE 202 →
+    404 → VPC DELETE 204. 이후 재검증: TGW `1f037f35…` **404**, VPC `9c89d154…`
+    **404**. "잔존 두 번째 VPC" `regrvpcsh6a4871f8` (02:37:49Z 생성) 는 leak 이 아니라
+    **owner 의 당시 진행 중 로컬 run (20260704-113744-7350, compute-virtualserver-full)
+    의 공유 VPC** 였고, run 종료 후 정리됨 — 최종 관측: **regr VPC 0**. 남은 것은
+    문서화된 known-stuck 뿐. 교훈: 정리/실행이 겹치는 시간대의 단발 관측은 leak 판정
+    근거로 불충분 — 상태 전이(DELETING/EDITING)는 in-progress 로 읽을 것.
+- **IA/CX phase 1 (2026-07-03, branch `claude/upbeat-ritchie-ieus5u` — owner-approved
+  4-item batch, no live mutations, .github/ untouched):** tracker =
+  `docs/working/trackers/UIUX-AUDIT-2026-07-03.md` §2 (구현 현황 표 참조).
+  (1) 홈 파이프라인 = 확정 IA 4칸(Catalog·Modeling·Testing·Reporting), `/planning`
+  구 스테퍼 301→`/planning/resources/map`, planning.html/_plan_steps.html 삭제
+  (`1aa96408`); (2) `/runtime` scope=mine 기본 — loggingaudit×oplog origin join
+  (local/CI/unknown 배지), hours∈{1,6,24}, deleted 숨김 기본, mine 0건+로컬 실행
+  없음 → all 폴백+배너, standalone Testing 셸 (`33bf61f4`; 로컬 run 워커가 이제
+  `APITEST_RUN_ID=<rec id>` 를 스탬프); (3) `/testing/resources` = 잔존 자원 단일
+  정본 — 실측 owned 스캔(비동기+캐시) 상단, ingest 표 '이력' 강등,
+  `known_issues.json` 에 `stuck_resources` 3건 신설(접힘 '기지 항목'), 강제 클린업
+  pre-scan 모달 + 사전 409 표기, `/local-run` 301 (`98c3b25f`); (4) console2
+  pre-flight blast-radius HTML 모달 — 서비스별 생성~삭제 예상 + 실측 ETA(durations
+  .json) + heavy 명명/필수 체크, preflight 실패 = 완전 차단, 강제 클린업 confirm
+  2곳도 owned-목록 모달로 (`f686601d`; `_plan` preview 에 est_creates/est_deletes/
+  duration_s 추가).
+  - ~~OPEN (IA/CX 후속)~~ → **phase 2 에서 처리됨** (아래 블록).
+    `local_run.html` 템플릿은 build_local_demo 가 참조해 보존(라우트만 301).
+- **IA/CX phase 2 (2026-07-04, 같은 브랜치 — IA 정렬 스프린트, owner 승인 배치,
+  no live mutations, .github/ 무변경):** tracker =
+  `docs/working/trackers/UIUX-AUDIT-2026-07-03.md` §2 phase-2 주석.
+  (1) `controlplane/common.py` base_ctx — ctx_snapshot 전 라우터 주입(P1-3) +
+  스냅샷 상대 나이/48h 노후 칩(P2-10) `fb145d71`; (2) Reporting 서브탭 단일
+  include `_reporting_tabs.html`(6탭 한국어, compare 포함) + 대시보드 탭
+  '추세→면②' 링크아웃(P2-8, compare 아카이브 병합은 기존 코드 확인)
+  `49b20d4e`; (3) `/testing` 라벨 "CI 디스패치 · 스케줄" + 두 실행 경로 대비
+  배너(P1-4 완결) `bd1a9f9d`; (4) Catalog·Modeling map·compose·자원 목록
+  카테고리 기본 접힘 + 검색 자동 전개 + sessionStorage(P2-7 — 55k→1.6k px)
+  `eb33ec0c`; (5) 지표 툴팁 C1/C2/C3·cov_op·cov_get·fail_new + '호출 EP vs
+  ok 관측' 단위 명시(P2-11) `1f8e8b68`+`935fff76`; (6) edit/view 무파라미터
+  HTML 선택기 + 없는 /runs/{id} 404(P2-12, 오프라인 테스트 2건 추가)
+  `c60f48ee`; (7) /testing/console 직접 접근 '← Testing 셸' 링크 + Catalog
+  '✏️ 레시피 편집' 정본 라벨(P3-16 잔여·A5) `fdf51864`; (8) C-결정 —
+  IA 문서에 +Knowledge 행(C1)·gated 정본 명기(C4), /ai 네비 편입('🤖 AI'
+  active 상태)+Modeling 딥링크+README AI 문장 정정(C3) `21230d65`.
+  - 테스트: pytest tests/offline 406 ✅ · controlplane 20/16/18/16 ✅ ·
+    validate 243/0 ✅. **OPEN 잔여:** P2-9 잔여(아카이브 행 메타 · run 상세
+    pass/fail 요약) · P3-13 한/영 정책 · P3-14 테마 · P3-15 접근성 ·
+    러너(로컬 vs CI) 완전 통합.
+- **RUNTIME-SCOPE 결함 수정 (2026-07-04, 같은 브랜치 — P1-1 후속, 오너 실측 재현,
+  live mutation 없음):** `20ab510c`. ACTIVE 로컬 실행(compute-virtualserver-full)
+  중 `/runtime?scope=mine` 이 빈 화면 — (a) mine 귀속이 oplog 버킷 join 에만
+  의존했는데 'created' res 이벤트는 create 폴링 완료 후에야 도달(수 분 지연;
+  33bf61f4 이전에 뜬 서버 프로세스는 `runs/local/` 로 기록), (b) 폴백 규칙이
+  실행 중일 때 all 강등을 막아 최악(빈 화면)을 렌더. 수정: **mine 귀속은
+  버킷 독립** — `_local_res_index()`(rec 이벤트 파일 resource-tracked/-deleted +
+  `core.registry` per-run 샤드) → `lv.annotate_local_origins` overlay 가 버킷
+  join 에 우선(버킷 join 은 CI gha-* 배지용 유지); mine 0건 + 실행 ACTIVE →
+  all 폴백 + 진단 배너("내 실행 귀속 실패 …"); engine resource-tracked 에
+  name 추가(이름 fallback 매칭); 남은 자원 패널(console2 + /testing/resources)
+  에 '🕒 마지막 스캔' 상시 + 실행 중 재스캔 경고. **로컬 oplog 미러는 동작
+  확인** (라이브 검증: 오너 run `20260704-113744-7350` → `runs/<rec>/res/*`
+  28 배치, res_id+name 포함 — "전혀 안 남는다"는 스탬프 이전 프로세스/초기
+  지연 관측). 테스트: offline 420 ✅ · validate 243/0 ✅ · uvicorn 스모크
+  (mine 렌더 + 폴백 배너) ✅. **주의(발견):** 자격증명이 export 된 환경에서
+  offline 테스트(cmd-test 등 engine 합성 라이프사이클)가 실 버킷
+  `runs/local/res/` 에 이벤트를 쓴다 — 오프라인 스위트 실행 시
+  `SCP_OPLOG_BUCKET=` 로 끄고 돌릴 것 (후속: conftest 자동 차단 검토).
+- **MODEL-PROMOTION pass (2026-07-03, same branch — offline only, no dispatch/live calls):**
+  - **18 docs→VALIDATED promoted** off service-scoped 2xx evidence via the NEW
+    `python -m tools.promote_validated` (dry-run default; `--apply` = targeted
+    provenance-line edit + `# evidence: <key> (run <id>)`; join mechanics + the
+    /v1/clusters cross-service collision guard in `knowledge/validated-facts.md`
+    2026-07-03 block). Model now **149 VALIDATED / 126 docs / 0 incomplete** (was
+    131/144/2 — `no_api` nodes now count complete in the Modeling UI, the honest fix).
+  - **34 docs nodes carry `gated: <reason>`** (license/entitlement-403/org-master/
+    credential — validate.py GATED_VALUES + FORMAT.md convention): the Modeling
+    map/worklist now separate 게이트(할 수 없음, 34) from the actionable docs queue (92).
+  - **light-batch-2 DISPATCH-READY (NOT dispatched — owner rule):** 9-lifecycle
+    light batch (5 newly composed in `generated__light-batch2.json`: gen-vpc-endpoint ·
+    gen-private-nat(+tgw-vpc-connection) · gen-direct-connect · gen-cm-event-policy ·
+    gen-lb-members-light; + enabled gen-alert · gen-quick-query-validate · gen-wave4-asg
+    (ASG desired 0 = no VM) · gen-wave5-apigw-privatelink). validate 243/0 err ·
+    validate_dag 0 gaps (adopt_edges +4) · collect-only = exactly 9. Request block:
+    `action=run` `mutations=true` `destructive=true` `heavy=false`
+    `crud_ids=gen-vpc-endpoint,gen-private-nat,gen-direct-connect,gen-cm-event-policy,gen-lb-members-light,gen-alert,gen-quick-query-validate,gen-wave4-asg,gen-wave5-apigw-privatelink`
+    → expected yield up to 15 promotions (run `python -m tools.derive_verified` on the
+    evidence, then `python -m tools.promote_validated --apply`).
+  - **OPEN:** (1) dispatch light-batch-2 when the chat-heavy lane is clear (owned==0 +
+    ~5min audit silence — batch-2 lesson); (2) **heavy-60 breakdown pending** — the
+    remaining ~57 actionable docs nodes are heavy-parented (DB log-export ×4,
+    bm/pfs snapshots, lb-static-nat, subops tails …): bank them onto their engines'
+    next heavy windows; (3) env-conditional light leftovers need owner input:
+    devops-service (iam-member id), secretvault-vault (iam-temp-auth-key), trail
+    (account_id + OBS bucket), iam-group-member/iam-user-policy-binding (user_id),
+    iam-resource-policy (srn); blocked: iam-role(+binding) blocked-owner,
+    iam-saml-provider blocked-engine, image-registration (no real image source, 4xx
+    by design), fs-replication (DR-region kr-east1 teardown — supervised run only),
+    asg-notification (user_id + IB-026 list envelope), cm-event (data-dependent lookup).
+- **▶ SESSION HANDOFF / RESUME HERE (2026-07-02, branch `claude/upbeat-ritchie-ieus5u`).**
+  All committed & pushed; **live owned == 0** (verified post-phase-3 + stop-sweep). Durable
+  `verified_endpoints.json` **1250 → 1464 (+214)** — the D2–D7 DB depth campaign (+150) plus the
+  next-batch α/β runs (+64: epas partial +13 run 28628073176, pg full +51 run 28631983945), all on
+  the **chat-heavy lane** (`.github/chat-heavy-request` push → `chat-heavy.yml`; note
+  `api-test.yml` push automation stays owner-disabled, so "CI heavy lane" = chat-heavy).
+  **Batch-2 lessons (2026-07-03):** (a) settle-polls must also end on terminal-bad states —
+  epas pinned at `service_state=UNKNOWN` after a Parameter Modify Error and 200+UNKNOWN
+  defeats `give_up_status`; all 94+23 wait-after polls now carry FAILED/ERROR/UNKNOWN in
+  `until`. (b) **Never dispatch while a prior run's sweep is still converging** — β retry-1
+  lost its shared VPC to the α stop-run's sweep 2s after provision (audit 01:06:03→01:06:05);
+  gate every dispatch on owned==0 AND ~5min audit silence. (c) pg backend was FAST today
+  (create 8min, full chain 22min); Parameter Modify → async Error is common to epas+pg
+  (recorded as 2xx accept then errors — triage material, not a blocker). epas tail
+  (archive/log-export/patch/kernel/stop/start/resize) remains open — backend flaky.
+  - **D2–D7 in 3 phases:** P1 (run 28595785223) proved `*-cluster-subops-guarded` bank NOTHING
+    dispatched alone (window-only design; only `database-mysql-cluster` ran real depth; its
+    observations were LOST — the lane had no artifact upload). P2 (28599889165): new
+    **self-sufficient `*-cluster-subops-full`** lifecycles (`database__subops-full.json`,
+    create→wait→subops→delete from proven blocks; replica/restore excluded as leak-unsafe)
+    → **+73**. P3 (28602725440): **ExistInprogress pacing fix** (settle-poll after every
+    mutating sub-op) opened the serialized tail (archive/audit-log/backup/stop/start/
+    kernel-upgrade/add-block-storages/…) → **+77**. mysql/mariadb/cachestore sub-op depth
+    is now MAXED to what the account allows; details in `knowledge/validated-facts.md`
+    (2026-07-02 block).
+  - **Evidence pipeline (NEW, load-bearing):** chat-heavy now uploads `reports/results/` as
+    an artifact AND mirrors it to the oplog bucket (`runs/<APITEST_RUN_ID>/artifact/`) —
+    sessions cannot download GitHub artifacts (proxy blocks api.github.com). For older runs:
+    push-triggered `fetch-results.yml` bridge. Fold with
+    `GITHUB_RUN_ID=<id> python -m tools.derive_verified --observations <file> --out data/baselines/verified_endpoints.json`.
+  - **Engine:** new `poll.give_up_status` (end a settle-poll on 4xx instead of burning its
+    timeout — P3's epas create was rejected and its ~15 wait-polls each burned 900s; run was
+    action=stop'ed after 3/4 engines passed; evidence survived via always() mirror).
+  - **Offline fixes landed:** 3 `test_compose_*` failures (real cause = e2be5356 WS4 refactor,
+    not b5a8295c), dag_runner/dag_scheduler "flake" root-caused (= `cleanup/verify_clean.py`
+    no-op'ing `time.sleep` PROCESS-WIDE at import; stub now scoped inside `scan_owned`) —
+    **full offline suite 390/390**. `build_ia_demo` loaders memoized (build-scoped).
+  - **OPEN / next:** (1) **epas** subops-full single-engine retry (create 500'd this round —
+    transient/capacity; body is proven-good from P2); (2) backup-agent/backup-job need a live
+    VM window (stale `server_uuid` 404) — bank during a compute-virtualserver-full run;
+    (3) replica/restore depth belongs to `gen-heavy-*-replica/-restore` (disabled, need
+    capture/teardown validation); (4) sqlserver stays license-gated reachability-only;
+    (5) SCF stranded pair auto-expires 2026-07-31 (PLS state still 403-unreadable);
+    (6) GitHub MCP token expired mid-session — re-auth needed for run-status/log API
+    (oplog-bucket evidence path unaffected); (7) `.github/chat-heavy-request` left at
+    `action=noop`.
+- **PLATFORM pass (2026-07-02, same branch — remaining platformization work executed):**
+  - **M4 worker executor VERIFIED in-process (read-only E2E):** uvicorn
+    `PLATFORM_EXECUTOR=worker` → `/runs/trigger` (smoke × service=quota) queued a
+    `dispatched` record → `python -m runner.worker --once` claimed it
+    (`local-1783030980`), ran validate → smoke (47 live GETs pass; mutation gates
+    forced false — worker `build_env` override beats a gate-arming host `.env`) →
+    dashboard → snapshot (64 files to `runs/local-…/snapshot/` on the real oplog
+    bucket) → finalize; DB milestones + final status `done`. Zero worker-code fixes
+    needed. **Still needs docker/owner:** Docker build + compose up (server+worker
+    containers) and a worker-path mutation run (docs/PLATFORM-PLAN.md M4).
+  - **Scheduler 1.0-d first step (flag-gated, non-disruptive):** `chat-heavy.yml`
+    now understands request-file keys `dag=true` (+ optional `dag_targets=`) — runs
+    `tools/dag_run_live.py` (SCP_DAG_RUNNER + AIMD) instead of pytest-xdist; the
+    default path is untouched (`dag` absent → xdist exactly as before). Evidence
+    upload/oplog-mirror/sweep steps apply to both paths. Full 1.0-d cutover (making
+    dag the default) still needs a validated heavy dag run — owner-gated.
+  - **Validator debt cleared (offline):** `requires_env` registered as a known
+    lifecycle key (engine reads it — engine.py:714; clears the generated__cloudml
+    warning), and the 10 untagged disabled lifecycles got IB-030 `_status`
+    (quota/support-reads, dns-hosted-zone, 4× gen-heavy-*-replica,
+    gen-heavy-mariadb-upgrade → `stale` [retired/superseded/de-dup notes];
+    certificatemanager-import, iam-role → `blocked-owner`). Validator now
+    237 lifecycles / 0 errors / **5 warnings** (was 16; rest are path-typo infos).
+  - **IB-019 verified done** (backlog row: billingplan + devopsservice bodies already
+    re-derived; no drift work left). `controlplane/tests_offline.py` hermeticity fix:
+    host `.env` re-armed `SCP_ALLOW_DESTRUCTIVE` via `_load_dotenv` setdefault after
+    the pop → gate now pinned `"false"` (18/18 again). All offline suites green:
+    tests/offline 392/392, controlplane 18+18+16+16, runner 16/16.
+- **PRIOR (2026-06-29 close, branch `claude/ecstatic-tesla-fo1g3b`).**
   Everything is committed, pushed, and FF-merged — **`main` = feature = `origin` = `101e08c2`,
   working tree CLEAN, live owned == 0** (last verify post-D1 cleanup; re-run `POST /api/cleanup`
   on resume to reconfirm). Nothing is mid-execution.

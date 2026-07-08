@@ -33,6 +33,7 @@ from __future__ import annotations
 import re
 import shutil
 import warnings
+from contextlib import contextmanager
 from pathlib import Path
 
 # strip the live-only dep-graph block from node form pages (it fetch()es graph.json
@@ -151,10 +152,7 @@ def _nav_rewrite(html: str) -> str:
         # --- links with no offline target -> '#' (kept clickable, no 404) ---
         ('href="/knowledge"', 'href="#"'),
         ('href="/dashboard/index.html"', 'href="../"'),  # demo: 면② public dashboard = Pages root
-        # --- Plan stepper sub-nav (_plan_steps.html, modeling page) ---
-        ('href="/planning?step=catalog"', 'href="index.html"'),
-        ('href="/planning?step=model"', 'href="modeling.html"'),
-        ('href="/planning?step=compose"', 'href="#"'),
+        # (구 Plan 스테퍼 sub-nav 는 은퇴 — /planning 은 이제 modeling map 으로 301)
         ('href="/planning/validate"', 'href="#"'),
         # --- modeling: 작업 큐 + the (offline-absent) list/breadcrumb -> '#' ---
         ('href="/planning/resources/worklist"', 'href="#"'),
@@ -339,6 +337,45 @@ def _write_readme() -> None:
     )
 
 
+@contextmanager
+def _model_cache():
+    """Memoize the pure model/lifecycle loaders for the DURATION OF THE BUILD only.
+
+    Every page render re-reads + re-parses all ``resources/*.yaml`` via
+    ``load_model()`` (~0.7s/call) because the LIVE console must always see fresh
+    edits — but this build fires ~280 GET-only requests (275 node forms + catalog/
+    modeling/reporting) against a frozen tree, so that freshness re-read is pure
+    waste (~4min of the build). Install an argument-keyed memo over the module
+    attributes and ALWAYS restore the originals, so the live app and every other
+    caller keep the uncached loaders. Safe because the build path is read-only:
+    no route mutates the returned model/lifecycle objects.
+    """
+    from controlplane import resource_model
+    from regression.scenarios import composer, loader
+
+    targets = [(resource_model, "load_model"), (composer, "load_model"),
+               (loader, "load_lifecycles")]
+    originals = [(mod, name, getattr(mod, name)) for mod, name in targets]
+
+    def _memo(fn):
+        cache: dict = {}
+
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            if key not in cache:
+                cache[key] = fn(*args, **kwargs)
+            return cache[key]
+        return wrapper
+
+    try:
+        for mod, name, fn in originals:
+            setattr(mod, name, _memo(fn))
+        yield
+    finally:
+        for mod, name, fn in originals:
+            setattr(mod, name, fn)
+
+
 def build() -> Path:
     from fastapi.testclient import TestClient
     from controlplane.app import app
@@ -349,14 +386,15 @@ def build() -> Path:
 
     htmx = _vendor_htmx_file()  # best-effort: download htmx -> relative sibling
     c = TestClient(app)
-    _build_catalog(c, htmx=htmx)
-    _build_modeling(c, htmx=htmx)
-    nodes = _build_node_pages(c, htmx=htmx)
-    print(f"  node detail pages: {nodes}")
-    _build_reporting(c, htmx=htmx)
-    _build_renderer(c)
-    _build_testing()
-    _build_testing_shell(c, htmx=htmx)
+    with _model_cache():  # load the resource model once, not once per page
+        _build_catalog(c, htmx=htmx)
+        _build_modeling(c, htmx=htmx)
+        nodes = _build_node_pages(c, htmx=htmx)
+        print(f"  node detail pages: {nodes}")
+        _build_reporting(c, htmx=htmx)
+        _build_renderer(c)
+        _build_testing()
+        _build_testing_shell(c, htmx=htmx)
     _write_readme()
     return OUT
 

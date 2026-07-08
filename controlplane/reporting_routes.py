@@ -36,7 +36,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from core import results as core_results
-from controlplane import dashdata
+from controlplane import common, dashdata
 
 # resource_routes.py pattern: ROOT = repo root, templates next to this module.
 ROOT = Path(__file__).resolve().parent.parent
@@ -271,7 +271,7 @@ def coverage_map(request: Request):
     """Coverage color-map page (active nav = 'reporting')."""
     payload = _coverage_payload()
     ctx = {
-        "active": "reporting",
+        **common.base_ctx("reporting"),
         "summary": payload["summary"],
         "legend": payload["legend"],
         "has_results": payload["has_results"],

@@ -1,7 +1,16 @@
 ---
-status: active
+status: SUPERSEDED (2026-06-26 owner decision)
 for: all
+superseded_by: working/plans/PLATFORM-IA-DIRECTION.md
 ---
+
+> **⚠️ SUPERSEDED — 정본 아님.** 확정 IA는 **`Catalog · Modeling · Testing ·
+> Reporting`** (면① 작업 콘솔) + 면② 공개 대시보드이며, 네이밍·배치의 정본은
+> [`docs/working/plans/PLATFORM-IA-DIRECTION.md`](working/plans/PLATFORM-IA-DIRECTION.md)
+> §"✅ 확정 IA (2026-06-26)" (결정 커밋 10f08f52), 빌드 규칙은
+> [`working/plans/IA-BUILD-CONTRACT.md`](working/plans/IA-BUILD-CONTRACT.md)다.
+> 이 파일(v3, 5-tab Knowledge→Report one-graph 정적 앱)은 그 이전 세대 설계로,
+> "그림 하나 · overlay 여러 얼굴" 원칙 등 확정안에 계승된 배경 자료로만 남긴다.
 
 # IA.md — one-graph / step-overlay console (v3, 2026-06-17)
 

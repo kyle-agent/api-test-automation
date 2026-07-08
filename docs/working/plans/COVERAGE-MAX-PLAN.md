@@ -1,7 +1,11 @@
 ---
 status: superseded
 for: coverage
+superseded_by: CAMPAIGN-C3-100.md
 ---
+
+> **⚠️ SUPERSEDED.** 현행 커버리지 캠페인의 정본은
+> [`CAMPAIGN-C3-100.md`](CAMPAIGN-C3-100.md)다. 아래는 2026-06-17 당시 플랜의 역사 기록.
 
 # COVERAGE-MAX-PLAN — how to drive C3 coverage to its ceiling
 

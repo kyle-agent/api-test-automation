@@ -10,7 +10,11 @@
 <!-- embedded in the control-plane shell (?embed=1): hide console2's own brand +
      external nav (the spine supplies those), KEEP the ①구성/②실행 toggle = the
      Test Planning | Test Execution sub-tabs. -->
-<script>if(new URLSearchParams(location.search).has('embed'))document.documentElement.classList.add('embed');</script>
+<script>if(new URLSearchParams(location.search).has('embed'))document.documentElement.classList.add('embed');
+/* direct access at /testing/console/ WITHOUT ?embed=1 (UIUX-AUDIT P3-16): flag the
+   root so a "← Testing 셸" back-link shows. Path-scoped, so the standalone static
+   build (build_static.py) never shows a dead link. */
+if(!document.documentElement.classList.contains('embed')&&location.pathname.indexOf('/testing/console')===0)document.documentElement.classList.add('bare-console');</script>
 <style>/* hide console2's brand + the redundant external links (📊 대시보드 lives in the
    spine nav now; resource model is just a label) — but KEEP 🌐 런타임 뷰 (no spine
    equivalent: live account topology). */
@@ -19,7 +23,9 @@ html.embed .top{justify-content:space-between;padding:7px 22px;min-height:0}
 /* embedded full-bleed: use the whole width + keep the left-selection | right-DAG
    2-column (build = Test Planning, run = Test Execution) even if it must be wide. */
 html.embed .wrap{max-width:none}
-html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0,1fr)!important}</style>
+html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0,1fr)!important}
+#backToShell{display:none}
+html.bare-console #backToShell{display:inline}</style>
 </head>
 <body>
 <div class="wrap">
@@ -33,8 +39,10 @@ html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0
     <button data-scr="run"><span class="k">②</span>Test Execution</button>
   </div>
   <nav class="nav">
+    <a href="/testing/embed" id="backToShell"
+       title="플랫폼 셸(4단계 네비)의 Testing으로 돌아가기">← Testing 셸</a>
     <a href="../../" id="dashLink" title="결과 대시보드 — 회귀/적합성 커버리지·응답코드·서비스별 추이 (이 콘솔의 실행 결과)">📊 대시보드</a>
-    <a href="#" id="runtimeLink" title="런타임 뷰 — 현재 계정에 떠 있는 인스턴스와 연관관계 토폴로지 (별도 창 · loggingaudit)">🌐 런타임 뷰</a>
+    <a href="#" id="runtimeLink" title="런타임 뷰를 별도 창으로 — 현재 계정에 떠 있는 인스턴스와 연관관계 토폴로지 (loggingaudit). 인라인은 ② 상세의 '런타임' 탭">🌐 런타임 뷰 (새 창)</a>
     <a href="https://127.0.0.1" id="modelLink" onclick="return false" title="모델 출처">resource model</a>
   </nav>
 </header>
@@ -43,6 +51,10 @@ html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0
 <div class="ctxbar" id="ctxbar">
   <span class="seg">로딩 중…</span>
 </div>
+
+<!-- NOW-PLAYING (신규4): persistent strip above the tabs — 지금 실행 중인
+     lifecycle:step + METHOD path + 경과/평균(durations.json). Hidden when idle. -->
+<div class="nowplaying hidden" id="nowplaying"></div>
 
 <!-- ======================= ① 구성 ======================= -->
 <section id="screen-build" class="screen">
@@ -135,12 +147,22 @@ html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0
             <button data-d="res" class="on">자원 <span class="n" id="d-nres">0</span></button>
             <button data-d="api">API <span class="n" id="d-napi">0</span></button>
             <button data-d="log">로그</button>
+            <button data-d="rt" title="런타임(계정 실측) — 지금 계정에 실제 떠 있는 자원 토폴로지를 인라인으로 (runtime 뷰 임베드 · scope=mine · 자동 갱신)">런타임 <span class="muted small">계정 실측</span></button>
           </div>
           <div id="detail-body"></div>
         </section>
       </div>
-      <h3>실행 기록 <span class="muted small">· /api/runs</span></h3>
-      <div id="report-side"></div>
+      <!-- 실행 기록: 기본 접힘 — "무엇이 지금인가"는 위 히어로(현재 실행)가 답한다.
+           항상 노출되는 것은 토글 헤더 + (실행이 없을 때) 최근 종료 1건 요약 행뿐;
+           전체 목록(run만/전체 필터 포함)은 펼쳤을 때만. 접힘 상태는 sessionStorage. -->
+      <section class="hist-sec" id="hist-sec">
+        <button class="hist-toggle" id="hist-toggle" title="과거 실행 기록 펼치기/접기 (/api/runs)">
+          <span class="hist-car" id="hist-car">▸</span> 실행 기록 <b id="hist-count">…</b>건
+          <span class="muted small">· /api/runs</span>
+        </button>
+        <div id="hist-current"></div>
+        <div id="report-side" class="hidden"></div>
+      </section>
     </div>
   </div>
 </section>

@@ -8,7 +8,7 @@ resource_routes.py 선례 그대로: 자체 APIRouter + 자체 Jinja2Templates(c
                       그룹 표 (각 행 = ``METHOD path``).
 
 순수 RO — 저장/편집 엔드포인트 없음(그래프 *이전* 목록). 각 서비스 헤더에
-**``✏️ 레시피 편집 →``** 링크 = Modeling 의 노드 에디터로 deep-link:
+**``✏️ 테스트 모델 편집 →``** 링크 = Modeling 의 노드 에디터로 deep-link:
 service(category/service)가 resource_model 노드로 매핑되면
 ``/planning/resources/{node_id}``, 아니면 ``/planning/resources?service=...``
 (둘 다 Modeling(다른 에이전트) 소유 라우트 — 여기서는 링크만 건다).
@@ -25,7 +25,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from controlplane import resource_model
+from controlplane import common, resource_model
 
 ROOT = Path(__file__).resolve().parent.parent
 HERE = Path(__file__).resolve().parent
@@ -147,5 +147,5 @@ def catalog_index(request: Request):
     return templates.TemplateResponse(
         request,
         "catalog.html",
-        {"active": "catalog", **view},
+        {**common.base_ctx("catalog"), **view},
     )

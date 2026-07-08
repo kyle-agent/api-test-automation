@@ -1,8 +1,15 @@
 ---
-status: ACTIVE contract (2026-06-26) — parallel build of the confirmed IA
+status: superseded (이행 완료된 빌드 계약 — 확정 IA 빌드 완료)
 for: the IA-build agents (Catalog · Modeling · Reporting) + integration owner
-see: PLATFORM-IA-DIRECTION.md (§확정 IA = the decision this implements)
+superseded_by: PLATFORM-IA-DIRECTION.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 이 병렬 빌드 계약은 **이행 완료**됐다 — 확정 IA
+> (`Catalog · Modeling · Testing · Reporting`)는 controlplane에 구현돼 있다. IA
+> 정본은 [`PLATFORM-IA-DIRECTION.md`](PLATFORM-IA-DIRECTION.md) §"✅ 확정 IA
+> (2026-06-26)". 아래 규칙 중 지금도 살아있는 원칙(같은 `graph_view` + 렌더러
+> 하나 + `overlay()`만 교체)은 그 문서와 코드(`controlplane/static/resource_graph.js`)가
+> 담보한다. 아래는 빌드 당시 계약의 역사 기록.
 
 # IA build contract — "그림 하나, 여러 얼굴" parallel build
 

@@ -602,7 +602,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes vpc-endpoints: POST /v1/vpc-endpoints, PUT/DELETE /v1/vpc-endpoints/{id}. Body from data/api_bodies.json (networking/vpc/createvpcendpoint) -> UNPROVEN. Needs a real resource_key (the target service, e.g. an SCR registry) + subnet under a VPC; we adopt the shared VPC and create our own subnet, but resource_key/resource_info are {unique}/synthetic so the create likely 4xx's. All vpc-endpoint steps optional+grouped+broad expect_status. capture envelope $.vpc_endpoint.id UNPROVEN. heavy:true (real VPC fallback + billable endpoint).",
+      "_note": "Closes vpc-endpoints: POST /v1/vpc-endpoints, PUT/DELETE /v1/vpc-endpoints/{id}. Body from data/api_bodies.json (networking/vpc/createvpcendpoint) -> UNPROVEN. Needs a real resource_key (the target service, e.g. an SCR registry) + a DEDICATED VPC_ENDPOINT-type subnet under a VPC (REPAIR 2026-07-06: create-subnet now sends type:VPC_ENDPOINT and self-creates every run — see the create-subnet step's own _note for the full HB4 root-cause + evidence); we adopt the shared VPC but resource_key/resource_info are still {unique}/synthetic so the create likely still 4xx's on that separate, not-yet-fixed axis. All vpc-endpoint steps optional+grouped+broad expect_status. capture envelope $.vpc_endpoint.id UNPROVEN. heavy:true (real VPC fallback + billable endpoint).",
       "steps": [
         {
           "name": "create-vpc",
@@ -655,8 +655,8 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression vpc-endpoint",
-            "cidr": "10.129.8.0/24",
-            "type": "GENERAL",
+            "cidr": "10.124.9.0/24",
+            "type": "VPC_ENDPOINT",
             "vpc_id": "{vpc_id}",
             "tags": []
           },
@@ -673,7 +673,7 @@
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
           },
-          "adopt": "subnet"
+          "_note": "REPAIR 2026-07-06 (HB4 400 scp-network.vpc-endpoint.subnet-not-found 'VPC Endpoint Type Subnet not found', run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): a VPC Endpoint needs a DEDICATED subnet of type=VPC_ENDPOINT, not a GENERAL subnet — this is already CONFIRMED/VALIDATED durable knowledge (knowledge/validated-facts.md 'Subnet type enum...VPC Endpoint needs a dedicated VPC_ENDPOINT-type subnet'; knowledge/formal/resources/networking__vpc.yaml 'endpoint-subnet' node, provenance VALIDATED, live-validated run 27583285457 2026-06-15) that this lifecycle had not yet applied — it was still sending type:GENERAL. type enum confirmed from data/api_docs.json models['networking/vpc/subnetcreaterequest'].type = 'enum (GENERAL, LOCAL, VPC_ENDPOINT)'. Dropped {\"adopt\":\"subnet\"}: the session-shared subnet (knowledge/vpc-scheduling-strategy.md) is GENERAL-type, so adopting it would reintroduce the exact same subnet-not-found 400 for this lifecycle even though the VPC itself is still adopted (adopt:vpc, above) — this endpoint needs its OWN dedicated VPC_ENDPOINT subnet every run, self-created + torn down like before 2026-06's adopt rollout. NOT fixed this session (separate, still-open gap, investigation only per task scope — do not fabricate): resource_key below is still a synthetic {unique} value; knowledge/formal/resources/networking__vpc.yaml's vpc-endpoint node (provenance: docs, NOT yet VALIDATED) shows resource_key must be a REAL target-service resource id (e.g. an actual filestorage volume_id when resource_type=FS) — a disabled composed lifecycle `gen-wave5-vpce` in regression/scenarios/lifecycles/generated__wave5-net.json already models wiring a real storage/filestorage volume for this (cross-service, out of this session's file scope) but is NOT live-validated (_disabled_reason: IB-013, ready for live re-validation, do not enable here). Expect the subnet fix alone to move the error signature from subnet-not-found to a resource_key-related 4xx (or 2xx if the backend doesn't hard-validate resource_key) — next heavy dispatch must observe which. REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 4): cidr changed from `10.129.8.0/24` to `10.124.9.0/24` — observation CONFIRMED 400 `scp-network.subnet.include-vp-cidr` (\"Cidr should be included in the vpc cidr. : (10.129.8.0/24)\") with NO preceding create-vpc POST recorded for this worker (only wait-vpc 200), which per engine.py's `{\"adopt\":\"vpc\"}` handling (create step silently skipped, `ctx[vpc_id]` seeded straight from `shared_vpc_id`) proves `{vpc_id}` resolved to the session-shared VPC, whose CIDR is the hardcoded `_SHARED_VPC_CIDR = \"10.124.0.0/20\"` (engine.py) — NOT this step's own create-vpc fallback body's `10.129.0.0/20` (that body is only sent when no shared VPC is adopted). `10.124.9.0/24` is a free /24 inside `10.124.0.0/20` — confirmed non-colliding with the shared subnet (`10.124.0.0/24`, `_SHARED_SUBNET_CIDR`) and the shared DB subnet (`10.124.7.0/24`, `_SHARED_DB_SUBNET_CIDR`), and grepped clean against every other lifecycle file's hardcoded `10.124.x` CIDR (none exist; only discrete in-subnet IPs like `10.124.0.30`/`.101`/`.102` for LB/eventstreams members, which don't overlap a /24 at `.9.`). RESIDUAL, NOT fixed this session: this lifecycle's own create-vpc step's fallback body (`10.129.0.0/20`, used only in the rare single-process/non-xdist path where no shared VPC exists and the create is NOT skipped) is now CIDR-INCOMPATIBLE with this new subnet cidr — a future non-xdist self-create run would reproduce this same 400 the other way. Not fixed here because (a) the CONFIRMED, OBSERVED failure mode in real heavy-dispatch runs (gw0-gw3 multi-worker) is the adopted-shared-VPC path, which this fix targets, and (b) under xdist a missing shared VPC now SKIPS this lifecycle entirely (IB-049, engine.py ~L920) rather than self-creating, so the fallback body is effectively dead code in the production heavy-dispatch model — flagged as a next-lever (see ledger) rather than silently left unaddressed."
         },
         {
           "name": "wait-subnet",
@@ -701,7 +701,7 @@
           "optional": true,
           "json": {
             "description": "API regression vpc endpoint",
-            "endpoint_ip_address": "10.124.0.20",
+            "endpoint_ip_address": "10.124.9.20",
             "name": "regrvpce{unique}",
             "resource_info": "x.samsungsdscloud.com(Registry)",
             "resource_key": "{unique}",
@@ -727,7 +727,8 @@
             "method": "DELETE",
             "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
             "service": "vpc"
-          }
+          },
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 6): 400 `scp-network.vpc-endpoint.check-ip-address-overlap` (\"The requested IP Address (10.124.0.20) does not overlap with the requested subnet CIDR\") — CONFIRMED residual from the HB4c subnet-cidr fix just above (create-subnet's own note): that repair moved the dedicated subnet's cidr from `10.129.8.0/24` to `10.124.9.0/24` but never updated this step's `endpoint_ip_address`, which was still the OLD scheme's address (`10.124.0.20`, actually inside the session-shared GENERAL subnet's `10.124.0.0/24`, not this endpoint's own `10.124.9.0/24` subnet) — an obvious address/subnet mismatch, not a new backend quirk. Fix: `endpoint_ip_address` -> `10.124.9.20`, inside the dedicated `subnet_id`'s own `10.124.9.0/24` range. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx (or the next real 4xx, e.g. the still-open `resource_key` gap noted in create-subnet's own note)."
         },
         {
           "name": "list-vpc-endpoints",
@@ -874,7 +875,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). 2026-06-11 run #4: create 202 but approve/set/DELETE of the peering all 400 in its initial state -> the peering survives and the VPC deletes 409 (now tolerated in expect_status; the own-run sweep reaps the leftovers). STATE MACHINE LEARNED (run #5 notes): create -> CREATING (set/delete/rules all 400 'not Active/changeable/deletable'); approval body is {\"type\": \"CREATE_APPROVE\"} (doc page; our old {action:APPROVE} drew ValidationError Field-required, leaving peerings STUCK in CREATING and their 2 VPCs undeletable -> the cap-poisoning root). Approve retries 400 to ride out CREATING, then wait-peering-active gates the sub-ops; delete retries 400/409. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
+      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). 2026-06-11 run #4: create 202 but approve/set/DELETE of the peering all 400 in its initial state -> the peering survives and the VPC deletes 409 (now tolerated in expect_status; the own-run sweep reaps the leftovers). STATE MACHINE LEARNED (run #5 notes): create -> CREATING (set/delete/rules all 400 'not Active/changeable/deletable'); approval body is {\"type\": \"CREATE_APPROVE\"} (doc page; our old {action:APPROVE} drew ValidationError Field-required, leaving peerings STUCK in CREATING and their 2 VPCs undeletable -> the cap-poisoning root). SAME-ACCOUNT RULE CONFIRMED (HB5 run 28831560635, reports/results/hb5/observations-gw0.jsonl): both VPCs (requester+approver VPC-B) live in OUR account, so `approve-vpc-peering` 400s every time with `scp-network.vpc-peering.approval-same-account-type` / \"Approval is not required for Same Account VPC peering\" -- this is a PERMANENT condition for this lifecycle (account_type will always be SAME per data/api_docs.json showvpcpeering response_example, which itself documents account_type:SAME + state:CREATING as the baseline case), not a transient CREATING-state 400, so retrying it (the old retry_on_status:400 x8x15s=120s) only burns time that the REAL settle-poll (wait-peering-active) needed -- HB5 showed wait-peering-active finishing right at its 300s timeout with the peering still not ACTIVE downstream (create-peering-routing-rule/set-vpc-peering/delete-vpc-peering all then hit 400 'not Active/changeable/deletable state(CREATING)'). Fix: wait-peering-active moved to run IMMEDIATELY after create-vpc-peering (before list/approve) so it gets the full fresh 300s budget instead of starting 120s late; approve-vpc-peering keeps its documented 400 in expect_status (real coverage of the endpoint) but NO LONGER retries on it (retrying a permanent same-account 400 cannot succeed) -- IF a future cross-account approver is ever added (different real account), the retry_on_status:[400] should be restored for THAT variant since a genuine pending-approval 400 during CREATING would then be transient. Two more short settle-polls added before set-vpc-peering and before delete-vpc-peering, mirroring the vpc-transit-gateway-children precedent below (wait-tgw-active-after-connection/wait-tgw-active-before-delete) where a child-resource create (here: create-peering-routing-rule / delete-peering-routing-rule) can flip the parent back to a transitional state right before the next write. delete-vpc-peering already carried retry_on_status:[400,409] (TGW precedent) pre-existing, unchanged. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE} (doc page confirms {type:CREATE_APPROVE} is right); the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback). Live re-validation still pending (this repair is OFFLINE, HB4c heavy run had the lane).",
       "steps": [
         {
           "name": "create-vpc",
@@ -999,6 +1000,33 @@
           }
         },
         {
+          "name": "wait-peering-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "_note": "Settle-poll moved to run IMMEDIATELY after create-vpc-peering (was previously after list/approve) so it gets the full fresh timeout budget instead of starting ~120s late behind approve-vpc-peering's now-removed retry loop -- HB5 (reports/results/hb5/observations-gw0.jsonl) showed this poll ending right at its (then) 300s timeout with state still not ACTIVE, and every subsequent write (routing-rule create, set, delete) then 400'd 'not Active/changeable/deletable state(CREATING)'. REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 5): the HB5 placement fix did NOT resolve it — this SAME run shows wait-peering-active (right after create, no approve/list ahead of it) STILL returning at ts create+~309s (i.e. it burned its full then-300s budget) with the cascade repeating identically (set/delete/create-routing-rule all 400 CREATING). Ruled out the 'wrong response-wrapper-key' hypothesis (the TGW capture-key class of bug): `data/api_docs.json` networking/vpc/showvpcpeering response_example confirms the wrapper IS `$.vpc_peering.state` — the field is correct, this is a genuine timeout-too-short-for-the-real-async-settle, same 'poll returns the LAST response on timeout regardless of field match' engine behaviour (engine.py _run_step) as the TGW/VPN cases, just with a longer real backend delay. Bumped timeout 300->900s (peering evidently needs several minutes) as the next evidence-based step; give_up_status unchanged (still bails fast on a failed create). UNVERIFIED LIVE — if a 900s window STILL never reaches ACTIVE, reclassify as a genuine product-side stuck-CREATING defect (baseline-worthy) rather than a settle-timing issue.",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.vpc_peering.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 900,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          }
+        },
+        {
           "name": "list-vpc-peerings",
           "service": "vpc",
           "method": "GET",
@@ -1016,6 +1044,7 @@
           "path": "/v1/vpc-peerings/{vpc_peering_id}/approval",
           "group": "peering",
           "optional": true,
+          "_note": "SAME-ACCOUNT: both requester and approver VPCs are ours, so this call is DOCUMENTED to always 400 with scp-network.vpc-peering.approval-same-account-type (\"Approval is not required for Same Account VPC peering\", confirmed HB5 observations-gw0.jsonl note field). 400 is therefore a PERMANENT/expected outcome here, not a transient CREATING-state error -- the previous retry_on_status:[400] x8 retries x15s (~120s) was chasing a condition that can never resolve and only delayed the real settle-poll (wait-peering-active, now positioned right after create). Retry removed. If a future variant adds a genuine cross-account approver (different real account_id), restore retry_on_status:[400] for THAT variant only -- a pending-approval 400 during CREATING would then be transient and worth riding out.",
           "json": {
             "type": "CREATE_APPROVE"
           },
@@ -1028,33 +1057,7 @@
             404,
             409,
             422
-          ],
-          "retry_on_status": [
-            400
-          ],
-          "retries": 8,
-          "retry_interval": 15
-        },
-        {
-          "name": "wait-peering-active",
-          "service": "vpc",
-          "method": "GET",
-          "path": "/v1/vpc-peerings/{vpc_peering_id}",
-          "group": "peering",
-          "optional": true,
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "poll": {
-            "field": "$.vpc_peering.state",
-            "until": [
-              "ACTIVE"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
+          ]
         },
         {
           "name": "create-peering-routing-rule",
@@ -1099,6 +1102,33 @@
           "params": {}
         },
         {
+          "name": "wait-peering-active-before-set",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "_note": "Second settle-poll, mirroring the vpc-transit-gateway-children precedent (wait-tgw-active-after-connection) where creating a CHILD resource (here: create-peering-routing-rule) can flip the PARENT peering back into a transitional state right before the next parent-level write (set-vpc-peering). REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 5): the original 60s budget assumed only a brief post-child-create reversion, but this run shows the peering can still be CREATING minutes after create (see wait-peering-active's note — timeout bumped 300->900 there) — 60s is nowhere near enough headroom if the FIRST settle-poll already gave up. Bumped to 300s so this poll can independently reach ACTIVE even if wait-peering-active's own window wasn't enough. UNVERIFIED LIVE.",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.vpc_peering.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          }
+        },
+        {
           "name": "set-vpc-peering",
           "service": "vpc",
           "method": "PUT",
@@ -1141,6 +1171,33 @@
           ],
           "retries": 4,
           "retry_interval": 15
+        },
+        {
+          "name": "wait-peering-active-before-delete",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "_note": "Third settle-poll (same rationale as wait-peering-active-before-set): delete-peering-routing-rule just ran and may have flipped the parent peering back to a transitional state; give it a window to settle before delete-vpc-peering (which also keeps its pre-existing retry_on_status:[400,409] as a fallback net -- TGW precedent). REPAIR 2026-07-07 (HB4d, run 28835929967): bumped 60->300s, same rationale as wait-peering-active-before-set's note (60s proved nowhere near enough headroom live). UNVERIFIED LIVE.",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.vpc_peering.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          }
         },
         {
           "name": "delete-vpc-peering",
@@ -1302,6 +1359,23 @@
           }
         },
         {
+          "name": "wait-tgw-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-06 (HB4 400 transit-gateway.not-active-state on EVERY child create, run 28738115294, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b): create-transit-gateway returns 202 (Accepted, async) and the TGW sits in state CREATING for a while (live detail: 'Transit Gateway state is not Active.:(CREATING)') — every child write (vpc-connection, firewall, firewall-connection, routing-rule, uplink-routing-rule, set) was firing immediately after create with no settle-poll, so all 10 children + set-transit-gateway 400'd in lockstep, cascading soft-capture misses to the deletes too (ResourceNotFound / not-in-vpc-connection on placeholder ids). Fix mirrors the settle-poll pattern already proven in database__subops-full.json (field+until+give_up_status) and networking__vpc.json's own create-internet-gateway-for-nat/wait-igw-for-nat-active pair: poll $.transit_gateway.state (field confirmed from api_docs.json networking/vpc/{createtransitgateway,showtransitgateway} response_example: {\"state\":\"ACTIVE\", ...}) until ACTIVE before any child touches the TGW. give_up_status on 400/403/404 so a create that itself soft-failed doesn't hang the poll for the full timeout. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx cascade to children."
+        },
+        {
           "name": "create-tgw-vpc-connection",
           "service": "vpc",
           "method": "POST",
@@ -1322,8 +1396,26 @@
             422
           ],
           "capture_soft": {
-            "vpc_connection_id": "$.vpc_connection.id"
-          }
+            "vpc_connection_id": "$.transit_gateway_vpc_connection.id"
+          },
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): capture path was `$.vpc_connection.id`, which never matches — `data/api_docs.json` endpoints['networking/vpc/createtransitgatewayvpcconnection'].response_example wraps the object as `transit_gateway_vpc_connection` (id/state/vpc_id/transit_gateway_id fields), not `vpc_connection`. CONFIRMED as the direct cause of the downstream delete-tgw-vpc-connection 400 `not-in-vpc-connection` whose error body showed the LITERAL unresolved placeholder `{vpc_connection_id}` (proof the soft-capture found nothing, not a TGW-state issue as first hypothesized) — see that step's own _note."
+        },
+        {
+          "name": "wait-tgw-active-after-connection",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): observation timestamps CONFIRM create-tgw-vpc-connection (202 at wait-tgw-active+~3s, itself already past a successful wait-tgw-active 200) is immediately followed (~7s later, after only 3 read-only GETs) by create-tgw-firewall 400 `transit-gateway.not-active-state:(EDITING)` — i.e. the vpc-connection create ASYNC-transitions the TGW from ACTIVE back to EDITING, exactly like create-transit-gateway itself does (same wait-tgw-active precedent), and every child write issued in that window 400s. Fix: re-settle to ACTIVE right after create-tgw-vpc-connection (same field/until/give_up_status as wait-tgw-active) before any subsequent child create touches the TGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm the firewall/routing-rule/uplink-routing-rule cascade clears."
         },
         {
           "name": "get-tgw-routing-rules",
@@ -1374,6 +1466,76 @@
           "params": {}
         },
         {
+          "name": "wait-tgw-active-before-firewall-connection",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 3): observation timestamps CONFIRM wait-tgw-active-after-connection returned 200 at ts …771.05 — ~306s after create-tgw-vpc-connection (ts …465.07), i.e. essentially its own full 300s timeout budget, so it very likely never actually observed state==ACTIVE and just returned the last polled response (the engine's poll loop returns the last response on timeout, regardless of the field's value — see engine.py's poll() implementation). EVERY subsequent child create/delete (firewall @+4s, firewall-connection @+5s, routing-rule @+6s, uplink-routing-rule @+7s, delete-firewall-connection @+8s, delete-vpc-connection @+13s, set @+14s, all measured from wait-tgw-active-after-connection's own return) then 400'd `not-active-state:(EDITING)` in lockstep — one settle-poll right after the vpc-connection create was not enough headroom for the TGW to reach a stable ACTIVE state before the whole child-op cascade began. Fix (same tedious-but-proven pattern as wait-tgw-active-before-delete, HB4b): re-settle to ACTIVE immediately before EACH remaining child op (this one + the siblings below), so every op gets its own up-to-300s settle window instead of all sharing the one budget already spent right after the vpc-connection create. REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): this settle-poll (and create-tgw-firewall-connection right after it) MOVED to run BEFORE create-tgw-firewall — see create-tgw-firewall-connection's own note for why the old order was backwards. UNVERIFIED LIVE (offline repair)."
+        },
+        {
+          "name": "create-tgw-firewall-connection",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/firewall-connections",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): MOVED to run BEFORE create-tgw-firewall (was previously created AFTER it, with a `{firewall_id}` body). CONFIRMED from the observation's own error body: create-tgw-firewall 400'd `scp-network.transit-gateway.firewall-connection-active-state` (\"Transit Gateway Firewall connection state is not Active: (INACTIVE)\") — i.e. the firewall create REQUIRES the TGW's `firewall_connection_state` to already be ACTIVE, so the connection must exist (and settle) FIRST, not after. `data/api_docs.json` networking/vpc/{createtransitgatewayfirewall,createtransitgatewayfirewallconnection}.response_example both wrap as `transit_gateway` with a `firewall_connection_state` field (e.g. \"INACTIVE\") on the SAME show-transit-gateway-shaped object — confirms this is a TGW-level connection-state gate, not a separate per-firewall resource. Dropped the `{\"firewall_id\": \"{firewall_id}\"}` body entirely: `data/api_docs.json`'s `parameters` for this endpoint list ONLY the `transit_gateway_id` path param (no documented request body), AND `firewall_id` is now captured by create-tgw-firewall which runs AFTER this step — keeping it would have left an always-undefined placeholder (regression.scenarios.validate flags undefined-placeholder references as a hard error). UNVERIFIED LIVE — next heavy dispatch must confirm 2xx here and that create-tgw-firewall (now after wait-firewall-connection-active) no longer 400s the connection-state error."
+        },
+        {
+          "name": "wait-firewall-connection-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.firewall_connection_state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): NEW step — settle-poll the TGW's `firewall_connection_state` (field CONFIRMED from `data/api_docs.json` networking/vpc/createtransitgatewayfirewallconnection response_example, same show-shaped object as showtransitgateway) to ACTIVE before create-tgw-firewall fires, per that create's own required-precondition error (see create-tgw-firewall-connection's note). Same GET (`show-transit-gateway`) as every other wait-tgw-active-* step, just polling a different field on the identical response body. UNVERIFIED LIVE (offline repair)."
+        },
+        {
+          "name": "wait-tgw-active-before-firewall",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall-connection above. create-tgw-firewall-connection is itself an async 202 too so may re-EDITING the TGW's general `state`; re-settle THAT (separate from firewall_connection_state, just confirmed ACTIVE by wait-firewall-connection-active above) before create-tgw-firewall touches it. REPAIR 2026-07-07 (HB4d): kept in place, now positioned right before create-tgw-firewall (its original purpose) instead of before firewall-connection — see the reordering note on create-tgw-firewall-connection."
+        },
+        {
           "name": "create-tgw-firewall",
           "service": "vpc",
           "method": "POST",
@@ -1394,29 +1556,26 @@
             422
           ],
           "capture_soft": {
-            "firewall_id": "$.firewall.id"
-          }
+            "firewall_id": "$.transit_gateway.firewall_ids[0]"
+          },
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): reordered to run AFTER create-tgw-firewall-connection + wait-firewall-connection-active (see those steps' notes for the CONFIRMED required-precondition error). Also fixed `capture_soft`: was `$.firewall.id`, but `data/api_docs.json` networking/vpc/createtransitgatewayfirewall.response_example wraps as `transit_gateway` (no top-level `firewall` key) and carries the firewall id in its `firewall_ids` list (e.g. `[\"bbb93aca123f4bb2b2c0f206f4a86b2b\"]`) — same class of wrong-wrapper-key bug already fixed for create-tgw-vpc-connection/create-tgw-routing-rule in this file. NOTE the doc's own response_example renders `firewall_ids` as a quoted Python-list-shaped STRING (`\"['bbb93aca...']\"`), which may be a doc-generation artifact (the real API likely returns a JSON array) or may be genuinely a string — `$.transit_gateway.firewall_ids[0]` (engine.py's list-index capture, same syntax already used for `internet_gateways[0].id` elsewhere in this repo) resolves correctly if it's a real array; if the live API instead returns the literal bracketed string, this capture degrades to grabbing the whole string (harmless — delete-tgw-firewall would then 404 on a bad id, same non-fatal outcome as the current always-unresolved placeholder, no regression). UNVERIFIED LIVE — next heavy dispatch must confirm 2xx and observe which shape `firewall_ids` actually takes."
         },
         {
-          "name": "create-tgw-firewall-connection",
+          "name": "wait-tgw-active-before-routing-rule",
           "service": "vpc",
-          "method": "POST",
-          "path": "/v1/transit-gateways/{transit_gateway_id}/firewall-connections",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
           "group": "tgw",
           "optional": true,
-          "json": {
-            "firewall_id": "{firewall_id}"
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
           },
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ]
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall — see that step's note."
         },
         {
           "name": "create-tgw-routing-rule",
@@ -1427,7 +1586,7 @@
           "optional": true,
           "json": {
             "description": "API regression tgw routing rule",
-            "destination_cidr": "10.131.0.0/20",
+            "destination_cidr": "10.124.0.0/24",
             "destination_type": "VPC",
             "tgw_connection_vpc_id": "{vpc_id}"
           },
@@ -1442,8 +1601,26 @@
             422
           ],
           "capture_soft": {
-            "routing_rule_id": "$.routing_rule.id"
-          }
+            "routing_rule_id": "$.transit_gateway_rule.id"
+          },
+          "_note": "REPAIR 2026-07-07 (HB4b-2, offline): capture path was `$.routing_rule.id` — `data/api_docs.json` endpoints['networking/vpc/createtransitgatewayrule'].response_example wraps as `transit_gateway_rule` (id/description/destination_cidr/state/... fields), not `routing_rule`. Same class of bug as create-tgw-vpc-connection's capture fix in this same session (see that step's _note); this create was ALSO 400 not-active-state in HB4b so the mismatch was never runtime-visible, but the wrapper key is independently confirmed from the doc model. REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 4): `destination_cidr` changed `10.131.0.0/20` -> `10.124.0.0/24` — CONFIRMED root cause from the observation's own error body: 400 `scp-network.routing-rule.destination-cidr-include-vpc-cidr` (\"If destination type is VPC, the destination cidr should be included in vpc cidr blocks: 10.131.0.0/20\" — the echoed cidr IS our own request's destination_cidr, i.e. the API is telling us OUR value isn't inside the connected VPC's cidr). `10.131.0.0/20` was copied from THIS lifecycle's own local create-vpc fallback body a few steps above (used only in the rare non-xdist path where no shared VPC exists) — but this lifecycle's `vpc_id` normally `adopt`s the xdist session-shared VPC instead (real heavy-dispatch path), whose hardcoded cidr is `10.124.0.0/20` (engine.py `_SHARED_VPC_CIDR`; same fact already used to fix the vpc-endpoint subnet cidr in this file, HB4c item 4) — a destination_cidr from the WRONG vpc's range was always going to 400 whenever the shared VPC was adopted. `10.124.0.0/24` is a valid sub-range of the shared VPC's `10.124.0.0/20` and satisfies `destination_type:VPC` requiring the destination inside the connected vpc's cidr blocks. RESIDUAL, NOT fixed here (same class as the vpc-endpoint fallback-cidr gap, HB4c item 4): the local create-vpc fallback body above is still `10.131.0.0/20`-only and would need its OWN matching routing-rule cidr for the rare non-adopted/non-xdist path — flagged as a next-lever, not fabricated. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx."
+        },
+        {
+          "name": "wait-tgw-active-before-uplink-routing-rule",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall — see that step's note."
         },
         {
           "name": "create-tgw-uplink-routing-rule",
@@ -1468,8 +1645,67 @@
             422
           ],
           "capture_soft": {
-            "uplink_routing_rule_id": "$.routing_rule.id"
-          }
+            "uplink_routing_rule_id": "$.transit_gateway_rule.id"
+          },
+          "_note": "REPAIR 2026-07-07 (HB4b-2, offline): same capture-key fix as create-tgw-routing-rule just above — `data/api_docs.json` endpoints['networking/vpc/createtransitgatewayuplinkrule'].response_example also wraps as `transit_gateway_rule`, not `routing_rule`."
+        },
+        {
+          "name": "wait-tgw-active-before-delete-firewall",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall — see that step's note. The prior child creates (firewall/firewall-connection/routing-rule/uplink-routing-rule) can each also re-EDITING the TGW, so re-settle before the delete cascade begins too. REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): moved ahead of wait-tgw-active-before-delete-firewall-connection — see delete-tgw-firewall's own note for the reordering rationale (child-first teardown)."
+        },
+        {
+          "name": "delete-tgw-firewall",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/firewalls/{firewall_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): reordered to run BEFORE delete-tgw-firewall-connection (was previously after). Not directly observed live (the prior run's delete-tgw-firewall 400'd `firewall-not-existed` only because create-tgw-firewall itself never succeeded due to the now-fixed creation-order bug — see create-tgw-firewall-connection's note), but inferred from the SAME dependency this session confirmed on the create side: create-tgw-firewall requires an ACTIVE firewall-connection, i.e. the firewall is the CHILD of the connection. This codebase's own established convention (e.g. the reconciler's TGW vpc-connection reaping, cleanup/reconciler.py) is always child-before-parent teardown; deleting the connection (parent gate) first risked leaving an orphaned/undeletable firewall the same way the old create order left an unmet precondition. INVESTIGATION, not fully proven — next heavy dispatch must confirm both deletes 2xx in this order (or surface a real error if the dependency runs the other way)."
+        },
+        {
+          "name": "wait-tgw-active-before-delete-firewall-connection",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall — see that step's note. REPAIR 2026-07-07 (HB4d): moved after delete-tgw-firewall — see that step's note."
         },
         {
           "name": "delete-tgw-firewall-connection",
@@ -1495,27 +1731,21 @@
           "retry_interval": 15
         },
         {
-          "name": "delete-tgw-firewall",
+          "name": "wait-tgw-active-before-delete-routing-rule",
           "service": "vpc",
-          "method": "DELETE",
-          "path": "/v1/transit-gateways/{transit_gateway_id}/firewalls/{firewall_id}",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
           "group": "tgw",
           "optional": true,
-          "expect_status": [
-            200,
-            202,
-            204,
-            400,
-            403,
-            404,
-            409
-          ],
-          "destructive": true,
-          "retry_on_status": [
-            409
-          ],
-          "retries": 4,
-          "retry_interval": 15
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall — see that step's note."
         },
         {
           "name": "delete-tgw-routing-rule",
@@ -1541,6 +1771,23 @@
           "retry_interval": 15
         },
         {
+          "name": "wait-tgw-active-before-delete-uplink-routing-rule",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall — see that step's note."
+        },
+        {
           "name": "delete-tgw-uplink-routing-rule",
           "service": "vpc",
           "method": "DELETE",
@@ -1564,6 +1811,23 @@
           "retry_interval": 15
         },
         {
+          "name": "wait-tgw-active-before-delete-vpc-connection",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall — see that step's note."
+        },
+        {
           "name": "delete-tgw-vpc-connection",
           "service": "vpc",
           "method": "DELETE",
@@ -1584,7 +1848,25 @@
             409
           ],
           "retries": 4,
-          "retry_interval": 15
+          "retry_interval": 15,
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): task hypothesis was that the 400 `not-in-vpc-connection` here was the SAME TGW-not-active-state class as the child creates. Observation evidence DISPROVES that: the error body's literal, unresolved `{vpc_connection_id}` placeholder text (not a real id) proves capture_soft never resolved a value — i.e. this was the create-tgw-vpc-connection capture-KEY bug (`$.vpc_connection.id` vs the doc-confirmed `$.transit_gateway_vpc_connection.id`, fixed on that step above), not a state/timing issue. With the capture fixed, a real `{vpc_connection_id}` should resolve here; the wait-tgw-active-after-connection settle-poll (added above) additionally covers the case where the TGW itself is still EDITING when this DELETE fires."
+        },
+        {
+          "name": "wait-tgw-active-before-set",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-07 (HB4c, §HB4c item 3): sibling settle-poll of wait-tgw-active-before-firewall — see that step's note."
         },
         {
           "name": "set-transit-gateway",
@@ -1609,6 +1891,23 @@
           "_note": "Closes settransitgateway (PUT /v1/transit-gateways/{transit_gateway_id}). Uses the transit_gateway_id captured by create-transit-gateway."
         },
         {
+          "name": "wait-tgw-active-before-delete",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [400, 403, 404]
+          },
+          "_note": "REPAIR 2026-07-06 (HB4 400 transit-gateway.invalid-state on delete-transit-gateway, run 28738115294, OFFLINE repair): live detail 'Transit Gateway state is not deletable state(Active, Error)' — the preceding vpc-connection/firewall/routing-rule children can each transition the TGW through a non-Active state (same CREATING-class timing as wait-tgw-active), so re-settle to ACTIVE right before delete rather than assuming it stayed ACTIVE since the earlier poll. Same settle-poll pattern as wait-tgw-active; give_up_status covers a TGW that never became ACTIVE (already-4xx create) so this doesn't hang out the full timeout."
+        },
+        {
           "name": "delete-transit-gateway",
           "service": "vpc",
           "method": "DELETE",
@@ -1626,6 +1925,7 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 4,

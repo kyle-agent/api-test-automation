@@ -19,8 +19,10 @@ Config (env): see controlplane/README.md.
 """
 from __future__ import annotations
 
+import calendar
 import json
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlencode
@@ -29,7 +31,7 @@ from fastapi import FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from controlplane import (authoring, compare, dashdata, db, dispatch,
+from controlplane import (authoring, common, compare, dashdata, db, dispatch,
                           local_executor, resources, scheduler, snapshots, triage)
 from core import profiles as core_profiles
 from core import suites as core_suites
@@ -77,39 +79,60 @@ app.include_router(reporting_routes.router)
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
 
-def _catalog() -> dict:
-    """Suites + profiles for the trigger forms (live from the repo files).
-    ctx_snapshot feeds the header ctxbar — which published snapshot the
-    numbers on screen come from (best-effort, degrades to None)."""
-    return {
-        "suites": [s.get("id") for s in core_suites.list_suites()],
-        "profiles": [p.get("id") for p in core_profiles.list_profiles()],
-        "dispatch_ok": dispatch.configured(),
-        "triage_ok": triage.enabled(),
-        "ctx_snapshot": dashdata.latest_coverage(),
-    }
-
-
 def _render(request: Request, name: str, active: str, **ctx) -> HTMLResponse:
+    """Every page rides the shared base context (controlplane.common — P1-3):
+    suites/profiles for the trigger forms + ctx_snapshot for the ctxbar."""
     return templates.TemplateResponse(request, name,
-                                      {**_catalog(), "active": active, **ctx})
+                                      {**common.base_ctx(active), **ctx})
 
 
 # --- home ----------------------------------------------------------------------
 
+def _catalog_count() -> int:
+    """엔드포인트 수 — 홈 Modeling 칸의 '전체 N API' 분모 (2026-07-07 IA 개정:
+    Catalog 칸은 제거, Modeling이 카탈로그를 흡수 — best-effort, 부재 시 0)."""
+    try:
+        from controlplane import catalog_routes
+        return len(catalog_routes._load_catalog())
+    except Exception:
+        return 0
+
+
+_STALE_RUNNING_S = 24 * 3600
+
+
+def _split_stale_running(runs) -> tuple[list, list]:
+    """표시층 전용 stale 분리 — DB 상태는 건드리지 않는다. running/dispatched인데
+    requested_at이 24h 이상 과거인 run은 죽은 워커/미회수 기록일 가능성이 높아
+    '진행 중' 집계에 넣으면 오신호가 된다(페르소나-2 P2C-6) → 별도 목록으로."""
+    active, stale = [], []
+    for r in runs:
+        if r["status"] not in ("running", "dispatched"):
+            continue
+        try:
+            age = time.time() - calendar.timegm(
+                time.strptime(r["requested_at"] or "", "%Y-%m-%dT%H:%M:%SZ"))
+        except ValueError:
+            age = _STALE_RUNNING_S + 1  # 나이 불명 → 집계 신뢰 불가, stale 쪽으로
+        (stale if age > _STALE_RUNNING_S else active).append(r)
+    return active, stale
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     runs = db.list_runs(limit=50)
-    running = [r for r in runs
-               if r["status"] in ("running", "dispatched")]
+    running, stale_running = _split_stale_running(runs)
     today = db.now()[:10]
     runs_today = sum(1 for r in runs
                      if (r["requested_at"] or "").startswith(today))
     return _render(request, "home.html", "home",
-                   runs=runs[:5], running=running, runs_today=runs_today,
+                   runs=runs[:5], running=running,
+                   stale_running=stale_running, runs_today=runs_today,
                    schedules=db.list_schedules(),
                    coverage=dashdata.latest_coverage(),
-                   scenario_stats=_scenario_stats())
+                   scenario_stats=_scenario_stats(),
+                   catalog_count=_catalog_count(),
+                   model_stats=_model_stats())
 
 
 # --- Planning ------------------------------------------------------------------
@@ -160,27 +183,12 @@ def _model_stats() -> dict:
         return {"nodes": 0, "validated": 0, "docs": 0, "groups": 0}
 
 
-PLAN_STEPS = ("catalog", "model", "compose", "validate")
-
-
-@app.get("/planning", response_class=HTMLResponse)
-def planning(request: Request, step: str = "catalog"):
-    """Plan = one linear flow (IA.md). The stepper ① Catalog → ② Model →
-    ③ Compose → ④ Validate is the single entry; ?step= selects the stage.
-    Validate is its own route (/planning/validate) since it runs a subprocess."""
-    if step == "validate":
-        return RedirectResponse("/planning/validate", status_code=307)
-    if step not in PLAN_STEPS:
-        step = "catalog"
-    rows = _scenario_rows()
-    return _render(request, "planning.html", "planning", plan_step=step,
-                   profile_list=core_profiles.list_profiles(),
-                   suite_list=core_suites.list_suites(),
-                   scenario_stats=_scenario_stats(),
-                   scenario_rows=rows,
-                   model_stats=_model_stats(),
-                   gen_count=sum(1 for r in rows if r["id"].startswith("gen-")),
-                   disabled_count=sum(1 for r in rows if not r["enabled"]))
+@app.get("/planning", include_in_schema=False)
+def planning_legacy():
+    """구 4단계 스테퍼(?step=) 은퇴 (IA 확정: Catalog·Modeling·Testing·Reporting).
+    Modeling의 정본 진입은 /planning/resources/map — 하위 라우트
+    (/planning/edit·view·validate·dependencies·scenarios·resources/*)는 유지."""
+    return RedirectResponse("/planning/resources/map", status_code=301)
 
 
 def _run_validate() -> dict:
@@ -281,8 +289,37 @@ def planning_knowledge(request: Request):
                    env_files=listing("environments/*.yaml"))
 
 
+def _file_listing(pattern: str) -> list[dict]:
+    """Repo files matching pattern -> [{rel, kb}] (the knowledge-browser shape)."""
+    out = []
+    for p in sorted(ROOT.glob(pattern)):
+        if p.is_file():
+            out.append({"rel": p.relative_to(ROOT).as_posix(),
+                        "kb": round(p.stat().st_size / 1024, 1)})
+    return out
+
+
+def _file_picker(request: Request, mode: str) -> HTMLResponse:
+    """`?path=` 없이 /planning/edit·view에 오면 raw 422 JSON 대신 친절한 HTML
+    선택기를 보여준다 (UIUX-AUDIT P2-12)."""
+    groups = [
+        ("suites/ — 스위트 정의", _file_listing("suites/*.yaml")),
+        ("environments/ — 환경 프로파일", _file_listing("environments/*.yaml")),
+        ("regression/scenarios/ — 시나리오·의존",
+         _file_listing("regression/scenarios/*.json")
+         + _file_listing("regression/scenarios/lifecycles/*.json")),
+        ("knowledge/formal/ — 정형 지식",
+         _file_listing("knowledge/formal/*.yaml")
+         + _file_listing("knowledge/formal/*.md")),
+    ]
+    return _render(request, "file_picker.html", "planning",
+                   mode=mode, groups=groups)
+
+
 @app.get("/planning/view", response_class=HTMLResponse)
-def planning_view(request: Request, path: str):
+def planning_view(request: Request, path: str = ""):
+    if not path.strip():
+        return _file_picker(request, "view")
     f = _safe_repo_file(path)
     if not f:
         raise HTTPException(404, "file not found (or outside the browsable dirs)")
@@ -298,7 +335,9 @@ def planning_view(request: Request, path: str):
 # --- Planning: 저작 편집기 (M3 §3.1 — 검증 → 쓰기 → 로컬 git 커밋) -----------------
 
 @app.get("/planning/edit", response_class=HTMLResponse)
-def planning_edit(request: Request, path: str, find: str = ""):
+def planning_edit(request: Request, path: str = "", find: str = ""):
+    if not path.strip():
+        return _file_picker(request, "edit")
     f = authoring.editable_path(path)
     if not f or not f.is_file():
         raise HTTPException(404, "file not found (or outside the editable dirs)")
@@ -451,7 +490,7 @@ def _run_preview_data() -> dict:
 def testing(request: Request, suite: str = "", service: str = "",
             profile: str = "", crud_filter: str = ""):
     runs = db.list_runs(limit=15)
-    running = [r for r in runs if r["status"] in ("running", "dispatched")]
+    running, stale_running = _split_stale_running(runs)
     live = []
     for r in running:
         if r["gh_run_id"]:
@@ -464,7 +503,8 @@ def testing(request: Request, suite: str = "", service: str = "",
     prefill = {"suite": suite.strip(), "service": service.strip(),
                "profile": profile.strip(), "crud_filter": crud_filter.strip()}
     return _render(request, "testing.html", "testing",
-                   runs=runs, live=live, schedules=db.list_schedules(),
+                   runs=runs, live=live, stale_running=stale_running,
+                   schedules=db.list_schedules(),
                    preview=_run_preview_data(), prefill=prefill)
 
 
@@ -517,7 +557,30 @@ def schedule_delete(schedule_id: int):
     return RedirectResponse("/testing", status_code=303)
 
 
-# --- Testing: 리소스 인벤토리 + 단일 리소스 삭제 (M2 §2.5) -------------------------
+# --- Testing: 잔존 자원 단일 정본 (실측 owned 스캔) + ingest 이력 + 단일 삭제 (M2 §2.5)
+
+def _cleanup_busy() -> tuple[bool, str]:
+    """강제 클린업의 409 조건(실행/대기 중인 run 존재)을 클릭 '전에' 계산 — 화면이
+    버튼을 비활성화+사유 표기할 수 있도록. console2 엔진의 admission 상태가 출처."""
+    try:
+        from tools import console2_server as c2
+        with c2._ADMIT:
+            n_run, n_q = len(c2._RESERVED), len(c2._QUEUE)
+        if n_run or n_q:
+            return True, (f"진행 중 {n_run}건 · 대기 {n_q}건 — reconciler 는 owner-tag "
+                          "전체를 reap 하므로 모든 실행이 끝난 뒤에만 가능합니다.")
+    except Exception:
+        pass
+    return False, ""
+
+
+def _owned_ctx() -> dict:
+    st = resources.owned_state()
+    busy, busy_reason = _cleanup_busy()
+    return {"owned": st, "owned_age": resources._age_label(st["age_s"]),
+            "busy": busy, "busy_reason": busy_reason,
+            "destructive": resources.destructive_enabled()}
+
 
 @app.get("/testing/resources", response_class=HTMLResponse)
 def testing_resources(request: Request, gh_run_id: str = "", msg: str = ""):
@@ -526,8 +589,40 @@ def testing_resources(request: Request, gh_run_id: str = "", msg: str = ""):
     return _render(request, "resources.html", "testing",
                    rows=rows, gh_run_id=gh_run_id, msg=msg[:300],
                    live_count=sum(1 for r in rows if r["live"]),
-                   destructive=resources.destructive_enabled(),
-                   run_ids=run_ids)
+                   run_ids=run_ids, **_owned_ctx())
+
+
+@app.get("/testing/resources/owned", response_class=HTMLResponse)
+def testing_resources_owned(request: Request):
+    """실측(owned 스캔) 섹션 fragment — 스캔 중일 때 htmx 가 폴링한다."""
+    return templates.TemplateResponse(request, "_owned_section.html", _owned_ctx())
+
+
+@app.post("/testing/resources/scan")
+def testing_resources_scan():
+    """owned 스캔(read-only LIST 인벤토리)을 백그라운드로 시작하고 돌아온다."""
+    resources.start_owned_scan()
+    return RedirectResponse("/testing/resources", status_code=303)
+
+
+@app.post("/testing/resources/cleanup")
+def testing_resources_cleanup():
+    """계정 전체 강제 클린업 (reconciler FORCE sweep) — console2 의 /api/cleanup 과
+    같은 엔진·같은 409 가드. 버튼 앞의 pre-scan 모달이 삭제 대상 목록을 보여준 뒤
+    호출된다."""
+    busy, reason = _cleanup_busy()
+    if busy:
+        msg = "강제 클린업 차단 — " + reason
+    else:
+        try:
+            from tools import console2_server as c2
+            rec = c2._start("cleanup", c2._cleanup_worker)
+            msg = (f"강제 클린업 시작 (run {rec['id']}) — 진행 로그는 Testing 콘솔 "
+                   "실행 기록에서, 끝나면 [다시 스캔]으로 확인하세요.")
+        except Exception as exc:
+            msg = f"강제 클린업 시작 실패: {exc}"
+    q = urlencode({"msg": msg})
+    return RedirectResponse(f"/testing/resources?{q}", status_code=303)
 
 
 @app.post("/testing/resources/delete")
@@ -566,17 +661,17 @@ def add_run_command(gh_run_id: str, action: str = Form(...), target: str = Form(
 
 # --- Reporting -----------------------------------------------------------------
 
-REPORT_TABS = (("summary", "Summary"),
-               ("dashboard", "Coverage & Conformance"),
-               ("runs", "Runs & Archive"), ("triage", "Triage"))
+# tab keys only — labels live in the single subtab include
+# (templates/_reporting_tabs.html, P2-8; coverage/compare are sibling routes).
+REPORT_TABS = ("summary", "dashboard", "runs", "triage")
 
 
 @app.get("/reporting", response_class=HTMLResponse)
 def reporting(request: Request, tab: str = "summary"):
-    if tab not in {t for t, _ in REPORT_TABS}:
+    if tab not in REPORT_TABS:
         tab = "summary"
     return _render(request, "reporting.html", "reporting",
-                   tab=tab, tabs=REPORT_TABS,
+                   tab=tab,
                    coverage=dashdata.latest_coverage(),
                    runs=db.list_runs(limit=100),
                    archive=snapshots.archive_index(limit=100))
@@ -622,12 +717,27 @@ def run_detail(request: Request, gh_run_id: str):
             tri_detail = json.loads(tri["detail"])
         except ValueError:
             pass
+    meta = snapshots.meta(gh_run_id)
+    milestones = db.list_events(gh_run_id, kind="milestone")
+    commands = db.list_commands(gh_run_id)
+    # 어떤 근거도 없는 id는 404 (P2-12) — 아카이브에만 있는 과거 run은 스냅샷/
+    # index 근거가 있으므로 계속 200 + 내용으로 렌더된다.
+    if not (run or meta or milestones or commands or tri or any(
+            str(row.get("run_id", "")) == gh_run_id
+            for row in snapshots.archive_index(limit=500))):
+        return templates.TemplateResponse(
+            request, "run_notfound.html",
+            {**common.base_ctx("reporting"), "gh_run_id": gh_run_id},
+            status_code=404)
+    # local (console2) runs: pass/fail summary from the run's events file
+    # (P2-9 잔여 — lifecycle pass/fail + api ok/soft/fail on the detail page).
+    local_summary = (console_api.local_run_summary(gh_run_id)
+                     if gh_run_id.startswith("local-") else None)
     return _render(request, "run_detail.html", "reporting",
-                   gh_run_id=gh_run_id, run=run,
-                   meta=snapshots.meta(gh_run_id),
-                   milestones=db.list_events(gh_run_id, kind="milestone"),
-                   commands=db.list_commands(gh_run_id),
-                   triage=tri, triage_detail=tri_detail)
+                   gh_run_id=gh_run_id, run=run, meta=meta,
+                   milestones=milestones, commands=commands,
+                   triage=tri, triage_detail=tri_detail,
+                   local_summary=local_summary)
 
 
 @app.post("/runs/{gh_run_id}/triage", response_class=HTMLResponse)
@@ -825,8 +935,10 @@ def api_local_log(run_id: str):
     return res
 
 
-@app.get("/local-run")
-def local_run_page(request: Request):
-    """Local Run screen (S3) — pick a selection → run simulate/live in-process →
-    watch the live event stream + per-lifecycle state, driven by /api/local/*."""
-    return templates.TemplateResponse(request, "local_run.html", {"active": "testing"})
+@app.get("/local-run", include_in_schema=False)
+def local_run_page():
+    """RETIRED (고아 페이지 — UIUX-AUDIT P1-4): 러너 UI는 Testing 콘솔(/testing/embed)
+    이, 계정 위생 역할은 /testing/resources(실측 owned 스캔 단일 정본)가 대체.
+    /api/local/* 는 콘솔이 계속 쓰므로 유지. (local_run.html + build_local_demo 는
+    2026-07-04 리포 정비 C1 에서 retire — REPO-AUDIT-2026-07-04.md §2)"""
+    return RedirectResponse("/testing/resources", status_code=301)

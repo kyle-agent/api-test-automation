@@ -156,6 +156,7 @@
       "id": "quota-reads",
       "service": "management/quota",
       "enabled": false,
+      "_status": "stale",
       "_note": "Read-only: list account-quotas + quota-requests, soft-capture an id each, probe the 2 path-param GETs (showaccountquota/showquotarequest). No writes/cleanup. Envelope/id grounded from docs ($.account_quotas[].id, $.quota_requests[].id). Runs in CRUD mode (engine gates all lifecycles on SCP_ALLOW_MUTATIONS); env-dependent (records SOFT if the account has no quota-requests).",
       "steps": [
         {
@@ -194,6 +195,7 @@
       "id": "support-reads",
       "service": "management/support",
       "enabled": false,
+      "_status": "stale",
       "_note": "Read-only: list inquiries + service-requests, soft-capture an id each, probe showinquiry/showservicerequest. No writes/cleanup. Env-dependent (records SOFT if the account has no inquiries/tickets — there is no create-ticket API in the catalog).",
       "steps": [
         {
@@ -1009,6 +1011,7 @@
       "id": "security-certificatemanager-import",
       "service": "security/certificatemanager",
       "enabled": false,
+      "_status": "blocked-owner",
       "needs_cert_material": true,
       "_note": "DISABLED: certificatemanager check-validation/import reject a runtime-minted self-signed key/cert regardless of PEM encoding (PKCS#8 and PKCS#1 both return 'This private key is not a PEM format'), so a synthetic keypair cannot satisfy the gateway's CA validation and there is no way to supply a real CA-signed cert in CI. The self-sign lifecycle already covers the create/read/delete spine; this import-only lifecycle stays disabled until real cert material is available. A throwaway self-signed cert+key is minted at runtime via openssl ({cert_body}/{private_key}/{cert_chain}); the lifecycle skips environmentally when openssl is unavailable. Synchronous.",
       "steps": [
@@ -3074,6 +3077,65 @@
           ]
         },
         {
+          "name": "create-port-subnet",
+          "group": "vs-port",
+          "optional": true,
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrpsub{unique}",
+            "description": "API regression VS standalone port subnet",
+            "cidr": "10.135.3.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "_note": "HB3b-2 (2026-07-06, run 28766151214): attach-port-to-server 400 `VirtualServer.CreateInterface.Duplicated` — the server already has an interface in `{subnet_id}` (its own boot NIC, created by create-server earlier in this same lifecycle), and this lifecycle has no second/shared subnet to point the standalone test port at (unlike the DB-engine `-full` lifecycles' `adopt: subnet#db` pattern — checked, not present here). Fix: give the vs-port group its OWN subnet in the same VPC (`10.135.3.0/24`, free — the lifecycle's only other subnet is `10.135.2.0/24` inside the VPC's `10.135.0.0/20`), so create-port/attach-port-to-server target a subnet the server has no existing interface on. Scoped to the `vs-port` group (own create+cleanup) so a rejection here tears down just this subnet, never the main VM spine.",
+          "capture_soft": {
+            "port_subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            404,
+            409,
+            422
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{port_subnet_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-port-subnet",
+          "group": "vs-port",
+          "optional": true,
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{port_subnet_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10,
+            "give_up_status": [
+              400,
+              404
+            ]
+          }
+        },
+        {
           "name": "create-port",
           "group": "vs-port",
           "optional": true,
@@ -3083,11 +3145,11 @@
           "json": {
             "name": "regrport{unique}",
             "description": "API regression standalone port",
-            "subnet_id": "{subnet_id}",
+            "subnet_id": "{port_subnet_id}",
             "security_groups": [],
-            "fixed_ip_address": "",
             "tags": []
           },
+          "_note": "HB3b (2026-07-05, run 28723287734): CONFIRMED live 400 `scp-network.port.fixed_ip.format-error` (\"The requested Fixed IP() is invalid IP format.\" — note the empty parens) when `fixed_ip_address` was sent as `\"\"`. data/api_docs.json networking/vpc/portcreaterequest documents the field as `any of [string, null]` (optional, default \"\") and the doc's own request_example literally sends `\"fixed_ip_address\":\"\"` — so the DOCUMENTED default is rejected live; fix is to OMIT the key entirely (let the backend auto-assign from the subnet) rather than send an empty string. This unblocks the whole vs-port group (map-sg-to-port/attach-port-to-server/read-attached-port/detach-port-from-server/delete-port — 6 catalog keys share this group, previously 404-demoted once create-port failed). Not re-verified live this session (offline-only, no SCP calls) — next HEAVY dispatch should confirm 2xx. HB3b-2 (2026-07-06): `subnet_id` switched from `{subnet_id}` (the server's own subnet) to `{port_subnet_id}` (new dedicated subnet, see create-port-subnet) — see attach-port-to-server note for why.",
           "capture_soft": {
             "std_port_id": "$.port.id"
           },
@@ -3132,8 +3194,9 @@
           "path": "/v1/servers/{server_id}/interfaces",
           "json": {
             "port_id": "{std_port_id}",
-            "subnet_id": "{subnet_id}"
+            "subnet_id": "{port_subnet_id}"
           },
+          "_note": "HB3b-2 (2026-07-06, run 28766151214): CONFIRMED live 400 `VirtualServer.CreateInterface.Duplicated` when this sent `subnet_id: {subnet_id}` — that's the server's OWN boot subnet, and it already has an interface there (create-server). Switched to `{port_subnet_id}` (the dedicated vs-port-group subnet created by create-port-subnet, matching create-port's own subnet_id) so the new interface lands on a subnet the server has no prior interface on. Not re-verified live this session (offline-only).",
           "expect_status": [
             200,
             201,
@@ -3499,14 +3562,15 @@
           "method": "PUT",
           "path": "/v1/images/{custom_image_id}",
           "json": {
-            "min_disk": 100,
             "min_ram": 0,
-            "protected": false
+            "protected": false,
+            "visibility": "private"
           },
           "expect_status": [
             200,
             202
-          ]
+          ],
+          "_note": "HB3b-2 (2026-07-06, run 28766151214): the min_disk:104 fix from HB3b (run 28723287734) still 400s, but with a DIFFERENT/categorical message this time: `Image with volumes cannot update min disk` — not a value-mismatch, an outright rejection of the min_disk field whenever the image was created from a server with attached volumes (this lifecycle's image IS such a snapshot). No min_disk value can satisfy it, so the field is dropped entirely rather than re-tuned. `data/api_docs.json` `compute/virtualserver/imagesetrequest` (ImageSetRequest, PUT /v1/images/{id}) has exactly 4 fields: min_disk, min_ram, protected, visibility — there is NO `description` field on this model (unlike some other services' update bodies), so the safe substitute is `visibility` (kept at its default `private` — a genuine no-op-safe value, pattern `private|shared`) alongside the pre-existing min_ram/protected. Not re-verified live this session (offline-only); next dispatch should confirm 2xx with this body shape."
         },
         {
           "name": "updateserverinterface",
@@ -3595,6 +3659,31 @@
           "destructive": true
         },
         {
+          "name": "wait-server-settled",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "wait": 20,
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "ACTIVE",
+              "STOPPED",
+              "SHUTOFF",
+              "RUNNING"
+            ],
+            "timeout": 120,
+            "interval": 15,
+            "give_up_status": [
+              404
+            ]
+          },
+          "_note": "HB3b (2026-07-05, run 28723287734): CONFIRMED delete-server 400 `InvalidVirtualServerState.DeleteImpossible` reproduced 3x in the same run, immediately after image-delete/detach-volume/detach-security-group — yet the reconciler's LATER sweep (cleanup/reconciler.py `_delete`+next-round retry, no special server-state handling, just elapsed time) deletes the SAME server successfully, so this is a transient post-mutation settle window, not a hard backend block. `state` itself may already read a stable value (ACTIVE/STOPPED) throughout the transition — the doc-visible field does not expose a task_state — so the fixed 20s pre-wait is the load-bearing part; the poll is a best-effort top-up in case state does briefly report something outside the accepted list. Paired with retry_on_status on delete-server itself (belt-and-suspenders, matching how the reconciler's cross-round retry eventually succeeds). Not re-verified live this session (offline-only)."
+        },
+        {
           "name": "delete-server",
           "method": "DELETE",
           "path": "/v1/servers/{server_id}",
@@ -3603,7 +3692,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 20
         },
         {
           "name": "wait-server-gone",
@@ -3620,6 +3715,26 @@
             "timeout": 600,
             "interval": 15
           }
+        },
+        {
+          "name": "delete-boot-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{boot_vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
+          "destructive": true,
+          "optional": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "HB3b-2 (2026-07-06, run 28766151214): the boot volume (`delete_on_termination:true` on create-server) survived the final chat-heavy sweep TWICE after the server itself was gone, needing a manual `SCP_SWEEP_IGNORE_TTL=true` recovery both times — `delete_on_termination`'s async cascade evidently doesn't always finish before the workflow's own final sweep pass runs. `boot_vol_id` was already captured by the pre-existing `capture-server-volume` step (`$.volumes[0].id`) but was a DEAD capture — nothing in this lifecycle used it. Explicitly deleting it right after the server is confirmed gone (`wait-server-gone` 404) closes that window directly, instead of leaning on the account-wide reconciler sweep's TTL/own-run heuristics (`cleanup/reconciler.py _is_deletable`) to reclaim it later. `optional:true` + broad `expect_status` (400/404 included) so a volume the cascade DID already reap (404), or one still mid-detach (400), never fails the lifecycle. Not re-verified live this session (offline-only) — next HEAVY dispatch should confirm the final sweep no longer needs an IGNORE_TTL rescue for this lifecycle's boot volume. See repair-log §HB3b-2 item 4 for the (b) workflow-level alternative considered and NOT applied (`.github/` is out of scope for this session)."
         },
         {
           "name": "delete-server-group",
@@ -6037,6 +6152,7 @@
       "id": "networking-dns-hosted-zone",
       "service": "networking/dns",
       "enabled": false,
+      "_status": "stale",
       "heavy": false,
       "_note": "DISABLED — SUPERSEDED 2026-06-11 by networking-dns-hosted-zone-private (regression/scenarios/lifecycles/networking__dns.json), which encodes the full userguide chain: create private-dns -> poll Active -> connect shared VPC -> hosted zone -> A record -> reverse teardown (zone before private-dns delete). Per the ingested userguide facts (networking__dns.yaml private-dns-account-global), an ACTIVATE call is only needed when re-using the account-global private-dns name in ANOTHER region — a fresh create in the run region polls straight to Active, so no activate sub-flow is required. Kept disabled as a historical record; bodies here lack the required private_dns_id chain. Real response shapes (framework/api_bodies.json + api_docs response examples): createprivatedns $.private_dns.id; createhostedzone and createhostedzonerecord return BARE envelopes — the id is $.id (not $.hosted_zone.id / $.record.id).",
       "steps": [
@@ -8467,6 +8583,7 @@
       "id": "iam-role",
       "service": "management/iam",
       "enabled": false,
+      "_status": "blocked-owner",
       "_note": "Light, self-contained: create a USER_DEFINED role (no path-param POST /v1/roles), read it, probe the 2 role-id path-param GETs, delete. Body grounded on management/iam/createrole example; assume_role_policy_document copied verbatim (sts:AssumeRole). policy_ids/principals sent empty to avoid referencing non-existent users. Create response envelope $.role.id confirmed from the doc 202 example. RISK: the trust-policy / principals validation is account-specific — if the gateway requires a real principal SRN, create returns 400 and this lifecycle should be disabled; everything else is grounded.",
       "steps": [
         {

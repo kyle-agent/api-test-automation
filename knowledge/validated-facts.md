@@ -1305,3 +1305,459 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   per-id, layered on the existing per-collection `_CONVERGED` cache, and **never widens
   ownership** — selection still goes through `is_owned`/`is_expired`; stuck-tracking only
   suppresses a known-futile retry so the sweep CONVERGES instead of looping to its cap.
+
+- **a transit-gateway "settling" in CREATING/EDITING (not yet ACTIVE/ERROR) was NOT
+  counted in-progress on its own DELETE attempt — a gap distinct from the 2026-07-03
+  DELETING-state fix above (CAMPAIGN-C3-100 repair-log #HB4b-2 item 5, 2026-07-07).**
+  `DELETE /v1/transit-gateways/{id}` only succeeds while `state` is `ACTIVE` or `ERROR`
+  (live error: *"Transit Gateway state is not deletable state(Active, Error)"*) —
+  `CREATING`/`EDITING` are transitional (a TGW re-enters `EDITING` for a settle window
+  after its OWN create, or after a vpc-connection create/delete on it — HB4b-2 item 2,
+  measured >300s live). The reconciler's TGW pass already treated `DELETING`-class
+  states specially (`_is_async_deleting`/`_ASYNC_DELETING_STATES`, the 2026-07-03 fix
+  above) but a 400 from a `CREATING`/`EDITING` TGW fell through to a bare `print()` with
+  NO `_INPROGRESS_THIS_ROUND` increment — so a sweep whose only remaining owned item
+  was a transiently-`EDITING` TGW (its vpc-connection already reaped, so
+  `_vpc_409_holder` no longer protected the VPC either) could report genuine=0/inprog=0
+  and **converge one round before the TGW would have settled**, stranding it (and its
+  VPC) for a human FORCE re-sweep hours later (exactly the 2026-07-06 HB4b incident,
+  run 28827996068 — a manual re-sweep succeeded cleanly once the TGW had settled on its
+  own). Fix: `_is_tgw_settling(item)` (allow-list `{"active","error"}`, deliberately
+  excluding the already-handled `_ASYNC_DELETING_STATES`) — when true, the TGW pass
+  SKIPS the doomed DELETE and counts it in-progress instead, mirroring the precedent
+  `_is_async_deleting` already set for the DELETING state. Offline-tested:
+  `tests/offline/test_reconciler_convergence.py::test_is_tgw_settling_predicate` +
+  `::test_editing_tgw_delete_skipped_and_counts_in_progress`.
+
+## DBaaS sub-op depth: window-only guarded lifecycles, ExistInprogress pacing, chat-heavy evidence sink (2026-07-02, branch upbeat-ritchie)
+
+> conf: 0.8 · seen: 2026-07-02 · obs: 2 (runs 28595785223 + 28599889165)
+
+- **`*-cluster-subops-guarded` bank NOTHING dispatched alone.** They soft-capture
+  an EXISTING cluster from `GET /v1/clusters` (live-cluster-window design, per
+  their `_note`); with no cluster up they "pass" in <90s recording only
+  reachability 4xx/5xx (run 28595785223: 5 guarded lifecycles, 0 real depth).
+  For standalone depth use the **self-sufficient `*-cluster-subops-full`**
+  variants (`database__subops-full.json`): dedicated create→wait→subops→delete
+  reusing the live-proven heavy-shared-dbaas / database-mysql-cluster blocks.
+  Replica/restore groups are EXCLUDED there (a successful create has no
+  capture/cleanup → untracked billable cluster); they belong to
+  `gen-heavy-*-replica/-restore`.
+- **DBaaS serializes cluster ops → 400 `Dbaas.ValidationError.ExistInprogress`.**
+  Back-to-back mutating sub-ops on a live cluster 400 with ExistInprogress (run
+  28599889165: ALL archive/log-export/patch/kernel ops). This SUPERSEDES the
+  earlier "sub-op 500s need a live-cluster window" reading for these ops: with a
+  live cluster the 500 becomes a 400 pacing error — i.e. NOT product-blocked.
+  Fix = the proven database-mysql-cluster pattern: an optional
+  `wait-after-<op>` poll (`$.service_state` until RUNNING/ACTIVE/AVAILABLE;
+  accept STOPPED after stop-cluster) after EVERY mutating sub-op.
+- **Small DBaaS cluster create→RUNNING ≈ 10 min** (mysql/mariadb/epas created
+  15:04 → sub-ops at 15:15, run 28599889165); a 4-cluster parallel
+  create+subops+delete CRUD step took 17.7 min wall. Cheap enough to iterate.
+- **Real 2xx yield of the first paced-less full run: +73 verified endpoints**
+  (1250→1323 in `verified_endpoints.json`): per-engine create/show/delete
+  cluster, list backup-histories / engine-version-properties / log-export-configs
+  / parameter-values / replicas, show archive-config, set-maintenance,
+  parameter set/sync, cachestore list/sync-commands.
+- **chat-heavy evidence sink.** The lane's runner is ephemeral and the workflow
+  had NO artifact upload → run 28595785223's observations are permanently lost
+  (fold impossible; do NOT trust "8 passed" as 2xx evidence). Now: (1)
+  `actions/upload-artifact` + (2) an oplog-bucket mirror step
+  (`runs/<APITEST_RUN_ID>/artifact/…`) run after every chat-heavy run — chat
+  sessions CANNOT download GitHub artifacts (session proxy blocks
+  api.github.com; MCP has no download tool) but read the bucket directly.
+  For older runs use the push-triggered `fetch-results.yml` bridge
+  (`.github/fetch-results-request`, needs `permissions: actions: read`; install
+  `requests` alongside boto3 — `core.oplog` imports `core.http_client`).
+- **backup-agent/backup-job** need a LIVE VM (`server_uuid` in the create body
+  is a stale hardcoded id → 404 `Backup.NotFoundVirtualServerForSearchError`);
+  bank them during a future VM-window (compute-virtualserver-full) run.
+- **Next-batch prep (2026-07-02 offline, COVERAGE-PREP).** ROI over
+  `verified_endpoints.json` (1400 keys → 558 distinct verified catalog ops):
+  `postgresql-cluster-subops-guarded` had the largest reachable gap (33/35 ops
+  unverified) → built **`postgresql-cluster-subops-full`** (database__subops-full.json,
+  67 steps, targets **29** unverified pg ops incl. create-path
+  listparametervalues/listlogexportconfigs/deletecluster; replica/restore
+  excluded as leak-unsafe). pg create is PROVEN (2xx in verified set,
+  database-postgresql-cluster) but FLAKY+SLOW: 500 ContactAdmin 2026-06-19
+  (known_issues) + 1 fail 2026-06-29, ~40min — dispatch pg ALONE so it never
+  gates other engines. `epas-cluster-subops-full` retry targets **23** ops
+  (P3 create 500 = transient; P2 body proven, run 28599889165). **Blocked from
+  the -full pattern (create body has NO live 2xx anywhere — do not invent):**
+  eventstreams (13 ops unverified), searchengine (18), vertica (15) — their
+  guarded lifecycles stay window-only until a proven create exists; sqlserver
+  (29) stays license-gated reachability-only. pg archive/log-export/kernel
+  sub-ops are baselined 500 ContactAdmin (2026-06-18) — the paced full run
+  tests whether the ExistInprogress-supersession seen on mysql/mariadb/epas
+  also holds for pg (if not, expect ~7 of the 29 to stay 500-blocked).
+- **M4 worker executor E2E-verified in-process (2026-07-02, read-only; conf HIGH,
+  obs run `local-1783030980`).** `PLATFORM_EXECUTOR=worker` + `/runs/trigger`
+  (suite=smoke, service=quota) queues a `dispatched`/`gh_run_id NULL` record;
+  `python -m runner.worker --once` claims it (`local-<ts>`), runs
+  validate → smoke (47 live GETs passed) → dashboard → `core.snapshot upload`
+  (64 files → `s3://apitest-oplog-permanent/runs/local-…/snapshot/`) → finalize,
+  writes milestones directly to the platform DB, and finishes `done`. Two
+  gotchas verified: (1) worker `build_env` explicitly forces
+  `SCP_ALLOW_MUTATIONS/DESTRUCTIVE/RUN_HEAVY` from the suite gates, so a host
+  `.env` that arms the gates CANNOT leak into a read-only worker run; (2) the
+  remaining unverified M4 surface is Docker only (image build, compose up,
+  mutation run via worker) — needs a real host, not this sandbox.
+- **Offline-test hermeticity trap: `os.environ.pop` is undone by `.env`
+  (2026-07-02, conf HIGH).** `core.config._load_dotenv()` runs at first `core`
+  import and `setdefault()`s every `.env` value back into `os.environ`. A test
+  harness that pops `SCP_ALLOW_DESTRUCTIVE` BEFORE importing app code gets it
+  re-armed (and `_bool` defaults that gate to **True**, so even `""` flips it
+  on — empty counts as unset). Hermetic pattern: SET the gate to the explicit
+  string `"false"` (existing env always wins over `.env`). Applied in
+  `controlplane/tests_offline.py`.
+
+## Cleanup-map gaps: CDN / IAM-policy / launch-config / server-group leaks + CDN disable-before-delete quirks (2026-07-02, branch upbeat-ritchie)
+
+> conf: 0.9 · seen: 2026-07-02 · obs: full-inventory sweep (225 param-less list-GETs
+> across all 59 catalog services) + live teardown of every found leak
+
+- **Why the regular sweeps missed them:** the reconciler walks a FIXED collection
+  map; anything not in the map never gets listed. The 2026-07-02 full inventory
+  (every catalog GET without path params, `retry=False, timeout=15`) found 19
+  owned-flagged items; the genuine leaks were all either (a) collections absent
+  from the map — `/v1/cdns` (**7 ACTIVE `regr{ualpha}` CDN distributions**, oldest
+  2026-06-20), `/v1/launch-configurations` (`regrlc371da604`),
+  `/v1/server-groups` (4 `regrsgrp*`) — or (b) name-prefix lists too narrow for
+  the lifecycle's actual template: keypair `regrlckp*` (launch-config lifecycle)
+  missed by `("regrkey",)`; IAM policies `regrgrpbpol*` (group-binding test)
+  missed by `("regrpol",)`. Map + prefixes extended in `cleanup/reconciler.py`
+  (launch-configurations before keypairs — an LC pins a platform-derived
+  `regrlckp{run}-{lc_id}` keypair; policy prefixes now
+  `regrpol/regrgrpbpol/regrrolepol`; keypair prefixes
+  `regrkey/regrlckp/regraskp`).
+- **CDN disable-before-delete state machine (all live-proven on the 7 leaks):**
+  - `DELETE /v1/cdns/{id}` on an **ACTIVE or STOPPING** distribution returns
+    **404 ResourceNotFound** ("Not found with ID …") even though GET/PUT/stop on
+    the SAME id work — a **masked state error**. A CDN DELETE 404 must NEVER be
+    trusted as "already gone" (the generic `_is_2xx_or_gone` rule would silently
+    leak it forever); verify with GET or gate on state instead.
+  - `POST /v1/cdns/{id}/stop` (body-less) → 202; `cdn_service_state` sits in
+    STOPPING **~10-15 min** before STOPPED.
+  - DELETE on STOPPED while `cdn_service_activation_state` is still
+    PENDING_DEACTIVATION → **400
+    `scp-network.cdn.service.property-invalid-state-delete`** (transitional —
+    do NOT stuck-mark it); once deactivation settles (a few more min) DELETE →
+    202. The reconciler's cdn pass is therefore a state machine: ACTIVE → issue
+    stop and defer; STOPPING → skip; else attempt DELETE counting ONLY 2xx.
+- **IAM policy detail body has `policy_name`, not `name`** (list items too) —
+  name checks against `item["name"]` silently skip policies.
+  `GET /v1/policies/{id}/bindings` → `{count, groups, roles, users, …}`; both
+  leaked `regrgrpbpol*` policies had 0 bindings and deleted with a plain 204.
+- **Deliberately left in the account** (known, documented): the 2 deadlocked SCF
+  functions `regrw5trg57f68be7`/`regrw5trgd7ff680d` (auto-expire 2026-07-31),
+  the IAM-gated SKE log-group `47fabeca13f24958a0344a00011a274d`, and
+  `regrsec1846e085` already "To be terminated" (secrets self-purge).
+
+## docs→VALIDATED promotion mechanics: service-scoped evidence join + gate markers (2026-07-03, branch upbeat-ritchie)
+
+> conf: 0.9 · seen: 2026-07-03 · obs: 1
+
+- **The promoter is now a tool** — `python -m tools.promote_validated` (dry-run;
+  `--apply` rewrites). Rule (IB-041 consumer): a resource-model docs node may
+  become VALIDATED **only if its CREATE endpoint has a real-2xx entry in
+  `data/baselines/verified_endpoints.json`** (a GET-create lookup node counts if
+  that GET has 2xx). Applied 2026-07-03: **18 promotions** (mariadb stop/start/
+  restart/kernel-upgrade/add-block-storage · pg parameter/kernel-upgrade/
+  add-block-storage · epas instance-group/parameter · mysql-kernel-upgrade ·
+  gslb · cdn · account-budget · volume-type · gpu-node-image ·
+  cm-account-resource · cm-addrbook) → model 131→149 VALIDATED.
+- **Join mechanics (load-bearing).** Verified keys are `category/service/op`
+  carrying `{method, norm_path}` (norm_path = query-stripped, leading-slash-
+  stripped, id segments→`*`, e.g. `v1/clusters/*/stop`); node create endpoints
+  are `"METHOD /path"` with `{ref.field}` placeholders, normalised by the SAME
+  `tools.derive_verified.norm_path`. **The join MUST be service-scoped** (node
+  `service` tail == verified key middle segment): `/v1/clusters` collides across
+  mysql/pg/epas/cachestore/sqlserver/vertica/searchengine/eventstreams/ske — an
+  unscoped (method, norm_path) match wrongly promotes sqlserver/vertica off
+  cachestore evidence. Regression-tested in
+  `tests/offline/test_promote_validated.py` (cachestore-vs-sqlserver collision).
+- **Apply is a targeted line edit, not a YAML redump** — the model files carry
+  hand-written comments; the tool flips only the `provenance: docs` line,
+  appends `# evidence: <verified key> (run <last_run>)`, then reparses and
+  diffs against the expected one-field change (reverts on any drift).
+- **Account-gate marker `gated: <reason>`** (validate.py `GATED_VALUES`:
+  license · entitlement-403 · console-only · org-master · credential; convention
+  in `knowledge/formal/FORMAT.md`). 34 docs nodes marked 2026-07-03 (sqlserver
+  ×16 + searchengine + vertica = license; archivestorage ×2 = entitlement-403;
+  cloudcontrol-landing-zone + organization ×4 + idc-account-assignment =
+  org-master; cloud-ml ×2, sts-token, scr-image/scr-tag, certificate-import,
+  iam-user, diagnosis = credential). `gated` never changes provenance; the
+  Modeling worklist separates 게이트(할 수 없음) from the actionable docs queue.
+- **`no_api: true` is UI-complete now** — controlplane `_map_meta` counts an
+  API-less node (scr-image/scr-tag, docker-push-born) as complete when its refs
+  resolve; the "생성 endpoint 없음" incomplete bucket went 2→0 truthfully (the
+  validator always allowed no_api; only the UI check was dishonest).
+
+## Transit-gateway teardown & private-nat pacing — the light-batch-2 leak (2026-07-04, branch upbeat-ritchie)
+
+> conf: 0.9 · seen: 2026-07-04 · obs: 2 (CI run 28648339307 + console2 FORCE cleanup log + live re-observation 2026-07-04)
+
+- **(a) TGW deletion is ASYNC-SLOW and 409-blocks the VPC delete the whole
+  time.** State enum `(CREATING, ACTIVE, DELETING, DELETED, ERROR, EDITING)`
+  (api_docs `transitgateway`); a 202-accepted DELETE leaves the TGW listing as
+  DELETING for minutes+, and while its vpc-connection exists the connected VPC's
+  DELETE → 409. The reconciler's genuinely-removed convergence rule (correct
+  for KMS/Secrets PF-09 scheduled deletion) misread this as "no progress" and
+  STOPPED mid-drain (console2 FORCE log: round 2 "no genuinely-removed resource
+  this round (reported=1); converged — stopping" with the TGW still listed) →
+  `regrtgw*` + connection + shared `regrvpcsh6a47724b` leaked ~1 day. Fix
+  (cleanup/reconciler.py): transitional deleting states (`_ASYNC_DELETING_STATES`)
+  count as **in-progress → grant another bounded round** (`_round_verdict`),
+  never converge-cache such a collection; PF-09 scheduled states still converge.
+  A VPC 409 with a detectable holder burns ONE attempt + a "blocked by <holder>"
+  line (was 6 identical 409s/round). NOTE the `reported=1` in that log was a
+  truthy-409 counted as a deletion by the old bare `if _delete(...)` TGW pass.
+- **(b) Connection enumeration is SPLIT: flat list 403, nested list 200.**
+  `GET /v1/transit-gateway-vpc-connections` (flat) → **403 Forbidden** for this
+  account (live 2026-07-04, req-97fdee97…) — a product finding: the catalog only
+  documents the NESTED `GET /v1/transit-gateways/{id}/vpc-connections`, which
+  works (200). So the sweep CAN enumerate connections per owned TGW — and MUST:
+  **TGW delete does NOT reliably cascade its connection.** Live 2026-07-04 (the
+  owner believed the account clean): TGW `regrtgwhdljjdbg` still present in
+  EDITING, its connection `d7544cf6…` stuck DELETING since 02:36:59Z, still
+  pinning VPC `regrvpcsh6a47724b` (ACTIVE). The reconciler now deletes an owned
+  TGW's connections (nested list) BEFORE the TGW.
+- **(c) private-nat create requires TGW state == ACTIVE** — live-proven 400
+  `scp-network.private-nat.active-transit-gateway-not-found` ("Cannot found the
+  Transit Gateway(…) in ACTIVE state", run 28648339307). Distinct from the older
+  `connectable-transit-gateway-not-found` (no ACTIVE connection at all, run
+  27466988779). **The TGW re-enters EDITING while a vpc-connection attaches/
+  detaches** (live-observed), so "connection ACTIVE" alone is not enough —
+  re-poll the TGW show until ACTIVE before create-private-nat. Pacing family,
+  same class as DBaaS ExistInprogress (2026-07-02 block). Also: the engine's
+  poll TIMEOUT is SILENT when the final HTTP status is in expect_status — the
+  old 300s connection wait timed out quietly and the chain marched into the 400;
+  the incident lifecycle failed mid-chain and the engine's one-shot teardown
+  (single DELETE per cleanup, no retry/wait — engine.py `_run_cleanup`) couldn't
+  clear connection→TGW in order, which is what leaked the chain. Fixes:
+  `generated__light-batch2.json` gen-private-nat (600s waits + terminal-bad
+  `until` + `give_up_status` + new `wait-transit-gateway-active`) and the model
+  (`networking__vpc.yaml` transit-gateway/tgw-vpc-connection — two-stage
+  `ready:` list, composer now accepts a ready LIST and passes `give_up_status`
+  through, so a recompose keeps the fix).
+
+## docs-research — 7 body-unknown endpoints resolved from `data/api_docs.json` (2026-07-04, branch upbeat-ritchie, read-only) — 미검증-docs유래 unless noted
+
+> conf: 0.5 (schema) / 0.3 (value domains still open) · seen: 2026-07-04 · obs: 1
+> Full writeup + draft bodies: `docs/working/plans/CAMPAIGN-C3-100-docs-research.md`.
+> Source for all of these: `data/api_docs.json` `endpoints[*].request_example` +
+> `models[*].fields` — the SCP API Reference "Example HTTP request" block, scraped
+> verbatim by `spec.scrape_docs`. **None of the bodies below have a real 2xx** unless
+> explicitly marked VALIDATED; provenance stays **docs** until one lands.
+
+- **networking/vpn createvpntunnel/setvpntunnel — official example values differ from
+  the current lifecycle.** `models["networking/vpn/vpnphase1createrequestv1dot1"]` /
+  `vpnphase2createrequestv1dot1` (docs): `phase1_diffie_hellman_groups`/
+  `phase2_diffie_hellman_groups` are `array[integer]` (not a formal enum) — official
+  doc example `[30, 31, 32]`; `phase1_encryptions` example `["des-md5",
+  "chacha20poly1305-prfsha256"]`, `phase2_encryptions` example `["null-md5",
+  "aes128gcm", "chacha20poly1305"]`. The ONE true enum is `perfect_forward_secrecy:
+  (ENABLE, DISABLE)`. The CURRENT `regression/scenarios/lifecycles/networking__vpn.json`
+  body instead sends `phase1_diffie_hellman_groups:[14]` +
+  `phase1_encryptions:["aes256-sha256"]` — self-admitted "docs-example guesses" that do
+  NOT actually match the official doc example. Recommend swapping to the values above
+  on the next VPN live attempt (HB4). provenance: docs.
+- **compute/virtualserver importimage — WRONG FIELD NAME in the current coverage
+  lifecycle.** `models["compute/virtualserver/imageimportrequest"]` (docs, official):
+  `ImageImportRequest` has exactly ONE field, `url` (required, pattern `.*\.qcow2$`).
+  `regression/scenarios/lifecycles/compute__virtualserver.json` `import-image` step
+  sends `{"source": "regression-coverage-probe"}` — `source` is not a real field;
+  this is a guaranteed schema-level 400 until swapped to `{"url": "<qcow2 URL>"}`.
+  provenance: docs.
+- **compute/virtualserver createimage — body schema LIVE-CONFIRMED past validation
+  (2026-06-18, `vs-image-write-coverage` lifecycle, still short of a real 2xx).**
+  `{name, os_distro, disk_format, container_format, min_disk, min_ram, visibility,
+  url, tags}` (matches `models["compute/virtualserver/imagecreaterequest"]` verbatim,
+  `os_distro` enum `alma|centos|rhel|rocky|ubuntu|windows|oracle`) sent live got
+  `Image.InvalidObjectStorageUrl` (a resource-lookup error), NOT a `ValidationError`
+  — i.e. the body shape itself is proven to pass validation; only a real uploaded
+  `.qcow2` Object Storage URL (heavy/billable, out of scope) stands between this and
+  a 2xx. provenance: docs schema + live partial (schema-pass only, not full 2xx).
+- **storage/backup createbackup FILESYSTEM — full enum schema confirmed via docs,
+  blocked on the Agent-backup prerequisite (owner waiver 2026-06-10).**
+  `models["storage/backup/backupcreaterequest1dot2"]`: `policy_category` enum
+  `(AGENTLESS, AGENT)`, `policy_type` enum `(VM_IMAGE, FILESYSTEM)`,
+  `server_category` enum `(VIRTUAL_SERVER, GPU_SERVER, BAREMETAL_SERVER)`,
+  `retention_period` enum `(WEEK_2, MONTH_1, MONTH_3, MONTH_6, YEAR_1)`. FILESYSTEM
+  body = `{policy_category: AGENT, policy_type: FILESYSTEM, server_category,
+  server_uuid, server_guid, is_all_filesystem, filesystem_paths, schedules,
+  retention_period, region, tags}` (draft in the plan doc). Reaching a live 2xx
+  needs a server with a Backup Agent installed FIRST (`storage/backup` service
+  yaml `server-prereq`, docs) — the 8 agent-family ops are already owner-waived
+  ("agent 없는 백업으로만", 2026-06-10), so this stays practically unreachable
+  until that waiver is revisited, even though the create-body schema itself is
+  fully known. `getbackuptargetlist` with `policy_type=FILESYSTEM` is already
+  LIVE-VALIDATED 200 (known_issues.json, 2026-06-20) so the discovery path works;
+  it just returns an empty list without an installed agent. provenance: docs
+  (schema) / VALIDATED (getbackuptargetlist FILESYSTEM 200 only).
+- **networking/dns activateprivatedns — body confirmed, single field.**
+  `models["networking/dns/privatednsactivaterequest"]` (docs, official): body is
+  just `{"name": "<private-dns name>"}` — activates an ALREADY-CREATED,
+  account-global private-dns name in another region (matches
+  `private-dns-account-global` quirk above). Same body already used by the
+  disabled legacy `dns-activate` step in `regression/scenarios/scenarios.json`
+  (disabled because a same-region create never needs it, not because the body was
+  wrong). provenance: docs.
+- **data-analytics/data-flow createdataflow/createdataflowserviceconsole — full
+  official body recovered, already matches current lifecycle.** Docs
+  `models["data-analytics/data-flow/dataflowbodycreate"]` /
+  `dataflowservicecreaterequest` request_example gives the complete field set
+  (`account`, `cluster_id`, `data_flow_name`, `domain`, `dsc_domain`,
+  `host_alias_list`, `image_id`, `ingress_controller_name`, `instance_id`,
+  `node_selector`, `storage_class_name`, `tags` for create-flow; `service_workload
+  {nifi, nifi_registry, zookeeper}` with REAL non-empty example values — cpu 2000,
+  memory 1024, nifi/nifi_registry replica 1, zookeeper replica 3, versions
+  1.27.1/3.9.2 — for create-service). The current
+  `regression/scenarios/lifecycles/data-analytics__data-flow.json` bodies already
+  match this schema field-for-field (optional fields account/dsc_domain/
+  instance_id/node_selector omitted, harmlessly). Body-shape "unknown" is resolved;
+  remaining unknown is whether the doc's example VALUES clear a live create (heavy,
+  HB7). provenance: docs.
+- **data-analytics/data-ops createdataopsservice service_workload — schema
+  confirmed, value DOMAIN still genuinely undocumented (matches the 2026-06-24 live
+  400s).** `models["data-analytics/data-ops/dataopsservicecreaterequest"]`:
+  `service_workload` is typed as a bare `object` with sub-fields `cpu`/`memory`/
+  `replica`/`version` all typed `string` with NO enum/pattern/example (docs leaves
+  them blank, unlike data-flow's equivalent) — so the doc scrape cannot supply
+  valid values, only the shape (`{scheduler, web_server, worker}` each
+  `{cpu, memory, replica, version}`), which already matches what the guarded
+  lifecycle sends. `worker_type` is also a bare `string` (not a formal enum) —
+  the userguide's `Kubernetes|Celery` wording (`data-analytics__data-ops.yaml`
+  `worker-executor-choice`, docs) does not confirm the exact API token
+  (`KubernetesExecutor` is a guess). New lead for next live attempt:
+  `GET /v1/data-ops/image-versions` (`getdataopsimageversionv1`, read-only) returns
+  `contents[].version` — a real discoverable Airflow version string instead of the
+  hardcoded guess `"2.7.3"`; not yet tried. Not a waiver candidate — recommend one
+  more live attempt (HB7) seeded from this GET before giving up. provenance: docs
+  (schema only, value domain open).
+- **data-analytics/eventstreams createcluster — schema 100% confirmed; topology
+  is a carried-forward HYPOTHESIS (commit `700f72a0`, "ZK quorum" fix), still
+  NEVER live-retested since that fix landed (2026-06-19).** `instance_groups[].
+  role_type` enum confirmed `{ZOOKEEPER_BROKER, BROKER, ZOOKEEPER, AKHQ, CONSOLE}`
+  (docs, `EventStreamsClusterCreateRequestV1Dot1` — the doc's own request_example
+  wrongly reuses `role_type: ACTIVE`, a different engine's value). The
+  `data/api_bodies.json` entry for this key was hand-edited in commit `700f72a0`
+  (2026-06-19, "eventstreams ZK quorum") to 3× combined `ZOOKEEPER_BROKER`
+  instances + `is_combined: true` + `server_type_name: db1v2m4` — a reasoned guess,
+  not a docs scrape. `knowledge/formal/resources/data-analytics__eventstreams.yaml`
+  (commit `ada47e7d`, 2026-06-12, i.e. BEFORE the ZK-quorum fix) still records the
+  create as "KNOWN-BLOCKED: undocumented topology value_error" — that failure
+  predates this fix and has never been re-tried. A 2026-07-04 SCP userguide summary
+  fetch (`.../userguide/analytics/event_streams/overview/`, page render truncated
+  the exact quote) suggests combined Zookeeper+Broker deployment is a real
+  documented mode ("3 or more is typical") — directionally consistent with the
+  ZK-quorum guess but not a confirmation. Recommend this body be the FIRST thing
+  tried in the next eventstreams live slot (HB2) before any further guessing.
+  provenance: docs (schema) / UNPROVEN (topology hypothesis, untested since fix).
+
+## HB1 deterministic-repair pass — mariadb/mysql/epas/cachestore/postgresql subops-full + eventstreams-full authored (2026-07-04, branch upbeat-ritchie, OFFLINE — no live calls this session)
+
+> conf: 0.5 (docs유래, all UNVERIFIED LIVE this session — see `docs/working/plans/CAMPAIGN-C3-100-repair-log.md`) · seen: 2026-07-04 · obs: 0 (repairs; HB1 obs are the FAILURE evidence that motivated them)
+
+HB1 (run 2026-07-04) re-hit the SAME 10 gap keys with the SAME signature as prior
+runs — proof that re-running unmodified bodies is pointless; each needed a real
+body/capture/pacing fix. Applied to `regression/scenarios/lifecycles/
+database__subops-full.json` (mariadb/mysql/epas/cachestore/postgresql -full
+variants) — all **UNVERIFIED LIVE**, apply + observe in HB1b/HB2b:
+
+- **DBaaS log-export `log_type` — "general" is wrong, "alert" is the
+  docs-evidenced value (docs유래-미검증).** HB1: `register-log-export-config`
+  400'd `Dbaas.InvalidLogType` sending `"general"`. `data/api_docs.json`'s
+  `response_example` for `list-log-export-configs` is IDENTICAL across
+  mariadb/mysql/postgresql/epas: `{"log_type":"alert","log_label":"DB Alert
+  Log",...}` — `"alert"` is the only value appearing in BOTH the request AND
+  response doc examples for every engine (the request doc example itself says
+  "Log type Example: alert", not "general"). Changed the 4 lifecycles'
+  `register-log-export-config` body to `"alert"`, and added a NEW
+  `capture-log-type-after-register` step (GET log-export-configs, run AFTER
+  register) so the downstream `set/export/delete-log-export-config` steps'
+  `{log_type}` path resolves from what was ACTUALLY registered — the OLD
+  `capture-log-type` step ran before anything existed and always found an empty
+  list (dead capture). cachestore has no log-export subresource (uses
+  `/commands` instead, per the 2026-06-20 fact below) so it's untouched here.
+- **`patch-minor-version` `software_version` — no enum, but the cluster's OWN
+  current value is capturable and at least format-valid (docs유래-미검증).**
+  HB1: 400 `ValidationError "Software version is not MARIA_DB"` sending `""`.
+  `MinorPatchRequest.software_version` (mariadb/mysql/epas/postgresql) has NO
+  enum/example in `api_docs` — but `GET /v1/clusters/{cluster_id}`
+  (`ClusterDetailResponse`) exposes the cluster's own `software_version` field
+  directly. Added a `capture_soft` on `capture-subop-ids` and wired it into
+  `patch-minor-version`'s body. Whether patching to the cluster's OWN current
+  version is accepted (no-op upgrade) or rejected ("already at version") is
+  unknown — there is no discovery endpoint for the actual list of
+  upgrade-eligible target versions. cachestore's patch model is DIFFERENT
+  (`MinorPatchDbEngineRequest {dbaas_engine, software_version}`, its own
+  `dbaas_engine` value also undocumented) — left untouched, out of scope.
+- **`resize-instance-group` same-server-type 400 is BY DESIGN — always capture a
+  SECOND, different server type (docs유래-미검증).** HB1: 400
+  `Dbaas.ValidationError "The server type is invalid"` on mariadb; the same body
+  shape (empty string, or the SAME type used at create) exists in epas/
+  cachestore/postgresql too.
+  `knowledge/formal/resources/database__mariadb.yaml`'s existing
+  `mariadb-resize-instance-group` note already predicted this ("same-type 400 is
+  intentional hard [reject]"). Fixed by capturing `$.contents[1].name` from each
+  engine's `GET /v1/server-types` list (a genuinely different entry than
+  index[0], which create already consumed) and feeding that into
+  `resize-instance-group`'s body instead of an empty literal or the create-time
+  type. Applied to mariadb/epas/cachestore/postgresql/eventstreams (mysql has no
+  `resize-instance-group` step in this file).
+- **`resize-block-storage`/`set-block-storage-size` `ExistInprogress` — needs a
+  settle-poll between `resize-instance-group` → `add-block-storages` →
+  `resize-block-storage` (docs유래-미검증, pacing not schema).** HB1: 400
+  `Dbaas.ValidationError.ExistInprogress "There is a request in progress"` —
+  the 3 resize ops in the `resize` group fired back-to-back with NO
+  `wait-after-<op>` between them (every OTHER subop group in this file already
+  has this pattern; `resize` was the one group missing it). Added
+  `wait-after-resize-instance-group` + `wait-after-add-block-storages` (mariadb/
+  epas/postgresql; cachestore only needed the first — it has no
+  `add-block-storages` step, provisioning OS+DATA at create time instead) —
+  same poll shape as every other group: until
+  RUNNING/ACTIVE/AVAILABLE/FAILED/ERROR/UNKNOWN, `give_up_status:[400,404]`,
+  timeout 900s.
+- **`showrequest` (`GET /v1/requests/{request_id}`) needs `request_id`
+  capture_soft on the cluster-create step — mariadb/epas/cachestore were
+  MISSING it (mysql/postgresql already had it, added 2026-06-11).** HB1:
+  mariadb-full's `show-request`-equivalent (the auto `probe_reads` GET) 400'd
+  because `ctx["request_id"]` was never populated for this engine.
+  `AsyncResponse {request_id, resource:{id}}` (api_docs, verbatim across all 5
+  DBaaS engines) is returned by every cluster-create — added
+  `capture_soft: {request_id: "$.request_id"}` to mariadb's `maria-create`,
+  epas's `epas-create`, and cachestore's `cache-create` (mirroring mysql/pg's
+  existing pattern in the SAME file).
+- **`remove-backup-histories` 401 `Dbaas.Unauthorized.AuthNFailed` (valid HMAC) —
+  CONFIRMED backend auth quirk family, re-observed HB1, still not fixable
+  client-side (VALIDATED, this is a re-confirmation not a new finding).** Same
+  quirk already documented for mysql/mariadb/postgresql/epas/cachestore
+  (`knowledge/formal/services/database__*.yaml`, this file's 2026-06-10 entry
+  above) — HB1 (2026-07-04) reproduces it on mariadb with a request signed
+  identically to every sibling call that DID pass in the same run. No doc/
+  header/version difference found for this endpoint. NOT fixing the call
+  itself; widened `remove-backup-histories`/`delete-backup`'s `expect_status`
+  to include 401(+500) so the KNOWN 401 no longer group-skips the sibling
+  `delete-backup` step out of the run — `database__sqlserver.json` already
+  carries this exact tolerance, this aligns the -full DB variants with that
+  precedent. PF/waiver candidate, not re-attempted as a "fix".
+- **mysql `remove-backup-histories` field-name bug found while repairing the
+  401 above: body key was `backup_history_ids`, should be
+  `backup_history_number` (docs유래, mechanical fix — 100% confidence, just
+  never live-tested since mysql-full's create-cluster PFs 500 before reaching
+  this step).** `data/api_docs.json`
+  `models["database/mysql/backuphistorynumberrequest"]` verbatim field name is
+  `backup_history_number` (identical DTO name/shape to mariadb/postgresql/epas/
+  cachestore) — mysql's -full variant was the only one with the wrong key.
+- **mysql `create-cluster` 500 `ContactAdminForAssistance` — PF, no fix
+  possible (re-confirmed, same class as postgresql's known create-500).** Not a
+  body problem; recorded as-is for the waiver/PF track.
+- **`eventstreams-cluster-subops-full` authored** (new lifecycle,
+  `regression/scenarios/lifecycles/data-analytics__eventstreams.json`) — same
+  shared-VPC-adopt → create → subops(+settle-poll per op) → delete pattern as
+  the DB -full variants, create body per the `docs-research` ZK-quorum
+  hypothesis above (topology still UNVERIFIED — this session did not
+  live-test it, only authored the scaffold + wired live discovery for
+  `dbaas_engine_version_id`/`subnet_id`/`server_type_name`). Full detail:
+  `docs/working/plans/CAMPAIGN-C3-100-repair-log.md`.

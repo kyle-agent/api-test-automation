@@ -16,6 +16,7 @@ app.py를 건드리지 않고 착륙한다 — 오케스트레이터가 머지 �
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -23,9 +24,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from regression.scenarios import composer
-from controlplane import dispatch, resource_model, triage
-from core import profiles as core_profiles
-from core import suites as core_suites
+from controlplane import common, resource_model
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -34,15 +33,10 @@ router = APIRouter(prefix="/planning/resources")
 
 
 def _render(request: Request, name: str, **ctx) -> HTMLResponse:
-    """app._render equivalent — base.html nav context, active=planning."""
-    base = {
-        "suites": [s.get("id") for s in core_suites.list_suites()],
-        "profiles": [p.get("id") for p in core_profiles.list_profiles()],
-        "dispatch_ok": dispatch.configured(),
-        "triage_ok": triage.enabled(),
-        "active": "planning",
-    }
-    return templates.TemplateResponse(request, name, {**base, **ctx})
+    """app._render equivalent — shared base context (common.base_ctx, P1-3)
+    so the ctxbar's published-snapshot line renders here too."""
+    return templates.TemplateResponse(
+        request, name, {**common.base_ctx("planning"), **ctx})
 
 
 # --- 표시용 변환 ---------------------------------------------------------------------
@@ -98,10 +92,12 @@ def _compose_nodes(model: dict) -> list[dict]:
     rows = []
     for nid in sorted(model):
         node = model[nid]
+        service = str(node.get("service") or "")
         rows.append({**_node_row(nid, node),
+                     "category": service.split("/")[0] if service else "(기타)",
                      "branches": _one_of_branches(node),
                      "opts": resource_model.options_rows(node)})
-    return sorted(rows, key=lambda r: (r["code"] or "zzz", r["id"]))
+    return sorted(rows, key=lambda r: (r["category"], r["code"] or "zzz", r["id"]))
 
 
 # --- 모델 지도(model map) 메타 — provenance/완성도 (계약 §4 Modeling overlay) -----------
@@ -131,19 +127,25 @@ def _missing_requires(node: dict, known: set) -> list[str]:
 
 def _map_meta(model: dict) -> tuple[list[str], dict]:
     """(targets, meta) — targets=생성 가능한(create.endpoint 보유) 노드 = 지도의 닻.
-    meta[id] = {provenance, has_endpoint, complete, missing[]} for overlay()."""
+    meta[id] = {provenance, has_endpoint, no_api, gated, complete, missing[]}
+    for overlay(). `no_api: true` 노드(예: scr-image — docker push 산물)는 생성
+    endpoint가 '없는 게 맞는' 노드이므로 endpoint 부재를 불완전으로 세지 않는다
+    (validate.py의 no_api 허용과 같은 판정 — UI만 다르게 세면 거짓 결손)."""
     known = set(model)
     targets: list[str] = []
     meta: dict[str, dict] = {}
     for nid in sorted(model):
         node = model[nid]
         has_ep = bool((node.get("create") or {}).get("endpoint"))
+        no_api = bool(node.get("no_api"))
         missing = _missing_requires(node, known)
         meta[nid] = {
             "provenance": str(node.get("provenance") or "?"),
             "has_endpoint": has_ep,
+            "no_api": no_api,
+            "gated": str(node.get("gated") or ""),
             "missing": missing,
-            "complete": has_ep and not missing,
+            "complete": (has_ep or no_api) and not missing,
         }
         if has_ep:
             targets.append(nid)
@@ -170,6 +172,119 @@ def _dependents_index(model: dict) -> dict[str, list[str]]:
     return {k: sorted(v) for k, v in rev.items()}
 
 
+# --- 카탈로그 인라인 (2026-07-07 오너 결정: Modeling이 Catalog를 흡수) -------------------
+#
+# 각 서비스 그룹 행에 "API N (모델됨 M · 미모델 K)" 집계 + 엔드포인트 드로어를 단다.
+# 데이터 = catalog_routes._load_catalog()(카탈로그 단일 소스 재사용) × 모델 노드들의
+# endpoint 참조(create/verify/ready/delete 어디에 있든 "METHOD /path" 문자열 —
+# _walk_endpoints 가 노드 정의를 재귀로 훑는다).
+#
+# 분류 규칙 (미모델 과대계상 금지 — 애매하면 '미매핑'):
+#   정규화: method 대문자 · 쿼리스트링 제거 · path 를 '/' 세그먼트로 나누고
+#   '{...}' 를 포함한 세그먼트는 이름을 버리고 자리표시자 '{}' 로 치환
+#   (catalog 의 {subnetId} 와 노드의 {subnet_id}·{vpc.vpc_id}·"stg{unique}" 가
+#   같은 자리로 맞춰진다).
+#   · 모델됨  — 정규화 키 (method, segments) 가 어떤 노드 endpoint 참조와 정확히 일치.
+#   · 미매핑  — 정확 일치는 없지만 '호환 가능'한 참조가 있음: method·세그먼트 수가
+#              같고 리터럴 세그먼트끼리는 전부 같으며, 최소 1개 자리에서 한쪽만
+#              자리표시자(예: catalog {stage_name} vs 노드 리터럴 "dev"). 모델이
+#              그 endpoint 를 구체값으로 치는지 다른 endpoint 인지 단정할 수
+#              없으므로 미모델로 세지 않고 별도 버킷으로 뺀다.
+#   · 미모델  — 위 둘 다 아님 (모델 어디에도 참조가 없음).
+
+_EP_STR_RE = re.compile(r"^([A-Z]+)\s+(\S+)$")
+
+
+def _walk_endpoints(obj):
+    """노드 정의(dict/list 트리)에서 모든 'endpoint' 문자열을 yield."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "endpoint" and isinstance(v, str):
+                yield v
+            elif isinstance(v, (dict, list)):
+                yield from _walk_endpoints(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            yield from _walk_endpoints(item)
+
+
+def _norm_endpoint(ep: str):
+    """'METHOD /path' -> (METHOD, (seg, ...)) 정규화 키 (규칙은 위 주석). 실패 None."""
+    m = _EP_STR_RE.match((ep or "").strip())
+    if not m:
+        return None
+    method, path = m.group(1), m.group(2).split("?", 1)[0]
+    segs = tuple("{}" if "{" in s else s
+                 for s in path.strip("/").split("/") if s)
+    return (method, segs) if segs else None
+
+
+def _endpoint_ref_index(model: dict) -> dict:
+    """정규화 키 -> 그 endpoint 를 참조하는 (첫) 노드 id — 드로어의 편집 딥링크용.
+    노드의 service 와 무관하게 전역으로 모은다(교차 서비스 verify 도 '모델됨')."""
+    idx: dict = {}
+    for nid in sorted(model):
+        for ep in _walk_endpoints(model[nid]):
+            key = _norm_endpoint(ep)
+            if key and key not in idx:
+                idx[key] = nid
+    return idx
+
+
+def _catalog_by_service() -> dict:
+    """catalog -> {'category/service': [{method, path, name}, ...]} (경로·method 정렬)."""
+    from controlplane import catalog_routes
+    by: dict = {}
+    for e in catalog_routes._load_catalog():
+        skey = (f"{e.get('category') or '(uncategorized)'}/"
+                f"{e.get('service') or '(unknown)'}")
+        by.setdefault(skey, []).append({
+            "method": str(e.get("method") or "").upper(),
+            "path": str(e.get("http_path") or e.get("path") or ""),
+            "name": str(e.get("name") or ""),
+        })
+    for rows in by.values():
+        rows.sort(key=lambda r: (r["path"], r["method"]))
+    return by
+
+
+def _classify_endpoints(eps: list[dict], ref_idx: dict) -> list[dict]:
+    """카탈로그 엔드포인트마다 status(modeled|unmapped|unmodeled) + node 를 붙인다."""
+    # 호환 검사용: (method, 세그먼트 수) -> [(segs, node_id)]
+    by_shape: dict = {}
+    for (method, segs), nid in ref_idx.items():
+        by_shape.setdefault((method, len(segs)), []).append((segs, nid))
+    out = []
+    for ep in eps:
+        key = _norm_endpoint(f"{ep['method']} {ep['path']}")
+        status, node = "unmodeled", ""
+        if key and key in ref_idx:
+            status, node = "modeled", ref_idx[key]
+        elif key:
+            for segs, nid in by_shape.get((key[0], len(key[1])), []):
+                if all(a == b or a == "{}" or b == "{}"
+                       for a, b in zip(key[1], segs)):
+                    status, node = "unmapped", nid
+                    break
+        out.append({**ep, "status": status, "node": node})
+    return out
+
+
+def _service_endpoint_stats(model: dict) -> dict:
+    """'category/service' -> {api, modeled, unmodeled, unmapped} — svc 그룹 행 집계."""
+    ref_idx = _endpoint_ref_index(model)
+    stats: dict = {}
+    for skey, eps in _catalog_by_service().items():
+        rows = _classify_endpoints(eps, ref_idx)
+        stats[skey] = {
+            "api": len(rows),
+            "modeled": sum(1 for r in rows if r["status"] == "modeled"),
+            "unmodeled": sum(1 for r in rows if r["status"] == "unmodeled"),
+            "unmapped": sum(1 for r in rows if r["status"] == "unmapped"),
+        }
+    return stats
+
+
 def _modeling_rows(model: dict, meta: dict, deps_idx: dict) -> list[dict]:
     """Modeling 표 행 — 노드별 한 줄: 무엇이 모델링됐고 무엇이 결손인지 한눈에.
     필터/정렬은 클라이언트(JS)에서 이 행들 위에서 한다(서버는 단일 source)."""
@@ -186,11 +301,14 @@ def _modeling_rows(model: dict, meta: dict, deps_idx: dict) -> list[dict]:
             "provenance": m["provenance"],
             "complete": m["complete"],
             "has_endpoint": m["has_endpoint"],
+            "no_api": m["no_api"],
+            "gated": m["gated"],
             "missing": m["missing"],
             "requires": _requires_summary(node),
             "n_requires": len(node.get("requires") or []),
             "dependents": len(deps_idx.get(nid, [])),
-            "options": len(((node.get("create") or {}).get("options")) or {}),
+            # P2C-16: options 카운트 컬럼은 표에서 제거 — 옵션은 노드 편집 화면에
+            # 이미 상세히 있어 표의 'opt N'은 판단에 기여하지 못했다.
         })
     return rows
 
@@ -204,9 +322,11 @@ def _modeling_tree(rows: list[dict]) -> list[dict]:
         cat = r["category"] or "(기타)"
         svc = r["service"] or "(기타)"
         c = cats.setdefault(cat, {"category": cat, "services": {},
-                                  "n": 0, "val": 0, "docs": 0, "inc": 0})
+                                  "n": 0, "val": 0, "docs": 0, "inc": 0,
+                                  "gated": 0})
         s = c["services"].setdefault(svc, {"service": svc, "nodes": [],
-                                           "n": 0, "val": 0, "docs": 0, "inc": 0})
+                                           "n": 0, "val": 0, "docs": 0,
+                                           "inc": 0, "gated": 0})
         s["nodes"].append(r)
         for scope in (c, s):
             scope["n"] += 1
@@ -214,6 +334,8 @@ def _modeling_tree(rows: list[dict]) -> list[dict]:
                 scope["inc"] += 1
             elif r["provenance"] == "VALIDATED":
                 scope["val"] += 1
+            elif r["gated"]:
+                scope["gated"] += 1   # 할 수 없음 (계정 게이트) ≠ 할 일(docs)
             elif r["provenance"] == "docs":
                 scope["docs"] += 1
     out = []
@@ -242,7 +364,7 @@ def _worklist(model: dict) -> tuple[list[dict], list[dict]]:
         service = str(model[nid].get("service") or "")
         if not m["complete"]:
             why = []
-            if not m["has_endpoint"]:
+            if not m["has_endpoint"] and not m["no_api"]:
                 why.append("생성 endpoint 없음")
             if m["missing"]:
                 why.append("미해결 참조: " + ", ".join(m["missing"]))
@@ -250,8 +372,14 @@ def _worklist(model: dict) -> tuple[list[dict], list[dict]]:
                                "why": " · ".join(why) or "정의 미완성",
                                "provenance": m["provenance"]})
         elif m["provenance"] == "docs":
-            docs_only.append({"id": nid, "service": service,
-                              "why": "실제 2xx 미검증 (모델만)",
+            if m["gated"]:
+                why = f"게이트({m['gated']}) — 이 계정에선 검증 불가 (할 일 아님)"
+            elif m["no_api"]:
+                why = "API 생성 없음(no_api) — 외부 수단(docker push 등) 검증 대상"
+            else:
+                why = "실제 2xx 미검증 (모델만)"
+            docs_only.append({"id": nid, "service": service, "why": why,
+                              "gated": m["gated"], "no_api": m["no_api"],
                               "provenance": "docs"})
     return incomplete, docs_only
 
@@ -380,7 +508,7 @@ def graph_demo():
     return RedirectResponse("/planning/dependencies", status_code=301)
 
 
-# --- 모델 지도(② 레시피 저작 — 그래프 얼굴) -------------------------------------------
+# --- 모델 지도(② 테스트 모델 저작 — 그래프 얼굴) -------------------------------------------
 #     같은 graph_view 데이터를 공유 렌더러(resource_graph.js)로 그리고, overlay()만
 #     provenance/완성도 색으로 바꾼다(계약 §1, §4 Modeling). 노드 클릭 → 그 노드의
 #     기존 편집 폼(/{node_id})을 사이드패널로 연다(htmx). map.json / map 둘 다
@@ -417,16 +545,42 @@ def map_page(request: Request):
     deps_idx = _dependents_index(model)
     rows = _modeling_rows(model, meta, deps_idx)
     tree = _modeling_tree(rows)
+    # 카탈로그 흡수(2026-07-07): 서비스 그룹 행에 "API N (모델됨 M · 미모델 K)" 집계
+    ep_stats = _service_endpoint_stats(model)
+    for cat in tree:
+        for svc in cat["services"]:
+            svc["ep"] = ep_stats.get(svc["service"])
     total = len(model)
     validated = sum(1 for v in meta.values() if v["provenance"] == "VALIDATED")
-    docs = sum(1 for v in meta.values() if v["provenance"] == "docs")
+    gated = sum(1 for v in meta.values()
+                if v["gated"] and v["provenance"] != "VALIDATED")
+    docs = sum(1 for v in meta.values() if v["provenance"] == "docs") - gated
     incomplete = sum(1 for v in meta.values() if not v["complete"])
     services = sorted({r["service"] for r in rows if r["service"]})
     return _render(request, "resource_map.html", plan_step="model",
                    active="modeling",  # 계약 §4: Modeling 얼굴 (lead가 nav 배선)
-                   total=total, validated=validated, docs=docs,
+                   total=total, validated=validated, docs=docs, gated=gated,
                    incomplete=incomplete, anchors=len(targets),
                    tree=tree, services=services, has_composer=True)
+
+
+@router.get("/map/endpoints", response_class=HTMLResponse)
+def map_endpoints(request: Request, service: str = ""):
+    """서비스 엔드포인트 드로어 파셜 (htmx lazy) — 카탈로그의 그 서비스 슬라이스를
+    METHOD path + 상태 칩(모델됨→노드 편집 링크 / 미매핑 / 미모델)으로 렌더.
+    1,372개 전체를 map 페이지에 한 번에 렌더하지 않기 위한 서버 파셜이다."""
+    skey = (service or "").strip()
+    eps = _catalog_by_service().get(skey)
+    if eps is None:
+        return templates.TemplateResponse(
+            request, "resource_map_endpoints.html",
+            {"endpoints": [], "service": skey,
+             "error": f"카탈로그에 '{skey}' 서비스가 없습니다"})
+    model = resource_model.load_model()
+    rows = _classify_endpoints(eps, _endpoint_ref_index(model))
+    return templates.TemplateResponse(
+        request, "resource_map_endpoints.html",
+        {"endpoints": rows, "service": skey, "error": ""})
 
 
 @router.get("/worklist", response_class=HTMLResponse)
@@ -437,11 +591,12 @@ def worklist_page(request: Request):
     각 노드 편집 폼으로 바로 가는 딥링크를 준다. "/{node_id}" 보다 먼저 선언."""
     model = resource_model.load_model()
     incomplete, docs_only = _worklist(model)
+    n_gated = sum(1 for d in docs_only if d.get("gated"))
     return _render(request, "resource_worklist.html", plan_step="model",
                    active="modeling",  # Modeling nav 탭 강조
                    incomplete=incomplete, docs_only=docs_only,
                    n_incomplete=len(incomplete), n_docs=len(docs_only),
-                   total=len(model))
+                   n_gated=n_gated, total=len(model))
 
 
 @router.get("/compose", response_class=HTMLResponse)
@@ -527,7 +682,13 @@ def resource_form(request: Request, node_id: str, service: str = ""):
                    capture_text=resource_model.capture_text(node),
                    verify_rows=resource_model.verify_rows(node),
                    lifecycle=resource_model.lifecycle_info(node),
-                   ready=node.get("ready") or {},
+                   # ready may be a LIST of specs (multi-stage readiness,
+                   # composer 2026-07-04, e.g. tgw-vpc-connection) — this
+                   # single-spec form shows stage 1 only; edit such a node in
+                   # the YAML directly (a form save would flatten the list).
+                   ready=(node["ready"][0]
+                          if isinstance(node.get("ready"), list)
+                          and node["ready"] else node.get("ready") or {}),
                    delete=node.get("delete") or {},
                    option_types=resource_model.OPTION_TYPES,
                    has_composer=True)

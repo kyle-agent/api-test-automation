@@ -3,8 +3,11 @@
 {% block content %}
 <div class="subtabs">
   <a href="/testing/embed">▶ 실행 콘솔</a>
-  <a href="/testing" class="active">🗓 스케줄 · 트리거</a>
+  <a href="/testing" class="active">🛰 CI 디스패치 · 스케줄</a>
 </div>
+
+<div class="banner">두 실행 경로 — <b>이 탭 = GitHub Actions/worker 원격 실행</b>
+  (suite 게이트) · <b>실행 콘솔 = 이 서버에서 직접 실행</b> (선택 파생 게이트).</div>
 
 <h2>RUN 조립 <span class="hint">환경 × 스위트 → 무엇을 할지 미리보기</span></h2>
 <div class="card pad">
@@ -43,6 +46,13 @@
   </div>
 </div>
 
+{% if stale_running %}
+<p class="muted small" style="margin:6px 0 2px"
+   title="running/dispatched 상태로 24시간 이상 방치된 기록 — 죽은 워커/미회수 run일 가능성이 높아 '진행 중'에서 제외 (DB 상태는 그대로)">
+  ⏸ 오래된 미회수 run {{ stale_running|length }}건 집계 제외:
+  {% for r in stale_running %}<code>{{ r['gh_run_id'] or r['id'] }}</code>{{ "" if loop.last else " · " }}{% endfor %}
+</p>
+{% endif %}
 {% if live %}
 <h2>진행 중 RUN <span class="hint">라이브 — 개입(중단/skip)은 run 상세에서</span></h2>
 {% for item in live %}

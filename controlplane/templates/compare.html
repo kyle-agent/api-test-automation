@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Run 비교{% endblock %}
 {% block content %}
+{% set rtab = 'compare' %}
+{% include "_reporting_tabs.html" %}
 
 <section>
   <h2>Run 비교 — A vs B (스냅샷 observations diff)</h2>

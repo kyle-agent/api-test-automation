@@ -20,7 +20,8 @@
       <div class="lbl" style="color:var(--amber)">미검증 (모델만)</div></div>
   </div>
   <p class="muted small" style="margin:0">
-    불완전 {{ n_incomplete }} · 미검증 {{ n_docs }}</p>
+    불완전 {{ n_incomplete }} · 미검증 {{ n_docs }}
+    (그중 게이트 🔒{{ n_gated }} — 이 계정에선 할 수 없음, 할 일 {{ n_docs - n_gated }})</p>
 </section>
 
 <section>
@@ -58,7 +59,8 @@
       <td><a href="/planning/resources/{{ n.id }}"><code>{{ n.id }}</code></a></td>
       <td class="muted">{{ n.service or '—' }}</td>
       <td>{{ n.why }}</td>
-      <td><span class="chip s-reached">미검증</span></td>
+      <td>{% if n.gated %}<span class="chip s-unobs">🔒 {{ n.gated }}</span>
+        {% else %}<span class="chip s-reached">미검증</span>{% endif %}</td>
       <td><a href="/planning/resources/{{ n.id }}">편집 →</a></td>
     </tr>
     {% endfor %}

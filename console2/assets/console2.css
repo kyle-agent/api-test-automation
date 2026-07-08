@@ -426,7 +426,7 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .lo-ok{color:var(--green);font-weight:700}
 .lo-warn{color:var(--red);font-weight:700}
 
-/* ============================================================================
+/* =====================================================================
  * DAG-at-scale (B2) — group/collapse · focus · zoom · 그림|표.
  * Ported from console2/mockups/b2-dag-scale.html, recolored to this Primer theme.
  * Used by the 구성 composition DAG (#dag-*) and reused on the 흐름 live DAG (#r1-*).
@@ -478,6 +478,8 @@ g.rg-selbox{cursor:pointer}
   box-shadow:0 1px 2px rgba(31,35,40,.1);max-width:60%}
 .hint-pill b{color:var(--ink)}
 .hint-pill .focusinfo{color:var(--accent);font-weight:600}
+/* 빈 힌트 필은 감춘다 — 빈 상태 문구(SVG 좌상단 텍스트)와 빈 필 상자가 겹쳐 보였음 */
+.hint-pill:empty{display:none}
 
 /* 표 mode: hide the stage, the order table becomes the primary view */
 #dag-tableview.tab-primary{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:4px;background:#fff}
@@ -599,3 +601,78 @@ g.rg-selbox{cursor:pointer}
 .schip.pol{color:var(--run);border-color:rgba(37,99,201,.4);background:rgba(37,99,201,.08)}
 .softbrk{margin:6px 0 0;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .softbrk .schip{font-size:10.5px;padding:1px 8px}
+=======
+/* ===== Run 관측성 개편 (2026-07-04) ===== */
+/* now-playing bar (신규4): persistent strip above the tabs */
+.nowplaying{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 2px;padding:7px 12px;
+  background:#eef4fe;border:1px solid #c3d7f7;border-radius:8px;font-size:12px;color:var(--ink)}
+.nowplaying code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
+.nowplaying .np-step{font-weight:600}
+.nowplaying .np-path{color:var(--muted)}
+.nowplaying .np-time{margin-left:auto;font-weight:600;color:#0f3d8a;white-space:nowrap}
+.nowplaying .np-dot{width:8px;height:8px;border-radius:50%;background:#8a93a0;flex:none}
+.nowplaying .np-dot.run{background:var(--accent);animation:nppulse 1.2s ease-in-out infinite}
+.nowplaying .np-dot.que{background:var(--amber)}
+.nowplaying .np-abort{flex:none;margin-left:6px}
+@keyframes nppulse{50%{opacity:.35}}
+
+/* 실행 기록 필터 (run만 | 전체) */
+.histfilter{display:flex;gap:5px;align-items:center;margin:2px 0 6px}
+.histfilter .minibtn.on{border-color:var(--accent);color:var(--accent);background:#eef4fe}
+
+/* run 뷰 ↔ 구성 미리보기 mode chip (F1·F2) */
+.modechip{display:flex;align-items:center;gap:8px;margin:6px 0 2px;padding:5px 10px;font-size:11.5px;
+  border:1px solid var(--line2);border-radius:7px;background:var(--panel)}
+.modechip.mode-run{border-color:rgba(37,99,201,.4);background:#eef4fe}
+.modechip .minibtn{margin-left:auto}
+
+/* run-end / late-resource toast */
+.c2toast{position:fixed;right:18px;bottom:18px;z-index:80;max-width:460px;padding:11px 16px;
+  border-radius:9px;background:#1f2328;color:#fff;font-size:12.5px;line-height:1.5;
+  box-shadow:0 8px 26px rgba(31,35,40,.35);opacity:0;transform:translateY(8px);
+  pointer-events:none;transition:opacity .25s,transform .25s}
+.c2toast.show{opacity:1;transform:none}
+.c2toast.ok{background:#116329}
+.c2toast.fail{background:#a40e26}
+
+/* 실행 기록: 복원됨 chip · 종료 후 자원 늦출현 alert */
+.kindtag.rehy{background:#fff8c5;border:1px solid #d4a72c66;color:#7d4e00}
+.latealert{font-size:10.5px;font-weight:700;color:#a40e26;background:#ffebe9;
+  border:1px solid rgba(207,34,46,.4);border-radius:9px;padding:1px 7px}
+.lo-late{margin:0 0 8px;padding:7px 10px;font-size:12px;font-weight:600;color:#a40e26;
+  background:#ffebe9;border:1px solid rgba(207,34,46,.4);border-radius:7px}
+
+/* 남은 자원: 기지 항목 (known-stuck) 접힘 그룹 — 빨간 카운트에서 제외 */
+.lo-stuck{margin-top:8px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
+.lo-stuck summary{cursor:pointer;padding:6px 10px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.lo-stuck-row{padding:4px 12px;font-size:11px;border-top:1px dashed var(--line);
+  display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+
+/* '포함 API' 재계산 스피너 */
+.spin{display:inline-block;animation:npspin 1s linear infinite;font-weight:700}
+@keyframes npspin{to{transform:rotate(360deg)}}
+
+/* ---- CX 재배치 (2026-07-07): 현재 실행 전면 · 계획↔실행 연속 · 런타임 인라인 ---- */
+/* 실행 기록 — 기본 접힘 섹션 (히어로 아래로 강등; 토글 헤더 + 최근 종료 1건만 상시) */
+.hist-sec{margin-top:14px;border-top:1px solid var(--line);padding-top:6px}
+.hist-toggle{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:transparent;
+  border:none;cursor:pointer;font:inherit;font-weight:800;color:var(--ink);padding:5px 2px;font-size:12.5px}
+.hist-toggle:hover{color:var(--accent)}
+.hist-toggle .hist-car{color:var(--muted);width:12px;display:inline-block}
+.hist-lastlbl{margin:4px 0 2px}
+/* 계획↔실행 연속성 칩 — run 그래프 바인딩 시 "① 그대로" 명시 */
+.plan-cont{display:inline-flex;align-items:center;gap:6px;margin:2px 0 7px;padding:3px 10px;
+  border-radius:14px;background:#eef7f0;border:1px solid #b6dfc2;color:#1a7f37;
+  font-size:11.5px;font-weight:600}
+#r1-plan-cont:empty{display:none}
+/* ② run 순서표 (접힘) — ① 과 동일한 표 + 진행 중 행 하이라이트 */
+.r1-order{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.r1-order>summary{cursor:pointer;padding:8px 12px;font-weight:700;font-size:12.5px;list-style:none}
+.r1-order>summary::-webkit-details-marker{display:none}
+.r1-order>summary:before{content:"▸ ";color:var(--muted)}
+.r1-order[open]>summary:before{content:"▾ "}
+.r1-order .r1-order-scroll{max-height:320px;overflow:auto;padding:0 10px 10px}
+.r1-order tr.ordnow td{background:#e8f0fd}
+.r1-order tr.ordnow td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+/* 런타임 인라인 탭 — 기존 /runtime 페이지 iframe 임베드 (단일 소스) */
+.rt-frame{width:100%;height:620px;border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:6px}

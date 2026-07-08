@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}파일 선택 — SCP API Regression{% endblock %}
+{% block content %}
+
+<section>
+  <h2>{{ '✏️ 편집할' if mode == 'edit' else '📄 볼' }} 파일을 선택하세요</h2>
+  <p class="muted">이 화면은 <code>?path=…</code> 없이 접근했을 때의 선택기입니다.
+    {% if mode == 'edit' %}편집 가능 범위: <code>suites/</code> ·
+    <code>environments/</code> · <code>knowledge/</code> ·
+    <code>regression/scenarios/</code>의 yaml/json/md — 저장은 검증 → 쓰기 →
+    로컬 git 커밋 파이프라인을 탑니다.{% else %}열람 가능 범위:
+    <code>knowledge/</code> · <code>suites/</code> · <code>environments/</code> ·
+    <code>docs/</code>.{% endif %}
+    전체 지식/설정 파일 목록은 <a href="/knowledge">Knowledge 브라우저 →</a></p>
+</section>
+
+{% for group, files in groups %}
+<section>
+  <h2>{{ group }} <span class="muted">({{ files|length }})</span></h2>
+  {% if files %}
+  <table>
+    <tr><th>파일</th><th style="width:80px">크기</th></tr>
+    {% for f in files %}
+    <tr>
+      <td><a href="/planning/{{ mode }}?path={{ f.rel }}"><code>{{ f.rel }}</code></a></td>
+      <td class="muted">{{ f.kb }} kB</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">파일 없음.</p>
+  {% endif %}
+</section>
+{% endfor %}
+
+{% endblock %}
