@@ -222,6 +222,9 @@ def _build_model() -> dict:
         lifecycles[lc["id"]] = {
             "id": lc["id"], "service": lc.get("service", ""),
             "enabled": bool(lc.get("enabled")), "heavy": bool(lc.get("heavy")),
+            # loader-derived role (HEAVY-PREMISE CONTRACT §1): "verify" | "probe" —
+            # consumed by scope resolution below and by the UI/CI.
+            "role": lc.get("role"),
             "n_steps": len(steps), "steps": steps, "source": sources.get(lc["id"], ""),
         }
 
@@ -474,19 +477,31 @@ def _lookup_endpoint_params(method: str, path: str) -> dict | None:
 # --------------------------------------------------------------------------- #
 def _resolve_lifecycle_ids(sel: dict) -> list[str]:
     """A selection can name node_ids, services, categories, and/or lifecycle_ids.
-    Resolve all of them to the union of source lifecycle ids (deduped, sorted)."""
+    Resolve all of them to the union of source lifecycle ids (deduped, sorted).
+
+    HEAVY-PREMISE CONTRACT §2: SCOPE selections (service / category / group —
+    i.e. anything reached via node_ids/services/categories) expand only to
+    ``enabled AND role=="verify"`` lifecycles — write-reachability probes are
+    CI-sweep material and never join a scope expansion. Heavy is NOT filtered
+    here (heavy-premise: it stays pre-flight display metadata). EXPLICIT
+    ``lifecycle_ids`` win: kept regardless of role, so a probe can still be
+    run deliberately by naming it."""
     m = _model()
     nodes, lcs = m["nodes"], m["lifecycles"]
-    want = set(sel.get("lifecycle_ids") or [])
+    explicit = {lid for lid in (sel.get("lifecycle_ids") or []) if lid in lcs}
     node_ids = set(sel.get("node_ids") or [])
     svcs = set(sel.get("services") or [])
     cats = set(sel.get("categories") or [])
+    scoped: set[str] = set()
     for nid, n in nodes.items():
         if not n.get("lifecycle"):
             continue
         if nid in node_ids or n["service"] in svcs or n["category"] in cats:
-            want.add(n["lifecycle"])
-    return sorted(lid for lid in want if lid in lcs)
+            scoped.add(n["lifecycle"])
+    scoped = {lid for lid in scoped
+              if lid in lcs and lcs[lid].get("enabled")
+              and lcs[lid].get("role") == "verify"}
+    return sorted(explicit | scoped)
 
 
 def _graph_targets(sel: dict) -> list[str]:

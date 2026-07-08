@@ -31,7 +31,11 @@ light/heavy 어휘는 UI에서 사라지고, 도달 프로브는 CI 스윕 전�
 *-subops-guarded 계열 · idc-delete-policies-probe / `verify` = compute-virtualserver-full ·
 virtualserver-keypair · vs-autoscaling-coverage · *-read-coverage · *-light-reads · gen-* reads.
 예외가 필요하면 **override 상수 dict** `ROLE_OVERRIDES: dict[lifecycle_id, role]` 를 loader에
-두고 여기(계약)에 사유와 함께 기록한다. (초기값: 빈 dict.)
+두고 여기(계약)에 사유와 함께 기록한다. 현재 등록분:
+- `vs-autoscaling-coverage → verify` (WP1, 2026-07-08): 스텝 모양이 쓰기-프로브와 기계적으로
+  동일(전부 tolerant mutating)하지만, keypair·launch-configuration create가 **라이브 2xx로
+  증명된**(2026-06-18) 무과금 실자원 + 자체 teardown — 규칙만으로는 vs-image-write류와 분리
+  불가하여 override. (사유 주석: `regression/scenarios/loader.py` ROLE_OVERRIDES.)
 
 노출: `loader.load_lifecycles()`가 각 lifecycle dict에 `"role"` 키를 추가. `_model()`의
 lifecycles에도 그대로 실린다 (UI/선택/CI가 공통 소비).
