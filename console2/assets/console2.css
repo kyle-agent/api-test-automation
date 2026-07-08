@@ -707,3 +707,28 @@ g.rg-selbox{cursor:pointer}
 .hist-head{display:flex;align-items:center;gap:12px}
 .hist-head .hist-toggle{flex:1;width:auto}
 .hist-rep{white-space:nowrap;flex-shrink:0}
+
+/* CX 재설계 (owner GO 2026-07-08): 좌측 컬럼 폐지 → 상단 슬림 스트립 3줄 + 전폭 리포트 */
+.run-full{margin-top:10px}
+#cap-strip,#leftover-strip,#staged-strip{margin:0 0 8px}
+#cap-strip:empty,#leftover-strip:empty,#staged-strip:empty{display:none;margin:0}
+.cap-line,.lo-line,.staged-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;
+  padding:8px 14px;margin:0}
+.cap-t{font-size:12.5px;white-space:nowrap;color:var(--muted);font-weight:800;
+  text-transform:none;letter-spacing:0}
+.cap-line .cap-meter.mini{display:inline-flex;gap:2px;margin:0}
+.cap-line .cap-meter.mini i{width:22px;height:8px}
+.cap-grp-in{display:inline-flex;align-items:center;gap:6px}
+.cap-grp-in .cap-lbl{font-size:11.5px;color:var(--muted)}
+.lo-line{display:block}
+.lo-line .lo-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.lo-line .lo-head{display:inline}
+.lo-line .lo-act{display:inline-flex;gap:4px;margin-left:auto}
+.lo-more{margin-top:6px}
+.lo-more>summary{cursor:pointer}
+.staged-line{align-items:flex-start}
+.staged-line .staged-body{flex:1;min-width:0}
+.staged-empty-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.r1-kpis{margin-left:auto;display:inline-flex;align-items:center;gap:12px;
+  font-size:12.5px;color:var(--muted);white-space:nowrap}
+.r1-kpis b{color:var(--text)}

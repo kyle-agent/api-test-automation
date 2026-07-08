@@ -23,7 +23,7 @@ html.embed .top{justify-content:space-between;padding:7px 22px;min-height:0}
 /* embedded full-bleed: use the whole width + keep the left-selection | right-DAG
    2-column (build = Test Planning, run = Test Execution) even if it must be wide. */
 html.embed .wrap{max-width:none}
-html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0,1fr)!important}
+html.embed .cols.build{grid-template-columns:320px minmax(0,1fr)!important}
 #backToShell{display:none}
 html.bare-console #backToShell{display:inline}</style>
 </head>
@@ -127,11 +127,12 @@ html.bare-console #backToShell{display:inline}</style>
 
 <!-- ======================= ② 실행 & 리포트 ======================= -->
 <section id="screen-run" class="screen hidden">
-  <!-- 실행용량 = 탭 최상단 풀폭 스트립 (owner 2026-07-08: "제일 먼저 현재 vpc 상태").
-       내용(#cap-bar)은 기존 drawCapBar/2s 폴 그대로 — 컨테이너만 승격. -->
+  <!-- CX 재설계 (owner GO 2026-07-08): 좌측 컬럼 폐지 — "실행 전 1회성"(용량·잔존·
+       대기열)은 상단 슬림 스트립 3줄로, "상시 보는" 라이브 리포트는 전폭으로. -->
   <div id="cap-strip"></div>
-  <div class="cols run">
-    <div id="run-left"></div>
+  <div id="leftover-strip"></div>
+  <div id="staged-strip"></div>
+  <div class="run-full">
     <div class="panel" id="run-right">
       <!-- master → detail report. 흐름(master) = the persistent B2 scene + a compact
            lifecycle list; clicking a lifecycle opens the detail pane scoped to it

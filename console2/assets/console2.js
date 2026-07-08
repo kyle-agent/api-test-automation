@@ -1002,17 +1002,18 @@ function launchSummary() {
 
 // ================= ② 실행 & 리포트 =================
 function drawRunScreen() {
-  // 실행용량(#cap-bar)은 탭 최상단 풀폭 스트립(#cap-strip)으로 승격 (owner
-  // 2026-07-08: "제일 먼저 현재 vpc 상태") — 좌측 컬럼은 실행 대기열(STAGED,
-  // 행마다 인라인 [▶ 실행]) + 남은 자원(잔존) 패널 + run settings.
+  // CX 재설계 (owner GO 2026-07-08): 좌측 컬럼 폐지 — 실행-전 1회성 정보는 상단
+  // 슬림 스트립 3줄(용량 · 잔존 · 대기열), 라이브 리포트는 전폭. 실행설정 패널은
+  // 폐지(게이트는 pre-flight 모달 + 대기열 빈-상태 줄의 직접실행에 표시).
   $("cap-strip").innerHTML = '<div id="cap-bar"></div>';
-  $("run-left").innerHTML =
-    '<div id="staged-panel"></div><div id="leftover-panel"></div><div id="run-settings"></div>';
+  $("leftover-strip").innerHTML = '<div id="leftover-panel"></div>';
+  $("staged-strip").innerHTML = '<div id="staged-panel"></div>';
+  // 🕸 버튼은 배너가 폴마다 재렌더되므로 위임 리스너 1개로 배선.
+  $("report-main").onclick = e => { if (e.target.closest("#r1-dag-open")) openDagModal(); };
   drawCapBar();
+  drawLeftover();
   drawStagedPanel();
   startCapPoll();           // poll /api/capacity every ~2s while on the run screen
-  drawLeftover();
-  drawRunSettings();
   drawReport();
 }
 
@@ -1030,7 +1031,18 @@ function drawStagedPanel() {
     : Math.max(0, (c.cap || 0) - ((c.baseline || 0) + (c.reserved || 0)));
   let body;
   if (!STAGED.length) {
-    body = `<div class="staged-empty muted small">대기열 비어 있음 — ① 구성에서 선택 후 '실행 대기열에 추가'</div>`;
+    // 빈 상태 = 직접 실행 줄 (실행설정 패널 폐지분 흡수 — 게이트 칩 + LIVE 버튼).
+    const svcs = new Set([...targets].map(id => (N[id] && N[id].service) || ""));
+    const heavy = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id] && N[id].heavy);
+    body = `<div class="staged-empty-row">
+      <span class="muted small">비어 있음 — ① 구성에서 추가하거나 현재 선택 바로 실행:</span>
+      <span class="chip" style="border-color:var(--red)" title="LIVE 는 항상 mutations ON — 게이트는 선택에서 파생, 토글 없음">✔ mutations</span>
+      <span class="chip" style="border-color:var(--red)">✔ destructive</span>
+      <span class="chip" style="border-color:${heavy ? "var(--red)" : "var(--line)"}">${heavy ? "✔ 과금 포함" : "✕ 과금 없음"}</span>
+      <span class="muted small">선택 <b>${svcs.size}</b> svc · <b>${targets.size}</b> 리소스</span>
+      <button class="minibtn go" id="run-go" ${targets.size ? "" : "disabled"} title="pre-flight confirm 후 실행">⚠ LIVE 실행 ▶</button>
+      <button class="minibtn" id="run-toconf" title="① 구성으로 돌아가 선택 변경">← 구성</button>
+    </div>`;
   } else {
     body = STAGED.map(it => {
       const open = stagedOpen === it.id;
@@ -1070,10 +1082,12 @@ function drawStagedPanel() {
         </div>${detail}</div>`;
     }).join("");
   }
-  host.innerHTML = `<div class="panel staged-pnl">
-    <h2>실행 대기열 <span class="muted small">· 구성에서 추가</span></h2>
-    ${body}
+  host.innerHTML = `<div class="panel staged-pnl staged-line">
+    <b class="cap-t" title="① 구성에서 '실행 대기열에 추가'한 계획 — 행에서 바로 ▶ 실행, 클릭=상세/DAG 미리보기">대기열${STAGED.length ? ` <span class="n">${STAGED.length}</span>` : ""}</b>
+    <div class="staged-body">${body}</div>
   </div>`;
+  if ($("run-go")) $("run-go").onclick = startRun;
+  if ($("run-toconf")) $("run-toconf").onclick = () => go("build");
   els("#staged-panel [data-stage-tog]").forEach(b => b.onclick = () => {
     const id = b.dataset.stageTog;
     stagedOpen = stagedOpen === id ? null : id;     // toggle (one open at a time)
@@ -1217,8 +1231,9 @@ function drawCapBar() {
   const host = $("cap-bar"); if (!host) return;
   const c = lastCapacity;
   if (!c) {
-    host.innerHTML = `<div class="panel cap-panel"><h2>실행 용량 <span class="muted small">· /api/capacity — VPC 동시 실행 한도</span></h2>
-      <div class="muted small">용량 확인 중…</div></div>`;
+    host.innerHTML = `<div class="panel cap-line">
+      <b class="cap-t" title="VPC 동시 실행 한도(cap)">실행용량</b>
+      <span class="muted small">⏳ 확인 중… (/api/capacity)</span></div>`;
     return;
   }
   const cap = c.cap || 0;
@@ -1246,21 +1261,19 @@ function drawCapBar() {
     ? queued.map(r => `<span class="capchip que" title="${esc(r.id)} — 여유가 생기면 자동 실행">
         <span class="kindtag">${esc(idTail(r.id))}</span> ${r.peak_vpcs || 0} VPC 필요 · 여유 ${headroom}</span>`).join("")
     : '<span class="muted small">없음</span>';
-  host.innerHTML = `<div class="panel cap-panel">
-    <h2>실행 용량 <span class="muted small">· VPC 동시 실행 한도 (cap) — ADMIT/대기 큐</span></h2>
-    <div class="cap-head"><b>현재 계정 VPC ${acct}/${cap}</b>
-      <span class="muted small">· 지금 실제 떠 있는 실측 (/v1/vpcs · 내 실행 + 기존 포함)</span></div>
-    <div class="cap-meter">${cells.join("")}</div>
-    <div class="cap-sub muted small">기존
-      <b title="내 실행 소유가 아닌 계정 VPC (baseline) — 아무 실행도 없을 때 실측 /v1/vpcs 로 재보정. 다른 세션·수동 생성분 포함">${baseline}</b>
-      · 내 실행 보유
-      <b title="내 실행이 지금 실제로 쥐고 있는 VPC (공유 VPC 포함 — run 의 자원 id 로 귀속)">${c.mine_live != null ? c.mine_live : 0}</b>
-      · 내 실행 예약
-      <b title="ADMIT 된 실행이 계획(peak VPC)상 선점한 슬롯 — 아직 생성 전이어도 cap 에서 미리 차감">${reserved}</b>
-      · 여유 <b title="cap − 기존 − max(예약, 보유) — 새 실행이 즉시 ADMIT 될 수 있는 슬롯">${headroom}</b>
-      <span class="cap-key"><i class="live"></i>떠 있음 <i class="resv"></i>내 예약 <i></i>여유</span></div>
-    <div class="cap-grp"><span class="cap-lbl">진행중 (${running.length})</span><span class="cap-chips">${runChips}</span></div>
-    <div class="cap-grp"><span class="cap-lbl">대기 (${queued.length})</span><span class="cap-chips">${queChips}</span></div>
+  // CX 재설계 (owner 2026-07-08): 세로 패널 → 한 줄 인라인. 진행중/대기는 비어
+  // 있으면 아예 숨긴다 ("없음" 두 줄이 낭비 — 눈에 안 들어옴 지적). 상세 설명은
+  // 전부 title 툴팁으로 유지.
+  host.innerHTML = `<div class="panel cap-line">
+    <b class="cap-t" title="VPC 동시 실행 한도(cap) — 이 아래에서 ADMIT 되거나 대기 큐로">실행용량</b>
+    <span class="cap-meter mini" title="칸 = cap 슬롯 · 채움 = 지금 떠 있는 VPC · 노랑 = 내 예약">${cells.join("")}</span>
+    <b title="지금 실제 떠 있는 실측 (/v1/vpcs · 내 실행 + 기존 포함)">VPC ${acct}/${cap}</b>
+    <span class="muted small">기존 <b title="내 실행 소유가 아닌 계정 VPC (baseline) — 다른 세션·수동 생성분 포함">${baseline}</b>
+      · 보유 <b title="내 실행이 지금 실제로 쥐고 있는 VPC (공유 VPC 포함)">${c.mine_live != null ? c.mine_live : 0}</b>
+      · 예약 <b title="ADMIT 된 실행이 계획(peak VPC)상 선점한 슬롯 — 생성 전이어도 미리 차감">${reserved}</b>
+      · 여유 <b title="cap − 기존 − max(예약, 보유) — 즉시 ADMIT 가능한 슬롯">${headroom}</b></span>
+    ${running.length ? `<span class="cap-grp-in"><span class="cap-lbl">진행중</span>${runChips}</span>` : ""}
+    ${queued.length ? `<span class="cap-grp-in"><span class="cap-lbl">대기</span>${queChips}</span>` : ""}
   </div>`;
   els("#cap-bar .capchip[data-runid]").forEach(b => b.onclick = () => loadRunIntoReport(b.dataset.runid));
 }
@@ -1367,18 +1380,24 @@ function drawLeftover() {
   const busyWarn = busy
     ? '<div class="lo-warn" style="margin-top:5px">⚠ 실행 중 — 실행 자원이 잔존으로 보일 수 있음, 종료 후 재스캔</div>'
     : "";
-  host.innerHTML = `<div class="panel lo-panel">
-    <h2>남은 자원(잔존) <span class="muted small">· 실행 전 점검 (read-only) + 강제 클린업</span></h2>
+  // CX 재설계 (owner 2026-07-08): 세로 패널 → 한 줄 스트립 + 필요할 때만 펼침.
+  // 상태기계(늦출현 배너 · 기지 접힘 · busy 경고 · 스캔 시각 · 의존잠금 힌트)는
+  // 전부 보존 — 표시 밀도만 압축.
+  const moreOpen = !!host.querySelector("details.lo-more[open]");
+  host.innerHTML = `<div class="panel lo-line">
     ${lateBanner}
-    <div class="lo-head">${head}</div>
-    ${busyWarn}
-    ${list}
-    <div class="run-ctl">
-      <button class="btn ghost" id="lo-scan">🔍 남은 자원 확인</button>
-      <button class="minibtn red" id="lo-cleanup" ${busy ? "disabled" : ""}
-        title="${busy ? "진행 중 실행이 있어 비활성화" : "owner=apitest 자원을 TTL 무시하고 삭제"}">🧹 강제 클린업</button>
-      ${s && s.owned_total != null ? '<button class="minibtn" id="lo-recheck">↻ 다시 확인</button>' : ""}
+    <div class="lo-row">
+      <b class="cap-t" title="실행 전 점검 (read-only) — owner 태그 자원의 잔존 여부. 강제 클린업은 TTL 무시 계정 전체 스윕">잔존</b>
+      <span class="lo-head">${head}</span>
+      ${busyWarn ? '<span class="lo-warn small">⚠ 실행 중 — 실행 자원이 잔존으로 보일 수 있음 (종료 후 재스캔)</span>' : ""}
+      <span class="lo-act">
+        <button class="minibtn" id="lo-scan">🔍 확인</button>
+        <button class="minibtn red" id="lo-cleanup" ${busy ? "disabled" : ""}
+          title="${busy ? "진행 중 실행이 있어 비활성화" : "owner=apitest 자원을 TTL 무시하고 삭제"}">🧹 클린업</button>
+        ${s && s.owned_total != null ? '<button class="minibtn" id="lo-recheck" title="다시 확인">↻</button>' : ""}
+      </span>
     </div>
+    ${list ? `<details class="lo-more"${moreOpen ? " open" : ""}><summary class="muted small">상세 목록 펼치기</summary>${list}</details>` : ""}
     <div class="lo-err" id="lo-err" style="display:none"></div>
   </div>`;
   $("lo-scan").onclick = scanOwned;
@@ -1439,29 +1458,8 @@ function pollOwned(id) {
   }).catch(() => { ownedScan = { status: "error", error: "연결 실패" }; if (screen === "run") drawLeftover(); });
 }
 
-function drawRunSettings() {
-  const svcs = new Set([...targets].map(id => N[id].service));
-  const heavy = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
-  // Gates are DERIVED from the selection now (no axis/mode UI): a LIVE run always
-  // sends mutations+destructive; heavy auto iff the selection pulls a heavy
-  // lifecycle. The panel just SHOWS what will be applied + the LIVE run button.
-  $("run-settings").innerHTML = `<div class="panel" style="margin-top:14px"><h2>실행 설정 <span class="muted small">· 항상 LIVE — 게이트는 선택에서 파생</span></h2>
-    <p class="muted small">실제 클라우드 자원을 만들고 삭제합니다. 게이트는 선택(의존 폐쇄집합)에서 자동으로 결정됩니다 — 별도 토글 없음. VPC 동시 실행 한도(cap) 아래에서 ADMIT 되거나 대기 큐에 들어갑니다.</p>
-    <h3>적용 게이트 <span class="muted small">(선택에서 파생)</span></h3>
-    <div class="chiprow">
-      <span class="chip" style="border-color:var(--red)">✔ mutations</span>
-      <span class="chip" style="border-color:var(--red)">✔ destructive</span>
-      <span class="chip" style="border-color:${heavy ? "var(--red)" : "var(--line)"}">${heavy ? "✔ 과금 자원 포함" : "✕ 과금 자원 없음"}</span>
-    </div>
-    <div class="kv"><span>선택</span><b>${svcs.size} svc / ${targets.size} 리소스</b></div>
-    <div class="run-ctl">
-      <button class="btn warn" id="run-go" ${targets.size ? "" : "disabled"}>⚠ LIVE 실행 ▶</button>
-      <button class="btn ghost" id="run-toconf" title="① 구성으로 돌아가 선택 변경">← 구성</button>
-    </div>
-    ${targets.size ? "" : '<p class="muted small">선택이 없습니다 — ① 구성에서 서비스를 고르세요.</p>'}</div>`;
-  $("run-go").onclick = startRun;
-  $("run-toconf").onclick = () => go("build");
-}
+// (실행 설정 패널은 CX 재설계로 폐지 — 게이트 칩 + LIVE 직접실행은 대기열
+// 스트립의 빈-상태 줄이, 확정 게이트는 pre-flight confirm 모달이 담당한다.)
 
 // ================= pre-flight blast-radius 모달 (native confirm 대체) ==========
 // 실행 전 '무엇이 얼마나 만들어지고 지워지는가'를 서비스 단위 표(생성~삭제 예상 ·
@@ -2322,29 +2320,32 @@ function reportR1() {
   const activeLc = prog.activeLifecycle;
   const choice = reportGraphChoice();
   const g = choice.g;
+  // 인라인 KPI (CX 재설계: 카드 4개 → 배너 한 줄 흡수) — 카드 리스트가 그만큼 위로.
+  const st = lifecycleStates();
+  const counts = k => Object.values(st).filter(v => v === k).length;
+  const total = Object.keys(st).length || (g ? g.nodes.filter(n => n.is_target).length : 0);
+  const kpis = `<span class="r1-kpis">
+      <span title="lifecycle 완료 수">완료 <b>${counts("done")}/${total}</b></span>
+      ${counts("running") ? `<span>실행중 <b style="color:var(--run)">${counts("running")}</b></span>` : ""}
+      ${counts("fail") ? `<span title="하나 이상의 스텝이 fail(5xx/HMAC-401/timeout)인 lifecycle">fail <b style="color:var(--fail)">${counts("fail")}</b></span>` : ""}
+      <button class="minibtn" id="r1-dag-open"
+        title="이 시나리오의 폐쇄집합 의존 그래프 + 생성·검증·삭제 순서표 — 팝업">🕸 의존 그래프</button>
+    </span>`;
   const banner = prog.running
     ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
         <b>${esc(prog.phaseLabel)}</b> · <span class="mono">${esc(activeLc || "")}</span>
-        ${prog.active ? `<span class="muted small">${esc((prog.active.method || "") + " " + (prog.active.path || ""))}</span>` : ""}</div>`
-    : `<div class="nowbar done"><span class="dot"></span><b>${runStatus === "aborted" ? "중단됨" : "완료"}</b> · 상태 ${esc(runStatus === "aborted" ? "aborted (사용자 중단 — teardown 스윕 수행)" : runStatus)}</div>`;
+        ${prog.active ? `<span class="muted small">${esc((prog.active.method || "") + " " + (prog.active.path || ""))}</span>` : ""}
+        ${kpis}</div>`
+    : `<div class="nowbar done"><span class="dot"></span><b>${runStatus === "aborted" ? "중단됨" : "완료"}</b> · 상태 ${esc(runStatus === "aborted" ? "aborted (사용자 중단 — teardown 스윕 수행)" : runStatus)} ${kpis}</div>`;
   // (re)build the shell only when missing or the run/graph-binding changed.
-  // 메인은 "현재 실행" 전용 (owner 2026-07-08: "상단 dag 의존 그래프는 잘 볼 일이
-  // 없어") — DAG 씬은 여기서 그리지 않고 🕸 버튼의 온디맨드 팝업(openDagModal)이
-  // 소유한다. 배너(지금 뭐 실행) + 계획연속성 칩 + 진행 KPI만 인라인.
+  // 메인 = "현재 실행" 전용 — DAG 씬은 🕸 팝업(openDagModal, 위임 배선)이 소유.
   const shellKey = String(runId) + "|" + choice.mode + "|" + (choice.mode === "run" ? String(runGraphFor) : "build");
   const shell = $("r1-shell");
   const fresh = !shell || shell.dataset.run !== shellKey;
   if (fresh) {
-    $("report-main").innerHTML = `<div id="r1-banner">${banner}</div>
-      <div id="r1-plan-cont">${planContinuityHtml(choice, g)}</div>
-      <div class="dag-launch" id="r1-shell">
-        <button class="minibtn" id="r1-dag-open"
-          title="이 시나리오의 폐쇄집합 의존 그래프 + 생성·검증·삭제 순서표 — 필요할 때만 팝업으로">🕸 의존 그래프</button>
-        <span class="muted small">메인 = 현재 실행 · 의존관계/순서표는 팝업에서</span>
-      </div>
-      <div id="r1-prog" style="margin-top:8px"></div>`;
+    $("report-main").innerHTML = `<div id="r1-shell"><div id="r1-banner">${banner}</div>
+      <div id="r1-plan-cont">${planContinuityHtml(choice, g)}</div></div>`;
     $("r1-shell").dataset.run = shellKey;
-    $("r1-dag-open").onclick = openDagModal;
     if (dagOpen) openDagModal();   // 팝업이 열린 채 run/그래프 바인딩이 바뀜 → 재구성
   } else {
     // same run, subsequent poll: refresh the banner + overlay in place (no rebuild)
@@ -2353,18 +2354,6 @@ function reportR1() {
     if (pc) pc.innerHTML = planContinuityHtml(choice, g);   // 실행 중 → 실행 (종료 시)
     if (r1Scene) r1Scene.refresh();   // 팝업이 열려 있을 때만 존재
   }
-  const st = lifecycleStates();
-  const counts = k => Object.values(st).filter(v => v === k).length;
-  const total = Object.keys(st).length || (g ? g.nodes.filter(n => n.is_target).length : 0);
-  // 진행 표시는 요약 KPI 한 줄만 — 라이프사이클별 진행 바(웨이브 목록)는 제거
-  // (owner 2026-07-08: 바로 아래 카드 리스트가 상태·API·soft 까지 다 보여줘
-  // 완전 중복 — "둘 다 보여줄 필요는 없을 것 같은데").
-  $("r1-prog").innerHTML = `<div class="kpi">
-      <div class="s"><b>${counts("done")}/${total}</b><span>완료</span></div>
-      <div class="s"><b style="color:var(--run)">${counts("running")}</b><span>실행중</span></div>
-      <div class="s" title="lifecycle 실패 수 — 하나 이상의 스텝이 fail(5xx/HMAC-401/timeout)"><b style="color:var(--fail)">${counts("fail")}</b><span>fail</span></div>
-      <div class="s"><b>${esc(runStatus === "aborted" ? "중단됨" : runStatus)}</b><span>상태</span></div>
-    </div>`;
   renderRunOrderTable(g);   // 팝업이 닫혀 있으면 r1-order-tbl 부재로 no-op
 }
 
