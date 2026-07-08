@@ -1411,7 +1411,8 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
     return out
 
 
-def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None):
+def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None,
+                         need_db_subnet: bool = True):
     """Create ONE VPC + ONE subnet (both ACTIVE) for the heavy/ADOPT-class
     lifecycles to ADOPT, so they don't each create their own against the 5-VPC
     cap (knowledge/vpc-scheduling-strategy.md).
@@ -1528,9 +1529,16 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     subnet_id, sresp = _subnet_create(
         "create-shared-subnet", f"regrsubsh{uniq}", _SHARED_SUBNET_CIDR,
         "API regression shared subnet")
-    db_subnet_id, dresp = _subnet_create(
-        "create-shared-db-subnet", f"regrsubshdb{uniq}", _SHARED_DB_SUBNET_CIDR,
-        "API regression shared DB subnet")
+    db_subnet_id = None
+    if need_db_subnet:
+        db_subnet_id, dresp = _subnet_create(
+            "create-shared-db-subnet", f"regrsubshdb{uniq}", _SHARED_DB_SUBNET_CIDR,
+            "API regression shared DB subnet")
+    else:
+        # 선택-인지 스킵 (owner 2026-07-08 "db subnet 만들어지기 전까지 아무것도
+        # 안 하고 있네"): subnet#db 를 입양하는 lifecycle 이 이 런의 선택에 없으면
+        # DB-lane 서브넷은 순수 직렬 대기(~1-2분)일 뿐이다.
+        print("  DB-lane shared subnet SKIPPED — selection has no subnet#db adopter")
     if subnet_id:
         _subnet_wait_track("wait-shared-subnet", subnet_id, _SHARED_SUBNET_CIDR,
                            "shared subnet")
@@ -1540,7 +1548,7 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     if db_subnet_id:
         _subnet_wait_track("wait-shared-db-subnet", db_subnet_id,
                            _SHARED_DB_SUBNET_CIDR, "shared DB subnet")
-    else:
+    elif need_db_subnet:
         print(f"  shared-DB-subnet provision failed ({dresp.status}); DB adopters "
               f"fall back to the main shared subnet.")
 

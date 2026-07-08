@@ -105,7 +105,13 @@ def scan_owned(client=None, list_errors=None) -> list[dict]:
         r._list_all = counting_list_all
         _t.sleep = lambda *a, **k: None  # no internal waits/backoff DURING the scan only
         try:
+            # 사람이 오독하지 않게 (2026-07-08: 'delete ... -> 200' 에코를 실삭제로
+            # 읽고 라이브 런 중단 오보까지 간 사례): 아래 sweep 로그는 스텁이
+            # 흉내낸 시뮬레이션이며 API delete 는 단 한 건도 나가지 않는다.
+            print("=== DRY SCAN (read-only) — _delete/_wait_gone stubbed; the sweep "
+                  "lines below are SIMULATED, no API delete is issued ===")
             r.run_sweep(client or core.ApiClient(core.settings))
+            print("=== DRY SCAN end — nothing was deleted ===")
         finally:
             r._delete, r._wait_gone, _t.sleep = orig_delete, orig_wait, orig_sleep
             r._list_all = orig_list_all
