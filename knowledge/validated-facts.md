@@ -1761,3 +1761,17 @@ variants) — all **UNVERIFIED LIVE**, apply + observe in HB1b/HB2b:
   live-test it, only authored the scaffold + wired live discovery for
   `dbaas_engine_version_id`/`subnet_id`/`server_type_name`). Full detail:
   `docs/working/plans/CAMPAIGN-C3-100-repair-log.md`.
+
+## VS 서버 SHOW 응답은 래퍼가 없다 (2026-07-08 실측 — 대기 폴 침묵 소진의 뿌리)
+
+- `GET /v1/servers/{id}` (showvirtualserver) 응답은 **top-level 평면 구조**다:
+  `state`/`name`/`volumes`… 가 바로 최상위. `{"server": {...}}` 래퍼 없음
+  (req 실측 2026-07-08, server 4f0e994c). 반면 list/create 는 `servers[]` 래핑.
+- 그래서 대기 폴의 `field: "$.server.state"` 는 영원히 None → **모든 서버 대기
+  (active/stopped/resized/restarted/rebuilt/settled, 13곳)가 타임아웃을 전부
+  태우고 200 pass-through** 로 통과해 왔다. E2E 20260708-010208 역산: stopped
+  +313s(≈300s 소진) · resized +621s(≈600s) · restarted +322s · rebuilt +630s.
+  "Windows 부팅 10.2분" 관측도 사실은 600s 소진 + 오버헤드였다.
+- 교정: 13곳 전부 `field: "$.state"`. duration_stats 의 기존 실측치(예: VS
+  makespan ~52분)는 이 소진으로 부풀려진 값 — 교정 후 런들이 다시 접히며
+  자동 재학습된다. 타임아웃 상향(600→1200s)은 헤드룸으로 유지.

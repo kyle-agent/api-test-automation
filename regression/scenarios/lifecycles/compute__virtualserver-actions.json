@@ -201,7 +201,7 @@
           "path": "/v1/servers/{server_id}",
           "expect_status": [200],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": ["ACTIVE"],
             "timeout": 1200,
             "interval": 15
@@ -240,7 +240,7 @@
           "path": "/v1/servers/{server_id}",
           "expect_status": [200],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": ["STOPPED", "SHUTOFF"],
             "timeout": 300,
             "interval": 15
@@ -263,7 +263,7 @@
           "expect_status": [200],
           "wait": 15,
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": ["STOPPED", "SHUTOFF"],
             "timeout": 600,
             "interval": 15
@@ -285,7 +285,7 @@
           "path": "/v1/servers/{server_id}",
           "expect_status": [200],
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": ["ACTIVE"],
             "timeout": 300,
             "interval": 15
@@ -308,7 +308,7 @@
           "expect_status": [200],
           "wait": 20,
           "poll": {
-            "field": "$.server.state",
+            "field": "$.state",
             "until": ["ACTIVE"],
             "timeout": 600,
             "interval": 15
