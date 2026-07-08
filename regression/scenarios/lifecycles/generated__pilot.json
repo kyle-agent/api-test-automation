@@ -249,8 +249,11 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
+          "optional": true,
+          "group": "internet-gateway",
           "capture": {
             "internet_gateway_id": "$.internet_gateway.id"
           },
@@ -258,7 +261,25 @@
             "method": "DELETE",
             "path": "/v1/internet-gateways/{internet_gateway_id}",
             "service": "vpc"
-          }
+          },
+          "_note": "2026-07-08 전런 수리 — find-or-tolerate: IGW는 VPC당 1개 싱글톤이라 공유 VPC에서 병렬 체인이 선점하면 400 'already associated with an Internet Gateway' (전런 동시성이 첫 노출). 400 허용 + hard capture 유지가 감지기: 400이면 id capture miss → optional이라 group 'internet-gateway' 실패 → 같은 그룹의 verify-list/verify-set(PUT)/delete-internet-gateway가 함께 스킵. 의미: 이 체인은 자기가 만든 IGW만 수정/삭제하고, 이미 있던(남의) IGW는 절대 지우지 않는다 (capture를 soft로 낮추면 400에도 그룹이 안 죽어 남의 IGW를 지우게 되므로 hard 유지가 필수). 직후 find-internet-gateway(그룹 밖 read)가 실 id를 capture_soft 보충 → wait는 양 경로 모두 실 id로 동작."
+        },
+        {
+          "name": "find-internet-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways",
+          "params": {
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "capture_soft": {
+            "internet_gateway_id": "$.internet_gateways[0].id"
+          },
+          "_note": "find-or-tolerate의 find쪽 (그룹 밖 — create 400시에도 실행되는 순수 read): vpc_id 서버측 필터로 이 VPC의 IGW id를 capture_soft 보충. LIVE 검증 2026-07-08: GET /v1/internet-gateways?vpc_id=<id> → 200 {count,internet_gateways:[{id,state,vpc_id,...}]}, 실 vpc_id로 count=1 필터 확인(가짜 id는 count=0), capture 경로 $.internet_gateways[0].id 확인. params 명시로 catalog key(listinternetgateways) 기록 유지 — create 400시 verify-internet-gateway-list가 그룹 스킵돼도 이 read가 그 커버리지를 대신한다. 이 id는 관찰(wait)용 — 삭제/수정은 그룹(자기 생성시에만)이 담당."
         },
         {
           "name": "wait-internet-gateway",
@@ -266,7 +287,8 @@
           "method": "GET",
           "path": "/v1/internet-gateways/{internet_gateway_id}",
           "expect_status": [
-            200
+            200,
+            404
           ],
           "poll": {
             "field": "$.internet_gateway.state",
@@ -276,9 +298,13 @@
               "CREATED",
               "RUNNING"
             ],
+            "give_up_status": [
+              404
+            ],
             "timeout": 300,
             "interval": 15
-          }
+          },
+          "_note": "2026-07-08 find-or-tolerate 동반 수리: create 400 경로에선 이 id가 선점한 다른 체인 소유라 폴 중 삭제될 수 있고, find가 빈손이면 리터럴 토큰 GET이 된다 — 404 give_up+허용으로 5분 타임아웃 소진/경성 실패 방지. 자기 생성 happy path에선 삭제 전이라 404가 나올 수 없어 기존 동작과 동일."
         },
         {
           "name": "verify-internet-gateway-list",
@@ -401,7 +427,9 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "internet-gateway",
+          "_note": "2026-07-08: create와 같은 그룹 — create가 400(IGW 선점)이면 그룹 실패로 이 삭제가 스킵된다. find가 보충한 id는 다른 체인 소유일 수 있으므로 '자기가 만든 경우에만 삭제'가 이 그룹 묶음의 목적 (남의 IGW를 지우면 그 체인이 파괴됨)."
         },
         {
           "name": "delete-vpc",

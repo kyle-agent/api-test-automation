@@ -837,6 +837,28 @@
           "retry_interval": 15
         },
         {
+          "name": "wait-public-ip-detached",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.publicip.state",
+            "until": [
+              "DETACHED",
+              "AVAILABLE",
+              "ACTIVE",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 180,
+            "interval": 10
+          },
+          "_note": "2026-07-08 전런 수리: delete-public-ip 400 'PublicIP state is not deletable state(ATTACHED)' — attach는 create-server-static-nat가 수행했고(카탈로그에 publicip 전용 detach endpoint 없음: create/delete/list/set/show뿐), detach = 직전 delete-server-static-nat인데 202 비동기라 ATTACHED가 남은 채 delete가 나갔다. wait-volume-detached와 동일한 settle 폴: ATTACHED 이탈(라이브 2026-07-08: attached 상태 문자열은 'ATTACHED'; until은 DETACHED/AVAILABLE + create쪽 wait의 검증 어휘)까지 대기, 미도달 시 180s 후 200 통과 → delete의 400 retry가 보험."
+        },
+        {
           "name": "delete-public-ip",
           "service": "vpc",
           "method": "DELETE",
@@ -850,10 +872,12 @@
           ],
           "destructive": true,
           "retry_on_status": [
-            409
+            409,
+            400
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "_note": "2026-07-08: 400(ATTACHED 잔존) retry 보험 — 엔진은 스텝당 retry 설정이 하나라 별도 3x15s 대신 기존 409 백스톱(40x30)에 400을 동승시킨다(409 인내 약화 없음). 1차 수리는 앞의 wait-public-ip-detached settle 폴; 끝내 400이면 스텝 실패로 신호 유지(expect에 400은 넣지 않음)."
         },
         {
           "name": "delete-internet-gateway",

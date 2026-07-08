@@ -71,12 +71,12 @@
           "path": "/v1/cloud-ml/images",
           "expect_status": [
             200,
-            201,
-            202
+            404
           ],
-          "capture": {
+          "capture_soft": {
             "image_id": "$.images[0].id"
-          }
+          },
+          "_note": "SCR 활성화 게이트 (2026-07-08 확정, 이번 전체 런 실패 주체): cloud-ml 전면이 계정 SCR credential 미활성으로 404 — 404 관용 + capture_soft로 게이트 하에서도 호출 증거는 기록. SCR 활성화 후 strict [200] + hard capture로 승급 (gen-cloudml-chain의 게이트 격리와 동일 날짜 처리)."
         },
         {
           "name": "verify-cloudml-image-read",
@@ -84,8 +84,10 @@
           "method": "GET",
           "path": "/v1/cloud-ml/images",
           "expect_status": [
-            200
-          ]
+            200,
+            404
+          ],
+          "_note": "SCR 게이트 관용 — 위 create-cloudml-image _note 참조."
         }
       ]
     },

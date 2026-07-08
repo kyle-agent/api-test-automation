@@ -15,11 +15,15 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            404
           ],
+          "optional": true,
+          "group": "cloud-ml",
           "capture": {
             "image_id": "$.images[0].id"
-          }
+          },
+          "_note": "SCR 활성화 게이트 — 활성화 후 strict 승급 (2026-07-08 확정): 이 계정은 cloud-ml 전면 404 (라이브 재확인 2026-07-08 GET /v1/cloud-ml/images → 404 Spring Not Found). 404 허용(optional+관용) + hard capture 유지가 게이트 감지기: 404(또는 빈 images)면 image_id capture miss → group 'cloud-ml' 실패 → 같은 그룹의 create/verify/delete-cloud-ml이 함께 스킵돼 리터럴 {image_id}/{cloud_ml_id} 실행이 없다. mutating 스텝 expect는 그대로(strict) — 관용화는 이 read 1개뿐이라 role=verify 유지(probe 강등 없음)."
         },
         {
           "name": "create-keypair",
@@ -421,6 +425,8 @@
             201,
             202
           ],
+          "group": "cloud-ml",
+          "_comment": "SCR 활성화 게이트 (2026-07-08 확정): group 'cloud-ml' 동승 — 감지기(create-cloudml-image)가 404/빈 목록이면 스킵. strict 유지(mutating 관용화 없음 → role=verify 보존); 게이트 해제 후엔 기존과 동일하게 실행.",
           "capture": {
             "cloud_ml_id": "$.id"
           },
@@ -437,7 +443,9 @@
           "path": "/v1/cloud-ml/{cloud_ml_id}",
           "expect_status": [
             200
-          ]
+          ],
+          "group": "cloud-ml",
+          "_note": "SCR 활성화 게이트 (2026-07-08 확정): group 'cloud-ml' 동승 — create 스킵 시 함께 스킵(리터럴 {cloud_ml_id} GET 방지). strict 유지."
         },
         {
           "name": "delete-cloud-ml",
@@ -449,7 +457,9 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "cloud-ml",
+          "_note": "SCR 활성화 게이트 (2026-07-08 확정): group 'cloud-ml' 동승 — create가 스킵되면 지울 것도 없으므로 함께 스킵(리터럴 토큰 DELETE 404로 lifecycle을 죽이던 delete-custom-image 교훈과 동일 패턴). strict 유지."
         },
         {
           "name": "delete-ske-cluster",
