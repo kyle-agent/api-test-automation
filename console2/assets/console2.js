@@ -1508,13 +1508,17 @@ function preflightRun(sel, opts) {
   Promise.all([
     fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sel) }).then(r => r.json()),
     fetch("/api/capacity").then(r => r.json()),
-  ]).then(([plan, capacity]) => {
+    // §3 견적(병렬 makespan p50~p90) — 합계 ETA용. 실패해도 모달은 순차합산으로 동작.
+    fetch("/api/preflight", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sel) })
+      .then(r => (r.ok ? r.json() : null)).catch(() => null),
+  ]).then(([plan, capacity, pf]) => {
     plan = plan || {}; capacity = capacity || {};
     // preflight FAILURE = 실행 차단 (우회 없음) — 이유 + [다시 점검]만.
     if (plan.error || capacity.error || capacity.headroom == null) {
       pfFail(plan.error || capacity.error || "capacity 응답이 불완전합니다 (headroom 없음)", sel, opts);
       return;
     }
+    opts.pf = pf && !pf.error ? pf : null;
     pfRender(plan, capacity, sel, opts);
   }).catch(e => pfFail(e.message, sel, opts));
 }
@@ -1581,9 +1585,13 @@ function pfRender(plan, capacity, sel, opts) {
     '<table class="tbl"><thead><tr><th>service</th><th>lifecycle</th><th>생성·삭제 예상</th><th>실측 ETA</th><th>과금</th></tr></thead>' +
     "<tbody>" + rows + "</tbody>" +
     '<tfoot><tr class="lc-head"><td>합계</td><td>' + N_lc + "</td><td>생성 ~" + tCreates + " · 삭제 ~" + tDeletes + "</td><td>" +
-    (tMeasured ? "~" + fmtDur(tDur) + (tMeasured < tN ? ' <span class="muted small">(미측정 ' + (tN - tMeasured) + ")</span>" : "") : '<span class="muted">미측정</span>') +
+    (opts.pf && opts.pf.est && opts.pf.est.p50_s != null
+      ? "~" + fmtDur(opts.pf.est.p50_s) + ' <span class="muted small">~ ' + fmtDur(opts.pf.est.p90_s) +
+        " (병렬 makespan · " + esc(opts.pf.est.basis || "?") + ")</span>"
+      : (tMeasured ? "~" + fmtDur(tDur) + (tMeasured < tN ? ' <span class="muted small">(미측정 ' + (tN - tMeasured) + ")</span>" : "") : '<span class="muted">미측정</span>')) +
     "</td><td>" + (heavy ? '<span style="color:var(--red);font-weight:700">⚠️ ' + heavyIds.length + "</span>" : "—") + "</td></tr></tfoot></table>" +
-    '<p class="muted small" style="margin:7px 0 0">ETA = 라이프사이클 실측 평균의 순차 합산 (병렬 실행 시 단축) · ' +
+    '<p class="muted small" style="margin:7px 0 0">행 ETA = 라이프사이클 실측 평균의 순차 합산 · <b>합계 ETA = 병렬 makespan 추정</b>' +
+    (opts.pf ? "" : " (견적 API 미응답 — 순차 합산 표시)") + " · " +
     "VPC 소모(peak) <b>" + peak + "</b> vs 현재 여유 <b>" + headroom + "</b></p>" +
     queueNote + skipped + heavyBlock;
   $("pf-foot").innerHTML =
@@ -2870,7 +2878,14 @@ function handleLateAlerts(runs) {
 // ================= shared helpers =================
 // the server resolves node_ids → graph_view targets (and → source lifecycles for a
 // run). Sending node_ids keeps the "selection = resources" contract.
-function selectionPayload() { return { node_ids: [...targets] }; }
+// 서비스의 선택 가능한 노드가 전부 켜져 있으면 그 서비스를 "통째로 선택"한 것 —
+// services 를 함께 실어 서버의 §2 해석(그 서비스로 태그된 enabled+verify lifecycle
+// 전부, 노드가 가리키지 않는 합성 lifecycle 포함)이 발동하게 한다. 부분 선택은
+// node_ids 범위 그대로 (서비스 전체로 부풀리지 않음).
+function selectionPayload() {
+  const services = allSelectableServices().filter(s => svcState(s) === "on");
+  return { node_ids: [...targets], services };
+}
 
 function legend(items) {
   return items.map(i => `<span><i style="background:${i[0]}"></i>${esc(i[1])}</span>`).join("");
