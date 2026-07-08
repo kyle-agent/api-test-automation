@@ -128,7 +128,9 @@ def api_run_events(rid: str) -> JSONResponse:
         rec = c2._RUNS.get(rid)
     if not rec:
         return _json({"error": "no such run"}, 404)
-    return _json({"id": rid, "status": rec["status"], "events": c2._read_events(rec["events"])})
+    # §4: step-end soft에 soft_class(중복/갭/정책) 부착 — UI가 chip으로 렌더
+    events = c2._enrich_soft_classes(c2._read_events(rec["events"]))
+    return _json({"id": rid, "status": rec["status"], "events": events})
 
 
 @router.get("/api/runs/{rid}")
@@ -176,6 +178,17 @@ async def api_plan(request: Request) -> JSONResponse:
         return _json({"lifecycle_ids": ids, **c2._plan(ids)})
     except Exception as exc:                               # noqa: BLE001
         return _json({"error": f"plan failed: {exc}"}, 500)
+
+
+@router.post("/api/preflight")
+async def api_preflight(request: Request) -> JSONResponse:
+    """HEAVY-PREMISE-CONTRACT §3 — 실행 전 confirm의 정보원 (자원·과금·예상시간).
+    선택 payload를 받아 {lifecycles, resources, peak_quota, billable_count, est,
+    warnings}를 반환. staging·직접실행 confirm이 이걸 표시한다."""
+    try:
+        return _json(c2._preflight(await _body(request)))
+    except Exception as exc:                               # noqa: BLE001
+        return _json({"error": f"preflight failed: {exc}"}, 500)
 
 
 @router.post("/api/run")

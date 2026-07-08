@@ -582,6 +582,99 @@ def _plan(lifecycle_ids: list[str]) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# pre-flight (HEAVY-PREMISE-CONTRACT §3) — 실행 전 confirm의 정보원: 무엇이
+# 만들어지고(자원·과금), 얼마나 걸릴지(측정 히스토리 makespan). 순수 조립 —
+# composer graph(자원·peak_quota) + dag plan(runnable) + duration_stats(est).
+# --------------------------------------------------------------------------- #
+def _preflight(sel: dict) -> dict:
+    ids = (sel.get("lifecycle_ids") if "lifecycle_ids" in sel and not (
+        sel.get("node_ids") or sel.get("services") or sel.get("categories"))
+        else _resolve_lifecycle_ids(sel))
+    ids = [str(x).strip() for x in (ids or []) if str(x).strip()]
+    plan = _plan(ids)
+    runnable = plan.get("runnable") or ids
+    m = _model()
+
+    # 생성 자원 = 선택의 합성 그래프 노드들 (UI 미리보기와 같은 소스). 그래프가 없으면
+    # (lifecycle-only 선택 등) plan의 peak_vpcs로 강등 — 페이지는 항상 응답을 받는다.
+    resources: list[dict] = []
+    peak_quota: dict = {}
+    try:
+        g = _graph(sel)
+        for n in g.get("nodes") or []:
+            resources.append({"node": n.get("id", "?"), "service": n.get("service", ""),
+                              "count": 1, "billable": bool(n.get("heavy"))})
+        peak_quota = dict(g.get("peak_quota") or {})
+    except Exception:  # noqa: BLE001 — graph 실패는 견적을 막지 않는다
+        resources = []
+    if "vpc" not in peak_quota:
+        peak_quota["vpc"] = plan.get("peak_vpcs", 0)
+    billable_count = sum(1 for r in resources if r["billable"])
+    if not resources:
+        # 자원 그래프가 없으면 heavy lifecycle 수를 과금 신호로 사용 (보수적 표기)
+        billable_count = sum(1 for lid in runnable
+                             if (m["lifecycles"].get(lid) or {}).get("heavy"))
+
+    try:
+        from tools import duration_stats
+        est = duration_stats.estimate(runnable, model={"lifecycles": m["lifecycles"]})
+    except Exception as exc:  # noqa: BLE001 — 견적 실패도 confirm은 가능해야 한다
+        est = {"p50_s": None, "p90_s": None, "basis": "unavailable",
+               "per_lifecycle": {}, "error": str(exc)[:120]}
+
+    warnings: list[str] = []
+    if est.get("basis") == "default":
+        warnings.append("예상 시간이 전부 기본값입니다 (측정 이력 없음)")
+    elif est.get("basis") == "mixed":
+        warnings.append("일부 lifecycle은 예상 시간이 기본값입니다")
+    if plan.get("skipped_disabled"):
+        warnings.append(f"비활성 lifecycle {len(plan['skipped_disabled'])}개 제외")
+
+    return {"lifecycles": runnable, "resources": resources, "peak_quota": peak_quota,
+            "billable_count": billable_count, "est": est, "warnings": warnings}
+
+
+# --------------------------------------------------------------------------- #
+# soft 3분류 (HEAVY-PREMISE-CONTRACT §4) — step-end 이벤트의 soft를 중복/갭/정책으로.
+# 폴링마다 불리므로 스토어(카탈로그/waiver/verified)는 모듈 싱글턴으로 1회 로드.
+# 분류 실패는 절대 리포트를 막지 않는다 (chip만 안 뜰 뿐).
+# --------------------------------------------------------------------------- #
+_SOFTCLS_DATA: dict = {}
+
+
+def _softcls_data() -> dict:
+    if not _SOFTCLS_DATA:
+        from regression import soft_classify as sc
+        _SOFTCLS_DATA.update(sc=sc, catalog=sc.load_catalog(),
+                             waivers=sc.load_waivers(), verified=sc.load_verified())
+    return _SOFTCLS_DATA
+
+
+def _enrich_soft_classes(events: list[dict]) -> list[dict]:
+    try:
+        if not any(e.get("kind") == "step-end" and e.get("category") == "soft"
+                   for e in events):
+            return events
+        d = _softcls_data()
+        sc = d["sc"]
+        idxs: list[int] = []
+        obs: list[dict] = []
+        for i, e in enumerate(events):
+            if e.get("kind") == "step-end":
+                idxs.append(i)
+                obs.append({"endpoint_key": f"{e.get('lifecycle', '?')}:{e.get('step', '?')}",
+                            "method": e.get("method"), "path": e.get("path"),
+                            "status": e.get("status"), "category": e.get("category")})
+        cmap = sc.classify(obs, verified=d["verified"], waivers=d["waivers"],
+                           run_endpoint_2xx=sc.build_run_2xx(obs), catalog=d["catalog"])
+        for oi, cls in cmap.items():
+            events[idxs[oi]]["soft_class"] = cls
+    except Exception:  # noqa: BLE001
+        pass
+    return events
+
+
+# --------------------------------------------------------------------------- #
 # live event stream (JSONL the engine appends to via core.console_events)
 # --------------------------------------------------------------------------- #
 def _read_events(path: str) -> list[dict]:
