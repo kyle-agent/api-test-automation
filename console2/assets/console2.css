@@ -590,3 +590,12 @@ g.rg-selbox{cursor:pointer}
 .suitemenu .ssave{margin-top:4px;border-top:1px solid var(--line);border-radius:0 0 6px 6px;
   font-size:11px;font-weight:600;color:var(--accent);text-align:center}
 .suitemenu .ssave:hover{background:rgba(37,99,201,.07);border-color:var(--line)}
+
+/* ---- heavy-전제(§4/§5): soft 3분류 chip + 분해 행 ---- */
+.schip{display:inline-block;padding:0 6px;border-radius:9px;font-size:10px;font-weight:700;
+  border:1px solid;vertical-align:1px;margin-left:2px}
+.schip.dup{color:#6b7480;border-color:#c9d1d9;background:#f2f4f7}
+.schip.gapc{color:var(--soft);border-color:rgba(181,116,11,.4);background:rgba(181,116,11,.08)}
+.schip.pol{color:var(--run);border-color:rgba(37,99,201,.4);background:rgba(37,99,201,.08)}
+.softbrk{margin:6px 0 0;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.softbrk .schip{font-size:10.5px;padding:1px 8px}

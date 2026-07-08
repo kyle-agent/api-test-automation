@@ -46,6 +46,7 @@ let pollTimer = null;
 let lastLogText = null;     // last log text written to the 로그 <pre> (in-place diff → no flicker)
 let r4LogTimer = null;      // dedicated slow (2s) log poller while running (detail 로그 tab)
 let expandedApi = null;     // key of the currently-expanded API row (detail API tab)
+let hideDupSoft = true;     // §5: 중복-soft(다른 곳에서 이미 2xx 검증된 것) 행은 기본 접힘
 
 // ---- B1 master→detail report state ----------------------------------------
 // 흐름 is the persistent MASTER (the B2 scene). The DETAIL pane is scoped to ONE
@@ -202,14 +203,13 @@ window.go = go;
 function ctxBar() {
   const closureK = lastGraph ? lastGraph.nodes.length : "…";
   const svcs = new Set([...targets].map(id => N[id].service));
-  const heavyTargets = [...targets].some(id => N[id].heavy);
-  const heavyClosure = lastGraph ? lastGraph.nodes.some(n => n.heavy) : heavyTargets;
+  // heavy-전제(HEAVY-PREMISE-CONTRACT §5): 선택 화면에 heavy/light 어휘를 두지 않는다 —
+  // 비용 정보는 pre-flight(대기열/미리보기 견적)에서만 등장한다.
   $("ctxbar").innerHTML =
     `<span class="seg">env <b>local</b></span>
      <span class="seg">· 선택 <b>${targets.size}</b> 리소스</span>
      <span class="seg">· 서비스 <b>${svcs.size}</b></span>
      <span class="seg">· 폐포 <b>${closureK}</b></span>
-     <span class="seg">· heavy <b>${heavyClosure ? "🜂 포함" : "없음"}</b></span>
      <span class="seg">· 모델 <b>${MODEL.node_count}</b> 자원 / <b>${MODEL.lifecycle_count}</b> lifecycle</span>
      <span class="badge live">LIVE</span>`;
 }
@@ -302,14 +302,13 @@ function toggleAll() {
   selectionChanged();
 }
 
-// the selection readout: 선택: N 서비스 · M 리소스 · 폐포 K (+ heavy flag)
+// the selection readout: 선택: N 서비스 · M 리소스 · 폐포 K
+// (heavy-전제 §5: 비용 표기는 pre-flight로 이동 — 선택 화면엔 두지 않는다)
 function selReadout() {
   const svcs = new Set([...targets].map(id => N[id].service));
   const K = lastGraph ? lastGraph.nodes.length : "…";
-  const heavy = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
   $("sel-readout").innerHTML =
-    `선택: <b>${svcs.size}</b> 서비스 · <b>${targets.size}</b> 리소스 · 폐포 <b>${K}</b>` +
-    `<span class="${heavy ? "hvflag" : ""}">${heavy ? " · 🜂 heavy" : ""}</span>`;
+    `선택: <b>${svcs.size}</b> 서비스 · <b>${targets.size}</b> 리소스 · 폐포 <b>${K}</b>`;
   // sync the "전체 선택" toggle state
   const svcsAll = allSelectableServices();
   const allOn = svcsAll.length && svcsAll.every(s => svcState(s) === "on");
@@ -348,7 +347,6 @@ function drawSvcTree() {
         const sel = svcSelectable(svc);
         const all = svcNodes(svc);
         const st = svcState(svc);
-        const heavy = all.some(id => N[id].heavy);
         const quota = all.some(id => N[id].quota);
         const onN = sel.filter(id => targets.has(id)).length;
         const cls = st === "on" ? "on" : st === "partial" ? "partial" : "";
@@ -356,7 +354,7 @@ function drawSvcTree() {
         const fracTxt = !sel.length ? "—" : st === "partial" ? `${onN}/${sel.length}` : `${sel.length}`;
         h += `<div class="trow tsvc-row ${cls} ${noLc ? "nolc" : ""}" data-svc="${esc(svc)}" title="${esc(svc)}${noLc ? " — 생애주기 없음(의존전용)" : " — 클릭하면 서비스 전체 선택"}">
             <span class="tchk svc">${st === "on" ? "✓" : st === "partial" ? "◐" : ""}</span>
-            <span class="tname">${esc(shortName(svc))}${heavy ? ' <span class="glyph" title="heavy 포함">🜂</span>' : ""}${quota ? ' <span class="glyph q" title="quota 제약">⛔</span>' : ""}</span>
+            <span class="tname">${esc(shortName(svc))}${quota ? ' <span class="glyph q" title="quota 제약">⛔</span>' : ""}</span>
             <span class="tcount">${fracTxt}</span>
             <button class="tdef" data-def-svc="${esc(svc)}" title="📖 정의 보기 — 이 서비스의 생애주기·엔드포인트·지식(read-only)">📖</button>
             ${noLc
@@ -452,7 +450,7 @@ function renderGraph(g) {
   }
   $("dag-legend").innerHTML = legend([
     ["#e6effd", "★ 대상"], ["#fffaf0", "■ 공유(dedup)"], ["#f3eefc", "↓ 의존"]
-  ]) + '<span>그룹 = <b>접힘</b>(클릭=펼치기) · <span style="color:var(--val)">●</span> VALIDATED · <span style="color:var(--docs)">●</span> docs · 🜂 heavy · ⛔ quota</span>';
+  ]) + '<span>그룹 = <b>접힘</b>(클릭=펼치기) · <span style="color:var(--val)">●</span> VALIDATED · <span style="color:var(--docs)">●</span> docs · ⛔ quota</span>';
   // (re)build or update the interactive scene. The node SET drives whether the
   // scene re-chooses its collapse state (new selection) or refreshes in place.
   if (!dagScene) {
@@ -527,7 +525,7 @@ function orderTable(g, focus) {
     const sh = n.shared ? '<span class="tag amber" title="공유(dedup)">공유</span>' : "";
     return `<tr>
       <td class="ordn">${i + 1}</td>
-      <td><b>${esc(id)}</b> ${tgt} ${sh}${n.heavy ? " 🜂" : ""}</td>
+      <td><b>${esc(id)}</b> ${tgt} ${sh}</td>
       <td class="muted">${esc(shortName(n.service || (N[id] && N[id].service) || ""))}</td>
       <td class="ordn">${verifyN}</td>
       <td class="ordn">${delRank[id] || "—"}</td>
@@ -589,7 +587,7 @@ function drawModalBody() {
       h += `<div class="mres ${pulledDep ? "dep" : ""}" data-mid="${esc(id)}"><label>
           <span class="cb ${on ? "on" : ""}"></span>
           <span class="nodedot" style="background:${prov}"></span>
-          <b>${esc(id)}</b>${n.heavy ? " 🜂" : ""}</label>
+          <b>${esc(id)}</b></label>
           <span class="meta">${n.quota ? '<span class="tag amber">⛔ ' + esc(n.quota) + "</span>" : ""}${pulledDep ? '<span class="tag dep">의존으로 포함</span>' : ""}</span></div>`;
     }
   });
@@ -650,7 +648,7 @@ function renderDefBody(lc, kn) {
     if (!lcs.length) h += '<p class="muted small">정의된 생애주기 없음 (의존전용 서비스일 수 있음).</p>';
     lcs.forEach(L => {
       const steps = L.steps || [];
-      h += `<details class="def-lc"><summary><b>${esc(L.id)}</b>${L.heavy ? ' <span class="bdg heavy">🜂 heavy</span>' : ""}${L.enabled === false ? ' <span class="bdg off">disabled</span>' : ""} <span class="muted small">${L.n_steps || steps.length} steps</span></summary><ol class="def-steps">`;
+      h += `<details class="def-lc"><summary><b>${esc(L.id)}</b>${L.heavy ? ' <span class="bdg heavy">과금</span>' : ""}${L.role === "probe" ? ' <span class="bdg off" title="도달 프로브 — CI 스윕 전용, 서비스 선택 실행에서는 제외">프로브</span>' : ""}${L.enabled === false ? ' <span class="bdg off">disabled</span>' : ""} <span class="muted small">${L.n_steps || steps.length} steps</span></summary><ol class="def-steps">`;
       steps.forEach(s => {
         h += `<li>${defm(s.method)}<code>${esc(s.path || "")}</code>${s.kind ? `<span class="kind">${esc(s.kind)}</span>` : ""}${s.optional ? ' <span class="muted small">optional</span>' : ""}</li>`;
       });
@@ -663,7 +661,7 @@ function renderDefBody(lc, kn) {
     const rs = lc.resources;
     h += `<div class="def-sec"><h4>리소스 <span class="muted small">${rs.length}개 · 엔드포인트·요청옵션·의존</span></h4>`;
     rs.forEach(r => {
-      h += `<details class="def-res"><summary><b>${esc(r.code || r.id)}</b> <span class="prov ${r.provenance === "VALIDATED" ? "val" : "docs"}">${esc(r.provenance)}</span>${r.heavy ? ' <span class="bdg heavy">🜂</span>' : ""}${r.quota ? ' <span class="bdg q">⛔ quota</span>' : ""}</summary>`;
+      h += `<details class="def-res"><summary><b>${esc(r.code || r.id)}</b> <span class="prov ${r.provenance === "VALIDATED" ? "val" : "docs"}">${esc(r.provenance)}</span>${r.heavy ? ' <span class="bdg heavy">과금</span>' : ""}${r.quota ? ' <span class="bdg q">⛔ quota</span>' : ""}</summary>`;
       (r.api || []).forEach(a => {
         const parts = (a.endpoint || "").split(" ");
         h += `<div class="def-apirow"><span class="phase ${esc(a.phase)}">${esc(a.phase)}</span>${defm(parts[0])}<code>${esc(parts.slice(1).join(" "))}</code></div>`;
@@ -712,6 +710,22 @@ function uuid() {
   return "s-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
 }
 
+// pre-flight 시간 표기: 초 → "52초" / "~37분" / "~1.8시간" (HEAVY-PREMISE-CONTRACT §3 est)
+function fmtDur(s) {
+  if (s == null || isNaN(s)) return "—";
+  if (s < 90) return Math.round(s) + "초";
+  if (s < 5400) return "~" + Math.round(s / 60) + "분";
+  return "~" + (s / 3600).toFixed(1) + "시간";
+}
+// staged 항목의 pre-flight 요약 문구 (자원 N (과금 M) · 예상 T) — pf 없으면 "" 반환
+function pfSummary(pf) {
+  if (!pf) return "";
+  const nRes = (pf.resources || []).reduce((a, r) => a + (r.count || 1), 0);
+  const bill = pf.billable_count || 0;
+  const est = pf.est || {};
+  return `자원 <b>${nRes}</b>개${bill ? ` (<span class="hv">과금 ${bill}</span>)` : ""} · 예상 <b>${fmtDur(est.p50_s)}</b>`;
+}
+
 // 구성 ▶ = STAGE: snapshot the current selection into STAGED (peak_vpcs/heavy from
 // /api/plan, nServices/nResources from the selection, closure from the live DAG),
 // then cross to ② so the user sees it in the 실행 대기열. NO /api/run here, no
@@ -725,18 +739,27 @@ function stageRun() {
   const heavyGuess = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
   // resolve peak_vpcs + heavy from the REAL plan; fall back to the local guess if the
   // pre-flight plan call fails (the staged item is still actionable on ②).
-  const add = (peak, heavy) => {
+  const add = (peak, heavy, pf) => {
     STAGED.push({ id: uuid(), selection, nServices, nResources,
-                  peak_vpcs: peak, heavy: heavy, closure });
+                  peak_vpcs: peak, heavy: heavy, closure, pf: pf || null });
     go("run");
   };
-  fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(selection) })
-    .then(r => r.json()).then(plan => {
-      plan = plan || {};
-      const peak = plan.peak_vpcs || 0;
-      const heavy = Object.values(plan.preview || {}).some(p => p && p.heavy) || heavyGuess;
-      add(peak, heavy);
-    }).catch(() => add(0, heavyGuess));
+  // heavy-전제(§3): staging 시점에 pre-flight 견적(자원·과금·예상시간)을 확보해 항목에 싣는다.
+  // /api/preflight가 없는(구) 서버면 /api/plan으로 강등 — 항목은 어느 쪽이든 실행 가능.
+  fetch("/api/preflight", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(selection) })
+    .then(r => { if (!r.ok) throw new Error("no /api/preflight"); return r.json(); })
+    .then(pf => {
+      const peak = (pf.peak_quota || {}).vpc || 0;
+      add(peak, (pf.billable_count || 0) > 0, pf);
+    })
+    .catch(() =>
+      fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(selection) })
+        .then(r => r.json()).then(plan => {
+          plan = plan || {};
+          const peak = plan.peak_vpcs || 0;
+          const heavy = Object.values(plan.preview || {}).some(p => p && p.heavy) || heavyGuess;
+          add(peak, heavy, null);
+        }).catch(() => add(0, heavyGuess, null)));
 }
 
 // ================= 스윗 (suites/*.yaml · CI 공유) =================
@@ -851,7 +874,7 @@ function launchSummary() {
   const pq = lastGraph ? Object.values(lastGraph.peak_quota || {}).reduce((a, b) => a + b, 0) : 0;
   $("launchSum").innerHTML =
     `대상 <b>${svcs.size}</b> svc / <b>${targets.size}</b> 리소스 · 폐포 <b>${K}</b> · peak quota <b>${pq}</b> · ` +
-    `🜂heavy <span class="${heavy ? "hv" : ""}">${heavy ? "포함" : "없음"}</span>`;
+    `과금 자원 <span class="${heavy ? "hv" : ""}">${heavy ? "포함" : "없음"}</span>`;
   const go = $("launch-go");
   if (go) {
     go.disabled = !targets.size;
@@ -896,12 +919,22 @@ function drawStagedPanel() {
     body = STAGED.map(it => {
       const open = stagedOpen === it.id;
       const over = (it.peak_vpcs || 0) > headroom;
-      const summary = `<b>${it.nServices}</b> 서비스 · <b>${it.nResources}</b> 리소스 · VPC <b>${it.peak_vpcs || 0}</b> 필요${it.heavy ? " 🜂" : ""}`;
+      // pre-flight 요약(§3): 견적이 있으면 자원·과금·예상시간이 요약/버튼에 그대로 —
+      // [▶ 실행]이 곧 informed confirm (heavy-전제: 별도 게이트 없음).
+      const pf = it.pf;
+      const est = (pf && pf.est) || {};
+      const summary = `<b>${it.nServices}</b> 서비스 · <b>${it.nResources}</b> 리소스 · ` +
+        (pf ? pfSummary(pf) : `VPC <b>${it.peak_vpcs || 0}</b> 필요`);
+      const runLabel = pf && pf.billable_count
+        ? `▶ 실행 <span class="small">(과금 ${pf.billable_count} · ${fmtDur(est.p50_s)})</span>`
+        : "▶ 실행";
       const detail = open ? `<div class="staged-detail">
           <div class="staged-facts">필요 VPC <b>${it.peak_vpcs || 0}</b> · 폐포 <b>${it.closure}</b> · 현재 여유 <b>${headroom}</b></div>
+          ${pf ? `<div class="staged-facts">예상 <b>${fmtDur(est.p50_s)}</b> ~ ${fmtDur(est.p90_s)} <span class="muted small">(${esc(est.basis || "?")})</span> · ${pf.billable_count ? `과금 자원 <b>${pf.billable_count}</b>개` : "과금 자원 없음"}${(pf.warnings || []).length ? ` · ⚠ ${esc(pf.warnings[0])}` : ""}</div>
+          ${(pf.resources || []).length ? `<div class="staged-facts muted small">${(pf.resources || []).slice(0, 8).map(r => `${esc(r.node)}${(r.count || 1) > 1 ? "×" + r.count : ""}${r.billable ? "💰" : ""}`).join(" · ")}${(pf.resources || []).length > 8 ? " …" : ""}</div>` : ""}` : ""}
           ${over ? `<div class="staged-over">여유 부족 → 대기 큐로 들어갑니다</div>` : ""}
           <div class="staged-act">
-            <button class="minibtn go" data-stage-run="${esc(it.id)}">▶ 실행</button>
+            <button class="minibtn go" data-stage-run="${esc(it.id)}">${runLabel}</button>
             <button class="minibtn red" data-stage-del="${esc(it.id)}">✕ 제거</button>
           </div>
         </div>` : "";
@@ -957,12 +990,16 @@ function renderStagedPreview() {
   // updateStagedPreviewBudget from the cap poll) so "그림 보고 → 바로 실행" has the
   // budget context right by the button, without rebuilding the DAG scene each poll.
   host.dataset.preview = item.id;
+  const pf = item.pf, est = (pf && pf.est) || {};
+  const pfLine = pf ? ` · ${pfSummary(pf)} <span class="muted">(p90 ${fmtDur(est.p90_s)})</span>` : "";
+  const runLabel = pf && pf.billable_count
+    ? `▶ 실행 <span class="small">(과금 ${pf.billable_count} · ${fmtDur(est.p50_s)})</span>` : "▶ 실행";
   host.innerHTML = `<div class="nowbar sp-head"><span class="dot" style="background:var(--accent)"></span>
       <b>대기열 미리보기</b>
-      <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · 폐포 ${item.closure} · VPC <b>${item.peak_vpcs || 0}</b> 필요 · 현재 여유 <b id="sp-headroom">…</b>${item.heavy ? " · 🜂 heavy" : ""}</span>
+      <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · 폐포 ${item.closure} · VPC <b>${item.peak_vpcs || 0}</b> 필요 · 현재 여유 <b id="sp-headroom">…</b>${pfLine}</span>
       <span class="sp-act">
         <span id="sp-overbadge"></span>
-        <button class="minibtn go" id="sp-run" title="이 계획을 실제 실행(LIVE) — cap 아래면 ADMIT, 아니면 대기 큐로">▶ 실행</button>
+        <button class="minibtn go" id="sp-run" title="이 계획을 실제 실행(LIVE) — cap 아래면 ADMIT, 아니면 대기 큐로">${runLabel}</button>
       </span></div>
     <div class="legend" id="sp-legend"></div>
     <div class="stage-wrap"><div class="stage" id="sp-stage">
@@ -1220,7 +1257,7 @@ function drawRunSettings() {
     <div class="chiprow">
       <span class="chip" style="border-color:var(--red)">✔ mutations</span>
       <span class="chip" style="border-color:var(--red)">✔ destructive</span>
-      <span class="chip" style="border-color:${heavy ? "var(--red)" : "var(--line)"}">${heavy ? "✔" : "✕"} heavy</span>
+      <span class="chip" style="border-color:${heavy ? "var(--red)" : "var(--line)"}">${heavy ? "✔ 과금 자원 포함" : "✕ 과금 자원 없음"}</span>
     </div>
     <div class="kv"><span>선택</span><b>${svcs.size} svc / ${targets.size} 리소스</b></div>
     <div class="run-ctl">
@@ -1232,36 +1269,48 @@ function drawRunSettings() {
   $("run-toconf").onclick = () => go("build");
 }
 
-// Runs are always LIVE. Before posting, fetch the plan + capacity (parallel) and
-// show a pre-flight confirm spelling out lifecycles, heavy count, VPC peak vs the
-// current headroom, and whether it will QUEUE. On confirm, POST /api/run (mode
-// live; the server derives the gates) and drive the existing report flow.
+// Runs are always LIVE (heavy-전제). Before posting, fetch the PRE-FLIGHT (§3:
+// 자원·과금·예상시간; /api/preflight — 구서버면 /api/plan 강등) + capacity, and show
+// THE one confirm spelling out what will be created, what bills, how long, VPC peak
+// vs headroom, and whether it will QUEUE. This confirm IS the deliberate opt-in
+// (Hard Rule 1). On confirm, POST /api/run and drive the existing report flow.
 function startRun() {
   if (!targets.size) return;
   const sel = selectionPayload();
-  Promise.all([
-    fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sel) }).then(r => r.json()),
-    fetch("/api/capacity").then(r => r.json()),
-  ]).then(([plan, capacity]) => {
-    plan = plan || {}; capacity = capacity || {};
-    const N_lc = plan.runnable ? plan.runnable.length : (plan.lifecycle_ids ? plan.lifecycle_ids.length : 0);
-    const peak = plan.peak_vpcs || 0;
+  const pfOrPlan =
+    fetch("/api/preflight", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sel) })
+      .then(r => { if (!r.ok) throw new Error("no preflight"); return r.json(); })
+      .then(pf => ({ pf }))
+      .catch(() => fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sel) })
+        .then(r => r.json()).then(plan => ({ plan })));
+  Promise.all([pfOrPlan, fetch("/api/capacity").then(r => r.json())]).then(([x, capacity]) => {
+    capacity = capacity || {};
     const headroom = capacity.headroom != null ? capacity.headroom : 0;
-    const heavyM = Object.values(plan.preview || {}).filter(p => p && p.heavy).length;
-    const heavy = heavyM > 0;
-    const lines = [
-      "실행 — 실제 클라우드 자원을 만들고 삭제합니다.",
-      "",
-      `라이프사이클: ${N_lc}개`,
-      heavy ? `⚠️ heavy(billable): ${heavyM}개` : "heavy: 없음",
-      `VPC 소모(peak): ${peak} · 현재 여유: ${headroom}`,
-    ];
+    const lines = ["실행 — 실제 클라우드 자원을 만들고 삭제합니다.", ""];
+    let peak = 0;
+    if (x.pf) {
+      const pf = x.pf, est = pf.est || {};
+      peak = (pf.peak_quota || {}).vpc || 0;
+      const nRes = (pf.resources || []).reduce((a, r) => a + (r.count || 1), 0);
+      lines.push(`라이프사이클: ${(pf.lifecycles || []).length}개`);
+      lines.push(`생성 자원: ${nRes}개${pf.billable_count ? ` (과금 ${pf.billable_count}개)` : " (과금 없음)"}`);
+      lines.push(`예상 시간: ${fmtDur(est.p50_s)} ~ ${fmtDur(est.p90_s)} (${est.basis || "?"})`);
+      (pf.warnings || []).forEach(w => lines.push("⚠ " + w));
+    } else {
+      const plan = x.plan || {};
+      peak = plan.peak_vpcs || 0;
+      const N_lc = plan.runnable ? plan.runnable.length : (plan.lifecycle_ids ? plan.lifecycle_ids.length : 0);
+      const heavyM = Object.values(plan.preview || {}).filter(p => p && p.heavy).length;
+      lines.push(`라이프사이클: ${N_lc}개`);
+      lines.push(heavyM ? `⚠️ 과금 자원 포함: ${heavyM}개` : "과금 자원: 없음");
+    }
+    lines.push(`VPC 소모(peak): ${peak} · 현재 여유: ${headroom}`);
     if (peak > headroom) lines.push("→ 여유보다 커서 대기 큐에 들어갑니다.");
     lines.push("진행할까요?");
     if (confirm(lines.join("\n"))) postRun(sel);
   }).catch(e => {
-    // plan/capacity pre-flight failed → still allow the run, but tell the user.
-    if (confirm("사전 점검(plan/capacity) 실패: " + e.message + "\n그래도 LIVE 실행할까요?")) postRun(sel);
+    // pre-flight failed → still allow the run, but tell the user.
+    if (confirm("사전 점검(pre-flight) 실패: " + e.message + "\n그래도 LIVE 실행할까요?")) postRun(sel);
   });
 }
 
@@ -1382,6 +1431,7 @@ function groupEventsByLifecycle(events) {
       if (e.params != null) c.params = e.params;
       if (e.req_body != null) c.req_body = e.req_body;
       if (e.resp_snippet != null) c.resp_snippet = e.resp_snippet;
+      if (e.soft_class != null) c.soft_class = e.soft_class;   // §4: duplicate|gap|policy (서버 분류)
       if (e.category === "soft") b.softN++; else if (e.category === "fail") b.failN++;
     }
     else if (e.kind === "resource-tracked") { const b = ensure(id);
@@ -1831,12 +1881,25 @@ function reportR3() {
   const okN = calls.filter(c => c.category === "ok").length;
   const softN = calls.filter(c => c.category === "soft").length;
   const failN = calls.filter(c => c.category === "fail").length;
+  // §4/§5 soft 3분류 — 서버가 step-end에 soft_class를 실어주면 chip + 분해 표시.
+  const sc = { duplicate: 0, gap: 0, policy: 0 };
+  calls.forEach(c => { if (c.category === "soft" && sc[c.soft_class] != null) sc[c.soft_class]++; });
+  const hasSC = sc.duplicate + sc.gap + sc.policy > 0;
+  const softChip = cls => {
+    const m = { duplicate: ["중복", "dup", "같은 런/스토어에서 이미 2xx 검증된 엔드포인트 — 무시 가능"],
+                gap: ["갭", "gapc", "어떤 검증 레시피에도 2xx 스텝이 없음 — 레시피 숙제"],
+                policy: ["정책", "pol", "reachability waiver — 만점=도달(4xx=접근 증거)"] };
+    const x = m[cls]; return x ? ` <span class="schip ${x[1]}" title="${x[2]}">${x[0]}</span>` : "";
+  };
+  const visCalls = hasSC && hideDupSoft
+    ? calls.filter(c => !(c.category === "soft" && c.soft_class === "duplicate")) : calls;
+  const hiddenN = calls.length - visCalls.length;
   const apiRow = c => {
     const k = rowKey(c);
     const isOpen = expandedApi === k;
     const row = `<tr class="apirow ${isOpen ? "open" : ""}" data-apik="${esc(k)}">
       <td><span class="caret">${isOpen ? "▾" : "▸"}</span> <span class="mtag ${esc(c.method || "")}">${esc(c.method || "")}</span> <code>${esc(c.path || "")}</code></td>
-      <td>${badge(c.category)}</td>
+      <td>${badge(c.category)}${c.category === "soft" ? softChip(c.soft_class) : ""}</td>
       <td class="muted">${c.status != null ? esc(c.status) : "—"}</td>
       <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run" ? "⏳" : "—")}</td>
     </tr>`;
@@ -1846,12 +1909,12 @@ function reportR3() {
   let body;
   if (d.agg) {
     const byLc = {};
-    calls.forEach(c => (byLc[c._lc || c.lifecycle] = byLc[c._lc || c.lifecycle] || []).push(c));
+    visCalls.forEach(c => (byLc[c._lc || c.lifecycle] = byLc[c._lc || c.lifecycle] || []).push(c));
     body = Object.keys(byLc).sort().map(lc =>
       `<tr class="lc-head"><td colspan="4">${esc(lc)} <span class="muted small">${byLc[lc].length} api</span></td></tr>` +
       byLc[lc].map(apiRow).join("")).join("");
   } else {
-    body = calls.map(apiRow).join("");
+    body = visCalls.map(apiRow).join("");
   }
   // 📖 정의 link(s) for the service(s) this scope's calls belong to (lifecycle→service
   // via the model) — jump from "what ran" to "what the definition + knowledge say".
@@ -1866,9 +1929,19 @@ function reportR3() {
       <div class="s"><b style="color:var(--soft)">${softN}</b><span>soft</span></div>
       <div class="s"><b style="color:var(--fail)">${failN}</b><span>fail</span></div>
     </div>
+    ${hasSC ? `<div class="softbrk small">soft 분류:
+        <span class="schip dup">중복 ${sc.duplicate}</span>
+        <span class="schip gapc">갭 ${sc.gap}</span>
+        <span class="schip pol">정책 ${sc.policy}</span>
+        <label class="muted" style="margin-left:8px;cursor:pointer">
+          <input type="checkbox" id="hidedup-soft" ${hideDupSoft ? "checked" : ""}> 중복 숨기기${hiddenN ? ` (${hiddenN}행 숨김)` : ""}</label>
+      </div>` : ""}
     <div class="scroll" style="max-height:560px;margin-top:8px"><table class="tbl apitbl">
       <thead><tr><th>method · path (대상)</th><th>결과</th><th>status</th><th>응답시간</th></tr></thead>
       <tbody>${body || `<tr><td colspan="4" class="empty">${d.status === "running" ? "API 호출 대기 중 (진행 중)…" : "이 스코프에 API 호출이 없습니다."}</td></tr>`}</tbody></table></div>`;
+  // 중복-soft 숨기기 토글 (§5 접힘 기본)
+  const hd = $("hidedup-soft");
+  if (hd) hd.onchange = () => { hideDupSoft = hd.checked; keepDetailScroll(reportR3); };
   // row click → toggle the inline detail (collapse if it was already open)
   els("#detail-body .apirow[data-apik]").forEach(row => row.onclick = () => {
     const k = row.dataset.apik;
