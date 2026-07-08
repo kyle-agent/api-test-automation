@@ -3437,6 +3437,11 @@
           "capture_soft": {
             "std_port_id": "$.port.id"
           },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/ports/{std_port_id}",
+            "service": "vpc"
+          },
           "expect_status": [
             200,
             201,
@@ -3479,6 +3484,11 @@
           "json": {
             "port_id": "{std_port_id}"
           },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
+            "service": "virtualserver"
+          },
 
           "_note": "2026-07-08(3) owner run: port_id+subnet_id 동시 전송 400 — 같은 런 netops attach(port_id 단독) 200 라이브 증명 → subnet_id 제거. | HB3b-2 (2026-07-06, run 28766151214): CONFIRMED live 400 `VirtualServer.CreateInterface.Duplicated` when this sent `subnet_id: {subnet_id}` — that's the server's OWN boot subnet, and it already has an interface there (create-server). Switched to `{port_subnet_id}` (the dedicated vs-port-group subnet created by create-port-subnet, matching create-port's own subnet_id) so the new interface lands on a subnet the server has no prior interface on. Not re-verified live this session (offline-only).",
           "expect_status": [
@@ -3512,6 +3522,7 @@
           "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats",
           "json": {},
           "capture_soft": {"pvnat_id": "$.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}", "service": "virtualserver"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "_note": "2026-07-08 25-편입(owner GO): createserverinterfaceprivatenat — body 스키마 미문서(빈 body로 도달+정정 유도), PF-15 계열 403 관용. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
@@ -4101,6 +4112,68 @@
           "destructive": true
         },
         {
+          "name": "final-release-private-static-nat",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "_note": "2026-07-08 delete-sg 409 회귀 수리 (이번 라이브 런: delete-sg 409 scp-network.securitygroup.has-related-resources + 계정에 이 체인의 포트 2개 잔존). 무그룹 safety-net 1/5 — vs-port 그룹이 중도 실패(엔진: 그룹 실패 시 같은 그룹 후속만 skip)했든 그룹 내 teardown이 관용 409로 '통과'만 했든, delete-sg 전에 NAT해제→detach→port삭제→port-subnet삭제를 무조건 한 번 더 시도한다(무그룹 스텝은 항상 실행). 정상 경로(서버 이미 삭제·포트 이미 정리)에선 404 관용 no-op. pvnat_id/std_port_id 는 capture_soft 라 미해결 placeholder 로 남을 수 있음 → 400/404 관용."
+        },
+        {
+          "name": "final-detach-port",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 404, 409],
+          "retry_on_status": [409],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "무그룹 safety-net 2/5: 서버가 아직 살아있는 엣지(wait-server-gone 200 타임아웃 통과)에서 표준 포트를 실제로 detach. 서버가 이미 사라진 정상 경로에선 404 관용. 409 사다리는 그룹 내 detach-port-from-server 와 동일 패턴(4×15s)."
+        },
+        {
+          "name": "final-delete-port",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/ports/{std_port_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 404],
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 20,
+          "_note": "무그룹 safety-net 3/5 — 핵심 스텝: map-sg-to-port 가 SG 를 참조시킨 표준 포트를 delete-sg 전에 확실히 제거. 서버 삭제가 표준 포트를 detach 상태로 살려두는 것이 이번 런에서 실측됨(포트 2개 잔존). expect 에 409 미포함(netops port-delete 패턴) — 사다리(6×20s) 소진 후에도 409 면 optional 실패 로그로 신호를 남기고 계속 진행, 최종 판정은 delete-sg 가 내린다. 400/404 는 이미 삭제됐거나 std_port_id placeholder 미해결(생성 자체가 실패)인 정상 경로."
+        },
+        {
+          "name": "final-wait-port-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/ports/{std_port_id}",
+          "optional": true,
+          "expect_status": [200, 400, 404],
+          "poll": {
+            "until_status": [404],
+            "timeout": 180,
+            "interval": 10,
+            "give_up_status": [400]
+          },
+          "_note": "무그룹 safety-net 4/5: 포트 삭제(202 비동기)가 실제로 끝나 SG 참조가 풀린 것을 delete-sg 전에 확인 — until_status[404] 는 wait-subnet-gone, give_up_status 는 wait-port-subnet 의 기존 파일 패턴 복사. 이미 삭제된 정상 경로에선 첫 GET 404 로 즉시 종료(체감 0s), placeholder 미해결이면 400 즉시 give-up."
+        },
+        {
+          "name": "final-delete-port-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{port_subnet_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 404],
+          "retry_on_status": [409],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "무그룹 safety-net 5/5: vs-port 전용 서브넷 최종 청소 — 그룹 실패로 그룹 내 delete-port-subnet 이 skip 된 경로를 닫아 공유 VPC teardown 의 자식-잔존 실패(07-07 사건 유형)까지 방지. 포트가 방금 지워졌으면 409 사다리(4×15s, 그룹 내 스텝과 동일)로 흡수."
+        },
+        {
           "name": "delete-sg",
           "service": "security-group",
           "method": "DELETE",
@@ -4110,7 +4183,11 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 20,
+          "_note": "2026-07-08 회귀 수리: 이번 라이브 런에서 이 스텝이 409 scp-network.securitygroup.has-related-resources 로 종결(과거 passed → failed). 1차 방어는 바로 앞 무그룹 final-* 포트 청소 라인 + vs-port 그룹 create 3종(create-port/attach/create-nat)의 cleanup 등록(그룹 실패 시 엔진 _teardown_group 이 NAT→detach→port→subnet LIFO 로 청소); 이 사다리(6×20s)는 포트 삭제의 202 비동기 전파·참조 해소 지연을 흡수한다. expect 는 strict 유지 — 사다리 소진 후에도 409 면 진짜 잔존이므로 실패가 맞다(회귀 신호 보존, role=verify 유지)."
         },
         {
           "name": "delete-sg2",
