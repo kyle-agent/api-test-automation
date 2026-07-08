@@ -214,7 +214,13 @@
             "private_key": "{private_key}"
           },
           "expect_status": [200, 400],
-          "_note": "showvirtualserverpassword with the REAL keypair private_key (read-only effect). [200,400] = PF-17: live 400 VirtualServer.InvalidPrivateKeyValue 'Failed to decrypt' (run 27452095757) — Linux/ubuntu servers have no encrypted admin password (Windows-only feature); the private_key capture itself is fine. The only non-strict action step; a genuine 2xx needs a Windows image."
+          "poll": {
+            "until_status": [200],
+            "give_up_status": [401, 403, 404, 409],
+            "timeout": 600,
+            "interval": 20
+          },
+          "_note": "showvirtualserverpassword with the REAL keypair private_key (read-only effect; safe to re-POST). 2026-07-08 re-investigation (owner: 'is this really Windows-only?'): the docs state NO OS precondition, and E2E 20260708-010208 proved this server WAS Windows 2016 (images[0]=00799e76) with the keypair bound — yet 400 'Failed to decrypt' fired 2.8s after ACTIVE (req-714ca840). The old 'Linux has no admin password (Windows-only)' explanation contradicts that data; likely cause = publish LATENCY (the guest posts the encrypted password minutes after first boot; querying before publish fails). Poll until_status 200 (max 10min; 400 keeps polling, other 4xx gives up), tolerant [200,400] so a never-published password stays soft — PF-17 amended."
         },
         {
           "name": "dump-server",
