@@ -818,7 +818,7 @@
    "service": "management/iam-identity-center",
    "enabled": true,
    "heavy": false,
-   "_note": "READ-ONLY (non-heavy) coverage probe for the 5 direct-GET IdC endpoints. listinstances needs no params and returns 200 (empty list when no SSO instance is provisioned — this is the correct API response, not an error). The other 4 list endpoints each require instance_id as a required query param (proven 2026-06-20: bare call returns 400 ValidationError; with instance_id=ssoins-12345 returns 404 ResourceNotFound — the service IS reached). listaccountassignments additionally requires target_account_id (proven 2026-06-20: instance_id alone -> 400; both synthetic ids -> 404). All 5 steps are optional and accept 200/403/404 so this lifecycle is always green regardless of account state. No mutations, no path params, no destructive operations.",
+   "_note": "READ-ONLY (non-heavy) coverage probe for the 5 direct-GET IdC endpoints, +1 (2026-07-08): show-group fulfills the showgroup reachability-waiver call contract (COMPLETENESS-AUDIT-2026-07-08 C2 debt — waived keys must still be CALLED; 4xx is the evidence). listinstances needs no params and returns 200 (empty list when no SSO instance is provisioned — this is the correct API response, not an error). The other 4 list endpoints each require instance_id as a required query param (proven 2026-06-20: bare call returns 400 ValidationError; with instance_id=ssoins-12345 returns 404 ResourceNotFound — the service IS reached). listaccountassignments additionally requires target_account_id (proven 2026-06-20: instance_id alone -> 400; both synthetic ids -> 404). All steps are optional and tolerant so this lifecycle is always green regardless of account state. No mutations, no destructive operations; the single path param (show-group) is a deliberately non-existent literal.",
    "steps": [
     {
      "name": "list-instances",
@@ -848,6 +848,23 @@
       404
      ],
      "_note": "instance_id required query param. Synthetic id -> 404 ResourceNotFound (service reached). 404 accepted as soft hit."
+    },
+    {
+     "name": "show-group",
+     "method": "GET",
+     "path": "/v1/groups/{ualpha}",
+     "service": "iam-identity-center",
+     "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345"
+     },
+     "expect_status": [
+      200,
+      400,
+      403,
+      404
+     ],
+     "_note": "waiver 이행: showgroup (GET /v1/groups/{group_id}) is reachability-waived but the waiver contract requires the endpoint to be CALLED — 호출 증거(4xx). {ualpha} resolves to a random NON-EXISTENT literal id at runtime (same idiom as idc-delete-policies-probe) so _norm_path -> v1/groups/* -> catalog key management/iam-identity-center/showgroup records, while nothing real is ever read. Both docs-required params sent: instance_id (synthetic ssoins-12345 query) + group_id (nonexistent literal path). LIVE-PROBED 2026-07-08: 404 identity-center.InstanceNotFound — endpoint reached, 4xx evidence. Tolerant [200,400,403,404]. C2 debt of COMPLETENESS-AUDIT-2026-07-08."
     },
     {
      "name": "list-permission-sets",

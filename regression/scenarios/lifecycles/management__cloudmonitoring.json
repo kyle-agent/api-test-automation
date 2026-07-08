@@ -153,7 +153,7 @@
       "id": "cloudmonitoring-readonly-shows",
       "service": "management/cloudmonitoring",
       "enabled": true,
-      "_note": "Light, READ-ONLY (no writes, no cleanup). Covers all 14 non-mutating cloudmonitoring endpoints. CONFIRMED FACTS 2026-06-20: (1) X-ResourceType header IS required for getaccountproductlist (VM/Object Storage both 200) and getproducteventpolicylist (needs header + productResourceId param). (2) BACKEND BUG: getproducteventlist, getaccounteventlist, geteventpolicyhistories ALL 400 with params[name=resourceType, value=<date>] for ANY date format tried — YYYY-MM-DD, ISO-T-Z, YYYYMMDD, epoch-int. The server-side router reads date param values as 'resourceType' field. X-ResourceType header IS forwarded correctly (debug-traced). No workaround. (3) Event policy IDs are NUMERIC (not UUID) — confirmed via 404 ResourceNotFound probes. (4) addrbook list endpoint is /v1/cloudmonitorings/product/v2/USERS/addrbooks (with 'users/' prefix) — the read_chains auto-derive incorrectly uses /v2/addrbooks (404 path not found) and therefore skips, explaining the smoke test SKIPPED message. (5) CRUD lifecycle engine skip: run_lifecycle() skips ALL lifecycles (including read-only ones) when SCP_ALLOW_MUTATIONS=false — so these steps only run in the CRUD pass. Account: 0 events, 0 event-policies, 0 addrbooks (all products state=NE not enrolled in monitoring backend). Every step is optional with tolerant expect_status including 400.",
+      "_note": "Light, READ-ONLY (no writes, no cleanup). Covers all non-mutating cloudmonitoring endpoints (14 original + 3 strict-200 completeness steps 2026-07-08: getaccountmembers/getmetriclist/getproducttypelist — COMPLETENESS-AUDIT-2026-07-08). CONFIRMED FACTS 2026-06-20: (1) X-ResourceType header IS required for getaccountproductlist (VM/Object Storage both 200) and getproducteventpolicylist (needs header + productResourceId param). (2) BACKEND BUG: getproducteventlist, getaccounteventlist, geteventpolicyhistories ALL 400 with params[name=resourceType, value=<date>] for ANY date format tried — YYYY-MM-DD, ISO-T-Z, YYYYMMDD, epoch-int. The server-side router reads date param values as 'resourceType' field. X-ResourceType header IS forwarded correctly (debug-traced). No workaround. (3) Event policy IDs are NUMERIC (not UUID) — confirmed via 404 ResourceNotFound probes. (4) addrbook list endpoint is /v1/cloudmonitorings/product/v2/USERS/addrbooks (with 'users/' prefix) — the read_chains auto-derive incorrectly uses /v2/addrbooks (404 path not found) and therefore skips, explaining the smoke test SKIPPED message. (5) CRUD lifecycle engine skip: run_lifecycle() skips ALL lifecycles (including read-only ones) when SCP_ALLOW_MUTATIONS=false — so these steps only run in the CRUD pass. Account: 0 events, 0 event-policies, 0 addrbooks (all products state=NE not enrolled in monitoring backend). Every step is optional with tolerant expect_status including 400.",
       "steps": [
         {
           "name": "list-events",
@@ -284,6 +284,30 @@
           "group": "cm-ro-products",
           "capture_soft": {"eventId": "$.contents[0].eventId"},
           "_note": "getaccounteventlist. CONFIRMED BACKEND BUG 2026-06-20: ALL date values for queryStartDt/queryEndDt (YYYY-MM-DD, ISO-T-Z, YYYYMMDD, int-epoch) trigger 400 InvalidInputValue params[name=resourceType, value=<date>]. Header X-ResourceType IS properly forwarded (confirmed by request debug trace). The bug is server-side: the middleware routing reads the queryEndDt value as 'resourceType' validation field. Affects getproducteventlist, getaccounteventlist, and geteventpolicyhistories equally. No client-side workaround exists. Tolerant — 400 counts as reachable endpoint."
+        },
+        {
+          "name": "get-account-members",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v1/accounts/members",
+          "expect_status": [200],
+          "group": "cm-ro-completeness",
+          "_note": "getaccountmembers — GET /v1/cloudmonitorings/product/v1/accounts/members. NOTE the product/v1 (not v2) prefix — cloudmonitoring is a dual-version path family (PF-26); path taken verbatim from data/api_catalog.json. Zero-required-param global read (page/size/sort optional). LIVE-CONFIRMED 200 2026-07-08 bare (totalCount 0, empty member list — empty 200 is the steady state). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08). Fresh group so the tolerant-4xx groups above never skip it."
+        },
+        {
+          "name": "get-metric-list",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v2/metrics",
+          "expect_status": [200],
+          "group": "cm-ro-completeness",
+          "_note": "getmetriclist — GET /v1/cloudmonitorings/product/v2/metrics (product/v2 prefix per catalog, PF-26 dual-version family). NO required query params (productTypeCode/objectType/page/size/sort all optional — docs-checked AND live-confirmed): bare call returns 200 with totalCount 3510 metric definitions, default page size 10. LIVE-CONFIRMED 200 2026-07-08. strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
+        },
+        {
+          "name": "get-product-type-list",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v1/product-types",
+          "expect_status": [200],
+          "group": "cm-ro-completeness",
+          "_note": "getproducttypelist — GET /v1/cloudmonitorings/product/v1/product-types (product/v1 prefix per catalog, PF-26). Zero-required-param global read (productCategoryCode optional). LIVE-CONFIRMED 200 2026-07-08 bare (totalCount 37 product types). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         }
       ]
     }

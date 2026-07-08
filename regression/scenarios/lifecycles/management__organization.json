@@ -549,6 +549,30 @@
           "_note": "Decline a pending invitation. Guarded; expected 404/400 when none pending."
         }
       ]
+    },
+    {
+      "id": "org-assignment-reads",
+      "service": "management/organization",
+      "enabled": true,
+      "_note": "READ-ONLY verify lifecycle — bare global GETs only, NO writes, no cleanup (the entire organization write surface stays exclusively in the guarded probe lifecycles above; this file adds zero mutation blast radius). Closes the 2 completeness-audit gaps (docs/working/trackers/COMPLETENESS-AUDIT-2026-07-08.md): listpoliciesfortarget + listtargetsforpolicy — the assignments domain's attach/remove writes live in org-policy-bindings-and-delegation-guarded (probe lane, deliberately NOT touched to avoid flipping its derived role), but neither assignments LIST was called by any scenario. Both endpoints are global GETs (no path params); their docs-REQUIRED query filters are satisfied with docs-example-format literal values — this is NOT a placeholder id-bound path read. LIVE-PROBED 2026-07-08 (org-MEMBER, non-master account): both return 403 Forbidden 'You do not have permission to List' with AND without params — the account can call but lacks org List permission. Tolerant [200,403,404] therefore: 200 on an org-master account, 403 = current member-account permission denial (사유: 계정이 조직 master가 아님 — 조직 read 권한 없음), 404 = unknown example ids on a master. Coverage union 편입 holds on any of these.",
+      "steps": [
+        {
+          "name": "list-policies-for-target",
+          "method": "GET",
+          "path": "/v1/assignments/policies",
+          "params": {"target_id": "ou-1a2b3c4d5e6f7g8h9i0j1k2l3m4n5"},
+          "expect_status": [200, 403, 404],
+          "_note": "listpoliciesfortarget — GET /v1/assignments/policies. target_id is a docs-REQUIRED query param (docs example format 'ou-...'); organization_id/policy_category/name/paging optional. LIVE 2026-07-08: 403 Forbidden on this org-member account (auth check precedes id validation). Tolerant [200,403,404] + 사유 in lifecycle _note. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
+        },
+        {
+          "name": "list-targets-for-policy",
+          "method": "GET",
+          "path": "/v1/assignments/targets",
+          "params": {"policy_id": "f98e76d54c32b10a9z8y7x6w5v4u3", "target_type": "OU"},
+          "expect_status": [200, 403, 404],
+          "_note": "listtargetsforpolicy — GET /v1/assignments/targets. policy_id AND target_type are docs-REQUIRED query params (docs example values; target_type 'OU'). LIVE 2026-07-08: 403 Forbidden on this org-member account. Tolerant [200,403,404] + 사유 in lifecycle _note. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
+        }
+      ]
     }
   ]
 }

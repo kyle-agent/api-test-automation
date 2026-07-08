@@ -177,6 +177,31 @@
           "destructive": true
         }
       ]
+    },
+    {
+      "id": "baremetal-catalog-reads",
+      "service": "compute/baremetal",
+      "enabled": true,
+      "_note": "READ-ONLY verify lifecycle — bare global catalog GETs only (no server provisioning, no writes, no cleanup, NOT heavy: these lookups are free and license-independent even though baremetal is a [U] untestable service for real provisioning). Closes the 2 completeness-audit gaps (docs/working/trackers/COMPLETENESS-AUDIT-2026-07-08.md): listbaremetalimages + listbaremetalproducts — baremetal previously had NO enabled verify lifecycle at all (probe lane only via baremetal-server-coverage, which is deliberately NOT touched so its derived role stays probe). Both steps pin an explicit step-level \"service\": \"baremetal\": GET /v1/images also exists under ske/virtualserver with DIFFERENT catalog keys — the (method, path, service) tuple disambiguates both the coverage attribution and the base-URL host. LIVE-CONFIRMED 200 2026-07-08 on both. strict [200].",
+      "steps": [
+        {
+          "name": "list-baremetal-images",
+          "service": "baremetal",
+          "method": "GET",
+          "path": "/v1/images",
+          "params": {"region_id": "{region}"},
+          "expect_status": [200],
+          "_note": "listbaremetalimages — GET /v1/images with EXPLICIT service 'baremetal' (same path exists for ske/virtualserver under different catalog keys). region_id is the docs-REQUIRED query param — satisfied with the {region} builtin. LIVE-CONFIRMED 200 2026-07-08 (region kr-west1: real image entries, e.g. Windows 2019 Standard). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
+        },
+        {
+          "name": "list-baremetal-products",
+          "service": "baremetal",
+          "method": "GET",
+          "path": "/v1/bm_products",
+          "expect_status": [200],
+          "_note": "listbaremetalproducts — GET /v1/bm_products (zero-required-param global read; image_id optional). LIVE-CONFIRMED 200 2026-07-08 (real product entries, e.g. HighMetal-2 / 96 vCPU). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
+        }
+      ]
     }
   ]
 }

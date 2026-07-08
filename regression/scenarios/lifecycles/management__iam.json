@@ -568,6 +568,14 @@
           "_note": "setresourcepolicy — PUT /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23: kms:* action is valid for a KMS SRN. Creates a resource policy (group 'rp-real'; cleanup deletes it). Action changed from iam:* (400 UnSupportedActionInPolicy) to kms:* (200). Expect_status narrowed to [200,201,202]: we now have confirmed 2xx."
         },
         {
+          "name": "show-resource-policy",
+          "method": "GET",
+          "path": "/v1/resource-policies/{iam_srn_b64}",
+          "group": "rp-real",
+          "expect_status": [200],
+          "_note": "showresourcepolicy — EXPLICIT GET /v1/resource-policies/{srn} on the REAL b64-encoded KMS SRN (iam_srn_b64) right after set-resource-policy created the policy. The probe-resource-policy-reads auto-seed below already fires this GET at runtime, but probe_reads steps are invisible to the static step->catalog union — this explicit strict-200 step closes that gap (COMPLETENESS-AUDIT-2026-07-08). CONFIRMED 200 2026-06-23 (same GET via the probe, policy present). Group rp-real gates it on setresourcepolicy success, so strict [200] never fires without the policy (e.g. 2026-07-08 live: resourcemanager lists 0 kms resources -> iam_srn capture miss -> set 4xx -> group isolates -> this step skips cleanly)."
+        },
+        {
           "name": "probe-resource-policy-reads",
           "group": "rp-real",
           "probe_reads": {"srn": "{iam_srn_b64}"},
@@ -774,7 +782,7 @@
       "id": "iam-readonly-shows",
       "service": "management/iam",
       "enabled": true,
-      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes 4 static id-bound GET gaps for read-only / list-discoverable IAM resources by the list->soft-capture->show idiom (the same pattern cloudcontrol uses for its list-discovered ids). access-keys and service-accounts have only list+show in the catalog (no create), so a synthetic id would be a guaranteed-404 dead read — instead we soft-capture a REAL id from the caller's own list and show it. account-users is shown via the account_id soft-captured from the caller's access-keys list (access_key.account_id) + a user id from the account-users list itself. Every step is optional with tolerant [200,400,403,404]: on an account with no access keys / service accounts the list is empty/403 and the dependent id segment stays a {placeholder} (normalizes to the catalog '*' key) so the show is still CALLED and the endpoint statically reachable. Envelopes grounded in data/api_docs.json response examples: accesskeylist $.access_keys[].{id,account_id}; listserviceaccount $.service_accounts[].id; listiamuser $.users[].id.",
+      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes 4 static id-bound GET gaps for read-only / list-discoverable IAM resources by the list->soft-capture->show idiom (the same pattern cloudcontrol uses for its list-discovered ids). +2 strict-200 bare global lists appended 2026-07-08 (listendpoints, listsamlprovider — COMPLETENESS-AUDIT-2026-07-08). access-keys and service-accounts have only list+show in the catalog (no create), so a synthetic id would be a guaranteed-404 dead read — instead we soft-capture a REAL id from the caller's own list and show it. account-users is shown via the account_id soft-captured from the caller's access-keys list (access_key.account_id) + a user id from the account-users list itself. Every step is optional with tolerant [200,400,403,404]: on an account with no access keys / service accounts the list is empty/403 and the dependent id segment stays a {placeholder} (normalizes to the catalog '*' key) so the show is still CALLED and the endpoint statically reachable. Envelopes grounded in data/api_docs.json response examples: accesskeylist $.access_keys[].{id,account_id}; listserviceaccount $.service_accounts[].id; listiamuser $.users[].id.",
       "steps": [
         {
           "name": "list-access-keys",
@@ -836,6 +844,20 @@
           "_note": "deletebulkiamuser (DELETE /v1/accounts/{account_id}/users/bulk). CONFIRMED 2026-06-24: empty user_ids array [] returns 204 (idempotent, no users deleted). account_id is soft-captured from list-access-keys (the caller's own real account id). This is NON-HEAVY because no IAM users are created or deleted — the empty array is a no-op. Covers the catalog key management/iam/deletebulkiamuser.",
           "json": {"user_ids": []},
           "expect_status": [200, 202, 204]
+        },
+        {
+          "name": "list-endpoints",
+          "method": "GET",
+          "path": "/v1/endpoints",
+          "expect_status": [200],
+          "_note": "listendpoints — GET /v1/endpoints (zero-param global read: the per-region service endpoint directory; docs declare no parameters at all). LIVE-CONFIRMED 200 2026-07-08 (returns $.endpoints[] with region/service_name/url entries). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
+        },
+        {
+          "name": "list-saml-providers",
+          "method": "GET",
+          "path": "/v1/saml-providers",
+          "expect_status": [200],
+          "_note": "listsamlprovider — GET /v1/saml-providers (zero-required-param global list; size/page/sort/federation_type/saml_provider_name all optional). SAML WRITES stay in the heavy probe lane (iam-credentials-heavy) — this is the bare list only. LIVE-CONFIRMED 200 2026-07-08 (count 0, empty saml_providers[] — empty-list 200 is the expected steady state on this account). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         }
       ]
     }
