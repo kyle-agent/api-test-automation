@@ -498,6 +498,15 @@ def _resolve_lifecycle_ids(sel: dict) -> list[str]:
             continue
         if nid in node_ids or n["service"] in svcs or n["category"] in cats:
             scoped.add(n["lifecycle"])
+    # 서비스/카테고리 scope는 노드-source lifecycle뿐 아니라 그 서비스로 태그된
+    # lifecycle 전부를 포함한다 (§2 "서비스 풀 테스트") — 어떤 노드도 가리키지 않는
+    # 합성/추가 lifecycle(예: vs-server-actions-verify)이 빠지지 않도록.
+    if svcs or cats:
+        for lid, lc in lcs.items():
+            svc = lc.get("service") or ""
+            cat = svc.split("/", 1)[0] if "/" in svc else ""
+            if svc in svcs or cat in cats:
+                scoped.add(lid)
     scoped = {lid for lid in scoped
               if lid in lcs and lcs[lid].get("enabled")
               and lcs[lid].get("role") == "verify"}
