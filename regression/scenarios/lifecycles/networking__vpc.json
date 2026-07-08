@@ -2398,6 +2398,70 @@
           "retry_interval": 15
         },
         {
+          "name": "refresh-vip-static-nat-id",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "static_nat_id": "$.subnet_vip.static_nat.id"
+          },
+          "_note": "VIP 해제 파이널 스윕 1/3 (ADDED 2026-07-08 — delete-subnet 409 'remaining VIPs. Please release the VIPs before deleting' 수리). 라이브 근거: 실패 런 잔존에서 VIP(8ee598df…)가 ACTIVE static_nat({id:5f0dbcd7…, publicip ATTACHED})를 문 채 살아 있었음 — delete-vip-static-nat-ip가 실패/캡처미스로 NAT가 남으면 delete-vip 409 → delete-subnet 409 연쇄. 이 GET이 show 응답($.subnet_vip.static_nat.id — 라이브 envelope 확인)에서 실 NAT id를 재캡처해 아래 파이널 해제가 create-시점 capture_soft 미스와 무관하게 동작하게 한다. 정상 경로(VIP 이미 삭제)면 404 → 캡처 미스 → 아래 스텝들 404 무해. params 없음 = showsubnetvip 커버리지 이중기록 안 함 (show-subnet-vip가 담당)."
+        },
+        {
+          "name": "release-vip-static-nat-final",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/static-nat-ips/{static_nat_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "VIP 해제 파이널 스윕 2/3 (ADDED 2026-07-08): 남은 static NAT를 재삭제(deletesubnetvipnatip — 카탈로그 확인) — NAT가 살아 있는 한 delete-vip 409·delete-publicip 400(ATTACHED)·delete-subnet 409가 전부 막힌다. 앞 스텝이 재캡처한 static_nat_id 사용; 이미 해제됐으면 404 무해."
+        },
+        {
+          "name": "release-vip-final",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15,
+          "_note": "VIP 해제 파이널 스윕 3/3 (ADDED 2026-07-08): NAT 해제 후 VIP 재삭제(deletesubnetvip — 카탈로그의 VIP release 엔드포인트; 별도 release op 없음). 첫 delete-vip가 NAT 잔존으로 409였던 경우의 두 번째 기회 — 이 스텝이 성공해야 delete-publicip(ATTACHED→해제)와 delete-subnet(remaining VIPs 409)이 뚫린다. 정상 경로면 404 무해. retry [400,409] 6×15s: NAT 해제 직후 VIP가 전이 중일 수 있음."
+        },
+        {
           "name": "set-subnet",
           "service": "vpc",
           "method": "PUT",
@@ -2497,7 +2561,8 @@
             409
           ],
           "retries": 8,
-          "retry_interval": 15
+          "retry_interval": 15,
+          "_note": "2026-07-08 라이브 런 실패 지점: 409 'remaining VIPs. Please release the VIPs before deleting' — 원인은 static NAT 잔존 → delete-vip 409 → VIP 잔존 연쇄 (refresh-vip-static-nat-id/release-vip-static-nat-final/release-vip-final 파이널 스윕 3스텝으로 수리). retry_on_status [409] 8×15s 유지 (요구 하한 4×15s 이상) — VIP 해제 직후 백엔드 카운트 전파 지연 흡수."
         },
         {
           "name": "wait-subnet-gone",

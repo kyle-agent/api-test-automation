@@ -1798,3 +1798,27 @@ variants) — all **UNVERIFIED LIVE**, apply + observe in HB1b/HB2b:
   신규 log-group 4개(mysql/mariadb slowlog·alertlog)에서도 동일 재현. 계정에
   log-stream 계열 IAM 액션이 없다 (대사 에이전트 실측). log-group 삭제가
   child-stream 권한을 요구해 실패하는 기지 잔존의 뿌리와 같은 게이트.
+
+## budget 이름은 20자 이하 — docs 미기재 (2026-07-08 실측)
+
+> conf: 0.8 · seen: 2026-07-08 · obs: 1
+
+- `POST /v1/budgets/account` (createaccountbudget)의 `name`은 **최대 20자**:
+  25자 템플릿이 400 `"Name length cannot exceed 20."` (BudgetCreateRequest
+  docs에 길이 제약 없음 — AI-usability gap). 기존 probe의 `regr-budget-{unique}`
+  (정확히 20자)가 201을 받아온 이유이기도 하다. lifecycle 수리:
+  `budget-account-budget-full`의 create/set name → `regrbud{unique}` (15자).
+
+## filestorage replication 관리 op는 볼륨 purpose 전제 — DR 측에서만 (2026-07-08 재확인)
+
+> conf: 0.8 · seen: 2026-07-08 · obs: 3
+
+- `purpose`는 **서버 관리 상태 필드** (VolumeCreateRequest에 없음 — 생성 body로
+  지정 불가): 복제 source 볼륨 = `original`, kr-east1 replica = `replication`
+  (라이브 관찰 2026-07-08). source 측 set/delete replication은 400
+  `"Check the volume purpose."` (= 2026-06-24 `Invalid.volume.purpose` 재확인)
+  — 2xx는 **DR 리전 호스트**(`filestorage-dr` alias + replica volume_id)로만.
+- 잔존 주의: replication 삭제 후에도 **replica 볼륨은 kr-east1에 남는다** —
+  teardown은 delete-replication-dr 뒤 replica 볼륨 자체를 지워야 함
+  (`delete-replica-volume-dr` 스텝, 2026-07-08 추가; replication 존속 중
+  replica delete는 400).
