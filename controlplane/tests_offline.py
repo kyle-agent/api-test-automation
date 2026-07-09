@@ -36,6 +36,14 @@ from fastapi.testclient import TestClient  # noqa: E402
 from controlplane import authoring, compare, db, resources, snapshots  # noqa: E402
 from controlplane.app import app  # noqa: E402
 
+# 2026-07-09: 위 env 핀만으론 부족 — pytest 는 root conftest.py 를 테스트 모듈보다
+# 먼저 import 하고, conftest 가 `from core.config import settings` 로 frozen 싱글턴을
+# 그 시점 env(.env 포함, _bool 기본 True)로 구워 버린다. .env 가 게이트를 arm 한
+# 호스트에선 destructive_enabled() 가 True 로 남아 test_delete_gated_* 가 실제
+# 라이브 DELETE 를 시도했다 (실측: VPC-G 404). 싱글턴 필드를 직접 끈다.
+import core.config as _core_cfg  # noqa: E402
+object.__setattr__(_core_cfg.settings, "allow_destructive", False)
+
 client = TestClient(app)
 
 
@@ -252,6 +260,24 @@ def test_ia_catalog_absorbed_into_modeling():
     missing = client.get("/planning/resources/map/endpoints",
                          params={"service": "no/such"})
     assert missing.status_code == 200 and "없습니다" in missing.text
+
+
+def test_modeling_group_header_rows_not_hit_by_global_cat_badge():
+    """2026-07-09 오너 실측 — Modeling 표의 카테고리 그룹 헤더 행이 내용-폭 둥근
+    칩으로 떠 보인 진짜 뿌리: base.html 의 bare `.cat` 배지 규칙(display:
+    inline-block · border-radius)이 `<tr class="cat">` 에도 걸렸다 (P2C-15 는 셀
+    내부만 고쳐 재발). 수리 = 배지 규칙을 `span.cat` 으로 스코프. 이 테스트는
+    (a) 셸 CSS 에 bare `.cat{` 선택자가 다시 생기지 않는 것과 (b) 그룹 헤더가
+    전폭 colspan 행 문법을 유지하는 것을 고정한다."""
+    import re
+    page = client.get("/planning/resources/map").text
+    # (a) 배지는 span 스코프로만 — bare `.cat{` 는 tr.cat 행을 인라인 칩으로 만든다
+    assert "span.cat{" in page
+    assert not re.search(r"(?<![\w.-])\.cat\s*\{", page), \
+        "bare `.cat{` 전역 규칙 재등장 — <tr class=\"cat\"> 그룹 헤더 행이 다시 칩이 된다"
+    # (b) 그룹 헤더 = 표 전체 폭을 스팬하는 행 (카테고리·서비스 모두)
+    assert '<tr class="cat"' in page and '<tr class="svc"' in page
+    assert page.count('colspan="6"') >= page.count('<tr class="cat"')
 
 
 # --- 4. run comparison ------------------------------------------------------------

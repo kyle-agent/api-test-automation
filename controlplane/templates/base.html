@@ -196,11 +196,15 @@
   .warn{color:#9a3412;font-size:12px}
   pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
       overflow-x:auto;font-size:12px}
-  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
-  .cat.real_regression{background:var(--red-bg);color:var(--red)}
-  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
-  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
-  .cat.environment    {background:var(--green-bg);color:var(--green)}
+  /* 카테고리/분류 배지 — span 전용으로 스코프 (2026-07-09, 오너 실측): bare `.cat`
+     전역 규칙이 Modeling 표의 그룹 헤더 행 `<tr class="cat">`에도 걸려 행이
+     display:inline-block 내용-폭 둥근 칩으로 떠 보였다 (P2C-15가 셀 내부만 고쳐
+     재발한 진짜 뿌리). 배지 사용처는 전부 `<span class="cat">`. */
+  span.cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  span.cat.real_regression{background:var(--red-bg);color:var(--red)}
+  span.cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  span.cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  span.cat.environment    {background:var(--green-bg);color:var(--green)}
 </style>
 </head>
 <body>
