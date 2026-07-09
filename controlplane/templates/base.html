@@ -239,9 +239,11 @@
     {# 환경정보 스트립 (2026-07-09 owner GO — legacy /platform 콘솔 (b) 이식):
        env·suite 세그먼트 + 표면별 LIVE/SNAPSHOT 배지. Testing 계열은 라이브
        데이터인데 종전 "모든 수치는 이 스냅샷 기준" 문구가 떠 부정확했다 → 분기. #}
+    {# 주의: 변수명은 ctx_* 프리픽스 — 자식 템플릿 컨텍스트(예: testing.html 의
+       `live` 런 목록)를 base 레벨 set 이 가리지 않게. #}
     {% set snap = ctx_snapshot if ctx_snapshot is defined else none %}
-    {% set live = active is defined and active == 'testing' %}
-    {% if live %}<span class="mode live"
+    {% set ctx_is_live = active is defined and active == 'testing' %}
+    {% if ctx_is_live %}<span class="mode live"
       title="이 화면의 실행·자원 수치는 라이브 서버 실측입니다 — 커버리지 수치만 발행 스냅샷 기준">LIVE</span>
     {% else %}<span class="mode snap"
       title="이 화면의 수치는 최신 발행 스냅샷(dashboard-data) 기준입니다">SNAPSHOT</span>{% endif %}
@@ -253,7 +255,7 @@
     <span class="seg">sha <b>{{ snap.get('sha','') }}</b></span> ·
     <span class="seg">{{ snap.get('ts','') }}{% if snap_age is defined and snap_age %}
     <b>({{ snap_age }})</b>{% endif %}</span>
-    · {% if live %}실행·자원 수치는 라이브 — 커버리지 수치만 이 스냅샷 기준{% else %}모든 수치는 이 스냅샷 기준{% endif %}
+    · {% if ctx_is_live %}실행·자원 수치는 라이브 — 커버리지 수치만 이 스냅샷 기준{% else %}모든 수치는 이 스냅샷 기준{% endif %}
     {% if snap_stale is defined and snap_stale %}<span class="chip s-reached"
       title="발행 후 48시간 이상 경과 — 화면 수치가 현재 상태와 다를 수 있습니다">노후</span>{% endif %}
     {% else %}

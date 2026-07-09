@@ -65,8 +65,22 @@ app.include_router(resource_routes.router)
 from controlplane import console_api  # noqa: E402
 app.include_router(console_api.router)
 from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+
+class _NoCacheStatic(StaticFiles):
+    """console2 자산은 항상 재검증 — StaticFiles 기본 응답의 휴리스틱 캐시가
+    `git pull`+재시작 후에도 브라우저에 옛 console2.js를 남겼다 (2026-07-09 오너
+    실측: P2C-22 반영 후에도 구형 실행 뷰가 렌더, 캐시 비우니 정상). 단독
+    tools/console2_server 는 이미 no-cache — 이 마운트만 빠져 있었다."""
+
+    async def get_response(self, path, scope):  # noqa: D102
+        resp = await super().get_response(path, scope)
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
+
+
 app.mount("/testing/console",
-          StaticFiles(directory=str(ROOT / "console2"), html=True),
+          _NoCacheStatic(directory=str(ROOT / "console2"), html=True),
           name="testing-console")
 
 # Catalog(①) + Reporting(④) faces of the confirmed IA — each its own router (built in

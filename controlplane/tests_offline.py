@@ -280,6 +280,37 @@ def test_modeling_group_header_rows_not_hit_by_global_cat_badge():
     assert page.count('colspan="6"') >= page.count('<tr class="cat"')
 
 
+def test_ctxbar_env_strip_live_vs_snapshot_badge():
+    """2026-07-09 owner GO (b) — legacy /platform 콘솔의 환경정보 스트립 이식.
+    ctxbar(전 페이지, base_ctx P1-3)는 env·suite 세그먼트 형식이 되고, 표면별
+    데이터 성격을 배지로 선언한다: Testing 계열 = LIVE (실행·자원 수치는 라이브
+    실측 — 종전 '모든 수치는 이 스냅샷 기준' 오표기 교정), 그 외 = SNAPSHOT.
+    노후 칩(P2-10)은 유지."""
+    home = client.get("/").text
+    testing = client.get("/testing").text
+    modeling = client.get("/planning/resources/map").text
+    # 표면별 배지 — testing 만 LIVE, 나머지는 SNAPSHOT (ctxbar 배지 클래스로 판별)
+    assert 'class="mode snap"' in home and 'class="mode live"' not in home
+    assert 'class="mode snap"' in modeling and 'class="mode live"' not in modeling
+    assert 'class="mode live"' in testing and 'class="mode snap"' not in testing
+    # env 세그먼트 — settings.env_code 가 있으면 모든 페이지에 동일하게
+    from core.config import settings as _settings
+    if _settings.env_code:
+        assert f"env <b>{_settings.env_code}</b>" in home
+        assert f"env <b>{_settings.env_code}</b>" in testing
+    # 스냅샷이 읽힐 때만: suite 라벨 + LIVE 화면의 분기 문구 (오프라인 환경에선
+    # dashboard-data 가 없어 폴백 문구가 나온다 — 그 경우도 배지는 위에서 보장)
+    from controlplane import dashdata
+    snap = dashdata.latest_coverage()
+    if snap:
+        if snap.get("run_type"):
+            assert f"suite <b>{snap['run_type']}</b>" in home
+        assert "모든 수치는 이 스냅샷 기준" in home
+        assert "커버리지 수치만 이 스냅샷 기준" in testing
+    else:
+        assert "발행 스냅샷 정보 없음" in home
+
+
 # --- 4. run comparison ------------------------------------------------------------
 
 _OBS = {
