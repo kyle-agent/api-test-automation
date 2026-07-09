@@ -1921,3 +1921,26 @@ vpc-endpoint create 첫 2xx 착지(R2 수리 유효) 후 CREATING-delete 400 (AC
 LB member의 빈 object_id 필드가 그 자체로 403 InvalidVmInMember (필드 제거; docs상
 optional) · filestorage-dr 별칭은 이제 core/config가 SCP_DR_REGION(기본 kr-east1)으로
 기본 합성 — SCP_SERVICE_HOSTS 없이도 교차리전 스텝 동작.
+
+## apigw resource-policy·iam role 500의 유력 뿌리 — 오너 하사 userguide 대조 (2026-07-09)
+
+> conf: 0.7 (오프라인 대조 확정, 라이브 재검증 대기) · seen: 2026-07-09
+
+오너가 짚어준 userguide 두 페이지로 run-2c의 500 두 클래스를 대조:
+- **apigateway setresourcepolicy (PF-19)**: 우리가 보낸 `Resource` SRN이
+  `srn:scp::apigateway:api/<id>` — **형식 자체가 불량** (세그먼트 수 부족).
+  정식: `srn:{offering}::{accountId}:kr-west1::apigateway:api/{apiId}`
+  (userguide resource_policy; offering=e). Principal 객체형은
+  `{"scp": [ "srn:e::<acct>:::iam:user/<uid>" ]}`. → 라이프사이클 2곳
+  (apigateway·wave5-appsvc) 정식 SRN으로 교정. 여전히 500이면 "불량 입력에
+  400 아닌 500" PF로 남는다.
+- **iam createrole (PF-20/PF-31)**: 우리 trust policy에 **Principal이 아예
+  없었고** top-level principals=[]. userguide role 페이지는 principal 연결
+  (계정/유저SRN/IdP/서비스, 최대 20)을 전제, json_guides는 Principal 필수 +
+  형식 `{"scp": "srn:e::<account>:::scp-iam:user/<userId>"}` (예시 그대로,
+  서비스명 **scp-iam**·리전 슬롯 빈칸) + Version "2024-07-01" 유효를 명시.
+  → find-iam-user(계정 유저 목록에서 실유저 id 캡처) 선행 + Principal 구성.
+- **LB member (run-2c 403 실측 2회)**: 직접 IP만으로 member 등록 불가 —
+  `object_id`(실제 VM id) 필수 (`InvalidVmInMember object_id: 'None'`).
+  구모델 "직접 입력 IP는 VM 불필요" 전제 반증. → find-member-vm(regrsrv*
+  캡처)+show로 실 IP·id 주입 (owner 방향: "vm의 id를 잘 넣으면 될 것").

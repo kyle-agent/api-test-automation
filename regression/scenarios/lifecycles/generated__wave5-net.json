@@ -1243,6 +1243,30 @@
           }
         },
         {
+          "name": "find-member-vm",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers",
+          "expect_status": [200],
+          "capture_soft": {
+            "member_vm_id": {"list": "$.servers", "where_prefix": {"name": "regrsrv"}, "get": "id"}
+          },
+          "optional": true,
+          "_note": "owner 방향 (2026-07-09, run-2c 403 InvalidVmInMember x2 실측): member 등록은 직접 IP만으로 불가 — 실제 VM object_id 필수 (구모델 'VM 불필요' 반증). 런에 살아있는 우리 VM(regrsrv*, 공유 VPC adopt류 — compute-virtualserver-full 등)을 잡아 id를 캡처. 없으면 soft-miss로 리터럴이 남고 member create는 그대로 하드-fail한다 (VM 있는 풀런 창에서 실검증하는 설계 — expect는 strict 유지)."
+        },
+        {
+          "name": "find-member-vm-ip",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{member_vm_id}",
+          "expect_status": [200, 400, 404],
+          "capture_soft": {
+            "member_vm_ip": "$.addresses[0].ip_addresses[0].ip_address"
+          },
+          "optional": true,
+          "_note": "VM의 실제 IP를 member_ip로 — 응답은 무래퍼(validated-facts 2026-07-08), addresses[0].ip_addresses[0].ip_address. VM 부재 시 400/404 관용."
+        },
+        {
           "name": "create-lb-member",
           "service": "loadbalancer",
           "method": "POST",
@@ -1252,7 +1276,8 @@
             "members": [
               {
                 "name": "regrmember1",
-                "member_ip": "10.124.0.101",
+                "member_ip": "{member_vm_ip}",
+              "object_id": "{member_vm_id}",
                 "member_port": 80,
                 "member_state": "ENABLE",
                 "member_weight": 100,
@@ -1317,7 +1342,8 @@
             "members": [
               {
                 "name": "regrmember2",
-                "member_ip": "10.124.0.102",
+                "member_ip": "{member_vm_ip}",
+              "object_id": "{member_vm_id}",
                 "member_port": 80,
                 "member_state": "ENABLE",
                 "member_weight": 100,

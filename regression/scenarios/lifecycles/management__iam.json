@@ -7,6 +7,18 @@
       "_note": "Light, self-contained ROLE lifecycle covering 7 role write ops. A real role create->read->update->bindings->delete is attempted in group 'role-real'; every step is optional so an environmental 500/400/403 (the prior disabled iam-role saw POST /v1/roles -> 500 ContactAdminForAssistance) records coverage on the CALL and skips the rest of the group cleanly rather than failing the run. Bodies grounded on api_bodies.json (createrole/setrole/setroletrustpolicy/addrolepolicybindings). assume_role_policy_document uses an empty Resource and no real Principal (principals[] empty) to avoid referencing a non-existent user SRN. policy_ids sent empty on create; the binding steps then add/remove a placeholder policy id (synthetic -> expected 400/404). The standalone group 'role-bulk' exercises DELETE /v1/roles/bulk and the bindings DELETE endpoints against ids that need no real role (bulk delete of an empty/synthetic set), so those writes are CALLED even if role create 500s. RISK (from docs, not runtime-proven): create role may 500 on this account; bulk role delete body shape (role_ids) is from convention, not a confirmed example -> _note on that step. Create response envelope $.role.id confirmed from createrole 202 doc example.",
       "steps": [
         {
+          "name": "find-iam-user",
+          "method": "GET",
+          "path": "/v1/accounts/ec11538abf8f46d2953539521f745366/users",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "iam_user_id": "$.users[0].id"
+          },
+          "_note": "owner 가이드 후속 (2026-07-09, userguide iam/role + json_guides): trust policy의 Principal은 필수이고 형식은 {\"scp\": \"srn:e::<account>:::scp-iam:user/<userId>\"} (json_guides 예시 그대로). 실사용자 id를 계정 유저 목록에서 캡처해 Principal을 구성 — account_id 리터럴은 knowledge/services.md 기록 상수."
+        },
+        {
           "name": "create-role",
           "method": "POST",
           "path": "/v1/roles",
@@ -23,9 +35,14 @@
                 {
                   "Sid": "statement1",
                   "Effect": "Allow",
-                  "Action": ["sts:AssumeRole"],
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
                   "Condition": {},
-                  "Resource": []
+                  "Resource": [],
+                  "Principal": {
+                    "scp": "srn:e::ec11538abf8f46d2953539521f745366:::scp-iam:user/{iam_user_id}"
+                  }
                 }
               ]
             },
@@ -33,16 +50,29 @@
             "principals": [],
             "tags": []
           },
-          "expect_status": [200, 201, 202],
-          "capture": {"role_id": "$.role.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/roles/{role_id}", "service": "iam"}
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "role_id": "$.role.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/roles/{role_id}",
+            "service": "iam"
+          },
+          "_note": "PF-20/PF-31 재시도 (owner 가이드 2026-07-09): 종전 body는 trust policy에 Principal이 없고 principals=[] — userguide role 페이지는 principal 연결(계정/유저SRN/서비스, 최대 20)을 전제하고 json_guides는 Principal 필수+형식을 명시. 실유저 SRN을 Principal로 추가. 여전히 500이면 PF-31(백엔드) 확정 증거가 강해진다. Version 2024-07-01은 json_guides가 유효 확인."
         },
         {
           "name": "get-role",
           "method": "GET",
           "path": "/v1/roles/{role_id}",
           "group": "role-real",
-          "expect_status": [200]
+          "expect_status": [
+            200
+          ]
         },
         {
           "name": "set-role",
@@ -50,8 +80,19 @@
           "path": "/v1/roles/{role_id}",
           "group": "role-real",
           "optional": true,
-          "json": {"description": "updated by API regression suite", "max_session_duration": 3600},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "description": "updated by API regression suite",
+            "max_session_duration": 3600
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-role-trust-policy",
@@ -64,11 +105,27 @@
             "assume_role_policy_document": {
               "Version": "2024-07-01",
               "Statement": [
-                {"Sid": "statement1", "Effect": "Allow", "Action": ["sts:AssumeRole"], "Condition": {}, "Resource": []}
+                {
+                  "Sid": "statement1",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
+                  "Condition": {},
+                  "Resource": []
+                }
               ]
             }
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "add-role-policy-bindings",
@@ -77,8 +134,21 @@
           "group": "role-real",
           "optional": true,
           "_note": "addrolepolicybindings: synthetic policy id -> expected 400/404 (no real policy bound) but the POST is CALLED.",
-          "json": {"policy_ids": ["00000000000000000000000000000000"]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "policy_ids": [
+              "00000000000000000000000000000000"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "get-role-policy-bindings",
@@ -86,13 +156,20 @@
           "path": "/v1/roles/{role_id}/policy-bindings",
           "group": "role-real",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "_note": "id-bound read (listrolepolicybindings). Closes GAP-get-id for GET /v1/roles/{role_id}/policy-bindings. Keys off the create-role-captured role_id; tolerant [200,400,403,404] because create-role may 500/4xx on this account (the prior iam-role saw POST /v1/roles -> 500), leaving role_id a placeholder (normalizes to the catalog '*' key, still records coverage). Complements probe-role-reads; this explicit step makes the endpoint statically reachable."
         },
         {
           "name": "probe-role-reads",
           "group": "role-real",
-          "probe_reads": {"role_id": "{role_id}"}
+          "probe_reads": {
+            "role_id": "{role_id}"
+          }
         },
         {
           "name": "remove-role-policy-binding",
@@ -102,7 +179,16 @@
           "optional": true,
           "destructive": true,
           "_note": "{unique} stands in for the synthetic policy id added above; remove single binding (path param segment normalizes to '*' for catalog match).",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "remove-bulk-role-policy-bindings",
@@ -112,7 +198,16 @@
           "optional": true,
           "destructive": true,
           "_note": "removebulkrolepolicybindings: detaches all policy bindings from the role.",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-role",
@@ -121,7 +216,16 @@
           "group": "role-real",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-roles-bulk",
@@ -131,8 +235,14 @@
           "optional": true,
           "destructive": true,
           "_note": "Standalone (does NOT need role-real to succeed) so DELETE /v1/roles/bulk is CALLED regardless. CONFIRMED 2026-06-24: empty role_ids array [] returns 204 (idempotent). Prior synthetic id '00000000000000000000000000000000' returned 404 ContactAdminForAssistance. Fixed to empty array for clean 2xx coverage.",
-          "json": {"role_ids": []},
-          "expect_status": [200, 202, 204]
+          "json": {
+            "role_ids": []
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
         }
       ]
     },
@@ -148,11 +258,22 @@
           "path": "/v1/roles",
           "group": "role-existing",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "capture_soft": {
             "existing_role_id": {
               "list": "$.roles",
-              "where_not_prefix": {"name": ["SCPServiceRole", "AWSReserved", "AWS"]},
+              "where_not_prefix": {
+                "name": [
+                  "SCPServiceRole",
+                  "AWSReserved",
+                  "AWS"
+                ]
+              },
               "get": "id"
             }
           },
@@ -176,15 +297,35 @@
               "policy_document": {
                 "Version": "2024-07-01",
                 "Statement": [
-                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
                 ]
               }
             },
             "tags": []
           },
-          "expect_status": [200, 201, 202],
-          "capture": {"temp_policy_id": "$.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/policies/{temp_policy_id}", "service": "iam"}
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "temp_policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{temp_policy_id}",
+            "service": "iam"
+          }
         },
         {
           "name": "add-role-policy-binding",
@@ -193,8 +334,21 @@
           "group": "role-existing",
           "optional": true,
           "_note": "addrolepolicybindings — POST /v1/roles/{role_id}/policy-bindings. CONFIRMED 200 2026-06-24: using OrganizationAccountAccessRole + real temp policy_id.",
-          "json": {"policy_ids": ["{temp_policy_id}"]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "policy_ids": [
+              "{temp_policy_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "remove-role-policy-binding-single",
@@ -204,7 +358,16 @@
           "optional": true,
           "destructive": true,
           "_note": "removerolepolicybinding — DELETE /v1/roles/{role_id}/policy-bindings/{policy_id}. CONFIRMED 204 2026-06-24.",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "add-role-policy-binding-again",
@@ -213,8 +376,21 @@
           "group": "role-existing",
           "optional": true,
           "_note": "Re-add the binding so removebulkrolepolicybindings can remove it.",
-          "json": {"policy_ids": ["{temp_policy_id}"]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "policy_ids": [
+              "{temp_policy_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "remove-role-policy-bindings-bulk",
@@ -224,8 +400,21 @@
           "optional": true,
           "destructive": true,
           "_note": "removebulkrolepolicybindings — DELETE /v1/roles/{role_id}/policy-bindings (bulk, body policy_ids). CONFIRMED 204 2026-06-24.",
-          "json": {"policy_ids": ["{temp_policy_id}"]},
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "json": {
+            "policy_ids": [
+              "{temp_policy_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-role-description",
@@ -234,8 +423,19 @@
           "group": "role-existing",
           "optional": true,
           "_note": "setrole — PUT /v1/roles/{role_id}. CONFIRMED 200 2026-06-24: updates description (non-destructive). Restores description to original value from capture_soft (or API regression suite marker).",
-          "json": {"description": "API regression suite (restored)", "max_session_duration": 3600},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "description": "API regression suite (restored)",
+            "max_session_duration": 3600
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-role-trust-policy",
@@ -251,15 +451,29 @@
                 {
                   "Sid": "statement1",
                   "Effect": "Allow",
-                  "Action": ["sts:*"],
+                  "Action": [
+                    "sts:*"
+                  ],
                   "Condition": {},
-                  "Principal": {"Account": ["73eab1a74c6347c1be9c892efc7f1102"]},
+                  "Principal": {
+                    "Account": [
+                      "73eab1a74c6347c1be9c892efc7f1102"
+                    ]
+                  },
                   "Resource": []
                 }
               ]
             }
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "restore-role-description",
@@ -268,8 +482,19 @@
           "group": "role-existing",
           "optional": true,
           "_note": "Restore the original role description. PUT with empty string (API doesn't accept null, returns 200 but keeps previous value if null passed).",
-          "json": {"description": "", "max_session_duration": 3600},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "description": "",
+            "max_session_duration": 3600
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-temp-policy",
@@ -279,8 +504,19 @@
           "optional": true,
           "destructive": true,
           "_note": "Explicit delete of temp policy in lifecycle steps (not just cleanup block). Belt-and-suspenders: ensures the policy is unbound from the role before deletion. Cleanup block also deletes it, making this idempotent (second delete returns 404 which is fine).",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "retry_on_status": [409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "retry_on_status": [
+            409
+          ],
           "retries": 5,
           "retry_interval": 5
         }
@@ -309,15 +545,35 @@
               "policy_document": {
                 "Version": "2024-07-01",
                 "Statement": [
-                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
                 ]
               }
             },
             "tags": []
           },
-          "expect_status": [200, 201, 202],
-          "capture": {"policy_id": "$.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/policies/{policy_id}", "service": "iam"}
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{policy_id}",
+            "service": "iam"
+          }
         },
         {
           "name": "set-policy",
@@ -334,12 +590,30 @@
               "policy_document": {
                 "Version": "2024-07-01",
                 "Statement": [
-                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
                 ]
               }
             }
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-policy-bindings",
@@ -348,13 +622,29 @@
           "group": "pol-real",
           "optional": true,
           "_note": "setpolicygroupbinding: add/remove a synthetic GROUP id -> expected 400/404 but PUT is CALLED.",
-          "json": {"identity_type": "GROUP", "add_ids": ["00000000000000000000000000000000"], "remove_ids": []},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "identity_type": "GROUP",
+            "add_ids": [
+              "00000000000000000000000000000000"
+            ],
+            "remove_ids": []
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "probe-policy-reads",
           "group": "pol-real",
-          "probe_reads": {"policy_id": "{policy_id}"}
+          "probe_reads": {
+            "policy_id": "{policy_id}"
+          }
         },
         {
           "name": "delete-policy",
@@ -363,7 +653,16 @@
           "group": "pol-real",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "query-policy",
@@ -371,8 +670,17 @@
           "path": "/v1/policies/list",
           "optional": true,
           "_note": "querypolicy — POST /v1/policies/list. Standalone (not group-gated so it fires even if pol-real fails). All query and body params optional; excluded_policy_ids is a best-effort filter only. Confirmed 200 on this account (runtime_status run, count=27 policies). Body from api_bodies.json (querypolicy). Closes GAP-mut for management/iam/querypolicy via the lifecycle file (also wired in scenarios.json xcov-querypolicy group but lives here for the iam-lifecycle batch).",
-          "json": {"excluded_policy_ids": []},
-          "expect_status": [200, 201, 202, 400, 403, 422]
+          "json": {
+            "excluded_policy_ids": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            422
+          ]
         }
       ]
     },
@@ -400,15 +708,35 @@
               "policy_document": {
                 "Version": "2024-07-01",
                 "Statement": [
-                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
                 ]
               }
             },
             "tags": []
           },
-          "expect_status": [200, 201, 202],
-          "capture": {"grp_policy_id": "$.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/policies/{grp_policy_id}", "service": "iam"}
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "grp_policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{grp_policy_id}",
+            "service": "iam"
+          }
         },
         {
           "name": "create-group",
@@ -416,10 +744,27 @@
           "path": "/v1/groups",
           "group": "grp-bind",
           "optional": true,
-          "json": {"name": "regrgrpb{ualpha}", "description": "API regression suite", "policy_ids": [], "user_ids": [], "tags": []},
-          "expect_status": [200, 201, 202],
-          "capture": {"group_id": "$.group.id", "group_name": "$.group.name"},
-          "cleanup": {"method": "DELETE", "path": "/v1/groups/{group_id}", "service": "iam"}
+          "json": {
+            "name": "regrgrpb{ualpha}",
+            "description": "API regression suite",
+            "policy_ids": [],
+            "user_ids": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "group_id": "$.group.id",
+            "group_name": "$.group.name"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/groups/{group_id}",
+            "service": "iam"
+          }
         },
         {
           "name": "set-group",
@@ -428,8 +773,19 @@
           "group": "grp-bind",
           "optional": true,
           "_note": "setgroup — PUT /v1/groups/{group_id}. CONFIRMED 2026-06-23: body REQUIRES 'name' field (400 'Field required' without it). Captures group_name from create response ($.group.name) and re-sends it unchanged with new description.",
-          "json": {"name": "{group_name}", "description": "updated by API regression suite"},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "name": "{group_name}",
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "add-group-member",
@@ -438,8 +794,19 @@
           "group": "grp-bind",
           "optional": true,
           "_note": "addgroupmember: synthetic user_id -> 404 (no IAM users on account), POST is CALLED and catalog key recorded.",
-          "json": {"user_id": "00000000000000000000000000000000"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "user_id": "00000000000000000000000000000000"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "add-group-policy-binding",
@@ -448,13 +815,28 @@
           "group": "grp-bind",
           "optional": true,
           "_note": "addgrouppolicybinding: uses real policy_id captured from create-policy-for-group -> CONFIRMED 200 (real policy bind). Falls back gracefully if policy create 503'd.",
-          "json": {"policy_ids": ["{grp_policy_id}"]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "policy_ids": [
+              "{grp_policy_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "probe-group-reads",
           "group": "grp-bind",
-          "probe_reads": {"group_id": "{group_id}"}
+          "probe_reads": {
+            "group_id": "{group_id}"
+          }
         },
         {
           "name": "remove-group-policy-binding",
@@ -464,7 +846,16 @@
           "optional": true,
           "destructive": true,
           "_note": "removegrouppolicybinding: uses real grp_policy_id captured above -> CONFIRMED 204 (removes the real policy binding). Falls back gracefully if policy not bound.",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "remove-group-member",
@@ -474,7 +865,16 @@
           "optional": true,
           "destructive": true,
           "_note": "removegroupmember: synthetic user id -> 404 (no real member), DELETE is CALLED and catalog key recorded.",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-group",
@@ -483,7 +883,16 @@
           "group": "grp-bind",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-policy-for-group",
@@ -492,7 +901,12 @@
           "group": "grp-bind",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 404],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
           "_note": "2026-07-09b (run-2b 잔존 실측): create-policy-for-group이 만든 policy가 binding 해제 후에도 잔존 — happy path는 명시 delete 스텝이 정본(cleanup은 실패 경로 전용)이라 policy 삭제 스텝 부재가 뿌리. 404 관용은 실패-경로 cleanup과의 중복 대비."
         }
       ]
@@ -508,15 +922,33 @@
           "method": "POST",
           "path": "/v1/users/{unique}/policy-bindings",
           "optional": true,
-          "json": {"policy_ids": ["00000000000000000000000000000000"]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "policy_ids": [
+              "00000000000000000000000000000000"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "get-user-policy-bindings",
           "method": "GET",
           "path": "/v1/users/{unique}/policy-bindings",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "_note": "id-bound read (listuserpolicybindings). CONFIRMED 2026-06-20: GET /v1/users/{user_id}/policy-bindings returns 200 with ANY user_id, even a fully-synthetic all-zeros id — the IAM gateway returns an empty list rather than 404 for unknown users. {unique} will therefore hit 200 here (smoke-verified via direct ApiClient probe). Path normalizes to catalog key management/iam/listuserpolicybindings via '*' segment."
         },
         {
@@ -525,7 +957,16 @@
           "path": "/v1/users/{unique}/policy-bindings/{unique}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         }
       ]
     },
@@ -541,8 +982,17 @@
           "path": "/v1/resources",
           "service": "resourcemanager",
           "optional": true,
-          "params": {"resource_type": "kms", "page": 0, "size": 10},
-          "expect_status": [200, 400, 403, 404],
+          "params": {
+            "resource_type": "kms",
+            "page": 0,
+            "size": 10
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "capture_soft": {
             "iam_srn": "$.resources[0].srn"
           },
@@ -567,13 +1017,31 @@
               "policy_document": {
                 "Version": "2024-07-01",
                 "Statement": [
-                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["kms:*"], "Resource": ["*"], "Principal": "*"}
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "kms:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": "*"
+                  }
                 ]
               }
             }
           },
-          "expect_status": [200, 201, 202],
-          "cleanup": {"method": "DELETE", "path": "/v1/resource-policies/{iam_srn_b64}", "service": "iam"},
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/resource-policies/{iam_srn_b64}",
+            "service": "iam"
+          },
           "_note": "setresourcepolicy — PUT /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23: kms:* action is valid for a KMS SRN. Creates a resource policy (group 'rp-real'; cleanup deletes it). Action changed from iam:* (400 UnSupportedActionInPolicy) to kms:* (200). Expect_status narrowed to [200,201,202]: we now have confirmed 2xx (strict 유지 = role verify 불변). 2026-07-08 런의 400 \"SRN decoding error … 0x89 in position 0\"는 제품결함도 b64 인코딩 누락도 아님 — list 캡처 미스(페이지네이션 버그)로 리터럴 플레이스홀더가 송신된 가짜 실패 (근본수리: list-kms-resources page=0/size + b64 스텝 non-optional 게이트; 각 스텝 note 참조). b64 경로 역학은 실 SRN으로 라이브 재검증됨 2026-07-08 (GET show가 b64 세그먼트를 원문 SRN으로 정확 복호, req-a3b1dd4b)."
         },
         {
@@ -581,13 +1049,17 @@
           "method": "GET",
           "path": "/v1/resource-policies/{iam_srn_b64}",
           "group": "rp-real",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "showresourcepolicy — EXPLICIT GET /v1/resource-policies/{srn} on the REAL b64-encoded KMS SRN (iam_srn_b64) right after set-resource-policy created the policy. The probe-resource-policy-reads auto-seed below already fires this GET at runtime, but probe_reads steps are invisible to the static step->catalog union — this explicit strict-200 step closes that gap (COMPLETENESS-AUDIT-2026-07-08). CONFIRMED 200 2026-06-23 (same GET via the probe, policy present). Group rp-real gates it on setresourcepolicy success, so strict [200] never fires without the policy. (정정 2026-07-08: 종전 note의 '0 kms resources' 진단은 오진 — 실제로는 kms 자원 5개 존재, list의 page=1이 빈 두 번째 페이지였음. 수리 후 캡처 미스 시나리오는 b64 게이트의 LifecycleSkip으로 lifecycle 전체가 깨끗이 환경 스킵되므로 이 스텝은 placeholder로 발화하지 않는다. b64 경로 자체는 실 SRN GET으로 라이브 확인 — 404 'No Policy found with ID srn:e::…' = 세그먼트 복호 정상, req-a3b1dd4b.)"
         },
         {
           "name": "probe-resource-policy-reads",
           "group": "rp-real",
-          "probe_reads": {"srn": "{iam_srn_b64}"},
+          "probe_reads": {
+            "srn": "{iam_srn_b64}"
+          },
           "_note": "showresourcepolicy — probe GET /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23. Explicitly maps catalog param 'srn' to the b64-encoded SRN value (iam_srn_b64). Without this explicit mapping, probe_reads can't resolve {srn} (ctx has 'iam_srn_b64', not 'srn'; _PARAM_ALIASES only has 'rg_srn' for srn). The probe fires GET /v1/resource-policies/{iam_srn_b64} after setresourcepolicy created the policy -> 200. Records under catalog key management/iam/showresourcepolicy. Group rp-real gates this on setresourcepolicy success."
         },
         {
@@ -599,14 +1071,29 @@
           "json": {
             "Sid": "Statement2",
             "Effect": "Allow",
-            "Action": ["kms:*"],
+            "Action": [
+              "kms:*"
+            ],
             "NotAction": [],
             "Principal": "*",
-            "Resource": ["*"],
+            "Resource": [
+              "*"
+            ],
             "Condition": {}
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {"rp_statement_sid": "$.Statement.Sid"},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture_soft": {
+            "rp_statement_sid": "$.Statement.Sid"
+          },
           "_note": "addpermission — POST /v1/resource-policies/{srn}/statements. CONFIRMED 201 2026-06-23 with kms:* action. Soft-captures $.Statement.Sid ('Statement2') as rp_statement_sid for use in setpermission/removepermission path. Action changed from iam:* to kms:* (same fix as setresourcepolicy)."
         },
         {
@@ -618,13 +1105,25 @@
           "json": {
             "Sid": "Statement2",
             "Effect": "Allow",
-            "Action": ["kms:*"],
+            "Action": [
+              "kms:*"
+            ],
             "NotAction": [],
             "Principal": "*",
-            "Resource": ["*"],
+            "Resource": [
+              "*"
+            ],
             "Condition": {}
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "_note": "setpermission — PUT /v1/resource-policies/{srn}/statements/{sid}. CONFIRMED 200 2026-06-23. {rp_statement_sid} captured from addpermission response ($.Statement.Sid='Statement2'). Prior {unique} caused 404 because synthetic id didn't match created Sid. {rp_statement_sid} path segment normalizes to catalog '*' key (variable, not literal)."
         },
         {
@@ -634,7 +1133,16 @@
           "group": "rp-real",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "_note": "removepermission — DELETE /v1/resource-policies/{srn}/statements/{sid}. CONFIRMED 204 2026-06-23. {rp_statement_sid} captured from addpermission (same fix as setpermission)."
         },
         {
@@ -644,7 +1152,16 @@
           "group": "rp-real",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "_note": "deleteresourcepolicy — DELETE /v1/resource-policies/{srn}. CONFIRMED 204 2026-06-23. Also registered as cleanup on set-resource-policy step (belt-and-suspenders so teardown runs even if this explicit step is skipped)."
         }
       ]
@@ -662,8 +1179,21 @@
           "path": "/v1/access-keys/send-otp",
           "optional": true,
           "_note": "accesskeysendtemporaryotp: sends an OTP to the caller; safe-ish but gated heavy because it triggers a real notification.",
-          "json": {"locale": "ko_KR", "method": "PHONE"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422, 429]
+          "json": {
+            "locale": "ko_KR",
+            "method": "PHONE"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422,
+            429
+          ]
         },
         {
           "name": "create-access-key",
@@ -672,9 +1202,23 @@
           "group": "ak",
           "optional": true,
           "_note": "accesskeycreate: PERMANENT key. parent_access_key_id/passcode omitted. Captures id if returned; the PUT/DELETE-by-id steps fall back to a synthetic id when capture misses (separate group).",
-          "json": {"access_key_type": "PERMANENT", "description": "API regression suite"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {"access_key_id": "$.access_key_id"}
+          "json": {
+            "access_key_type": "PERMANENT",
+            "description": "API regression suite"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture_soft": {
+            "access_key_id": "$.access_key_id"
+          }
         },
         {
           "name": "set-access-key",
@@ -682,8 +1226,18 @@
           "path": "/v1/access-keys/{unique}",
           "optional": true,
           "_note": "accesskeyset: enable/disable. Synthetic id ({unique}) so the PUT is always CALLED; path param segment normalizes to '*'.",
-          "json": {"is_enabled": "true"},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "is_enabled": "true"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-access-key",
@@ -691,7 +1245,16 @@
           "path": "/v1/access-keys/{unique}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-access-keys-bulk",
@@ -700,8 +1263,21 @@
           "optional": true,
           "destructive": true,
           "_note": "Body access_key_ids from convention (no confirmed example) -> synthetic id.",
-          "json": {"access_key_ids": ["00000000000000000000000000000000"]},
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "json": {
+            "access_key_ids": [
+              "00000000000000000000000000000000"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-account-user",
@@ -709,8 +1285,23 @@
           "path": "/v1/accounts/{unique}/users",
           "optional": true,
           "_note": "createiamuser: empty group_ids/policy_ids; synthetic account_id ({unique}) -> expected 400/403/404, POST CALLED. user_name unique.",
-          "json": {"user_name": "regru{ualpha}", "description": "API regression suite", "group_ids": [], "policy_ids": [], "tags": []},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "user_name": "regru{ualpha}",
+            "description": "API regression suite",
+            "group_ids": [],
+            "policy_ids": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "update-account-user",
@@ -718,8 +1309,18 @@
           "path": "/v1/accounts/{unique}/users/{unique}",
           "optional": true,
           "_note": "updateiamuser.",
-          "json": {"description": "updated by API regression suite"},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-account-user-password",
@@ -727,8 +1328,18 @@
           "path": "/v1/accounts/{unique}/users/{unique}/password",
           "optional": true,
           "_note": "updateiamuserpassword. password omitted-as-empty to avoid setting a weak real password; expecting 400/403.",
-          "json": {"temporary_password": false},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "temporary_password": false
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-account-user",
@@ -736,7 +1347,16 @@
           "path": "/v1/accounts/{unique}/users/{unique}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-account-users-bulk",
@@ -745,8 +1365,21 @@
           "optional": true,
           "destructive": true,
           "_note": "Body user_ids from convention (no confirmed example) -> synthetic id.",
-          "json": {"user_ids": ["00000000000000000000000000000000"]},
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "json": {
+            "user_ids": [
+              "00000000000000000000000000000000"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-saml-provider",
@@ -754,16 +1387,36 @@
           "path": "/v1/saml-providers",
           "optional": true,
           "_note": "createsamlprovider: api_bodies.json entry is corrupt (_raw). Best-effort JSON guess (name + metadata_document placeholder); NOT runtime-proven. Likely 400 on invalid metadata, which still records coverage. Soft-captures saml_provider_id ($.id, FLAT envelope per the doc 201 example) to drive the id-bound show below; on the expected 4xx nothing is captured and the show segment stays a placeholder.",
-          "json": {"name": "regrsaml{ualpha}", "metadata_document": "PLACEHOLDER_SAML_METADATA", "tags": []},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {"saml_provider_id": "$.id"}
+          "json": {
+            "name": "regrsaml{ualpha}",
+            "metadata_document": "PLACEHOLDER_SAML_METADATA",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture_soft": {
+            "saml_provider_id": "$.id"
+          }
         },
         {
           "name": "show-saml-provider",
           "method": "GET",
           "path": "/v1/saml-providers/{saml_provider_id}",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "_note": "id-bound read (showsamlprovider). Closes GAP-get-id for GET /v1/saml-providers/{saml_provider_id}. Keys off the create-soft-captured saml_provider_id; tolerant [200,400,403,404] because the create body is UNPROVEN (corrupt api_bodies.json entry) and 4xx's, leaving saml_provider_id a placeholder (normalizes to the catalog '*' key, still records coverage). HEAVY-gated with the rest of this lifecycle; the GET is CALLED so the endpoint is statically reachable."
         },
         {
@@ -772,8 +1425,18 @@
           "path": "/v1/saml-providers/{unique}",
           "optional": true,
           "_note": "setsamlprovider: corrupt body in api_bodies.json; best-effort guess; synthetic id.",
-          "json": {"metadata_document": "PLACEHOLDER_SAML_METADATA"},
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "metadata_document": "PLACEHOLDER_SAML_METADATA"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-saml-providers-bulk",
@@ -782,8 +1445,21 @@
           "optional": true,
           "destructive": true,
           "_note": "deletesamlproviders: CONFIRMED body key is 'ids' (not 'saml_provider_ids') from api_docs.json request_example 2026-06-24. Synthetic id -> 404 ResourceNotFound (vs 400 ValidationError with empty array or wrong key). Not coverable to 2xx without a real SAML provider (createsamlprovider requires multipart/form-data or HEAVY opt-in).",
-          "json": {"ids": ["00000000000000000000000000000000"]},
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "json": {
+            "ids": [
+              "00000000000000000000000000000000"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         }
       ]
     },
@@ -798,8 +1474,16 @@
           "method": "GET",
           "path": "/v1/access-keys",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
-          "capture_soft": {"access_key_id": "$.access_keys[0].id", "account_id": "$.access_keys[0].account_id"},
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "access_key_id": "$.access_keys[0].id",
+            "account_id": "$.access_keys[0].account_id"
+          },
           "_note": "Zero-param list (already in the smoke GET floor) reused here to soft-capture a REAL access_key_id + the caller's account_id (accesskeylist envelope $.access_keys[]). Drives the two id-bound shows below."
         },
         {
@@ -807,7 +1491,12 @@
           "method": "GET",
           "path": "/v1/access-keys/{access_key_id}",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "_note": "id-bound read (accesskeyshow). Closes GAP-get-id for GET /v1/access-keys/{access_key_id}. Keys off the list-captured access_key_id (a real id when the caller has any key); if none, the segment stays a placeholder (normalizes to catalog '*') and 4xx's. Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
         },
         {
@@ -815,8 +1504,15 @@
           "method": "GET",
           "path": "/v1/accounts/{account_id}/users",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
-          "capture_soft": {"account_user_id": "$.users[0].id"},
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "account_user_id": "$.users[0].id"
+          },
           "_note": "id-bound read (listiamuser) — Closes GAP-get-id for GET /v1/accounts/{account_id}/users. account_id is soft-captured from list-access-keys (the caller's own account); the segment normalizes to catalog '*'. Also soft-captures a real user id ($.users[].id) to drive show-account-user. Tolerant [200,400,403,404]."
         },
         {
@@ -824,7 +1520,12 @@
           "method": "GET",
           "path": "/v1/accounts/{account_id}/users/{account_user_id}",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "_note": "id-bound read (showiamuser). Closes GAP-get-id for GET /v1/accounts/{account_id}/users/{user_id}. Both segments are placeholders (account_id from list-access-keys, account_user_id from list-account-users) -> normalizes to v1/accounts/*/users/* matching the catalog. If either is uncaptured the show 4xx's harmlessly while still recording coverage. Tolerant [200,400,403,404]."
         },
         {
@@ -832,8 +1533,15 @@
           "method": "GET",
           "path": "/v1/service-accounts",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
-          "capture_soft": {"service_account_id": "$.service_accounts[0].id"},
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "service_account_id": "$.service_accounts[0].id"
+          },
           "_note": "Zero-param list (smoke GET floor) reused to soft-capture a REAL service_account_id (listserviceaccount envelope $.service_accounts[]). Drives show-service-account."
         },
         {
@@ -841,7 +1549,12 @@
           "method": "GET",
           "path": "/v1/service-accounts/{service_account_id}",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "_note": "id-bound read (showserviceaccount). Closes GAP-get-id for GET /v1/service-accounts/{service_account_id}. service-accounts is read-only in the catalog (list+show only, no create), so a synthetic id would be a guaranteed-404 dead read — instead this keys off the list-captured real service_account_id. If the caller has no service accounts the segment stays a placeholder (normalizes to catalog '*') and 4xx's. Tolerant [200,400,403,404]."
         },
         {
@@ -851,21 +1564,31 @@
           "optional": true,
           "destructive": true,
           "_note": "deletebulkiamuser (DELETE /v1/accounts/{account_id}/users/bulk). CONFIRMED 2026-06-24: empty user_ids array [] returns 204 (idempotent, no users deleted). account_id is soft-captured from list-access-keys (the caller's own real account id). This is NON-HEAVY because no IAM users are created or deleted — the empty array is a no-op. Covers the catalog key management/iam/deletebulkiamuser.",
-          "json": {"user_ids": []},
-          "expect_status": [200, 202, 204]
+          "json": {
+            "user_ids": []
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
         },
         {
           "name": "list-endpoints",
           "method": "GET",
           "path": "/v1/endpoints",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "listendpoints — GET /v1/endpoints (zero-param global read: the per-region service endpoint directory; docs declare no parameters at all). LIVE-CONFIRMED 200 2026-07-08 (returns $.endpoints[] with region/service_name/url entries). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         },
         {
           "name": "list-saml-providers",
           "method": "GET",
           "path": "/v1/saml-providers",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "listsamlprovider — GET /v1/saml-providers (zero-required-param global list; size/page/sort/federation_type/saml_provider_name all optional). SAML WRITES stay in the heavy probe lane (iam-credentials-heavy) — this is the bare list only. LIVE-CONFIRMED 200 2026-07-08 (count 0, empty saml_providers[] — empty-list 200 is the expected steady state on this account). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         }
       ]
