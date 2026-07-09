@@ -492,47 +492,73 @@ g.rg-selbox{cursor:pointer}
  * lifecycle (sticky scope bar pins which) or the 전체 aggregate. Ported from
  * console2/mockups/b1-report-drilldown.html, recolored to this Primer theme.
  * ========================================================================== */
-.md-report{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;margin-bottom:8px}
-/* the scope DETAIL (자원·API·로그 — a long downward list) STACKS BELOW the 흐름
-   master, full-width, rather than as a tall right-hand column. */
+/* P2C-22 (owner 2026-07-09): 2-pane — master strip(배너+①→②칩)는 전폭 1행, 그
+   아래 좌 RAIL(전체 카드 + 상태 필터 + 시나리오 목록, 내부 스크롤) + 우 DETAIL.
+   세로 카드 스택(96행) ↔ 하단 상세의 스크롤 왕복 제거. 시맨틱 무변경 — 배치만. */
+.md-report{display:grid;grid-template-columns:minmax(230px,260px) minmax(0,1fr);gap:14px;
+  align-items:start;margin-bottom:8px}
+/* 유휴(런 미바인딩) = has-detail 없음 (drawReport 가 토글) — 빈 rail 거터 없이 단일 컬럼 */
+.md-report:not(.has-detail){grid-template-columns:1fr}
+.md-report:not(.has-detail) .md-rail{display:none}
+.md-master{grid-column:1/-1}
 .md-master,.md-detail{min-width:0}
 .md-master>h2,.md-detail .detail-h{margin-top:0}
+.fold-car{background:transparent;border:none;cursor:pointer;font-size:12px;color:var(--muted);
+  padding:0 4px;vertical-align:1px}
+.fold-car:hover{color:var(--accent)}
 
-/* MASTER: compact lifecycle list + 전체 toggle (escape hatch for a dense graph) */
-.lc-picker{margin-top:12px}
+/* RAIL: sticky — 목록(.lclist)만 내부 스크롤, 전체 카드/필터는 상단 고정 */
+.md-rail{position:sticky;top:8px;max-height:86vh;min-width:0;display:flex;flex-direction:column}
+.lc-picker{display:flex;flex-direction:column;min-height:0;flex:1}
 .lcp-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px}
-/* 대기 중(이벤트 0) 라이프사이클 접힌 요약 — 카드 홍수 대신 한 줄 */
-.lcqueue{margin:0 0 6px;padding:6px 10px;border:1px dashed var(--line);border-radius:8px;
-  color:var(--muted);font-size:12px;background:#fafbfc}
-.lcqueue summary{cursor:pointer;font-weight:600}
-.lcqueue .qnames{margin-top:6px;line-height:1.8;word-break:break-all}
-.lclist{display:flex;flex-direction:column;gap:6px}
-.lcitem{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
-  border-radius:8px;padding:7px 10px;cursor:pointer}
+.lclist{display:flex;flex-direction:column;gap:4px;overflow-y:auto;min-height:0;flex:1 1 auto;
+  position:relative;padding-right:2px}
+.lcitem{display:flex;align-items:center;gap:7px;width:100%;text-align:left;background:#fff;
+  border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer}
 .lcitem:hover{border-color:var(--accent)}
 .lcitem.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
-.lcitem .lctop{display:flex;align-items:center;gap:8px}
-.lcitem .st{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:800;color:#fff;flex:0 0 auto}
+/* now = now-playing 의 active lifecycle (선택(sel)과 별개 채널 — 좌 인셋 바) */
+.lcitem.now{background:#eef4fe;box-shadow:inset 3px 0 0 var(--accent)}
+/* pend = 대기 중(이벤트 0) — 클릭 불가 회색 행 (구 .lcqueue 접힌 요약을 대체) */
+.lcitem.pend{color:var(--muted);cursor:default;border-style:dashed}
+.lcitem.pend:hover{border-color:var(--line)}
+.lcitem .st{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;color:#fff;flex:0 0 auto}
 .lcitem .st.done{background:var(--green)}.lcitem .st.run{background:var(--accent)}
 .lcitem .st.fail{background:var(--red)}.lcitem .st.skip{background:var(--line2)}
 .lcitem .st.queued{background:#fff;border:1.5px solid var(--line2);color:var(--muted)}
-.lcitem .lcname{font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lcitem .lcmeta{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px;align-items:center}
-.lcitem .lcsvc{color:var(--muted);font-size:11px}
-.lcitem .pill{border:1px solid var(--line2);border-radius:10px;padding:0 7px;font-size:10px;font-weight:700;
-  color:#3a424b;white-space:nowrap}
-.lcitem .pill.l{background:var(--accent);color:#fff;border-color:var(--accent)}
-.lcitem .pill.soft{border-color:var(--amber);color:var(--amber)}
+.lcitem .lcname{flex:1 1 auto;min-width:0;font-weight:700;font-size:12px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.lcitem .pill{border:1px solid var(--line2);border-radius:10px;padding:0 5px;font-size:9.5px;font-weight:700;
+  color:#3a424b;white-space:nowrap;flex:0 0 auto}
 .lcitem .pill.fail{border-color:var(--red);color:var(--red)}
 
+/* 상태 필터 칩 (rail 로컬) — 전체 · 진행 · 실패 · 대기 */
+.lcfilter{display:flex;gap:4px;margin:0 0 6px;flex-wrap:wrap}
+.fchip{border:1px solid var(--line);background:#fff;border-radius:12px;padding:2px 8px;
+  font-size:10.5px;color:var(--muted);cursor:pointer;font-weight:600}
+.fchip b{font-weight:800}
+.fchip.on{border-color:var(--accent);color:var(--accent);background:#f0f6ff}
+.fchip:hover{border-color:var(--accent)}
+
+/* 전체(집계) 카드 — rail 최상단 고정 + 진행률 링(done/total, 단일 채널=완료율) */
 .aggitem{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#fff;
-  border:1px dashed var(--line2);border-radius:8px;padding:8px 11px;margin-top:9px;cursor:pointer}
+  border:1px dashed var(--line2);border-radius:8px;padding:8px 11px;cursor:pointer}
+.aggitem.top{margin:0 0 8px;border-style:solid;flex:0 0 auto}
 .aggitem:hover{border-color:var(--accent)}
 .aggitem.sel{border-style:solid;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
-.aggitem .ico{font-size:15px}
+.aggitem .ring{width:22px;height:22px;border-radius:50%;flex:0 0 auto;
+  background:conic-gradient(var(--green) calc(var(--p,0)*1%),var(--line2) 0);
+  display:inline-flex;align-items:center;justify-content:center}
+.aggitem .ring::after{content:"";width:14px;height:14px;border-radius:50%;background:#fff}
+.aggitem .aggtxt{min-width:0}
 .aggitem .aggtxt b{font-size:12.5px;display:block}
-.aggitem .sub{color:var(--muted);font-size:11px;margin-left:auto;white-space:nowrap}
+.aggitem .sub{color:var(--muted);font-size:10.5px;display:block;margin-top:2px}
+.aggitem .failn{color:var(--red);font-weight:800}
+
+/* 좁은 화면 폴백 — 단일 컬럼: rail 은 static (86vh sticky 가 상세를 가리지 않게,
+   .treepanel 폴백과 같은 패턴), 목록은 짧은 내부 스크롤 스트립으로. */
+@media(max-width:1180px){.md-report{grid-template-columns:1fr}.md-rail{position:static;max-height:none}.lclist{max-height:280px}}
 
 /* DETAIL: sticky scope bar pins WHICH lifecycle (the thing flat tabs lose) */
 .md-detail{background:var(--panel);border:1px solid var(--line);border-radius:8px;

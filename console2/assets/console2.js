@@ -242,6 +242,10 @@ function wireNav() {
   const ht = $("hist-toggle");
   if (ht) ht.onclick = () => setHistOpen(!histOpen);
   syncHistFold();
+  // master strip fold (P2C-22) — 기본 열림 (배너+①→②칩을 접어 rail/상세에 세로 양보)
+  const mf = $("master-fold");
+  if (mf) mf.onclick = () => setMasterOpen(!masterOpen);
+  syncMasterFold();
 }
 
 // the ONE runtime-view URL (single source — popup 링크와 인라인 iframe 이 공유).
@@ -265,6 +269,23 @@ function syncHistFold() {
   if (body) body.classList.toggle("hidden", !histOpen);
   const car = $("hist-car");
   if (car) car.textContent = histOpen ? "▾" : "▸";
+}
+
+// ---- master strip 접힘 (P2C-22 2026-07-09) ----------------------------------
+// 전폭 master(배너 + ①→② 연속성 칩)를 접어 rail/상세에 세로 공간을 양보한다.
+// 기본 열림 — 계획↔실행 연속성 칩은 상시성이 원칙(P2C-19), 접힘은 명시적 선택만.
+let masterOpen = true;
+try { masterOpen = sessionStorage.getItem("c2.masterOpen.v1") !== "0"; } catch (e) { /* private mode */ }
+function setMasterOpen(v) {
+  masterOpen = !!v;
+  try { sessionStorage.setItem("c2.masterOpen.v1", masterOpen ? "1" : "0"); } catch (e) { /* ignore */ }
+  syncMasterFold();
+}
+function syncMasterFold() {
+  const body = $("report-main");
+  if (body) body.classList.toggle("hidden", !masterOpen);
+  const car = $("master-fold");
+  if (car) car.textContent = masterOpen ? "▾" : "▸";
 }
 function go(scr) {
   screen = scr;
@@ -2021,47 +2042,90 @@ function lcStatusClass(s) { return s === "done" ? "done" : s === "running" ? "ru
 function lcStatusGlyph(s) { return s === "done" ? "✓" : s === "running" ? "⏳" : s === "fail" ? "✕" : s === "skip" ? "–" : "·"; }
 function lcStatusLabel(s) { return s === "done" ? "완료" : s === "running" ? "진행 중" : s === "fail" ? "실패" : s === "skip" ? "건너뜀" : "대기"; }
 
-// ---- MASTER: compact lifecycle list + 전체(aggregate) toggle ----------------
-// The escape hatch for a dense / collapsed graph: a one-row-per-lifecycle list
-// (status · service · API/자원 counts) where a click drills into that lifecycle's
-// detail, plus a clearly-labeled 전체 pill that switches the detail to the cross-run
-// aggregate (the CURRENT flat behavior). Highlights the current scope.
+// ---- RAIL (P2C-22, owner 2026-07-09): 전체 카드 + 상태 필터 + 시나리오 목록 --
+// 세로 카드 스택(96행)이 하단 상세와 스크롤 왕복하던 것을 좌 rail ↔ 우 상세
+// 2-pane 으로. rail = ① 전체(집계) 카드 최상단 고정(진행률 링 done/total + fail
+// 스텝 합계 — "메인은 전체") ② 상태 필터 칩 ③ 1줄 압축 행 목록(내부 스크롤;
+// API/자원/soft 카운트는 title 툴팁으로) + 대기(이벤트 0) 회색 행 통합.
+// 시맨틱 무변경: 행 클릭 = selectScope(기존), 전체 카드 = selectScope("*").
+let railFilter = "all";     // all | run | fail | queued — rail 상태 필터 (로컬 상태)
+let railUserTs = 0;         // 사용자가 목록을 만진 최근 시각 — follow-active 유보
+let railProgTs = 0;         // 프로그램적 scrollTop 조정 시각 (scroll 이벤트 오인 방지)
+const RAIL_FOLLOW_HOLD_MS = 10000;
+
 function renderLcPicker() {
   const host = $("lc-picker"); if (!host) return;
   const { lcs, order } = groupedRun();
   const agg = aggregateBucket(lcs, order);
-  const rows = order.map(id => {
+  const prog = liveProgress();
+  const activeLc = prog.running ? prog.activeLifecycle : null;
+  // 대기 중(이벤트 0) 라이프사이클 — rec 전체 선택(runSelIds)과의 차집합 파생은
+  // 유지 (2026-07-08 owner), 표시만 접힌 요약 한 줄 → rail 회색 행으로.
+  const pending = (runSelIds || []).filter(id => !lcs[id]).sort();
+  const n = { run: 0, fail: 0, queued: pending.length, done: 0 };
+  order.forEach(id => { const s = lcs[id].status;
+    if (s === "running") n.run++; else if (s === "fail") n.fail++;
+    else if (s === "queued") n.queued++; else if (s === "done") n.done++; });
+  const total = order.length + pending.length;
+  const pct = total ? Math.round(n.done / total * 100) : 0;
+  const failSteps = order.reduce((a, id) => a + lcs[id].failN, 0);
+  const match = s => railFilter === "all"
+    || (railFilter === "run" && s === "running")
+    || (railFilter === "fail" && s === "fail")
+    || (railFilter === "queued" && s === "queued");
+  const rows = order.filter(id => match(lcs[id].status)).map(id => {
     const b = lcs[id];
     const cls = lcStatusClass(b.status);
-    return `<button class="lcitem ${detailScope === id ? "sel" : ""}" data-lc="${esc(id)}" title="${esc(id)} — 상세 열기">
-      <span class="lctop"><span class="st ${cls}">${lcStatusGlyph(b.status)}</span>
-        <span class="lcname">${b.heavy ? "🜂 " : ""}${esc(id)}</span></span>
-      <span class="lcmeta">${b.service ? `<span class="lcsvc">${esc(b.service)}</span>` : ""}
-        <span class="pill l">${b.api.length} API</span>
-        <span class="pill">${b.resources.length} 자원</span>
-        ${b.softN ? `<span class="pill soft">${b.softN} soft</span>` : ""}
-        ${b.failN ? `<span class="pill fail">${b.failN} fail</span>` : ""}</span>
+    const tip = `${id}${b.service ? " — " + b.service : ""} · ${lcStatusLabel(b.status)}`
+      + ` · ${b.api.length} API · ${b.resources.length} 자원`
+      + (b.softN ? ` · ${b.softN} soft` : "") + (b.failN ? ` · ${b.failN} fail` : "")
+      + " — 상세 열기";
+    return `<button class="lcitem ${detailScope === id ? "sel" : ""}${activeLc === id ? " now" : ""}" data-lc="${esc(id)}" title="${esc(tip)}">
+      <span class="st ${cls}">${lcStatusGlyph(b.status)}</span>
+      <span class="lcname">${b.heavy ? "🜂 " : ""}${esc(id)}</span>
+      ${b.failN ? `<span class="pill fail">✕${b.failN}</span>` : ""}
     </button>`;
   }).join("");
-  // 대기 중(이벤트 0) 라이프사이클 — 카드는 이벤트 폴딩으로만 생기므로 rec의
-  // 전체 선택(runSelIds)과의 차집합으로 파생한다 (2026-07-08 owner: "대기중인
-  // 라이프사이클은 표시가 안되는구나"). 125장 카드 홍수 대신 접힌 요약 한 줄.
-  const pending = (runSelIds || []).filter(id => !lcs[id]).sort();
-  const inflight = runStatus === "running" || runStatus === "queued" || runStatus === "…";
-  const qstrip = pending.length && inflight
-    ? `<details class="lcqueue"><summary>⏸ 대기 ${pending.length}개 — 워커가 비면 순서대로 시작</summary>
-       <div class="qnames">${pending.map(esc).join(" · ")}</div></details>` : "";
+  const pendRows = (railFilter === "all" || railFilter === "queued")
+    ? pending.map(id => `<div class="lcitem pend" title="${esc(id)} — 대기 중, 워커가 비면 순서대로 시작">
+        <span class="st queued">·</span><span class="lcname">${esc(id)}</span></div>`).join("") : "";
+  const chip = (k, label, cnt) =>
+    `<button class="fchip ${railFilter === k ? "on" : ""}" data-f="${k}" title="${label} 시나리오만 표시">${label} <b>${cnt}</b></button>`;
+  const prevList = host.querySelector(".lclist");
+  const keepTop = prevList ? prevList.scrollTop : 0;   // 폴 재렌더에도 목록 스크롤 보존
   host.innerHTML =
-    `<div class="lcp-h">라이프사이클 <span class="muted small">· 클릭 = 상세 (밀집/접힌 그래프용)</span></div>
-     ${qstrip}
-     <div class="lclist">${rows || '<p class="muted small">라이프사이클 대기 중…</p>'}</div>
-     <button class="aggitem ${isAggScope() ? "sel" : ""}" id="agg-toggle" title="크로스-런 집계 — 평면 탭의 기존 동작">
-       <span class="ico">🗂️</span><span class="aggtxt"><b>전체 (집계)</b>
-         <span class="muted small">런 전체 자원/API/로그 합산</span></span>
-       <span class="sub">${agg.resources.length} 자원 · ${agg.api.length} API</span>
-     </button>`;
-  els("#lc-picker .lcitem[data-lc]").forEach(b => b.onclick = () => selectScope(b.dataset.lc));
+    `<button class="aggitem top ${isAggScope() ? "sel" : ""}" id="agg-toggle"
+       title="크로스-런 집계 — 런 전체 자원/API/로그 합산 · ${agg.resources.length} 자원 · ${agg.api.length} API">
+       <span class="ring" style="--p:${pct}"></span>
+       <span class="aggtxt"><b>🗂️ 전체 (집계)</b>
+         <span class="sub">완료 ${n.done}/${total}${failSteps ? ` · <span class="failn">✕${failSteps}</span>` : ""} · ${agg.resources.length} 자원 · ${agg.api.length} API</span></span>
+     </button>
+     <div class="lcfilter" id="lc-filter">${chip("all", "전체", total)}${chip("run", "진행", n.run)}${chip("fail", "실패", n.fail)}${chip("queued", "대기", n.queued)}</div>
+     <div class="lcp-h">시나리오 <span class="muted small">· 클릭 = 우측 상세</span></div>
+     <div class="lclist">${rows + pendRows || '<p class="muted small">라이프사이클 대기 중…</p>'}</div>`;
   $("agg-toggle").onclick = () => selectScope("*");
+  els("#lc-picker .fchip").forEach(b => b.onclick = () => { railFilter = b.dataset.f; renderLcPicker(); });
+  els("#lc-picker .lcitem[data-lc]").forEach(b => b.onclick = () => { railUserTs = Date.now(); selectScope(b.dataset.lc); });
+  const list = host.querySelector(".lclist");
+  if (!list) return;
+  const touch = () => { if (Date.now() - railProgTs > 200) railUserTs = Date.now(); };
+  list.addEventListener("scroll", touch, { passive: true });
+  list.addEventListener("mouseenter", touch);
+  railProgTs = Date.now();
+  list.scrollTop = keepTop;
+  // follow-active: 실행 중이면 now 행을 목록 뷰포트 안으로 — 단 사용자가 최근
+  // ~10s 내 목록을 스크롤/호버했으면 유보 (keepDetailScroll 과 같은 존중 원칙).
+  if (activeLc && Date.now() - railUserTs > RAIL_FOLLOW_HOLD_MS) {
+    const row = list.querySelector(".lcitem.now");
+    if (row) {
+      // .lclist 는 position:relative — row.offsetTop 이 곧 목록-상대 좌표다.
+      const top = row.offsetTop, bot = top + row.offsetHeight;
+      if (top < list.scrollTop || bot > list.scrollTop + list.clientHeight) {
+        railProgTs = Date.now();
+        list.scrollTop = Math.max(0, top - Math.round(list.clientHeight / 2));
+      }
+    }
+  }
 }
 
 // aggregate bucket across all lifecycles (the 전체 scope) — concatenates resources +

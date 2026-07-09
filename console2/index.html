@@ -138,12 +138,19 @@ html.bare-console #backToShell{display:inline}</style>
            lifecycle list; clicking a lifecycle opens the detail pane scoped to it
            (자원·API·로그 = "…for this lifecycle"); 전체 = the cross-run aggregate. -->
       <div class="md-report" id="md-report">
-        <!-- MASTER: 흐름 scene (B2) + compact lifecycle list + 전체 toggle -->
+        <!-- MASTER strip (전폭): run 배너 + ①→② 연속성 칩 — DAG 씬은 🕸 팝업이 소유.
+             P2C-22: 접기 토글 (기본 열림 · sessionStorage c2.masterOpen.v1) -->
         <section class="md-master" id="report-master">
-          <h2>흐름 <span class="muted small">· master — 노드/행 클릭 = 그 라이프사이클 상세</span></h2>
+          <h2><button class="fold-car" id="master-fold" title="흐름 배너 접기/펼치기 (기본 열림)">▾</button>
+            흐름 <span class="muted small">· master — 노드/행 클릭 = 그 라이프사이클 상세</span></h2>
           <div id="report-main"></div>
-          <div class="lc-picker" id="lc-picker"></div>
         </section>
+        <!-- RAIL (P2C-22, owner 2026-07-09): 좌측 = 전체(집계) 카드 + 상태 필터 +
+             시나리오 목록(내부 스크롤) — 세로 카드 스택 ↔ 하단 상세의 스크롤 왕복 제거.
+             lc-picker 의 id 는 JS 렌더러 계약 — 유지. -->
+        <aside class="md-rail" id="report-rail">
+          <div class="lc-picker" id="lc-picker"></div>
+        </aside>
         <!-- DETAIL: sticky scope bar + 자원·API·로그 scoped to the selected lifecycle -->
         <section class="md-detail" id="report-detail">
           <div class="scopebar" id="scopebar"></div>

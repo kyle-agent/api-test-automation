@@ -690,3 +690,48 @@ def test_execution_cx_relayout_frontend_contract():
     # runtimeUrl() is the ONE place the runtime URL lives (popup, pf link, iframe)
     assert js.count('"/runtime?scope=mine"') == 1 and "function runtimeUrl()" in js
     assert "새 창" in html  # popup 유지 + 라벨
+
+
+# --------------------------------------------------------------------------- #
+# P2C-22 (2026-07-09) — ② 실행 뷰 2-pane: 좌 rail(전체+시나리오) + 우 상세
+# --------------------------------------------------------------------------- #
+def test_execution_rail_master_detail_contract():
+    """Pin the P2C-22 two-pane relayout (owner 2026-07-09: 세로 카드 스택 ↔ 하단
+    상세의 스크롤 왕복 제거 — 좌측 전체+시나리오 목록, 우측 상세). Layout only;
+    the drill-down semantics (selectScope / default 전체 scope) are untouched:
+
+      1. index.html: a rail <aside> hosts the lc-picker BEFORE the detail pane;
+         the master strip keeps its full-width slot and gains a fold toggle.
+      2. css: 2-column grid + full-width master row + sticky rail whose LIST
+         (not the page) scrolls; single-column fallback at the shared 1180px
+         breakpoint (same pattern as .treepanel).
+      3. js: 전체(집계) card pinned FIRST with a done/total progress ring,
+         status filter chips, compact rows (counts demoted to title tooltip),
+         pending rows folded into the rail, follow-active with a user-scroll
+         hold, and master fold state persisted in sessionStorage."""
+    html = (ROOT / "console2" / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
+    # 1) rail hosts the picker, left of (= before) the detail pane; master folds
+    assert '<aside class="md-rail" id="report-rail">' in html
+    assert html.index('id="report-rail"') < html.index('id="report-detail"')
+    assert html.index('id="lc-picker"') > html.index('id="report-rail"')
+    assert 'id="master-fold"' in html
+    # 2) 2-pane grid, full-width master, sticky rail + internal list scroll
+    assert "grid-template-columns:minmax(230px,260px) minmax(0,1fr)" in css
+    assert ".md-master{grid-column:1/-1}" in css
+    assert ".md-rail{position:sticky" in css
+    lclist_rule = css.split(".lclist{", 1)[1].split("}")[0]
+    assert "overflow-y:auto" in lclist_rule, "the rail LIST must scroll internally"
+    assert "@media(max-width:1180px){.md-report{grid-template-columns:1fr}" in css
+    # 3) rail renderer: agg-first w/ ring, filter chips, tooltip counts,
+    #    pending rows, follow-active hold, master fold persistence
+    assert 'class="aggitem top' in js and 'class="ring"' in js
+    agg_pos = js.index('class="aggitem top')
+    assert agg_pos < js.index('<div class="lclist">'), "전체 카드가 목록 위 (rail 최상단)"
+    assert "railFilter" in js and 'chip("fail"' in js and 'chip("queued"' in js
+    assert " API · " in js  # 카운트는 행 title 툴팁으로 (1줄 압축 행)
+    assert 'class="lcitem pend"' in js  # 대기 행 rail 통합 (구 lcqueue 대체)
+    assert "lcqueue" not in js
+    assert "RAIL_FOLLOW_HOLD_MS" in js and ".lcitem.now" in js
+    assert "c2.masterOpen.v1" in js
