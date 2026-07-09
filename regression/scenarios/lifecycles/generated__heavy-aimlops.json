@@ -639,10 +639,15 @@
               "Completed",
               "COMPLETED"
             ],
+            "give_up_status": [
+              400,
+              403,
+              404
+            ],
             "timeout": 1800,
             "interval": 30
           },
-          "_note": "poll the release to a deployed/ready state. CORRECTED offline 2026-07-07 (A-repair-9): data/api_docs.json `getaimlopsplatformv1` response_example proves the real field is top-level `release_state` (example value 'DEPLOYED', not wrapped) — the prior `$.status` guess does not exist on this response at all. Kept the other UNPROVEN enum members as a broad fallback (untested) alongside the CONFIRMED 'DEPLOYED'. optional+grouped+broad expect_status so a 404 (release never created on a 4xx POST) or an unexpected status field does not hard-fail before teardown. **Live-unverified.**"
+          "_note": "poll the release to a deployed/ready state. CORRECTED offline 2026-07-07 (A-repair-9): data/api_docs.json `getaimlopsplatformv1` response_example proves the real field is top-level `release_state` (example value 'DEPLOYED', not wrapped) — the prior `$.status` guess does not exist on this response at all. Kept the other UNPROVEN enum members as a broad fallback (untested) alongside the CONFIRMED 'DEPLOYED'. optional+grouped+broad expect_status so a 404 (release never created on a 4xx POST) or an unexpected status field does not hard-fail before teardown. **Live-unverified.** || 2026-07-09 owner 목격('뭘 더 기다리는거지?'): 탐사용 create가 400을 허용해 release_id가 리터럴인 채 이 폴이 400을 30분 내내 재시도(10회차+4.6분 실측) — give_up_status [400,403,404] 추가로 미존재 release는 즉시 포기하고 그룹 스킵→티어다운 직행. 같은 '관용 create→리터럴 폴' 클래스의 전수 점검은 회고 백로그."
         },
         {
           "name": "update-aimlops-platform",
