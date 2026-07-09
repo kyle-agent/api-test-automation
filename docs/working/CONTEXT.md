@@ -113,7 +113,38 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-07-09 오후, run-2b 트리아지 + 엔진 cleanup 근본수리 — branch
+- **LATEST (2026-07-09 밤, 오너 실시간 협업 세션 마감 — main=`f8b44f62`, branch 동기):**
+  하루 종일 오너와 실시간으로 런 3회(run-2b 90/96 → run-2c 16/2 표적 → run-85b2
+  91/96 풀런 → 진행 중 4번째) 트리아지·수리·화면개편을 반복. **내일 아침 리뷰
+  포인트: `docs/working/plans/CX-IA-DESIGN-2026-07-09.md`** (제3자 실사용 리뷰 —
+  A안 점진/B안 재구조화 + 오너 결정 D1~D8; 오너 "내일 리뷰하고 방향성 맞추자").
+  ① **수리 라이브 검증 완료**: vpce create+delete 사이클(2,376 fold, C3 74.4%
+  재발행 `dashboard-data:9d65449b`) · vip-nat 사다리 · filestorage-dr 자동 호스트
+  (교차리전 절차까지 pass) · shared-networking dns 삭제 · **LB member VM
+  object_id 주입**(InvalidVmInMember 통과 → PF-35 weight/ROUND_ROBIN 미문서
+  제약 발견·수리) · 엔진 cleanup(하드실패 시 잔존 0 실증).
+  ② **엔진 신규 규약 2건**: 미해석 {token} 폴 즉시 스킵 · **terminal-bad**
+  (ERROR/FAILED 폴 즉시 종료+실패 분류, until 명시/refire 예외, poll.terminal_bad
+  오버라이드) — VM ERROR 20분 공회전 실측이 계기.
+  ③ **per-lifecycle 중단**: core.commands 채널을 로컬 콘솔 런에 배선
+  (stop_polling+skip_scenario, console2_server in-memory 큐+1e9 오프셋,
+  controlplane 병합 서빙) + 스코프바 ⏸ 버튼.
+  ④ **화면 (P2C-22~24)**: 실행 뷰 2-pane rail · Modeling 카테고리 행 수리
+  (전역 .cat 배지 충돌) · 환경 스트립(LIVE/SNAPSHOT 배지) · **폴링 다이어트**
+  (events 증분 ?offset= + 2s 단일 tick, 라이브 ≈1req/2s) · in-place 렌더
+  (깜빡임/클릭 유실 제거) · 진행률 바+ETA · 자산 no-cache. P2C-25(의존그래프
+  탭 처리)는 오너 결정 대기.
+  ⑤ **정리 자동화**: run-scoped reaper(런 대장 tracked−deleted를 사다리로 삭제
+  — fs 교차리전 + VPC 409 홀더) per-run cleanup 편입 · reconciler vpc-endpoints
+  패스 신설(공유 VPC stuck 뿌리) · heavy-shared-dbaas 은퇴 1단계(vpc 선택에
+  과금 DB 3기 딸려오던 문제, 21 op 전부 subops-full이 커버).
+  ⑥ **잔존 기준선**: 계정 = 기지 IAM-gated log-group 1건뿐 (수 회 재검증).
+  ⑦ **미해결/대기**: gen-private-nat 'Connectable'(재배열+사다리 반영, 라이브
+  검증 대기 — 2런 연속 실패했던 것) · iam-role-full Principal 수리 라이브 검증 ·
+  aimlops(명시 선택시) · pre-flight mutations 칩 하드코딩(CX 문서 발견, 방향
+  합의 후) · P2C-25 · CX-IA D1~D8 오너 결정. 오프라인 게이트는 분리 실행이 정본
+  (offline 514 · controlplane 73; 합치면 hermeticity 충돌).
+- **PRIOR (2026-07-09 오후, run-2b 트리아지 + 엔진 cleanup 근본수리 — branch
   `claude/continuation-uk2rwc`=`c0a908c7` 푸시완료):** 오너 콘솔 전체 런
   **run-2b (90/96 pass·5 fail·39분, ai/db 상품군 제외)** 이벤트 전문 트리아지 완료.
   ① **fail 5 원인 확정+수리**: gen-vpc-endpoint(create 2xx 첫 착지! 그러나
