@@ -35,6 +35,14 @@ from fastapi.responses import HTMLResponse, JSONResponse
 # import-safe: its server only starts under ``if __name__ == '__main__'``.
 from tools import console2_server as c2
 
+# per-lifecycle 중단 채널 (owner 2026-07-09): embed 모드에선 이 컨트롤플레인이
+# /api/runs/{id}/commands 를 서빙하므로, 로컬 런 엔진 subprocess가 폴링할 URL을
+# 컨트롤플레인 자신으로 지정한다 (표준 uvicorn 8000; 다른 포트면 서버 기동 env
+# APITEST_PLATFORM_URL로 지정). os.environ은 건드리지 않는다 (import 부작용 금지).
+import os as _os
+c2.EMBED_PLATFORM_URL = _os.environ.get("APITEST_PLATFORM_URL",
+                                        "http://127.0.0.1:8000")
+
 router = APIRouter()
 
 
@@ -282,6 +290,15 @@ def api_run_abort(rid: str) -> JSONResponse:
     """로컬 run 중단 (2026-07-04): kill the pytest process tree → teardown 스윕
     → status '중단됨(aborted)'. Engine half lives in c2._abort_run."""
     code, payload = c2._abort_run(rid)
+    return _json(payload, code)
+
+
+@router.post("/api/runs/{rid}/skip-lifecycle")
+async def api_run_skip_lifecycle(rid: str, request: Request) -> JSONResponse:
+    """특정 라이프사이클만 중단 (owner 2026-07-09) — 엔진 명령 채널에
+    stop_polling+skip_scenario 를 넣어 다음 안전 지점에서 정리 후 스킵."""
+    body = await _body(request)
+    code, payload = c2.skip_lifecycle(rid, str(body.get("lifecycle") or ""))
     return _json(payload, code)
 
 

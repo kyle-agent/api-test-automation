@@ -1633,6 +1633,60 @@ def _kill_proc_tree(proc, grace_s: float = 10.0) -> None:
         pass
 
 
+# ── per-lifecycle intervention (owner 2026-07-09: "중간에 특정 라이프사이클을
+# 멈출 수는 없네") — 런 전체 kill(중단 버튼)과 별개로 특정 라이프사이클만
+# 안전 지점에서 멈춘다. 엔진의 기존 플랫폼 명령 채널(core.commands)을 그대로
+# 재사용: stop_polling(진행 중인 긴 wait를 즉시 탈출) + skip_scenario(다음
+# 스텝 경계에서 지금까지 만든 자원 teardown 후 스킵 기록). 로컬 런용 in-memory
+# per-run 큐 — CI 런의 DB 큐(controlplane.db, sqlite autoincrement 소수 id)와
+# ack id가 충돌하지 않게 1e9 오프셋을 쓴다.
+_CMD_BASE = 10 ** 9
+_CMD_SEQ = iter(range(_CMD_BASE + 1, 2 * _CMD_BASE))
+_COMMANDS: dict[str, list[dict]] = {}   # rid -> [{id, action, target, acked}]
+# embed(controlplane) 모드에서 console_api가 세팅 — 엔진 subprocess가 폴링할
+# 명령 채널 URL. import 부작용으로 os.environ을 오염시키지 않기 위한 모듈 변수
+# (전체 오프라인 스위트에서 dag_runner env 테스트가 깨지던 원인).
+EMBED_PLATFORM_URL: str | None = None
+
+
+def local_pending_commands(rid: str) -> list[dict]:
+    with _LOCK:
+        return [{"id": c["id"], "action": c["action"], "target": c["target"]}
+                for c in _COMMANDS.get(rid, []) if not c["acked"]]
+
+
+def local_ack_command(cid: int) -> bool:
+    with _LOCK:
+        for items in _COMMANDS.values():
+            for c in items:
+                if c["id"] == cid:
+                    c["acked"] = True
+                    return True
+    return False
+
+
+def skip_lifecycle(rid: str, lifecycle: str) -> tuple[int, dict]:
+    """특정 라이프사이클만 중단(정리 후 스킵) — running LIVE 런에만 허용."""
+    lifecycle = (lifecycle or "").strip()
+    with _LOCK:
+        rec = _RUNS.get(rid)
+    if not rec:
+        return 404, {"error": "no such run"}
+    if rec.get("status") != "running":
+        return 409, {"error": f"run is {rec.get('status')} — 실행 중에만 가능"}
+    if lifecycle not in (rec.get("lifecycle_ids") or []):
+        return 404, {"error": f"'{lifecycle}' is not in this run"}
+    with _LOCK:
+        q = _COMMANDS.setdefault(rid, [])
+        # stop_polling 먼저 — 20분짜리 wait 한복판이어도 즉시 깨어나 스텝
+        # 경계로 오고, 거기서 skip_scenario가 teardown+스킵을 집행한다.
+        for action in ("stop_polling", "skip_scenario"):
+            q.append({"id": next(_CMD_SEQ), "action": action,
+                      "target": lifecycle, "acked": False})
+    return 202, {"ok": True, "lifecycle": lifecycle,
+                 "note": "다음 안전 지점에서 정리 후 스킵됩니다 (긴 대기는 즉시 탈출)"}
+
+
 def _abort_run(rid: str) -> tuple[int, dict]:
     """중단 버튼의 서버 반쪽 — abort a LOCAL run (persona 2차 수용: 로컬 run 은
     실행 중 중단 수단이 전혀 없었다). Returns ``(http_code, payload)``.
@@ -1947,6 +2001,12 @@ def _run_worker(rec: dict) -> None:
            # Both are why /runtime attribution now reads the IN-PROCESS records
            # (_local_res_index) first and treats the bucket join as CI-only garnish.
            "APITEST_RUN_ID": rec["id"],
+           # per-lifecycle 중단 채널 (skip_lifecycle): 엔진(core.commands)이 이
+           # URL의 /api/runs/{rid}/commands 를 스텝 경계/폴 루프에서 폴링한다.
+           # embed(controlplane) 모드에선 컨트롤플레인이 자기 URL을 미리
+           # export(setdefault)하고 로컬 큐를 병합 서빙한다.
+           "APITEST_PLATFORM_URL": os.environ.get("APITEST_PLATFORM_URL")
+               or EMBED_PLATFORM_URL or f"http://127.0.0.1:{PORT}",
            "SCP_CRUD_IDS": ",".join(rec["lifecycle_ids"]),
            "SCP_CONSOLE_EVENTS": rec["events"],
            "SCP_ALLOW_MUTATIONS": "true" if rec["mutations"] else "false",
@@ -2521,6 +2581,9 @@ class Handler(BaseHTTPRequestHandler):
                 rows = [_rec_view(r) for r in sorted(_RUNS.values(),
                                                      key=lambda x: x["started"], reverse=True)]
             return self._json(200, {"runs": rows})
+        if p.startswith("/api/runs/") and p.endswith("/commands"):
+            rid = p[len("/api/runs/"):-len("/commands")]
+            return self._json(200, {"commands": local_pending_commands(rid)})
         if p.startswith("/api/runs/") and p.endswith("/events"):
             rid = p[len("/api/runs/"):-len("/events")]
             with _LOCK:
@@ -2635,6 +2698,17 @@ class Handler(BaseHTTPRequestHandler):
             rid = p[len("/api/runs/"):-len("/abort")]
             code, payload = _abort_run(rid)
             return self._json(code, payload)
+        if p.startswith("/api/runs/") and p.endswith("/skip-lifecycle"):
+            rid = p[len("/api/runs/"):-len("/skip-lifecycle")]
+            code, payload = skip_lifecycle(rid, str(self._body().get("lifecycle") or ""))
+            return self._json(code, payload)
+        if p.startswith("/api/commands/") and p.endswith("/ack"):
+            try:
+                cid = int(p[len("/api/commands/"):-len("/ack")])
+            except ValueError:
+                return self._json(400, {"error": "bad command id"})
+            return self._json(200, {"ok": True}) if local_ack_command(cid) \
+                else self._json(404, {"error": "no such command"})
         if p == "/api/verify":
             return self._json(202, _rec_view(_start("verify", _verify_worker)))
         if p == "/api/owned":

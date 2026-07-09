@@ -791,9 +791,14 @@ def _require_ingest_token(request: Request) -> None:
 @app.get("/api/runs/{gh_run_id}/commands")
 def api_pending_commands(request: Request, gh_run_id: str):
     """Pending (un-acked) intervention commands — the engine polls this at
-    step boundaries (PLATFORM-PLAN §2.5 명령 채널)."""
+    step boundaries (PLATFORM-PLAN §2.5 명령 채널). LOCAL console runs (embed
+    mode — the run worker lives in THIS process via console_api → console2_server)
+    keep their queue in console2_server._COMMANDS; merge it so one URL serves
+    both CI(DB) and local runs (owner 2026-07-09 per-lifecycle 중단)."""
     _require_ingest_token(request)
-    return {"commands": [
+    from tools import console2_server as _c2
+    local = _c2.local_pending_commands(gh_run_id)
+    return {"commands": local + [
         {"id": c["id"], "action": c["action"], "target": c["target"]}
         for c in db.pending_commands(gh_run_id)]}
 
@@ -801,6 +806,9 @@ def api_pending_commands(request: Request, gh_run_id: str):
 @app.post("/api/commands/{command_id}/ack")
 def api_ack_command(request: Request, command_id: int):
     _require_ingest_token(request)
+    from tools import console2_server as _c2
+    if _c2.local_ack_command(command_id):   # local ids ride a 1e9 offset
+        return {"ok": True}
     if not db.ack_command(command_id):
         raise HTTPException(404, "no such command")
     return {"ok": True}
