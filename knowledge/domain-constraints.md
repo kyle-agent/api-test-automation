@@ -92,3 +92,14 @@ distinct hosts — see `dependencies.json:vpc_schedule.fixed_ip_map`).
 
 Never let two VPC-mutating runs overlap (they compete for the same 3 VPCs).
 Trigger one CRUD run at a time; wait for the prior run's regression job to finish.
+
+## retry_on_status 규칙 — 401은 절대 넣지 말 것 (2026-07-10, run-85b2/377e 실측)
+
+401(인증/인가 실패)은 호출 자체가 거부된 것이라 재시도로 수렴하지 않는다.
+DBaaS delete/unset류 27개 스텝이 관성적으로 `retry_on_status: [400, 401, …]`
+× 20회 × 60s를 갖고 있었고, run-377e에서 `unset-backup` 2건이 각 1,220초를
+태우고 그대로 401-fail — 같은 워커 직렬화와 겹쳐 **makespan을 40분 늘렸다**
+(94.2분의 43%). 27곳 전부에서 401 제거(2026-07-10). 재시도가 정당한 것은
+상태-전이성 코드뿐: 400(EDITING류 반려)·409(충돌)·429·5xx. 만약 미래에
+"401 후 수렴" 패턴이 관측되면 그 서비스 한정으로 근거와 함께 재도입하고
+이 항목에 기록할 것.

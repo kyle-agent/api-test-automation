@@ -19,7 +19,11 @@
             "cidr": "10.176.0.0/20",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "vpc_id": "$.vpc.id"
           },
@@ -36,10 +40,14 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/vpcs/{vpc_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.vpc.state",
-            "until": ["ACTIVE"],
+            "until": [
+              "ACTIVE"
+            ],
             "timeout": 180,
             "interval": 10
           }
@@ -57,7 +65,11 @@
             "vpc_id": "{vpc_id}",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "subnet_id": "$.subnet.id"
           },
@@ -73,10 +85,14 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.subnet.state",
-            "until": ["ACTIVE"],
+            "until": [
+              "ACTIVE"
+            ],
             "timeout": 180,
             "interval": 10
           }
@@ -92,7 +108,11 @@
             "loggable": false,
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "sg_id": "$.security_group.id"
           },
@@ -110,7 +130,11 @@
             "name": "regrvakey{unique}",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "private_key": "$.private_key"
           },
@@ -125,7 +149,9 @@
           "name": "find-image",
           "method": "GET",
           "path": "/v1/images",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "params": {
             "status": "active",
             "scp_original_image_type": "standard",
@@ -141,7 +167,9 @@
           "name": "find-resize-server-type",
           "method": "GET",
           "path": "/v1/server-types",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture": {
             "resize_server_type": {
               "list": "$.server_types",
@@ -149,7 +177,10 @@
                 "id": "s"
               },
               "where_not_prefix": {
-                "id": ["g", "s1v1m2"]
+                "id": [
+                  "g",
+                  "s1v1m2"
+                ]
               },
               "get": "id"
             }
@@ -184,7 +215,11 @@
               }
             ]
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "server_id": "$.servers[0].id"
           },
@@ -199,13 +234,18 @@
           "name": "wait-server-active",
           "method": "GET",
           "path": "/v1/servers/{server_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.state",
-            "until": ["ACTIVE"],
-            "timeout": 1200,
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 1500,
             "interval": 15
-          }
+          },
+          "_note": "2026-07-10 타임아웃 1200→1500s: run-85b2/377e 실측이 한도의 98~99%를 소진(경계 플레이키 방지, 완화가 아니라 여유 확보)."
         },
         {
           "name": "get-server-password",
@@ -214,22 +254,35 @@
           "json": {
             "private_key": "{private_key}"
           },
-          "expect_status": [200, 400],
+          "expect_status": [
+            200,
+            400
+          ],
           "_note": "showvirtualserverpassword with the REAL keypair private_key (read-only effect). OWNER DECISION 2026-07-08: fleet pinned to ubuntu (find-image os_distro=ubuntu — fast boot, no Windows-license rate) and the call keeps passing the real key, single-shot. On ubuntu the guest never publishes an encrypted admin password (the publish flow is the Windows/cloudbase-init mechanism), so live 400 'Failed to decrypt' is the EXPECTED terminal state — the 10-min until-200 poll added earlier the same day (Windows-latency hypothesis, PF-17 corrected) was removed as pure wall-time waste on ubuntu. Reachability-waiver decision pending with owner; PF-17 has the full history."
         },
         {
           "name": "dump-server",
           "method": "POST",
           "path": "/v1/servers/{server_id}/dump",
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "_note": "createvirtualserverdump — no request body (api_docs: server_id path param only; 202 Accepted). Strict-2xx on an ACTIVE server is live-proven: gen-heavy-vs-netops runs the same step non-optional and its later static-nat steps were proven 2xx in run 27450089575."
         },
         {
           "name": "stop-server",
           "method": "POST",
           "path": "/v1/servers/{server_id}/stop",
-          "expect_status": [200, 202, 204],
-          "retry_on_status": [409],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "retry_on_status": [
+            409
+          ],
           "retries": 6,
           "retry_interval": 15,
           "_note": "Same endpoint/expectation as the full lifecycle's validated stop; 409-retry armor in case the dump is still materializing when stop fires."
@@ -238,10 +291,15 @@
           "name": "wait-server-stopped",
           "method": "GET",
           "path": "/v1/servers/{server_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.state",
-            "until": ["STOPPED", "SHUTOFF"],
+            "until": [
+              "STOPPED",
+              "SHUTOFF"
+            ],
             "timeout": 300,
             "interval": 15
           }
@@ -253,18 +311,27 @@
           "json": {
             "server_type": "{resize_server_type}"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "_note": "setvirtualservertype on the STOPPED server (SCP console requires stopped for a type change; api_docs states no server-state precondition, so stopped is the conservative path). Body field is server_type per the docs model serversetservertyperequestbody — NOT server_type_id (the old coverage probe's unproven guess)."
         },
         {
           "name": "wait-server-resized",
           "method": "GET",
           "path": "/v1/servers/{server_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "wait": 15,
           "poll": {
             "field": "$.state",
-            "until": ["STOPPED", "SHUTOFF"],
+            "until": [
+              "STOPPED",
+              "SHUTOFF"
+            ],
             "timeout": 600,
             "interval": 15
           },
@@ -274,8 +341,14 @@
           "name": "start-server",
           "method": "POST",
           "path": "/v1/servers/{server_id}/start",
-          "expect_status": [200, 202, 204],
-          "retry_on_status": [409],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "retry_on_status": [
+            409
+          ],
           "retries": 6,
           "retry_interval": 15
         },
@@ -283,10 +356,14 @@
           "name": "wait-server-restarted",
           "method": "GET",
           "path": "/v1/servers/{server_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.state",
-            "until": ["ACTIVE"],
+            "until": [
+              "ACTIVE"
+            ],
             "timeout": 300,
             "interval": 15
           }
@@ -295,8 +372,14 @@
           "name": "rebuild-server",
           "method": "POST",
           "path": "/v1/servers/{server_id}/rebuild",
-          "expect_status": [200, 201, 202],
-          "retry_on_status": [409],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "retry_on_status": [
+            409
+          ],
           "retries": 4,
           "retry_interval": 15,
           "_note": "rebuildvirtualserver — api_docs lists NO request body (server_id path param only): reinstalls the OS from the server's own image, so nothing external is wiped in. Run on ACTIVE (the standard rebuild path); 409-retry armor if the resize/start is still settling. Ordered last of the 4 actions since it re-provisions the guest."
@@ -305,11 +388,15 @@
           "name": "wait-server-rebuilt",
           "method": "GET",
           "path": "/v1/servers/{server_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "wait": 20,
           "poll": {
             "field": "$.state",
-            "until": ["ACTIVE"],
+            "until": [
+              "ACTIVE"
+            ],
             "timeout": 600,
             "interval": 15
           },
@@ -319,9 +406,15 @@
           "name": "delete-server",
           "method": "DELETE",
           "path": "/v1/servers/{server_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
-          "retry_on_status": [409],
+          "retry_on_status": [
+            409
+          ],
           "retries": 8,
           "retry_interval": 15
         },
@@ -329,9 +422,14 @@
           "name": "wait-server-gone",
           "method": "GET",
           "path": "/v1/servers/{server_id}",
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
-            "until_status": [404],
+            "until_status": [
+              404
+            ],
             "timeout": 600,
             "interval": 15
           }
@@ -340,7 +438,11 @@
           "name": "delete-keypair",
           "method": "DELETE",
           "path": "/v1/keypairs/regrvakey{unique}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true
         },
         {
@@ -348,7 +450,11 @@
           "service": "security-group",
           "method": "DELETE",
           "path": "/v1/security-groups/{sg_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true
         },
         {
@@ -356,7 +462,11 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/subnets/{subnet_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
           "adopt": "subnet"
         },
@@ -365,9 +475,14 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
-            "until_status": [404],
+            "until_status": [
+              404
+            ],
             "timeout": 180,
             "interval": 10
           },
@@ -378,7 +493,11 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
           "adopt": "vpc"
         }
