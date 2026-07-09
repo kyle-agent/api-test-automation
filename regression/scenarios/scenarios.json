@@ -6158,7 +6158,10 @@
       "id": "heavy-shared-dbaas",
       "service": "networking/vpc",
       "heavy": true,
-      "enabled": true,
+      "enabled": false,
+      "_status": "done-modeled",
+      "_replaced_by": "mariadb-cluster-subops-full,epas-cluster-subops-full,cachestore-cluster-subops-full",
+      "_disabled_reason": "\uc740\ud1f4 1\ub2e8\uacc4 (owner \uc2b9\uc778 2026-07-09 '\uc9c4\ud589'): service \ud0dc\uadf8\uac00 networking/vpc\ub77c vpc \uc120\ud0dd\ub9cc\uc73c\ub85c \uacfc\uae08 DB \ud074\ub7ec\uc2a4\ud130 3\uae30\uac00 \ub534\ub824\uc624\ub358 \ubb38\uc81c(\uc624\ub108 \uc2e4\uce21 run 2\ud68c). \uc815\uc801 \ub300\uc870: \uc774 \ub77c\uc774\ud504\uc0ac\uc774\ud074\uc758 21 op = subops-full 3\uc885(D2-D7 \ub77c\uc774\ube0c \uadf8\ub9b0)+vpc \ub77c\uc774\ud504\uc0ac\uc774\ud074\uc774 \uc804\ubd80 \ucee4\ubc84, \uace0\uc720 \ucee4\ubc84\ub9ac\uc9c0 0. \ud55c \uc708\ub3c4\uc6b0 \ubb34\uc601\ud5a5 \ud655\uc778 \ud6c4 phase-2 \ubb3c\ub9ac\uc0ad\uc81c \ub300\uc0c1.",
       "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 5 dbaas engines (mysql/postgresql/mariadb/epas/cachestore); VM excluded (#6 no identifiable boot image); eventstreams (undocumented topology value_error), searchengine/sqlserver/vertica (require a real license) excluded. Subnet/vpc teardown retries 409 to wait out async cluster termination. created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body). SLIMMED 2026-06-10 (run e3ba190 timing: 160min wall, ~135min of it teardown wait): mysql/postgresql legs REMOVED (redundant — the standalone database-mysql-cluster/database-postgresql-cluster heavy lifecycles cover the same catalog keys and more); -gone polls capped at 900s (mariadb took ~90min to vanish; a still-deleting cluster just means the subnet delete 409s, which is tolerated); delete-subnet/delete-vpc 409-retry budget 20min->4min each (they burned 45min combined and STILL 409'd — the tag-scoped sweep job is the designed backstop for late-releasing ports).",
       "steps": [
         {
