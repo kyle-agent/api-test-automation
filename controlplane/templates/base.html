@@ -38,6 +38,12 @@
   .ctxbar b{color:var(--text)}
   .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
   .ctxbar .pip.off{background:var(--faint)}
+  /* 환경정보 스트립 배지 (2026-07-09 owner GO — legacy /platform 콘솔 이식):
+     이 화면의 수치가 라이브 실측인지 발행 스냅샷 기준인지 한눈에. */
+  .ctxbar .mode{font-size:10px;font-weight:800;letter-spacing:.5px;padding:1px 8px;border-radius:5px;border:1px solid}
+  .ctxbar .mode.live{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+  .ctxbar .mode.snap{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
+  .ctxbar .seg{white-space:nowrap}
 
   main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
   h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
@@ -230,12 +236,24 @@
     </nav>
   </div>
   <div class="ctxbar">
+    {# 환경정보 스트립 (2026-07-09 owner GO — legacy /platform 콘솔 (b) 이식):
+       env·suite 세그먼트 + 표면별 LIVE/SNAPSHOT 배지. Testing 계열은 라이브
+       데이터인데 종전 "모든 수치는 이 스냅샷 기준" 문구가 떠 부정확했다 → 분기. #}
     {% set snap = ctx_snapshot if ctx_snapshot is defined else none %}
+    {% set live = active is defined and active == 'testing' %}
+    {% if live %}<span class="mode live"
+      title="이 화면의 실행·자원 수치는 라이브 서버 실측입니다 — 커버리지 수치만 발행 스냅샷 기준">LIVE</span>
+    {% else %}<span class="mode snap"
+      title="이 화면의 수치는 최신 발행 스냅샷(dashboard-data) 기준입니다">SNAPSHOT</span>{% endif %}
+    {% if ctx_env is defined and ctx_env %}<span class="seg"
+      title="SCP_ENV — 호스트/계정을 가르는 환경 코드">env <b>{{ ctx_env }}</b></span> ·{% endif %}
     {% if snap %}
-    <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    {{ snap.get('ts','') }}{% if snap_age is defined and snap_age %}
-    <b>({{ snap_age }})</b>{% endif %} · <b>sha {{ snap.get('sha','') }}</b>
-    ({{ snap.get('run_type','') }}) · 모든 수치는 이 스냅샷 기준
+    {% if snap.get('run_type') %}<span class="seg"
+      title="이 스냅샷을 발행한 run 의 suite/레인">suite <b>{{ snap.get('run_type') }}</b></span> ·{% endif %}
+    <span class="seg">sha <b>{{ snap.get('sha','') }}</b></span> ·
+    <span class="seg">{{ snap.get('ts','') }}{% if snap_age is defined and snap_age %}
+    <b>({{ snap_age }})</b>{% endif %}</span>
+    · {% if live %}실행·자원 수치는 라이브 — 커버리지 수치만 이 스냅샷 기준{% else %}모든 수치는 이 스냅샷 기준{% endif %}
     {% if snap_stale is defined and snap_stale %}<span class="chip s-reached"
       title="발행 후 48시간 이상 경과 — 화면 수치가 현재 상태와 다를 수 있습니다">노후</span>{% endif %}
     {% else %}

@@ -298,6 +298,17 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
             f.write("\n=== per-run cleanup: teardown-scoped ===\n"
                     "  this run's resources were deleted by the lifecycle teardown above.\n"
                     "  account-wide reaping = the manual 강제 클린업 (POST /api/cleanup).\n")
+            # Run-scoped leftover reap (owner 2026-07-09): tracked−deleted of THIS
+            # run, deleted with the proven ladders — filestorage cross-region
+            # (pause→delete→snapmirror→volume) + hidden VPC holders (409 hints).
+            f.write("\n=== per-run cleanup: run-scoped reap (이 런의 잔존만) ===\n")
+            f.flush()
+            try:
+                from cleanup.run_scoped import reap_run_leftovers
+                reap_run_leftovers(events_path,
+                                   log=lambda m: (f.write(m + "\n"), f.flush()))
+            except Exception as exc:  # noqa: BLE001 — best-effort tail
+                f.write(f"  run-scoped reap 실패(무시): {exc}\n")
         f.flush()
     return {"rc": rc, "runner_missing": runner_missing}
 

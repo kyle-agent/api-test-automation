@@ -49,6 +49,15 @@ def base_ctx(active: str) -> dict:
     """Everything base.html needs, for ANY page-rendering route."""
     snap = dashdata.latest_coverage()
     age = snapshot_age(snap)
+    # 환경정보 스트립 (2026-07-09 owner GO — legacy /platform 콘솔 이식): env 는
+    # 호스트/계정을 가르는 SCP_ENV (core settings.env_code); suite 라벨은 스냅샷의
+    # run_type 을 템플릿이 그대로 읽는다. settings 접근 실패는 빈 값으로 강등
+    # (스트립은 best-effort — 페이지 렌더를 막지 않는다).
+    try:
+        from core.config import settings as _settings
+        ctx_env = str(_settings.env_code or "")
+    except Exception:
+        ctx_env = ""
     return {
         "active": active,
         "suites": [s.get("id") for s in core_suites.list_suites()],
@@ -56,6 +65,7 @@ def base_ctx(active: str) -> dict:
         "dispatch_ok": dispatch.configured(),
         "triage_ok": triage.enabled(),
         "ctx_snapshot": snap,
+        "ctx_env": ctx_env,
         "snap_age": age["label"],
         "snap_stale": age["stale"],
     }

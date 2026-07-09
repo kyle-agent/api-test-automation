@@ -2046,8 +2046,20 @@ def _run_worker(rec: dict) -> None:
                         "  teardown 시도 완료 — 이 실행이 만든 자원의 라이프사이클 teardown 을 "
                         "수행했습니다. 실측 재스캔 예약됨 (+0 · +5m · +15m; 비동기 생성물 감시).\n"
                         "  계정 전체 reconciler 청소는 자동 실행하지 않음 — '강제 클린업'(POST "
-                        "/api/cleanup) 버튼으로 수동 실행하세요 (run-scoped 청소를 reconciler 가 "
-                        "지원하지 않기 때문).\n")
+                        "/api/cleanup) 버튼으로 수동 실행하세요.\n")
+                f.flush()
+                # Run-scoped leftover reap (owner 2026-07-09): this run's
+                # tracked−deleted 자원을 사다리로 마저 삭제 — filestorage 교차리전
+                # 절차(pause→delete→snapmirror→volume) + VPC 홀더(409
+                # related_resources) 포함. 계정 전체가 아니라 이 런의 대장만.
+                f.write("\n=== per-run cleanup: run-scoped reap (이 런의 잔존만) ===\n")
+                f.flush()
+                try:
+                    from cleanup.run_scoped import reap_run_leftovers
+                    reap_run_leftovers(rec["events"],
+                                       log=lambda m: (f.write(m + "\n"), f.flush()))
+                except Exception as exc:  # noqa: BLE001 — best-effort tail
+                    f.write(f"  run-scoped reap 실패(무시): {exc}\n")
                 f.flush()
         with _LOCK:
             rec["status"] = "aborted" if aborted else "done"
