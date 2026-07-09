@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 63 docs · 21 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 64 docs · 22 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -44,6 +44,7 @@
 | [`working/plans/PLATFORM-CONVERGENCE.md`](working/plans/PLATFORM-CONVERGENCE.md) | owner + platform | 수렴 계획 — console2 → controlplane (척추 흡수) |  superseded (이행 완료된 수렴 계획 — console2가 척추에 흡수됨) |
 | [`working/plans/PLATFORM-IA-DIRECTION.md`](working/plans/PLATFORM-IA-DIRECTION.md) | owner + platform | 플랫폼 방향성 — 쉽게 정리 |  CONFIRMED (오너 확정 — 2026-06-26 · IA = Catalog · Modeling · Testing · Reporting · **2026-07-07 개정: Catalog→우측 유틸 링크, Modeling이 흡수 — §개정 참조**) |
 | [`working/plans/PROBE-READS-PLAN.md`](working/plans/PROBE-READS-PLAN.md) | coverage | where the probe-read principle still needs applying |  superseded (2026-06-15 스냅샷 워크리스트 — 커버리지 캠페인 정본으로 대체) |
+| [`working/plans/V2-KICKOFF.md`](working/plans/V2-KICKOFF.md) | v2-session (별도 세션 전담) | V2 킥오프 브리프 — B안(재구조화)을 /v2 스트랭글러로 | 🟢 active |
 | [`working/plans/COVERAGE-MAX-PLAN.md`](working/plans/COVERAGE-MAX-PLAN.md) | coverage | how to drive C3 coverage to its ceiling | ⚪ superseded |
 
 ## Working — handoffs
