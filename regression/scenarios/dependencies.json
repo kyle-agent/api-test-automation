@@ -26,9 +26,6 @@
       "vpc",
       "private-dns"
     ],
-    "vpc-cidr-secondary": [
-      "vpc"
-    ],
     "vpc-privatelink-service": [
       "vpc"
     ],
@@ -42,9 +39,6 @@
       "vpc"
     ],
     "vpc-subnet-vip-nat": [
-      "vpc"
-    ],
-    "networking-loadbalancer-members-nat": [
       "vpc"
     ],
     "networking-vpn-gateway-tunnel": [
@@ -213,7 +207,6 @@
       "heavy-shared-dbaas",
       "vpc-privatelink-service",
       "vpc-endpoint",
-      "networking-loadbalancer-members-nat",
       "networking-vpn-gateway-tunnel",
       "networking-direct-connect-routing",
       "networking-dns-hosted-zone-private"
@@ -224,7 +217,6 @@
       "vpc-peering",
       "vpc-transit-gateway-children",
       "heavy-shared-networking",
-      "vpc-cidr-secondary",
       "vpc-subnet-vip-nat",
       "gen-wave5-fw"
     ],
@@ -237,10 +229,6 @@
       },
       "vpc-endpoint": {
         "endpoint_ip_address": "10.124.0.20"
-      },
-      "networking-loadbalancer-members-nat": {
-        "service_ip": "10.124.0.30",
-        "member_ip": "10.124.0.31"
       },
       "gen-wave5-apigw-privatelink": {
         "service_ip_address": "10.124.0.7",
