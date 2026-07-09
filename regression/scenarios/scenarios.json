@@ -458,10 +458,11 @@
             "until_status": [
               404
             ],
-            "timeout": 180,
-            "interval": 10
+            "timeout": 600,
+            "interval": 15
           },
-          "service": "vpc"
+          "service": "vpc",
+          "_note": "2026-07-09 실측 수리: 서브넷 202 비동기 삭제가 180s보다 느려 이 폴이 200으로 pass-through → delete-vpc 409 related-resource (이번 런 잔존 VPC 2대의 뿌리). 600s로 상향; 진짜 stuck이면 아래 delete-vpc의 409 사다리 소진에서 크게 실패."
         },
         {
           "name": "delete-vpc",
@@ -472,7 +473,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20,
+          "_note": "409 사다리(8×20s) — wait-subnet-gone 상향과 벨트로, 총 ~13분 내 수렴 못 하면 명시적 실패(신호 보존)."
         }
       ]
     },
