@@ -505,7 +505,9 @@
             404
           ],
           "poll": {
-            "until_status": [404],
+            "until_status": [
+              404
+            ],
             "timeout": 300,
             "interval": 15
           }
@@ -1144,6 +1146,25 @@
           }
         },
         {
+          "name": "disable-scf-privatelink-before-delete",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
+          "json": {
+            "privatelink_service_enabled": false
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "_note": "run-85b2 delete-function 400 근본수리 (2026-07-09): 'PrivateLink Service disabled AND Endpoint 부재'가 함수 삭제 전제 — scf PLE create가 서비스 상태를 되살리고 PLE delete는 관용이라 잔재가 남을 수 있어, 삭제 직전 서비스 disable을 멱등 재실행."
+        },
+        {
           "name": "delete-function",
           "service": "scf",
           "method": "DELETE",
@@ -1156,11 +1177,11 @@
           ],
           "destructive": true,
           "retry_on_status": [
-            409,
-            500
+            400
           ],
-          "retries": 6,
-          "retry_interval": 20
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "run-85b2: PLE 비동기 삭제/서비스 상태 전이를 타넘는 400 재시도 사다리(8x15s) + 직전 disable 멱등 재실행."
         },
         {
           "name": "wait-function-gone",
@@ -1172,7 +1193,9 @@
             404
           ],
           "poll": {
-            "until_status": [404],
+            "until_status": [
+              404
+            ],
             "timeout": 300,
             "interval": 15
           }
@@ -1653,7 +1676,9 @@
             404
           ],
           "poll": {
-            "until_status": [404],
+            "until_status": [
+              404
+            ],
             "timeout": 300,
             "interval": 15
           }
