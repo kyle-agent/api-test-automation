@@ -2148,6 +2148,37 @@ def _run_worker(rec: dict) -> None:
                 except Exception as exc:  # noqa: BLE001 — best-effort tail
                     f.write(f"  run-scoped reap 실패(무시): {exc}\n")
                 f.flush()
+                # 런 종료 자동 클린업 (owner 2026-07-10: "끝나면 cleanup 해서
+                # 0으로 만드는 걸 미리 반영해둬"): run-scoped 리퍼가 못 보는
+                # 잔존(공유 VPC/subnet은 이벤트 대장에 미추적, 늦출현 스냅샷,
+                # 이전 런 이월분)까지 owner-tag 강제 스윕으로 수렴시킨다.
+                # 가드: 다른 실행이 진행/대기 중이면 생략 (스윕은 계정 전체
+                # owner-tag 대상이라 타 런 자원을 삭제할 수 있음 — 그때는
+                # 수동 강제 클린업). 끄기: SCP_RUN_END_SWEEP=false.
+                if os.environ.get("SCP_RUN_END_SWEEP", "").strip().lower() \
+                        not in ("false", "0", "no"):
+                    with _ADMIT:
+                        others = [r for r in _RESERVED if r != rec["id"]] \
+                            + list(_QUEUE)
+                    if others:
+                        f.write("\n=== 런 종료 자동 클린업: 생략 — 다른 실행 "
+                                f"진행/대기 중 {others[:3]} (수동 강제 클린업 사용) ===\n")
+                    else:
+                        f.write("\n=== 런 종료 자동 클린업: owner-tag 강제 스윕 "
+                                "(IGNORE_TTL) — 잔존 0 수렴 ===\n")
+                        f.flush()
+                        subprocess.run(
+                            [sys.executable, "-m", "cleanup.reconciler"],
+                            cwd=str(ROOT),
+                            env={**env, "SCP_ALLOW_MUTATIONS": "true",
+                                 "SCP_ALLOW_DESTRUCTIVE": "true",
+                                 "SCP_SWEEP_IGNORE_TTL": "true",
+                                 "SCP_SWEEP_NOWAIT": "true"},
+                            stdout=f, stderr=subprocess.STDOUT)
+                        f.write("  자동 클린업 완료 — 늦출현(스냅샷류 ~20분 지연)은 "
+                                "아래 +5m/+15m 재스캔이 감시, 다음 런 종료 스윕이 "
+                                "정리합니다.\n")
+                f.flush()
         with _LOCK:
             rec["status"] = "aborted" if aborted else "done"
             rec["rc"], rec["ended"] = rc, time.time()

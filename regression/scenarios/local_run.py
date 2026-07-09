@@ -309,6 +309,18 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
                                    log=lambda m: (f.write(m + "\n"), f.flush()))
             except Exception as exc:  # noqa: BLE001 — best-effort tail
                 f.write(f"  run-scoped reap 실패(무시): {exc}\n")
+            # 런 종료 자동 클린업 (owner 2026-07-10) — CLI 경로는 단일 런이라
+            # 동시성 가드 불요. 끄기: SCP_RUN_END_SWEEP=false.
+            if os.environ.get("SCP_RUN_END_SWEEP", "").strip().lower() \
+                    not in ("false", "0", "no"):
+                f.write("\n=== 런 종료 자동 클린업: owner-tag 강제 스윕 (IGNORE_TTL) ===\n")
+                f.flush()
+                subprocess.run(
+                    [sys.executable, "-m", "cleanup.reconciler"], cwd=str(_ROOT),
+                    env={**env, "SCP_ALLOW_MUTATIONS": "true",
+                         "SCP_ALLOW_DESTRUCTIVE": "true",
+                         "SCP_SWEEP_IGNORE_TTL": "true", "SCP_SWEEP_NOWAIT": "true"},
+                    stdout=f, stderr=subprocess.STDOUT)
         f.flush()
     return {"rc": rc, "runner_missing": runner_missing}
 
