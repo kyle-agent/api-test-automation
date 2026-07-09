@@ -113,7 +113,36 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-07-09, run-2 잔여 7fail 전량 수리 + filestorage 교차리전 절차 착지 —
+- **LATEST (2026-07-09 오후, run-2b 트리아지 + 엔진 cleanup 근본수리 — branch
+  `claude/continuation-uk2rwc`=`c0a908c7` 푸시완료):** 오너 콘솔 전체 런
+  **run-2b (90/96 pass·5 fail·39분, ai/db 상품군 제외)** 이벤트 전문 트리아지 완료.
+  ① **fail 5 원인 확정+수리**: gen-vpc-endpoint(create 2xx 첫 착지! 그러나
+  CREATING-delete 400 → ACTIVE 폴+사다리) · vpc-subnet-vip-nat(subnet-gone 180s
+  pass-through → networking__vpc.json 4개 lifecycle 일괄 600s+409 사다리) ·
+  gen-private-nat(tgw-vpc-connection 600s+ CREATING 실측 → 1500s + create 400
+  사다리; **라이브 재검증 필요**) · gen-heavy-lb-members(403 InvalidVmInMember
+  가 빈 object_id 필드 자체를 검증 → 필드 제거; **재발 시 실VM 필수 반증 확정,
+  formal yaml 반증 처리할 것**) · filestorage-replication-schedule(콘솔 env에
+  SCP_SERVICE_HOSTS 부재 → core/config가 `<service>-dr` 별칭을 SCP_DR_REGION
+  (기본 kr-east1)으로 **기본 합성**, env 불요화).
+  ② **잔존 뿌리 = 엔진 3중 결함 (knowledge 블록 참조)**: _run_cleanup이 4xx도
+  'deleted' 기록·재시도 없음·콘솔 이벤트 무발신 → 사다리+상태검사+
+  resource-delete-failed 이벤트로 수리 (tests/offline/test_cleanup_ladder.py).
+  성공-경로 잔존은 명시 delete 스텝 갭 = kms sym/hmac·iam policy 스텝 신설.
+  **잔존 삭제는 오너가 콘솔 강제 클린업으로 직접** (오너 지시 — 세션은 삭제 금지;
+  단 04:0x경 세션의 IGNORE_TTL 스윕이 10분 타임아웃까지 일부 지웠을 수 있음).
+  ③ 오전 작업: '관용 create→리터럴 폴' **엔진 차단**(미해석 토큰 폴 스킵) ·
+  aimlops initial_user_email(PF-33)·vpce resource_key(PF-34) · **phase-2 물리
+  삭제 29건**(251→222) · green stale 9건 정리(18→9) · **spec-intel 카탈로그
+  재추출 1372/1372 — 2026-06-05 대비 드리프트 0** (SPEC-DIFF-2026-07-09.md,
+  재테스트 불요; extract_catalog는 캐시 무효화 없인 no-op 주의).
+  ④ **UX**: 오너 요구 "② 실행 뷰 좌 rail(전체+시나리오)/우 상세 2-pane" 분석
+  완료 — 시맨틱은 기존재, console2.css 단일컬럼 grid가 원인, 프런트 전용 S–M
+  (UIUX 트래커 **P2C-22** 초안; 오너 컨펌 후 구현).
+  ⑤ **다음**: (a) 오너 재런 → vpce/private-nat/lb-members/vip-nat/fs-dr 수리
+  라이브 검증 + cleanup 사다리/delete-failed 가시화 동작 확인 (b) P2C-22 구현
+  (c) 기존 오너 결정 대기 항목(waiver A·C-list) 유지.
+- **PRIOR (2026-07-09 새벽, run-2 잔여 7fail 전량 수리 + filestorage 교차리전 절차 착지 —
   세션 인계):** git 채널 복구로 6커밋 **branch=main=`4416e44e`** 푸시 완료(재서명
   불요 — gpgsig 정상, 앞선 'N' 표시는 로컬 검증환경 착시. MCP 커넥터 만료는
   구세션 토큰 문제 — 새 세션에서 자연 해소 예상). 내용:
