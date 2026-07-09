@@ -135,10 +135,10 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   `_reap_filestorage_snapshots`(owned `?volume_id=` 스코프만) 배선.
   ③ 게이트: offline 493 passed(+INDEX 재생성) · validate 251/0err · knowledge
   0err/79warn 기준선 · 리뷰 PASS(후속 `_scope_exclude` 회귀 테스트 `4416e44e`).
-  ④ **인-플라이트**: west 스윕 1회 구동 중 — 계정 잔존은 공유 VPC/서브넷 쌍
-  (`regrvpcsh6a4edbe9`/`regrsubsh6a4edbe9`)뿐, 과금성 0. 새 세션 첫 확인:
-  one-shot 인벤토리(GET /v1/vpcs·subnets, regr 프리픽스 카운트) → 남아 있으면
-  `SCP_SWEEP_IGNORE_TTL=true python -m cleanup.reconciler`(TTL 게이트 가능성).
+  ④ **잔존 스윕 수렴 완료**: 공유 VPC/서브넷 쌍(`regrvpcsh6a4edbe9`) 삭제 확인
+  (409→204), **계정 잔존 0** — 유일 stuck은 기지 IAM-gated log-group 1건
+  (47fabeca…, log-stream IAM 권한 필요 — C-list 오너 결정 대기, 강제 안 함).
+  새 세션 스팟체크: one-shot 인벤토리(GET /v1/vpcs 등 regr 카운트 0 기대).
   ⑤ **다음 우선순위**: (a) 재런으로 R2 수리 라이브 검증(콘솔 전체 선택·워커 18;
   vpce create 2xx 관측 대기, aimlops는 명시 선택시에만) (b) 오너 결정대기 —
   waiver A(클래스 1-4·6-8 승인 + 9=ⓐ + **5 반려** 권고; 승인 시
