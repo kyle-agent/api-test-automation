@@ -232,43 +232,55 @@ resources:
     # wrong — the 400 'scp-network.vpc-endpoint.subnet-not-found "VPC Endpoint
     # Type Subnet not found"' fires because subnet_id pointed at a GENERAL
     # subnet. So require the endpoint-subnet node (type=VPC_ENDPOINT) and wire
-    # subnet_id to it. filestorage-volume stays the FS target resource_key.
+    # subnet_id to it. filestorage-volume stays in the composition, but is NOT
+    # the resource_key source — see the 2026-07-09 live correction below.
     requires: [vpc, endpoint-subnet, filestorage-volume]
     create:
       endpoint: "POST /v1/vpc-endpoints"
-      # resource_key is the TARGET service resource (an FS volume id here);
-      # resource_info is free text describing it (api_docs: string, max 200).
+      # resource_key is NOT a volume uuid — live-measured 2026-07-09: for FS it
+      # is the filestorage service endpoint IP (e.g. "198.19.64.8"), enumerated
+      # by GET /v1/vpc-endpoints/connectable-resources?resource_type=FS (query
+      # REQUIRED); entries are {resource_key, resource_info, resource_type} and
+      # the paired resource_info (e.g. "198.19.64.8(HDD)") rides along verbatim.
+      # The old {filestorage-volume.volume_id} wiring was the root cause of the
+      # 400 invalid-resource-key; api_docs' 32-hex example is misleading too.
       # subnet_id MUST be a VPC_ENDPOINT-type subnet (endpoint-subnet node).
       body: {name: "regrvpce{unique}", description: "API regression vpc endpoint",
              endpoint_ip_address: "{opt.endpoint_ip_address}",
-             resource_info: "regrfs{unique}",
-             resource_key: "{filestorage-volume.volume_id}",
+             resource_info: "{opt.resource_info}",
+             resource_key: "{opt.resource_key}",
              resource_type: "{opt.target}",
              subnet_id: "{endpoint-subnet.subnet_id}", vpc_id: "{vpc.vpc_id}", tags: []}
       options:
         target: {type: enum, values: [FS, OBS, SCR], default: FS,
                  required: true, vary: true,
-                 note: "유효 enum은 라이브 ValidationError가 직접 알려줌(run 27394211896): 'VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)' — dns는 유효 타입이 아님 (VALIDATED enum). resource_key가 FS 볼륨 id로 배선되어 있으므로 OBS/SCR 변형은 각자의 실 자원 키로 재배선 전에는 합성 금지"}
+                 note: "유효 enum은 라이브 ValidationError가 직접 알려줌(run 27394211896): 'VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)' — dns는 유효 타입이 아님 (VALIDATED enum). resource_key는 connectable-resources 리스팅(resource_type 쿼리별)에서 얻는다 — OBS/SCR 변형도 같은 리스팅으로 실 키를 확보한 뒤에만 합성"}
+        resource_key: {type: string, required: true, default: "(discovery)",
+                       note: "GET /v1/vpc-endpoints/connectable-resources?resource_type={target} 응답 [0].resource_key — FS는 파일스토리지 서비스 endpoint IP (라이브 실측 2026-07-09; gen-vpc-endpoint의 list-vpce-connectable-resources 스텝이 캡처해 create에 배선)"}
+        resource_info: {type: string, required: true, default: "(discovery)",
+                        note: "같은 리스팅 [0].resource_info 쌍을 그대로 동승 (예 '198.19.64.8(HDD)')"}
         endpoint_ip_address: {type: string, required: true, default: "10.160.8.20",
                               note: "선택한 endpoint-subnet cidr 내부의 빈 IP여야 한다 — 기본값은 endpoint-subnet이 vpc(10.160.0.0/20)의 8번째 /24(10.160.8.0/24)를 받는 합성 기본 배치를 따른다; 공유 subnet 재호밍/다른 cidr로 합성 시 override 필요"}
     capture: {vpc_endpoint_id: "$.vpc_endpoint.id"}
     verify:
       - {name: read, endpoint: "GET /v1/vpc-endpoints/{vpc_endpoint_id}",
          expect_status: [200, 400, 403, 404],
-         note: "id-bound GET getid 갭. vpc_endpoint_id가 create에서 잡히나 resource_key가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status"}
+         note: "id-bound GET getid 갭. resource_key 형식은 실측 확정(2026-07-09, endpoint IP)이나 새 배선의 create 2xx는 아직 미관측이라 관용 status 유지"}
     delete: {endpoint: "DELETE /v1/vpc-endpoints/{vpc_endpoint_id}", destructive: true}
     provenance: docs
-    source: {lifecycle: gen-wave5-vpce, steps: [create-vpc-endpoint, delete-vpc-endpoint]}
+    source: {lifecycle: gen-vpc-endpoint, steps: [list-vpce-connectable-resources, create-vpc-endpoint, delete-vpc-endpoint]}
     notes: >
       READY FOR LIVE RE-VALIDATION (IB-013). endpoint_type(=resource_type) enum
-      FS/OBS/SCR 라이브 증명. 핵심 수정: subnet_id가 이제 VPC_ENDPOINT 유형
-      subnet(endpoint-subnet 노드)을 가리킨다 — run 27466988779의 400
-      subnet-not-found('VPC Endpoint Type Subnet not found')는 GENERAL subnet을
-      넘겨 발생했고, 전용 endpoint-type subnet이 선행돼야 한다. 실 FS volume_id +
-      endpoint-subnet 배선까지 합쳐진 body/capture는 아직 라이브 2xx 미관측이라
-      UNPROVEN(docs) — heavy/gated 유지, 라이브 재검증 대기. FS 볼륨은 VPC 무관
-      (standalone NFS)이라 'TARGET 서비스 subnet' 해석이 볼륨 쪽에서 어떻게
-      풀리는지는 라이브 정제 대상."
+      FS/OBS/SCR 라이브 증명. 핵심 수정 1(subnet): subnet_id는 VPC_ENDPOINT 유형
+      subnet(endpoint-subnet 노드) — run 27466988779의 400 subnet-not-found
+      ('VPC Endpoint Type Subnet not found')는 GENERAL subnet을 넘겨 발생.
+      핵심 수정 2(resource_key, 2026-07-09 라이브 반증): FS의 resource_key는
+      볼륨 uuid가 아니라 파일스토리지 서비스 endpoint IP다 — connectable-resources
+      리스팅(resource_type 쿼리 필수)이 canonical 소스로 타입별(HDD/SSD 등) 6종을
+      반환했고, 실볼륨 showvolume.endpoint_path가 HDD 키와 일치해 교차검증됨.
+      구 배선(볼륨 id 직결)이 400 invalid-resource-key의 근본원인; api_docs의
+      32-hex 예시도 오도적(PF/문서화 후보). 키 소스는 실측 검증됐고 새 배선의
+      create 2xx는 다음 라이브 관측 대기라 provenance는 docs 유지.
 
   privatelink-service:
     code: "nw-vpc-privatelink-service"

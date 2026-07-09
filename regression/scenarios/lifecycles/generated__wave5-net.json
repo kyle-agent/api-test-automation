@@ -1222,10 +1222,32 @@
           "group": "lb-listener"
         },
         {
+          "name": "rewait-load-balancer-before-members",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "_note": "REPAIR 2026-07-09 (live run): create-lb-member 409 scp-loadbalancer.members.NotUpdatableState 'Unable to update members in current Lb Server...' — health-check/서버그룹/리스너 부착 직후 LB가 아직 업데이트 중이라 member 쓰기가 거부됨. 기존 wait-load-balancer 패턴 복사 재폴: member 쓰기 직전 LB settle(ACTIVE 계열) 재확인 (TGW EDITING 재폴·DBaaS ExistInprogress와 같은 pacing 계열). create-lb-member/-bulk의 retry_on_status 409 6×20s는 belt.",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.loadbalancer.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
           "name": "create-lb-member",
           "service": "loadbalancer",
           "method": "POST",
           "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "_note": "REPAIR 2026-07-09 (live run): 409 members.NotUpdatableState — 직전 rewait-load-balancer-before-members 재폴이 본수리, 409 6×20s 재시도는 잔여 전이(다른 부착 연산의 늦은 전파) 흡수용 belt.",
           "json": {
             "members": [
               {
@@ -1244,6 +1266,11 @@
             201,
             202
           ],
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 20,
           "capture": {
             "member_id": "$.members[0].id"
           },
@@ -1286,6 +1313,7 @@
           "service": "loadbalancer",
           "method": "POST",
           "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "_note": "REPAIR 2026-07-09: create-lb-member와 동일 409 NotUpdatableState 계열 대비 — 직전 member 쓰기가 LB를 다시 업데이트 상태로 만들 수 있어 같은 6×20s 재시도 사다리 적용.",
           "json": {
             "members": [
               {
@@ -1304,6 +1332,11 @@
             201,
             202
           ],
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 20,
           "capture": {
             "member_bulk_id": "$.members[0].id"
           },

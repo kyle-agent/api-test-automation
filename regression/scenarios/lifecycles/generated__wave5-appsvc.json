@@ -858,18 +858,21 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/privatelink-endpoints/{ple_id}",
+          "_note": "REPAIR 2026-07-09 (live run): PLE 생성까지 성공한 뒤 400 scp-application-apigateway.privatelink-endpoint.invalid-deletable-state — AUTO 승인/연결 정착 전(직전 apigw-ple-actions 프로브들이 상태를 흔든 직후) 삭제 거부. settle 폴 대신 재시도 사다리인 근거: api_docs showprivatelinkendpoint response 상태 field는 $.privatelink_endpoint.status 이나 enum 미문서(plain string, 예시값 CANCELED[detail]/Active[summary]뿐)라 '삭제 가능 상태' 집합을 특정할 수 없음 — 미검증 enum 필드 폴은 매런 타임아웃만 태운다. 고정 지연 대체: retry_on_status에 400 추가 + 6×20s(최대 120s 정착 유예), 500은 기존 유지. group apigw-ple 동승: create-apigw-privatelink-endpoint(optional+group) 실패 시 이 delete가 리터럴 {ple_id}로 실행돼 strict 실패하는 잔여 경로 차단 — 그룹 스킵이어도 실2xx에서 등록된 cleanup은 엔진 _teardown_group이 처리.",
           "expect_status": [
             200,
             202,
             204
           ],
           "destructive": true,
+          "group": "apigw-ple",
           "retry_on_status": [
+            400,
             409,
             500
           ],
-          "retries": 4,
-          "retry_interval": 15
+          "retries": 6,
+          "retry_interval": 20
         },
         {
           "name": "create-function",

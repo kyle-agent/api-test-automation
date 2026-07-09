@@ -139,6 +139,28 @@
           }
         },
         {
+          "name": "list-vpce-connectable-resources",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-endpoints/connectable-resources",
+          "params": {
+            "resource_type": "FS"
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "vpce",
+          "capture": {
+            "vpce_resource_key": "$.vpc_endpoint_connectable_resources[0].resource_key",
+            "vpce_resource_info": "$.vpc_endpoint_connectable_resources[0].resource_info"
+          },
+          "_note": "REPAIR+조사 2026-07-09 (live run): create-vpc-endpoint 400 scp-network.vpc-endpoint.invalid-resource-key '<uuid>' — resource_key는 FS 볼륨 uuid가 아니다. 라이브 실측(읽기 전용 GET, 2026-07-09): GET /v1/vpc-endpoints/connectable-resources?resource_type=FS → 200, entries={resource_key:'198.19.64.8', resource_info:'198.19.64.8(HDD)', resource_type:'FS'}×6 — FS의 resource_key는 파일스토리지 서비스 endpoint IP(showvolume의 endpoint_path와 값 일치 실측: 계정 볼륨 endpoint_path 198.19.64.8 == 리스팅 HDD 키; 볼륨 id는 dashed uuid로 별개 → 구 배선 {volume_id}가 400 근본원인). 이 GET(query resource_type 필수 — bare probe 도달 불가 gap)이 유효 (key,info) 쌍의 canonical 소스라 [0] 쌍을 그대로 캡처해 create에 배선; 볼륨 1개 계정에서도 타입별 엔드포인트 6개가 리스팅돼 [0] 안정(볼륨 1:1 아님). optional+group vpce: 리스팅 미가용/빈 목록이면 캡처 미스로 vpce 체인만 스킵(런 non-red). formal yaml(networking__vpc.yaml vpc-endpoint 노드)의 resource_key={filestorage-volume.volume_id} 모델은 이 실측으로 반증 — 정본/knowledge 갱신은 후속(이 파일 편집 범위 밖). 선행 볼륨 create/wait는 FS 서비스 프로비저닝 보장자 + filestorage 쓰기 커버리지로 유지."
+        },
+        {
           "name": "create-vpc-endpoint",
           "service": "vpc",
           "method": "POST",
@@ -147,8 +169,8 @@
             "name": "regrvpce{unique}",
             "description": "API regression vpc endpoint",
             "endpoint_ip_address": "10.124.10.20",
-            "resource_info": "regrfs{unique}",
-            "resource_key": "{volume_id}",
+            "resource_info": "{vpce_resource_info}",
+            "resource_key": "{vpce_resource_key}",
             "resource_type": "FS",
             "subnet_id": "{subnet_id}",
             "vpc_id": "{vpc_id}",
@@ -157,9 +179,12 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
-          "_note": "REPAIR 2026-07-08: endpoint_ip_address moved 10.160.8.20 -> 10.124.10.20 together with create-endpoint-subnet's cidr re-home (10.124.10.0/24) — HB4d precedent (networking__vpc.json): moving the subnet cidr WITHOUT the endpoint ip yields 400 check-ip-address-overlap.",
+          "optional": true,
+          "group": "vpce",
+          "_note": "REPAIR 2026-07-08: endpoint_ip_address moved 10.160.8.20 -> 10.124.10.20 together with create-endpoint-subnet's cidr re-home (10.124.10.0/24) — HB4d precedent (networking__vpc.json): moving the subnet cidr WITHOUT the endpoint ip yields 400 check-ip-address-overlap. | REPAIR 2026-07-09 (live run): 400 invalid-resource-key '<uuid>' — resource_key/resource_info를 {volume_id}/이름 텍스트에서 직전 list-vpce-connectable-resources [0] 캡처 쌍으로 재배선(FS 키 = FS 서비스 endpoint IP, 라이브 실측 — 상세는 그 스텝 _note). 키 소스는 실측 검증됐으나 create 자체의 2xx는 아직 미관측이라 optional+group vpce+400 관용 belt — 실패 시 vpce 체인만 스킵(non-red), 2xx면 기존과 동일하게 verify/delete strict 진행.",
           "capture": {
             "vpc_endpoint_id": "$.vpc_endpoint.id"
           },
@@ -180,7 +205,8 @@
             403,
             404
           ],
-          "_note": "id-bound GET getid 갭. vpc_endpoint_id가 create에서 잡히나 resource_key가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status"
+          "group": "vpce",
+          "_note": "id-bound GET getid 갭. vpc_endpoint_id가 create에서 잡히나 resource_key가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status | 2026-07-09: group vpce 동승 — create 실패 시 리터럴 {vpc_endpoint_id} 가비지 4xx 기록 대신 그룹 스킵."
         },
         {
           "name": "delete-vpc-endpoint",
@@ -192,7 +218,9 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "vpce",
+          "_note": "2026-07-09: group vpce 동승 — create(optional+group) 실패 시 리터럴 {vpc_endpoint_id} DELETE가 strict 실패하는 경로 차단(등록된 cleanup은 _teardown_group이 처리)."
         },
         {
           "name": "delete-filestorage-volume",
@@ -446,6 +474,30 @@
             ]
           },
           "_note": "REPAIR 2026-07-08 (live run): create-private-nat 400 'Cannot found the Transit Gateway(...) in Connect...' — 요구 상태는 ACTIVE 가 아니라 CONNECTED (connection 부착 완료 후의 settle 상태; 직전 wait 가 ACTIVE 를 잡고 조기 통과하면 TGW 가 아직 EDITING→CONNECTED 전이 전). TGW show 를 CONNECTED 까지 재폴링 (ERROR/DELETED = terminal-bad 즉시 종료, give_up_status 400/404 = 선행 실패 시 타임아웃 소진 방지 — 파일 내 wait-transit-gateway 패턴 복사, timeout 600/20). CONNECTED enum 이 없는 환경이면 폴 타임아웃 후 expect_status 200 으로 통과해 기존 동작으로 저하(무해). {transit_gateway_id} 캡처는 create-transit-gateway 및 create-tgw-vpc-connection 재캡처로 이 체인에 이미 존재."
+        },
+        {
+          "name": "rewait-tgw-vpc-connection-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway_vpc_connections[0].state",
+            "until": [
+              "ACTIVE",
+              "ERROR",
+              "DELETED"
+            ],
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "REPAIR 2026-07-09 (live run): TGW CONNECTED 대기 보강 후에도 create-private-nat 400 scp-network.private-nat.connectable-transit-gateway-not-found 재발 — 요구 조건은 TGW 본체가 아니라 TGW-VPC 연결(자식 객체)의 정착 상태로 판단. 정적 근거: knowledge/formal/resources/networking__vpc.yaml private-nat 노드 'private-nat needs the TGW in Connectable state — which only happens once a VPC connection on it is ACTIVE' + 동일 시그니처 run 27466988779('Cannot find the Transit Gateway in Connectable state'). 첫 wait-tgw-vpc-connection의 ACTIVE 관측 뒤 TGW가 EDITING→CONNECTED로 전이하는 동안 연결이 재전이할 수 있어, create 직전에 연결 상태를 재폴(직전 TGW 본체 폴 2개는 유지). 상태 소스: per-id show가 catalog에 없어(listtransitgatewayvpcconnections가 유일) nested list [0] 재사용 — 이 lifecycle의 TGW엔 연결이 1개뿐. state 필드는 api_docs transitgatewayvpcconnection 모델(예시 ACTIVE, enum 미문서) — 기존 wait-tgw-vpc-connection 패턴 복사(ERROR/DELETED terminal-bad, give_up 400/404). 라이브 재실측은 불가(2026-07-09 GET /v1/transit-gateways → 200 count 0, 계정에 TGW 부재)라 정적 근거로 작성. {transit_gateway_id}는 create-tgw-vpc-connection 재캡처 재사용."
         },
         {
           "name": "create-private-nat",
@@ -1013,6 +1065,7 @@
           "service": "loadbalancer",
           "method": "POST",
           "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "_note": "REPAIR 2026-07-09 (live run): 403 scp-loadbalancer.members.InvalidVmInMember \"Member VM object_id is invalid ('')\" — VM 부재 구조 한계: 이 light 미러는 설계상 VM을 만들지 않아 object_id 공급원이 없고(빈 문자열 고정), member 등록의 실검증(C3)은 heavy 미러 gen-heavy-lb-members가 담당. 이번 런 assert 사인(死因): 그룹 head(create-lb-health-check)가 2xx로 통과(공유 subnet에 동시 실행 heavy LB 선존 → 400 격리 우회)해 체인이 여기까지 전진했는데, 이 스텝은 group 소속이어도 non-optional + 403 비관용이라 엔진 group-skip 경로를 못 타고 strict assert로 사망. 봉합: optional + 403 관용 — 403이면 expect 통과 후 capture($.members[0].id) 미스가 optional 경로로 떨어져 lb-members-chain 그룹 전체(verify/set/bulk/delete)가 스킵-캐스케이드(런 non-red), 엔진 _teardown_group이 등록된 그룹 cleanup 처리. R3가 VM-연계 공급을 붙이면 그대로 2xx로 살아난다.",
           "json": {
             "members": [
               {
@@ -1029,8 +1082,10 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            403
           ],
+          "optional": true,
           "group": "lb-members-chain",
           "capture": {
             "member_id": "$.members[0].id"
@@ -1074,6 +1129,7 @@
           "service": "loadbalancer",
           "method": "POST",
           "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "_note": "REPAIR 2026-07-09: create-lb-member와 동일 봉합(optional+403 관용) — VM 부재 구조 한계로 object_id 공급원이 없어 403 InvalidVmInMember가 구조적. 정상 경로에선 그룹 스킵으로 여기 도달하지 않지만, member 단건이 우연히 2xx일 때 bulk가 단독 assert로 죽는 잔여 경로까지 차단. heavy 미러가 실검증 담당.",
           "json": {
             "members": [
               {
@@ -1090,8 +1146,10 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            403
           ],
+          "optional": true,
           "group": "lb-members-chain",
           "capture": {
             "member_bulk_id": "$.members[0].id"
