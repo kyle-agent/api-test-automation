@@ -1056,6 +1056,21 @@ def run_sweep(client) -> int:
     for svc, cid in dbaas_deleted:
         _wait_gone(c, svc, f"/v1/clusters/{cid}", 900, 20)
 
+    # 2z. VPC endpoints (regrvpce) — VPC children that 409-block their VPC.
+    # COVERAGE GAP found 2026-07-09 (run-2b): the sweep had NO vpc-endpoints
+    # pass at all, so an endpoint whose lifecycle delete 400'd (CREATING —
+    # gen-vpc-endpoint) pinned the session-shared VPC (`regrvpcsh…` 8cdd0e0c)
+    # ACTIVE for hours while every scan reported the collection converged.
+    # Must run BEFORE the subnet/vpc passes.
+    vpce_ids = []
+    for it in _select(c, "vpc", "/v1/vpc-endpoints",
+                      name_prefixes=("regrvpce",)):
+        if it.get("id") and _delete(c, "vpc", f"/v1/vpc-endpoints/{it['id']}"):
+            deleted += 1
+            vpce_ids.append(it["id"])
+    for eid in vpce_ids:
+        _wait_gone(c, "vpc", f"/v1/vpc-endpoints/{eid}")
+
     # 3. subnets — delete all, then wait each is gone.
     subnet_ids = []
     for it in _select(c, "vpc", "/v1/subnets",
