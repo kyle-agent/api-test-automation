@@ -210,6 +210,12 @@ def test_resolve_lifecycle_ids_by_service_and_category():
     by_cat = set(C2._resolve_lifecycle_ids({"categories": ["networking"]}))
     # category selection is a superset of any single service in it
     assert by_cat >= set(C2._resolve_lifecycle_ids({"services": ["networking/vpc"]}))
+    # C-6 (_scope_exclude): scope expansion skips an owner-deferred lifecycle,
+    # but explicit selection still runs it (owner escape hatch).
+    by_svc = set(C2._resolve_lifecycle_ids({"services": ["ai-ml/aimlops-platform"]}))
+    assert "gen-heavy-aimlops" not in by_svc
+    explicit = set(C2._resolve_lifecycle_ids({"lifecycle_ids": ["gen-heavy-aimlops"]}))
+    assert "gen-heavy-aimlops" in explicit
 
 
 # --------------------------------------------------------------------------- #
