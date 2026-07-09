@@ -735,3 +735,72 @@ def test_execution_rail_master_detail_contract():
     assert "lcqueue" not in js
     assert "RAIL_FOLLOW_HOLD_MS" in js and ".lcitem.now" in js
     assert "c2.masterOpen.v1" in js
+
+
+# --------------------------------------------------------------------------- #
+# P2C-24 (2026-07-09) — 폴링 다이어트 + 무깜빡 렌더 + 진행률 + per-lifecycle 중단
+# --------------------------------------------------------------------------- #
+def test_events_view_incremental_offset(tmp_path):
+    """서버 반쪽: /api/runs/{id}/events?offset=N 증분 계약 (_events_view).
+
+    offset = 클라이언트가 이미 가진 이벤트 개수 → tail 만 응답. next_offset 은
+    다음 요청에 보낼 값. 범위 초과/쓰레기 offset 은 0 강등 = 전체 재전송(응답
+    offset==0 이 '교체' 신호 — 클라이언트 재동기화)."""
+    p = tmp_path / "events.jsonl"
+    rows = [{"kind": "run-meta", "runnable": ["a"]},
+            {"kind": "lifecycle-start", "lifecycle": "a"},
+            {"kind": "lifecycle-end", "lifecycle": "a", "status": "passed"}]
+    p.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    rec = {"status": "running", "lifecycle_ids": ["a"], "events": str(p)}
+    full = C2._events_view(rec, 0)
+    assert full["offset"] == 0 and full["next_offset"] == 3
+    assert [e["kind"] for e in full["events"]] == [
+        "run-meta", "lifecycle-start", "lifecycle-end"]
+    assert full["status"] == "running" and full["lifecycle_ids"] == ["a"]
+    tail = C2._events_view(rec, 2)          # 증분: 이미 2개 보유 → tail 1개만
+    assert tail["offset"] == 2 and tail["next_offset"] == 3
+    assert [e["kind"] for e in tail["events"]] == ["lifecycle-end"]
+    same = C2._events_view(rec, 3)          # 신규 없음 → 빈 tail (호출은 가볍다)
+    assert same["events"] == [] and same["next_offset"] == 3
+    over = C2._events_view(rec, 99)         # 파일 교체/리셋 → 0 강등 전체 재전송
+    assert over["offset"] == 0 and len(over["events"]) == 3
+    junk = C2._events_view(rec, "x")        # 쓰레기 입력은 0 취급
+    assert junk["offset"] == 0 and len(junk["events"]) == 3
+
+
+def test_polling_diet_and_flickerfree_frontend_contract():
+    """P2C-24 프런트 계약 (owner 2026-07-09 — "백엔드에 api가 너무 많이 날아감" +
+    "깜빡거려서 클릭이 안됨" + "run 진행률" + "특정 라이프사이클 중단"):
+
+      1. 폴링 다이어트 — 단일 tick 2s + 증분 fetch(?offset=) + capacity 30s
+         (대기열 시 5s) + /api/runs 는 시작/종료/감시로만 + 숨은 탭 정지.
+      2. 무깜빡 렌더 — setHtmlIfChanged + 키 기반 syncUnits + 위임 클릭.
+      3. 런 진행률 — runProgress() + now-playing 진행률 바 (rail 링과 동일 소스).
+      4. per-lifecycle 중단 — 스코프바 ⏸ → POST /api/runs/{rid}/skip-lifecycle."""
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
+    # 1) 폴링 다이어트
+    assert "EV_TICK_MS = 2000" in js
+    assert "/events?offset=" in js and "next_offset" in js
+    assert "setTimeout(pollEvents, 700)" not in js, "구 700ms 폴 복귀 금지"
+    assert "CAP_MS = 30000" in js and "CAP_QUEUED_MS = 5000" in js
+    assert "RUNS_WATCH_MS" in js and "function startRunsWatch" in js
+    assert "document.hidden" in js and "visibilitychange" in js
+    # capacity tick 의 /api/runs 동승(폭주 원인)이 사라졌는지 — startCapPoll 본문에
+    # loadRunRecords 호출이 없어야 한다
+    cap_body = js.split("function startCapPoll", 1)[1].split("function stopCapPoll")[0]
+    assert "loadRunRecords" not in cap_body
+    # drawReport 라이브 경로에서도 제거 (유휴 no-run 분기의 1회 호출만 허용)
+    draw_body = js.split("function drawReport", 1)[1].split("function groupEventsByLifecycle")[0]
+    live_path = draw_body.split("a run owns the")[1]        # no-run 분기 이후
+    assert "loadRunRecords" not in live_path
+    # 2) 무깜빡 렌더
+    assert "function setHtmlIfChanged" in js and "function syncUnits" in js
+    assert "function wireReportDelegation" in js
+    assert 'data-k="lc:' in js and 'data-apik=' in js
+    # 3) 진행률
+    assert "function runProgress" in js and 'id="np-prog-fill"' in js
+    assert "잔여 ~" in js and ".np-prog{" in css
+    # 4) per-lifecycle 중단
+    assert '"/skip-lifecycle"' in js and 'id="scope-skip"' in js
+    assert "이 라이프사이클 중단" in js

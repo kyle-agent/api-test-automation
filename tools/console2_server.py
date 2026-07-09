@@ -1108,6 +1108,33 @@ def _read_events(path: str) -> list[dict]:
     return out
 
 
+def _events_view(rec: dict, offset: int = 0, enrich=None) -> dict:
+    """GET /api/runs/<id>/events[?offset=N] 응답 (P2C-24 폴링 다이어트).
+
+    ``offset`` = 클라이언트가 이미 가진 이벤트 **개수** — 그 뒤(tail)만 보낸다.
+    응답의 ``offset`` 은 서버가 실제 적용한 값(에코), ``next_offset`` 은 다음
+    요청에 보낼 값(현재 총 개수). 파일 교체/리셋으로 offset 이 총 개수를
+    넘으면 0 으로 강등해 전체를 재전송한다 (클라이언트는 offset==0 응답을
+    '전체 교체'로 처리해 재동기화). 음수/비수치는 0 취급.
+
+    ``enrich`` (예: ``_enrich_soft_classes``) 는 **슬라이스 전에 전체 리스트**에
+    적용한다 — soft_class 분류가 run 전체 문맥(선행 2xx 등)에 의존하기 때문."""
+    evs = _read_events(rec["events"])
+    if enrich is not None:
+        evs = enrich(evs)
+    total = len(evs)
+    try:
+        off = max(0, int(offset))
+    except (TypeError, ValueError):
+        off = 0
+    if off > total:
+        off = 0
+    return {"status": rec["status"],
+            # 대기 중(이벤트 0) 라이프사이클 표시용 — 전체 선택
+            "lifecycle_ids": rec.get("lifecycle_ids", []),
+            "events": evs[off:], "offset": off, "next_offset": total}
+
+
 def _emit_event(evpath: str, evkind: str, **fields) -> None:
     """Append one event line (server-side, used by the simulate worker). Same shape
     as core.console_events so the live view is identical for simulate vs real runs.
@@ -2590,10 +2617,10 @@ class Handler(BaseHTTPRequestHandler):
                 rec = _RUNS.get(rid)
             if not rec:
                 return self._json(404, {"error": "no such run"})
-            return self._json(200, {"id": rid, "status": rec["status"],
-                                    # 대기 중(이벤트 0) 라이프사이클 표시용 — 전체 선택
-                                    "lifecycle_ids": rec.get("lifecycle_ids", []),
-                                    "events": _read_events(rec["events"])})
+            # ?offset=N — 증분 fetch (P2C-24 폴링 다이어트): tail 만 전송
+            qs = parse_qs(urlparse(self.path).query)
+            return self._json(200, {"id": rid,
+                                    **_events_view(rec, (qs.get("offset") or ["0"])[0])})
         if p.startswith("/api/runs/") and p.endswith("/graph"):
             rid = p[len("/api/runs/"):-len("/graph")]
             with _LOCK:

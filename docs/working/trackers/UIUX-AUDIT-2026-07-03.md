@@ -307,3 +307,23 @@ index.html:143 · console2.js:2383). Q6 잔여 진행률 링은 P2C-22 rail '전
 | ID | 심각도 | 발견 | 수정 상태 |
 |---|---|---|---|
 | P2C-23 | CX·재발 | Modeling 표 카테고리 그룹 헤더가 내용-폭 둥근 칩으로 부유 (P2C-15 재발) — 뿌리는 base.html 전역 `.cat` 배지 규칙이 `<tr class="cat">`에 매칭돼 tr이 display:inline-block(colspan 무력화). 헤드리스 실측 확정 (행 299~374px vs 표 1092px) | ✅ 수리 (2026-07-09) — 배지 규칙 `span.cat` 스코프 + bare `.cat` 재등장 금지 회귀 테스트. 부수: conftest 선임포트로 offline 테스트가 라이브 DELETE 가능하던 게이트 핀 구멍 봉합 (settings 싱글턴 직접 핀) |
+
+
+### 6-5. 오너 피드백 — 폴링 폭주·깜빡임·진행률·per-lifecycle 중단 (2026-07-09, append-only)
+
+> 오너 피드백(2026-07-09, 터미널 캡쳐 + 발언): "화면이 너무 깜빡거려서 필요한
+> 라이프사이클 잘 클릭이 안되기도 하고 … 전체 실시간을 많이 넣어놓다 보니 백엔드에
+> api가 너무 많이 날아감" + "run 이 얼마나 진행되고 있는지" + "중간에 특정
+> 라이프사이클을 멈출 수는 없네". 실측: 같은 초에 /api/runs 2-3회 + events 2회 +
+> capacity 1회 — 뿌리는 ① pollEvents 700ms 전체 재fetch ② drawReport 가 매 폴마다
+> loadRunRecords(/api/runs) 호출 ③ capacity 2s 틱의 /api/runs 동승 ④ 로그 탭 틱의
+> 이중 fetch(+/api/runs), 그리고 rail/detail 의 폴마다 innerHTML 전체 재빌드.
+> 서버 반쪽(per-lifecycle skip 채널)은 main `7624e296` 선랜딩.
+
+| ID | 심각도 | 발견 | 수정 상태 |
+|---|---|---|---|
+| P2C-24a | 성능 | 라이브 중 백엔드 폴링 폭주 (초당 ~5req) | ✅ 구현 (2026-07-09) — 이벤트 폴 단일 tick 2s(EV_TICK_MS) + **증분 fetch** `?offset=N`(서버 `_events_view` — tail만 전송, offset 초과=0 강등 재동기화) · capacity 30s(대기열 있을 때만 5s) · /api/runs 는 시작/종료/종료 후 30s 감시(startRunsWatch)로만 · 로그 탭 이중 fetch 통합(3s) · document.hidden 이면 전 폴 정지 + 복귀 시 즉시 재개. 라이브 정상 상태 ≈ events 1req/2s |
+| P2C-24b | CX | 라이브 중 rail/상세 전체 재렌더로 깜빡임·클릭 유실 | ✅ 구현 — 키 기반 in-place patch(`syncUnits` — 바뀐 행만 교체, data-k 계약) + `setHtmlIfChanged`(불변 조각은 DOM 유지: 배너·스코프바·kpi·soft 분류·now-playing 셸) + **정적 컨테이너 위임 클릭**(rail·scopebar·detail·⏹) — 행이 교체돼도 클릭 불멸, 스크롤 자연 보존 |
+| P2C-24c | CX | 런 전체 진행률이 어디에도 없음 | ✅ 구현 — now-playing 바에 진행률 바+텍스트(종결 N/전체 · % · 경과 · 잔여 ~ETA; ETA = durations.json 실측 평균의 미종결 합/병렬 6 가정 — duration_stats 와 동일) `runProgress()`; rail '전체' 카드 링도 같은 소스로 동기 |
+| P2C-24d | CX | 특정 라이프사이클만 중단 불가 (UI 부재 — 서버는 7624e296) | ✅ 구현 — detail 스코프바에 조건부 "⏸ 이 라이프사이클 중단" (선택 스코프 진행/대기 + 런 running 일 때만) → POST /api/runs/{rid}/skip-lifecycle, 202 note 토스트. rail 행 hover 아이콘은 보류 (in-place patch 단순성 우선 — 필요시 후속) |
+| P2C-25 | IA·결정 대기 | 오너: "Modeling 의 '의존 그래프 (영향 파악)' 탭은 의미 없는 것 같음" | 🔲 **오너 결정 대기** — 옵션: (i) 탭 숨김 + 딥링크/라우트 보존 (저비용, 복구 쉬움 — map.json·resource_graph.js 는 console2 run 뷰와 공유라 제거 불가) (ii) 완전 제거 (UI+graph/map.json 정리 — 단 편집 화면·의존성 검증의 그래프 사용처와 분리 필요, 회귀 테스트 수정) (iii) 유용화 — 6-x 레퍼런스 검토에서 제안한 '우측 정의·사실 패널'(legacy /platform 콘솔 이식 (d)-1)과 결합해 "노드 클릭=사실 요약+편집 딥링크"로 재목적화. **권고 = (iii) 시도 후 불채택 시 (i)** — '영향 파악'이라는 용도 라벨(P2C-17)로도 안 쓰인다면 뷰 자체가 아니라 내용물이 문제라는 신호 |

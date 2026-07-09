@@ -132,14 +132,16 @@ def api_runs() -> JSONResponse:
 
 
 @router.get("/api/runs/{rid}/events")
-def api_run_events(rid: str) -> JSONResponse:
+def api_run_events(rid: str, offset: int = 0) -> JSONResponse:
     with c2._LOCK:
         rec = c2._RUNS.get(rid)
     if not rec:
         return _json({"error": "no such run"}, 404)
-    # §4: step-end soft에 soft_class(중복/갭/정책) 부착 — UI가 chip으로 렌더
-    events = c2._enrich_soft_classes(c2._read_events(rec["events"]))
-    return _json({"id": rid, "status": rec["status"], "events": events})
+    # P2C-24 폴링 다이어트: ?offset=N 증분 응답 — tail 만 전송 (계약: c2._events_view;
+    # lifecycle_ids 포함). §4 soft_class(중복/갭/정책) enrich 는 run 전체 문맥
+    # 의존이라 슬라이스 **전에** 전체 리스트에 적용한다.
+    return _json({"id": rid, **c2._events_view(rec, offset,
+                                               enrich=c2._enrich_soft_classes)})
 
 
 @router.get("/api/runs/{rid}/graph")

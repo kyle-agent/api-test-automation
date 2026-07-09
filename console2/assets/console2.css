@@ -577,6 +577,10 @@ g.rg-selbox{cursor:pointer}
 .scopebar .clear{margin-left:auto;font-size:11px;color:var(--accent);cursor:pointer;border:1px solid var(--line);
   background:#fff;border-radius:6px;padding:3px 9px;font-weight:600;white-space:nowrap}
 .scopebar .clear:hover{background:var(--panel2)}
+/* P2C-24: per-lifecycle 중단(⏸) 버튼 — 첫 .clear 만 우측 밀기, 이후는 이어붙임 */
+.scopebar .clear + .clear{margin-left:0}
+.scopebar .clear.skip{color:#9a3412;border-color:#d9a066}
+.scopebar .clear.skip:hover{background:#fdf3e2}
 
 /* detail sub-tabs (자원·API·로그) with a per-tab count chip */
 .detailtabs{gap:2px;padding:8px 12px 0;margin:0;background:var(--panel);border-bottom:1px solid var(--line)}
@@ -646,6 +650,12 @@ g.rg-selbox{cursor:pointer}
 .nowplaying .np-dot.que{background:var(--amber)}
 .nowplaying .np-abort{flex:none;margin-left:6px}
 @keyframes nppulse{50%{opacity:.35}}
+/* P2C-24: 런 진행률 바 (now-playing) — rail 전체 카드 링과 같은 runProgress 소스 */
+.nowplaying .np-prog{width:110px;height:6px;border-radius:4px;background:#d9e2ef;overflow:hidden;
+  flex:none;display:inline-block}
+.nowplaying .np-prog i{display:block;height:100%;width:0;background:var(--accent);border-radius:4px;
+  transition:width .5s ease}
+.nowplaying .np-progtxt{font-size:11px;font-weight:700;color:#0f3d8a;white-space:nowrap}
 
 /* 실행 기록 필터 (run만 | 전체) */
 .histfilter{display:flex;gap:5px;align-items:center;margin:2px 0 6px}
