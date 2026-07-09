@@ -1891,3 +1891,33 @@ igw/nat/pls/fw/dns/lb 등). **일괄 give_up [400,404] 추가는 기각** — �
 전부 덮고, "실ID인데 영영 안 나타남" 서브케이스는 batch-2 규약(모든 wait 폴
 until에 FAILED/ERROR/UNKNOWN terminal-bad 포함)이 담당. give_up_status는
 aimlops처럼 **탐사용(4xx-관용) create 뒤 폴에만 선별 적용**이 정본.
+
+## 하드실패 teardown이 '조용히' 새는 3중 결함 — run-2b (2026-07-09) 잔존의 엔진 뿌리
+
+> conf: 0.9 · seen: 2026-07-09 · obs: run-2b events.jsonl 전문 + 라이브 잔존 대조 + 코드 확인
+
+run-2b(오너 콘솔, 90/96·fail 5)에서 실패 라이프사이클들만 resource-deleted 0
+(lb-members 4/0 · private-nat 2/0 · vpc-endpoint 3/0)이던 뿌리는 데이터가 아니라
+**engine._run_cleanup 3중 결함**:
+① 응답 상태 미검사 — DELETE가 409/400이어도 예외만 아니면 oplog에 'deleted' 기록
+  (매니페스트/스윕이 이미 지워진 것으로 오인),
+② 재시도 없음 — 중도 실패 직후의 자원은 EDITING/DELETING이라 1회성 DELETE는
+  구조적으로 실패 (LB·TGW 실측),
+③ 콘솔 이벤트(_cev) 미발신 — cleanup 시도/실패가 화면에 전혀 안 보여 오너는
+  "teardown 시도 완료" 후 잔존만 목격.
+수리: 상태검사(404=already-gone은 성공) + 409/invalid-state 사다리
+(SCP_CLEANUP_RETRIES=3 × SCP_CLEANUP_RETRY_INTERVAL=20s) + 실패 시
+resource-delete-failed 이벤트/큰 로그. 회귀: tests/offline/test_cleanup_ladder.py.
+
+동반 확인(설계 사실): **happy path에서 cleanup은 의도적으로 안 돈다** — 성공 경로의
+삭제 정본은 명시 delete 스텝 (engine.py "deletes only on a later failure" 주석).
+따라서 '성공했는데 잔존'은 전부 명시 delete 스텝 부재 = 데이터 갭이다. run-2b 실증:
+kms sym/hmac 2키(메인 키만 delete 존재) · iam-group-bindings policy(binding만 해제) —
+둘 다 명시 delete 추가로 수리. heavy-shared-networking private-dns는 스텝은 있었으나
+그룹(dns) 실패로 스킵 → cleanup 폴백이 ①②③에 걸려 잔존 → 엔진 수리가 커버.
+
+기타 run-2b 실측: TGW vpc-connection 생성이 600s+ CREATING (wait 1500s 재상향) ·
+vpc-endpoint create 첫 2xx 착지(R2 수리 유효) 후 CREATING-delete 400 (ACTIVE 폴 신설) ·
+LB member의 빈 object_id 필드가 그 자체로 403 InvalidVmInMember (필드 제거; docs상
+optional) · filestorage-dr 별칭은 이제 core/config가 SCP_DR_REGION(기본 kr-east1)으로
+기본 합성 — SCP_SERVICE_HOSTS 없이도 교차리전 스텝 동작.

@@ -278,3 +278,22 @@ E(runtime 신선도) 부분 · F(클린업 힌트류) 합격 — C(지연 재스
 검증: `node --check` · `pytest tests/offline -k console2` 52 passed (계약 테스트
 `test_execution_cx_relayout_frontend_contract` 추가) · :8832 read-only smoke
 (SCP_ALLOW_MUTATIONS=false — ② 렌더·rt 탭·접힘·/runtime 200·run graph 계약).
+
+### 6-3. 오너 피드백 — ② 실행 뷰 마스터-디테일 2-pane 전환 (2026-07-09, append-only)
+
+> 오너 피드백(2026-07-09, 캡쳐 2장): "위-아래 화면 구성이 불편 — 몇 개가 될지 모르는
+> 시나리오가 가로 한 줄씩 세로로 쌓이고, 누르면 상세가 '아래'에 열려 시나리오가 많으면
+> 스크롤 왕복. 원하는 구조 = 좌측에 전체 + 그 하위 시나리오 목록(시작/종료 상태 인라인),
+> 클릭하면 우측에 자원·API 등. 메인은 전체 — 전체의 로그·자원·API·라이브 런타임이 주."
+> P2C-18~21(43a85eec)의 직접 후속 — 시맨틱(히어로 전면·①→②칩·순서표·rt탭)은 보존,
+> 배치만 세로 스택 → 2-pane. 실증 규모: 96 lifecycle 런에서 스크롤 왕복 발생.
+> 분석(전담 에이전트): 마스터-디테일 시맨틱(selectScope/scopeData/집계 기본선택)은
+> 이미 구현돼 있고, 원인은 `console2.css:495` `.md-report{grid-template-columns:1fr}`
+> 단일 컬럼 — 프런트 전용 S–M 수술.
+
+| ID | 심각도 | 발견 | 수정 상태 |
+|---|---|---|---|
+| P2C-22 | CX | ② 실행 뷰가 단일 컬럼 — 라이프사이클 카드 96개 세로 스택 아래에 상세 패널; '전체(집계)' 진입점이 목록 맨 아래; 진행/완료/실패 분포를 한눈에 못 봄 | 🔲 설계안 확정 대기 — 2-pane 전환: 좌 rail(sticky·내부 스크롤·'전체' 행 최상단+진행률 링(Q6 잔여 흡수)·상태 필터 칩·1줄 압축 행(fill=상태 단일 채널, Q3 준수)·대기 행 통합·now-playing 자동 추적) + 우 detail(기존 스코프바/4탭 그대로) + 그래프 전폭 상단(접기 토글, P2C-19 칩 보존) + ≤1180px 단일 컬럼 폴백. 지점: console2.css `.md-report` · index.html lc-picker 이동 · console2.js renderLcPicker · 계약 테스트 확장 |
+
+부수: §5 Q4 → 사실상 DONE (노드 클릭=상세 스코프 열기 구현됨, 43a85eec 계열 —
+index.html:143 · console2.js:2383). Q6 잔여 진행률 링은 P2C-22 rail '전체' 행으로 흡수 예정.

@@ -484,6 +484,16 @@
           "optional": true,
           "destructive": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-policy-for-group",
+          "method": "DELETE",
+          "path": "/v1/policies/{grp_policy_id}",
+          "group": "grp-bind",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404],
+          "_note": "2026-07-09b (run-2b 잔존 실측): create-policy-for-group이 만든 policy가 binding 해제 후에도 잔존 — happy path는 명시 delete 스텝이 정본(cleanup은 실패 경로 전용)이라 policy 삭제 스텝 부재가 뿌리. 404 관용은 실패-경로 cleanup과의 중복 대비."
         }
       ]
     },

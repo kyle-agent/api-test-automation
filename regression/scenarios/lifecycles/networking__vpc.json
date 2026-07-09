@@ -453,8 +453,8 @@
             "until_status": [
               404
             ],
-            "timeout": 180,
-            "interval": 10
+            "timeout": 600,
+            "interval": 15
           },
           "adopt": "subnet"
         },
@@ -469,6 +469,11 @@
             204
           ],
           "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20,
           "adopt": "vpc"
         }
       ]
@@ -726,8 +731,8 @@
             "until_status": [
               404
             ],
-            "timeout": 180,
-            "interval": 10
+            "timeout": 600,
+            "interval": 15
           },
           "adopt": "subnet"
         },
@@ -742,6 +747,11 @@
             204
           ],
           "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20,
           "adopt": "vpc"
         }
       ]
@@ -1149,6 +1159,11 @@
             409
           ],
           "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20,
           "adopt": "vpc"
         }
       ]
@@ -1829,6 +1844,11 @@
             204
           ],
           "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20,
           "adopt": "vpc"
         }
       ]
@@ -2450,8 +2470,8 @@
             "until_status": [
               404
             ],
-            "timeout": 180,
-            "interval": 10
+            "timeout": 600,
+            "interval": 15
           }
         },
         {
@@ -2464,7 +2484,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20,
+          "_note": "2026-07-09b 클래스 수리 (run-2b vpc-subnet-vip-nat 실측): 서브넷 202 비동기 삭제가 180s gone-폴을 pass-through → delete-vpc 409 related-resource. 폴 600s/15s 상향 + 409 사다리 8×20s (networking-vpc-subnet 81d67600과 동일 패턴, 파일 내 4개 lifecycle 일괄)."
         }
       ]
     },
@@ -2870,8 +2896,8 @@
             "until_status": [
               404
             ],
-            "timeout": 180,
-            "interval": 10
+            "timeout": 600,
+            "interval": 15
           },
           "adopt": "subnet"
         },
@@ -2886,6 +2912,11 @@
             204
           ],
           "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20,
           "adopt": "vpc"
         }
       ]

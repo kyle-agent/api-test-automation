@@ -206,7 +206,22 @@
             404
           ],
           "group": "vpce",
-          "_note": "id-bound GET getid 갭. vpc_endpoint_id가 create에서 잡히나 resource_key가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status | 2026-07-09: group vpce 동승 — create 실패 시 리터럴 {vpc_endpoint_id} 가비지 4xx 기록 대신 그룹 스킵."
+          "poll": {
+            "field": "$.vpc_endpoint.state",
+            "until": [
+              "ACTIVE",
+              "ERROR",
+              "DELETED"
+            ],
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          },
+          "_note": "id-bound GET getid 갭. vpc_endpoint_id가 create에서 잡히나 resource_key가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status | 2026-07-09: group vpce 동승 — create 실패 시 리터럴 {vpc_endpoint_id} 가비지 4xx 기록 대신 그룹 스킵. || 2026-07-09b (run-2b 실측): create 202 첫 성공 — 그러나 직후 delete가 CREATING 상태라 400 invalid-deletable-state. ACTIVE 폴 추가 (envelope $.vpc_endpoint.state, showvpcendpoint response_example 실증)."
         },
         {
           "name": "delete-vpc-endpoint",
@@ -220,7 +235,13 @@
           ],
           "destructive": true,
           "group": "vpce",
-          "_note": "2026-07-09: group vpce 동승 — create(optional+group) 실패 시 리터럴 {vpc_endpoint_id} DELETE가 strict 실패하는 경로 차단(등록된 cleanup은 _teardown_group이 처리)."
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20,
+          "_note": "2026-07-09: group vpce 동승 — create(optional+group) 실패 시 리터럴 {vpc_endpoint_id} DELETE가 strict 실패하는 경로 차단(등록된 cleanup은 _teardown_group이 처리). || 2026-07-09b: 400/409 사다리 8×20s — run-2b에서 CREATING 중 delete 400 invalid-deletable-state (위 read의 ACTIVE 폴과 벨트)."
         },
         {
           "name": "delete-filestorage-volume",
@@ -417,14 +438,14 @@
               "ERROR",
               "DELETED"
             ],
-            "timeout": 600,
-            "interval": 15,
+            "timeout": 1500,
+            "interval": 20,
             "give_up_status": [
               400,
               404
             ]
           },
-          "_note": "run 28648339307: connection 이 300s 내 ACTIVE 미도달 → 구 poll 이 조용히 타임아웃 (expect_status 200 충족) → create-private-nat 400 active-transit-gateway-not-found. 600s 로 연장 + terminal-bad/give_up. NESTED per-TGW list 는 200 (라이브 확인 2026-07-04); flat /v1/transit-gateway-vpc-connections 는 이 계정에서 403."
+          "_note": "run 28648339307: connection 이 300s 내 ACTIVE 미도달 → 구 poll 이 조용히 타임아웃 (expect_status 200 충족) → create-private-nat 400 active-transit-gateway-not-found. 600s 로 연장 + terminal-bad/give_up. NESTED per-TGW list 는 200 (라이브 확인 2026-07-04); flat /v1/transit-gateway-vpc-connections 는 이 계정에서 403. || 2026-07-09b (run-2b 폴 실측): connection 이 600s 를 꽉 채우고도 CREATING (38회 전량) — 이 대기가 미수렴 통과하면 뒤의 TGW-CONNECTED 대기까지 전부 밀려 create 400 connectable-transit-gateway-not-found 로 종착. 1500s/20s 로 재상향."
         },
         {
           "name": "wait-transit-gateway-active",
@@ -512,6 +533,11 @@
             "service_type": "TRANSIT_GATEWAY",
             "tags": []
           },
+          "retry_on_status": [
+            400
+          ],
+          "retries": 6,
+          "retry_interval": 30,
           "expect_status": [
             200,
             201,
@@ -524,7 +550,8 @@
             "method": "DELETE",
             "path": "/v1/private-nats/{private_nat_id}",
             "service": "vpc"
-          }
+          },
+          "_note": "2026-07-09b 벨트: TGW가 Connectable로 전이하는 마지막 구간의 레이스를 400 사다리 6×30s로 흡수 (wait-tgw-vpc-connection 1500s 재상향과 별개의 최종 방어선 — connectable-transit-gateway-not-found는 시간이 해결하는 상태 대기 계열)."
         },
         {
           "name": "verify-private-nat-read",

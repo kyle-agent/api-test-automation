@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 61 docs · 19 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 62 docs · 20 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -75,6 +75,7 @@
 | [`working/trackers/READ-REACHABILITY.md`](working/trackers/READ-REACHABILITY.md) | coverage | id-bound GET reachability from the resource model |  superseded (2026-06-18 생성 리포트 — 재생성 가능: python -m spec.read_reachability) |
 | [`working/trackers/REPO-AUDIT-2026-07-04.md`](working/trackers/REPO-AUDIT-2026-07-04.md) | orchestrator | 리포 하이진 감사 (C1, 2026-07-04) — 인벤토리 · retire 후보 · 문서 모순 · 진입점 | 🟢 active |
 | [`working/trackers/SERVICE-GAP-REPORTS.md`](working/trackers/SERVICE-GAP-REPORTS.md) | coverage | 서비스별 커버리지 갭 리포트 (병렬 agent 분석, 2026-06-13) |  superseded (2026-06-13 분석 스냅샷 — 커버리지 캠페인 정본으로 대체) |
+| [`working/trackers/SPEC-DIFF-2026-07-09.md`](working/trackers/SPEC-DIFF-2026-07-09.md) | orchestrator | SPEC-DIFF — 카탈로그 리프레시 + diff (2026-07-09) | 🟢 active |
 | [`working/trackers/UIUX-AUDIT-2026-07-03.md`](working/trackers/UIUX-AUDIT-2026-07-03.md) | all | SCP 컨트롤플레인 UI — IA/UX 감사 보고서 (2026-07-03) | 🟢 active |
 | [`working/trackers/VALIDATION-QUEUE.md`](working/trackers/VALIDATION-QUEUE.md) | validation | prioritized order for the coverage-validator | 🟢 active |
 | [`working/trackers/harness-tests.md`](working/trackers/harness-tests.md) | all | Harness adversarial safety-rail tests (Tier-0) | 🟢 active |

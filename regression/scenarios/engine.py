@@ -861,17 +861,47 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         label, method, path, svc, cu_json, _grp, bkind = entry
         try:
             if cfg.allow_destructive:
-                client.request(method, path, json=cu_json, service=svc)
-                print(f"  cleanup: {method} {path}")
+                resp = client.request(method, path, json=cu_json, service=svc)
+                # Async-state ladder: a teardown DELETE fired right after a
+                # mid-chain failure often hits 409/invalid-state while the
+                # resource is still EDITING/DELETING (run-2b field case: the
+                # LB + TGW leaks — one-shot best-effort leaked by design).
+                # Bounded retries, then report loudly instead of silently.
+                attempts = int(os.getenv("SCP_CLEANUP_RETRIES", "3"))
+                while (attempts > 0 and resp.status >= 400
+                       and resp.status != 404
+                       and (resp.status == 409
+                            or "state" in (resp.raw_text or "").lower())):
+                    time.sleep(float(os.getenv("SCP_CLEANUP_RETRY_INTERVAL", "20")))
+                    resp = client.request(method, path, json=cu_json, service=svc)
+                    attempts -= 1
+                # 404 = already gone (an explicit delete step or a racing sweep
+                # got there first) — success for teardown purposes.
+                ok = resp.status < 400 or resp.status == 404
+                print(f"  cleanup: {method} {path} -> {resp.status}"
+                      + ("" if ok else f"  !! NOT deleted: {(resp.raw_text or '')[:160]}"))
                 if _oplog:
-                    _oplog.emit_resource("deleted", path=path, service=svc or "",
+                    # Emit 'deleted' only on an actually-successful delete —
+                    # a 4xx here previously recorded 'deleted' and hid the leak.
+                    _oplog.emit_resource("deleted" if ok else "delete-failed",
+                                         path=path, service=svc or "",
                                          lifecycle=lifecycle["id"],
-                                         status="cleanup")
+                                         status="cleanup" if ok else str(resp.status))
+                if _cev:
+                    # Console live view previously saw NOTHING from teardown
+                    # cleanups (only explicit DELETE steps emitted) — the owner
+                    # watched "teardown 시도 완료" with leftovers and no clue why.
+                    _cev.emit("resource-deleted" if ok else "resource-delete-failed",
+                              lifecycle=lifecycle["id"], path=path,
+                              service=(svc or ""), status=resp.status)
         except Exception as exc:  # best-effort; report and continue
             print(f"  cleanup FAILED for {label} ({path}): {exc}")
             if _oplog:
                 _oplog.emit_resource("delete-failed", path=path, service=svc or "",
                                      lifecycle=lifecycle["id"], status=str(exc)[:40])
+            if _cev:
+                _cev.emit("resource-delete-failed", lifecycle=lifecycle["id"],
+                          path=path, service=(svc or ""), status=str(exc)[:80])
         finally:
             if bkind:  # release the reserved budget slot regardless of outcome
                 budget.release(bkind)

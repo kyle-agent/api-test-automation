@@ -242,6 +242,26 @@
           "path": "/v1/kms/transit/{key_id}",
           "expect_status": [200, 202, 204],
           "destructive": true
+        },
+        {
+          "name": "delete-sym",
+          "method": "DELETE",
+          "path": "/v1/kms/transit/{sym_key_id}",
+          "expect_status": [200, 202, 204, 404],
+          "destructive": true,
+          "optional": true,
+          "group": "xcov-kms-sym-create",
+          "_note": "2026-07-09b (run-2b 잔존 실측): sym/hmac 키는 cleanup만 등록돼 있었는데 happy path는 명시 delete 스텝이 정본(cleanup은 실패 경로 전용, engine.py 설계) — PASSED 런마다 2키 잔존. 명시 delete 추가; 404 관용은 실패-경로 cleanup과의 중복 삭제 대비."
+        },
+        {
+          "name": "delete-hmac",
+          "method": "DELETE",
+          "path": "/v1/kms/transit/{hmac_key_id}",
+          "expect_status": [200, 202, 204, 404],
+          "destructive": true,
+          "optional": true,
+          "group": "xcov-kms-hmac-create",
+          "_note": "delete-sym과 동일 근거 (2026-07-09b)."
         }
       ]
     },

@@ -103,6 +103,10 @@ class Settings:
     #   3. regional template + region + env          (the common case)
     #   4. SCP_BASE_URL                              (explicit single-host fallback)
     region: str = field(default_factory=lambda: _env("SCP_REGION"))
+    # DR (재해복구/복제 상대) region — the `<service>-dr` host alias resolves
+    # here (filestorage cross-region replication teardown). kr-west1 accounts
+    # replicate to kr-east1 (validated 2026-07-09).
+    dr_region: str = field(default_factory=lambda: _env("SCP_DR_REGION", "kr-east1"))
     env_code: str = field(default_factory=lambda: _env("SCP_ENV", "e"))
     host_template: str = field(default_factory=lambda: _env(
         "SCP_HOST_TEMPLATE", "https://{service}.{region}.{env}.samsungsdscloud.com"))
@@ -172,6 +176,17 @@ class Settings:
         if service and service in self.service_hosts:
             host = self.service_hosts[service]
             return (host if host.startswith("http") else f"https://{host}").rstrip("/")
+        # `<service>-dr` alias: the cross-region teardown steps (filestorage
+        # replication) address the DR-region twin of a service. Previously this
+        # ONLY worked with an explicit SCP_SERVICE_HOSTS entry — without it the
+        # template built `filestorage-dr.kr-west1...` (no such DNS) and the
+        # lifecycle died on a transport error (run-2b field case). Synthesize
+        # the DR host by default: same service, region = SCP_DR_REGION
+        # (default kr-east1). An explicit SCP_SERVICE_HOSTS entry still wins.
+        if service and service.endswith("-dr") and self.region and self.host_template:
+            return self.host_template.format(
+                service=service[:-3], region=self.dr_region,
+                env=self.env_code).rstrip("/")
         if self.is_global(service) and self.global_host_template:
             return self.global_host_template.format(
                 service=service, env=self.env_code).rstrip("/")
