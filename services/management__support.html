@@ -205,11 +205,12 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-07-07 17:41 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-07-09 19:27 KST · branch <code>claude/continuation-uk2rwc</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
 var R=[{"m": "GET", "p": "/v1/inquiries", "api": "getinquirylist", "c": "y", "s": 200, "t": 1.5, "src": "44db789", "d": []}, {"m": "GET", "p": "/v1/inquiries/{inquiry_id}", "api": "showinquiry", "c": "y", "s": 200, "t": 1.1, "src": "44db789", "d": []}, {"m": "GET", "p": "/v1/service-requests", "api": "getservicerequestlist", "c": "y", "s": 200, "t": 1.0, "src": "44db789", "d": []}, {"m": "GET", "p": "/v1/service-requests/{service_request_id}", "api": "showservicerequest", "c": "y", "s": 200, "t": 1.1, "src": "44db789", "d": []}];
+var CONF_EVAL=true;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
@@ -233,7 +234,9 @@ function matches(r){
 }
 function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function defBtn(r){
-  if(!r.d.length)return '<span class="ok">✓ 정상</span>';
+  if(!r.d.length)return CONF_EVAL
+    ?'<span class="ok">✓ 정상</span>'
+    :'<span class="mut" title="이 머신에서 컨포먼스 점검(python -m conformance.static)이 실행된 적이 없어 판정 근거가 없습니다 — 근거 없음 ≠ 정상">미평가</span>';
   var crit=r.d.some(function(i){return i.crit;});
   return '<button class="defbtn'+(crit?' crit':'')+'" onclick="toggleDetail(this)">'
     +(crit?'결함':'개선')+' '+r.d.length+'<span class="ca">▾</span></button>';

@@ -156,11 +156,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
   <div class="split">
     <div><div class="k">읽기 GET</div><div class="v" style="color:var(--amber)">50% <span class="sub">2/4</span></div></div>
     <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--red)">0% <span class="sub">0/2</span></div></div>
-    <div><div class="k">설계/동작 결함</div><div class="v">0 <span class="sub">개선 · 결함 0</span></div></div>
+    <div><div class="k">설계/동작 결함</div><div class="v">1 <span class="sub">개선 · 결함 0</span></div></div>
   </div>
 </div>
 
-<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0).</div></div>
+<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0). 문서/설계 결함 중 가장 흔한 건 <b>undiscoverable-params(1)</b>.</div></div>
 
 <div class="controls">
   <div class="row1">
@@ -205,11 +205,12 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-07-07 17:41 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-07-09 19:27 KST · branch <code>claude/continuation-uk2rwc</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/devops-services/{devops_service_id}", "api": "deletedevopsservice", "c": "n", "s": 404, "t": 1.7, "src": "fe79059", "d": []}, {"m": "GET", "p": "/v1/devops-services", "api": "listdevopsservices", "c": "y", "s": 200, "t": 2.4, "src": "44db789", "d": []}, {"m": "GET", "p": "/v1/devops-services/{devops_service_id}", "api": "showdevopsservice", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/{devops_service_id}/check-deletable", "api": "checkdeletabledevopsservice", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/check-duplication", "api": "checkduplicationdevopsservice", "c": "y", "s": 200, "t": 3.0, "src": "fe79059", "d": []}, {"m": "POST", "p": "/v1/devops-services", "api": "createdevopsservice", "c": "n", "s": 409, "t": 2.2, "src": "fe79059", "d": []}];
+var R=[{"m": "DELETE", "p": "/v1/devops-services/{devops_service_id}", "api": "deletedevopsservice", "c": "n", "s": 404, "t": 1.7, "src": "fe79059", "d": []}, {"m": "GET", "p": "/v1/devops-services", "api": "listdevopsservices", "c": "y", "s": 200, "t": 2.4, "src": "44db789", "d": []}, {"m": "GET", "p": "/v1/devops-services/{devops_service_id}", "api": "showdevopsservice", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/{devops_service_id}/check-deletable", "api": "checkdeletabledevopsservice", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/check-duplication", "api": "checkduplicationdevopsservice", "c": "y", "s": 200, "t": 3.0, "src": "fe79059", "d": []}, {"m": "POST", "p": "/v1/devops-services", "api": "createdevopsservice", "c": "n", "s": 409, "t": 2.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: tenant_code, tenant_name", "crit": false}]}];
+var CONF_EVAL=true;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
@@ -233,7 +234,9 @@ function matches(r){
 }
 function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function defBtn(r){
-  if(!r.d.length)return '<span class="ok">✓ 정상</span>';
+  if(!r.d.length)return CONF_EVAL
+    ?'<span class="ok">✓ 정상</span>'
+    :'<span class="mut" title="이 머신에서 컨포먼스 점검(python -m conformance.static)이 실행된 적이 없어 판정 근거가 없습니다 — 근거 없음 ≠ 정상">미평가</span>';
   var crit=r.d.some(function(i){return i.crit;});
   return '<button class="defbtn'+(crit?' crit':'')+'" onclick="toggleDetail(this)">'
     +(crit?'결함':'개선')+' '+r.d.length+'<span class="ca">▾</span></button>';
