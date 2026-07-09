@@ -113,7 +113,43 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-07-08 저녁, SKE 단일화 + 실측 잔존 핀 + 완전성 감사 착지):** ①
+- **LATEST (2026-07-09, run-2 잔여 7fail 전량 수리 + filestorage 교차리전 절차 착지 —
+  세션 인계):** git 채널 복구로 6커밋 **branch=main=`4416e44e`** 푸시 완료(재서명
+  불요 — gpgsig 정상, 앞선 'N' 표시는 로컬 검증환경 착시. MCP 커넥터 만료는
+  구세션 토큰 문제 — 새 세션에서 자연 해소 예상). 내용:
+  ① **run-2(73243c6e, 111/7/2, 91.6분) 잔여 7fail 전부 수리 반영** —
+  networking-vpc-subnet wait-subnet-gone 600s+delete-vpc 409 사다리(`81d67600`,
+  뿌리: expect가 timeout을 관용 통과시키는 엔진 패턴) · aimlops give_up
+  [400,403,404]+C-6 `_scope_exclude` 오너 유예(`6f0eaae0`/`d2cfc7eb`; **재시도
+  시 POST body에 필수 `initial_user_email` 추가할 것** — run-2 400 근본원인) ·
+  수리 R2 5건(`65ecdef2`): apigw-ple 삭제 사다리+그룹 동승 / heavy-lb-members
+  ACTIVE 재폴+409 사다리 / lb-light member 403 관용(VM 부재 구조 한계 — heavy
+  미러가 실검증) / private-nat tgw-vpc-connection ACTIVE 재대기 / **vpce 근본수리:
+  FS resource_key = 파일스토리지 endpoint IP(볼륨 uuid 아님; connectable-resources
+  GET이 canonical 소스, 라이브 실측; api_docs 32-hex 예시 오도 — PF 후보)** +
+  networking__vpc.yaml 모델 반증 동반.
+  ② **filestorage 교차리전 정리 절차 (오너 하사, `22f200ff`)**: ①일시중지
+  ②삭제(둘 다 **replica 리전 측**, `?volume_id=` 필수) ③snapmirror.* 스냅샷
+  정리(**복제 삭제 후에야 리스팅 노출** — 신규 실측) ④양 리전 볼륨 삭제.
+  west/east regr 잔존 0 실증. reconciler: `replication_volume_id` 1순위 +
+  `_reap_filestorage_snapshots`(owned `?volume_id=` 스코프만) 배선.
+  ③ 게이트: offline 493 passed(+INDEX 재생성) · validate 251/0err · knowledge
+  0err/79warn 기준선 · 리뷰 PASS(후속 `_scope_exclude` 회귀 테스트 `4416e44e`).
+  ④ **인-플라이트**: west 스윕 1회 구동 중 — 계정 잔존은 공유 VPC/서브넷 쌍
+  (`regrvpcsh6a4edbe9`/`regrsubsh6a4edbe9`)뿐, 과금성 0. 새 세션 첫 확인:
+  one-shot 인벤토리(GET /v1/vpcs·subnets, regr 프리픽스 카운트) → 남아 있으면
+  `SCP_SWEEP_IGNORE_TTL=true python -m cleanup.reconciler`(TTL 게이트 가능성).
+  ⑤ **다음 우선순위**: (a) 재런으로 R2 수리 라이브 검증(콘솔 전체 선택·워커 18;
+  vpce create 2xx 관측 대기, aimlops는 명시 선택시에만) (b) 오너 결정대기 —
+  waiver A(클래스 1-4·6-8 승인 + 9=ⓐ + **5 반려** 권고; 승인 시
+  CAMPAIGN-C3-100-waivers.md §3-2 절차로 coverage_waivers.json 반영) · C-list
+  (SCR credential 활성화 · IAM log-stream 권한 · password Win 1-VM 실험 ·
+  budget {yyyymm} 엔진 토큰 · peering CREATING PF 재분류 · 이미지 파라미터화 ·
+  HB6b/7b) (c) 회고 백로그 — '관용 create→리터럴 폴' 클래스 전수 점검 ·
+  spec-intel 카탈로그 리프레시(현행 2026-06-05자)+diff 변경분 재테스트 ·
+  phase-2 물리 삭제(은퇴 라이프사이클 바디·members-nat fixed_ip_map .30/.31·
+  dep rows) · green_lifecycles.json stale 정리.
+- **(2026-07-08 저녁, SKE 단일화 + 실측 잔존 핀 + 완전성 감사 착지):** ①
   **SKE 재편** — placeholder 프로브 2종(ske-read-coverage / ske-upgrade-write-coverage)
   은퇴("생성은 안하고 조회만 하는게 무슨의미?"), 6개 리드가 실ID로 heavy 편입
   (kubeconfig×2는 소문자 public 쿼리, nodes 리드, 전부 optional 자체그룹 —
