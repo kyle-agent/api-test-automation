@@ -631,6 +631,23 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
             val = _jsonpath_get(resp.body, field) if resp.body else None
             if val in until:
                 return resp
+            # TERMINAL-BAD (batch-2 규약의 엔진 내장화 — owner 2026-07-09 실측:
+            # VM이 ERROR로 전이했는데 wait 폴이 20분 한도까지 공회전). until이
+            # 못 잡은 ERROR/FAILED는 절대 수렴하지 않으니 즉시 폴을 끝내고
+            # 응답에 마커를 남긴다 — 호출측이 스텝을 실패로 분류한다.
+            # until에 명시된 값(의도적 대기)과 refire 폴(failed-delete 상태를
+            # 보고 재발사하는 설계)은 건드리지 않는다. per-poll override:
+            # poll.terminal_bad (예: [] = 끔, ["UNKNOWN"] = 확장).
+            _bad = poll.get("terminal_bad")
+            _bad = {"ERROR", "FAILED"} if _bad is None else set(map(str, _bad))
+            if (not refire and isinstance(val, str) and val in _bad):
+                print(f"  step '{step.get('name')}': polled state '{val}' is "
+                      f"TERMINAL-BAD — ending poll early (never converges)")
+                try:
+                    resp._terminal_bad = val
+                except Exception:
+                    pass
+                return resp
         if refire and refire_left > 0 and resp.status < 400 and resp.body:
             _state = _jsonpath_get(resp.body, refire["field"])
             if _state in refire.get("when", []):
@@ -1276,6 +1293,15 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                     f"'{step['name']}': {resp.raw_text[:200]}")
 
             status_ok = resp.status in expected or _is_already_present
+            # 폴이 terminal-bad(ERROR/FAILED)로 끝났으면 2xx라도 성공이 아니다 —
+            # 종전엔 200+ERROR가 expect [200]을 조용히 통과해 다음 스텝이 죽은
+            # 자원 위에서 계속 진행됐다 (masked-defect 클래스). optional/group
+            # 스텝은 아래 기존 분기로 그룹-스킵, 필수 스텝은 명확한 사유로 실패.
+            _tbad = getattr(resp, "_terminal_bad", None)
+            if _tbad is not None and status_ok:
+                print(f"  step '{step['name']}': state '{_tbad}' = terminal-bad "
+                      f"— classifying as FAILED despite HTTP {resp.status}")
+                status_ok = False
             if _is_already_present:
                 print(f"  step '{step['name']}' -> {resp.status} "
                       f"already-present (idempotent on shared resource) "
@@ -1299,10 +1325,12 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                     group_fail_reason.setdefault(grp, reason)
                     _teardown_group(grp)
                 continue
-            assert resp.status in expected or _is_already_present, (
+            assert (resp.status in expected or _is_already_present) and _tbad is None, (
                 f"[{lifecycle['id']}] step '{step['name']}' "
-                f"{step['method']} {path} -> {resp.status}, expected {expected}\n"
-                f"{resp.raw_text[:500]}")
+                f"{step['method']} {path} -> {resp.status}, expected {expected}"
+                + (f" · polled state '{_tbad}' is TERMINAL-BAD (resource will "
+                   f"never converge)" if _tbad is not None else "")
+                + f"\n{resp.raw_text[:500]}")
 
             # v0.5 throttle: the happy path deletes its VPC via its OWN step (not
             # teardown), so free the cross-process slot here too — otherwise a
