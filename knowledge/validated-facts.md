@@ -1866,3 +1866,28 @@ docs listvolumereplications에 required로 명기돼 있다.
   가능; alias 미설정이면 템플릿이 `filestorage-dr.kr-west1...`(DNS 부재, 실측
   NXDOMAIN)을 만들어 **ConnectionError로 라이프사이클이 즉사**한다 (PUT/DELETE는
   전송예외 재시도 후 raise) — storage__filestorage.json의 그룹 동승 수리 참조.
+
+## '관용 create→리터럴 폴' 클래스 — 엔진 차원 차단 (2026-07-09 오프라인, run-2 회고 백로그 완료)
+
+> conf: 0.9 · seen: 2026-07-09 · obs: run-2 aimlops 30분 공회전(라이브) + 전수 정적 스캔
+
+**클래스 정의:** 4xx를 관용하는 탐사용 create(또는 `capture_soft`)가 캡처를 못
+남기면, 그 토큰을 경로/쿼리에 쓰는 후속 state-폴이 **리터럴 `{token}` 그대로**
+400/404를 timeout 한도까지 재시도한다 (run-2 실측: gen-heavy-aimlops
+`{release_id}` 폴 10회차/~30분). 리터럴 토큰은 절대 수렴 불가.
+
+**근본수리 (engine.py `_run_step`):** poll 진입 직전, 치환 후에도 경로 또는
+params에 `{`가 남아 있으면 **폴 루프를 통째로 스킵**하고 첫 응답을 그대로 반환
+(give_up_status/expect_status 의미론은 불변). optional-retry 캡(`"{" not in
+path`)과 같은 판정 기준. 회귀 테스트:
+`tests/offline/test_poll_unresolved_placeholder.py` (경로 토큰 · 쿼리 토큰 ·
+정상 경로 폴 보존 3건).
+
+**전수 스캔 결과와 남긴 결정:** 관용-캡처 토큰을 폴하는 give_up 미보유
+state-폴 20건 검출(DB subops-full 4 · gslb 4 · blockstorage/filestorage 5 ·
+igw/nat/pls/fw/dns/lb 등). **일괄 give_up [400,404] 추가는 기각** — 비동기
+202 create 직후 리소스가 일시적으로 404일 수 있어(가시성 지연) 정상
+프로비저닝 대기를 오판 중단시킬 위험. 리터럴-토큰 서브케이스는 엔진 가드가
+전부 덮고, "실ID인데 영영 안 나타남" 서브케이스는 batch-2 규약(모든 wait 폴
+until에 FAILED/ERROR/UNKNOWN terminal-bad 포함)이 담당. give_up_status는
+aimlops처럼 **탐사용(4xx-관용) create 뒤 폴에만 선별 적용**이 정본.

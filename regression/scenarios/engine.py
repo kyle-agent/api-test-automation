@@ -584,6 +584,24 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     poll = step.get("poll")
     if not poll:
         return resp
+    # A path/param that still carries an unresolved {token} (soft-capture miss
+    # after a tolerated create) can NEVER converge — the server keeps answering
+    # 400/404 for the literal token until the poll's full timeout burns (field
+    # case: gen-heavy-aimlops run-2 spun 30min x 10 attempts on a literal
+    # {release_id}; same judgement as the optional-retry cap above). Return the
+    # first response as-is: give_up_status/expect_status semantics still apply.
+    def _has_unresolved(v) -> bool:
+        if isinstance(v, str):
+            return "{" in v
+        if isinstance(v, dict):
+            return any(_has_unresolved(x) for x in v.values())
+        if isinstance(v, (list, tuple)):
+            return any(_has_unresolved(x) for x in v)
+        return False
+    if "{" in path or _has_unresolved(params):
+        print(f"  step '{step.get('name')}': unresolved placeholder in polled "
+              f"path/params — skipping poll (a literal token can never converge)")
+        return resp
     until_status = _as_status_list(poll.get("until_status")) or None
     field, until = poll.get("field"), _as_status_list(poll.get("until"))
     # give_up_status: statuses that END the poll immediately (resp returned as-is).
