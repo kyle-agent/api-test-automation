@@ -1944,3 +1944,16 @@ optional) · filestorage-dr 별칭은 이제 core/config가 SCP_DR_REGION(기본
   `object_id`(실제 VM id) 필수 (`InvalidVmInMember object_id: 'None'`).
   구모델 "직접 입력 IP는 VM 불필요" 전제 반증. → find-member-vm(regrsrv*
   캡처)+show로 실 IP·id 주입 (owner 방향: "vm의 id를 잘 넣으면 될 것").
+
+## 이 계정의 IAM 유저 목록은 비어 있다 (2026-07-09 run-377e 실측)
+
+> conf: 0.85 · seen: 2026-07-09 · obs: 1 (GET /v1/accounts/ec11538a…/users → 200 {count:0, users:[]})
+
+role trust policy의 Principal에 쓸 실유저가 없다 — iam-group-member /
+iam-user-policy-binding이 user_id 부재로 blocked-owner였던 기지 사실의 뿌리와
+동일. created_by 필드들에 보이는 90dddfc2…는 이 목록에 안 나오는 주체(콘솔
+로그인/오너 계정 계층)로 보임. → iam-role-full은 'Current Account' principal
+추정형(srn:e::<acct>:::scp-iam:root, 미검증)으로 전환; 400이 오면 그
+ValidationError가 정형을 알려줄 것. apigw resource-policy는 같은 런에서
+**정식 SRN 수리로 500→200 착지** (PF-19 = 우리 입력 형식 오류가 뿌리, 남는
+결함은 '불량 입력에 400 아닌 500'뿐).

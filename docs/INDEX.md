@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 62 docs · 20 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 63 docs · 21 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -37,6 +37,7 @@
 | [`working/plans/CAMPAIGN-C3-100.md`](working/plans/CAMPAIGN-C3-100.md) | orchestrator + all campaign agents (다른 세션이 이어받을 때 이 문서가 진입점) | CAMPAIGN — C3 100% · 플랫폼 dogfood 개선 · 리포 정비 (3 워크스트림 병렬) |  ACTIVE campaign (2026-07-04, owner-directed autonomous run) |
 | [`working/plans/COVERAGE-GETID-PLAN.md`](working/plans/COVERAGE-GETID-PLAN.md) | coverage | the id-bound GET gap, classified and attacked |  superseded (2026-06-12 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체) |
 | [`working/plans/COVERAGE-WAVE-PLAN.md`](working/plans/COVERAGE-WAVE-PLAN.md) | coverage | the remaining static gap, prioritized |  superseded (2026-06-11 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체) |
+| [`working/plans/CX-IA-DESIGN-2026-07-09.md`](working/plans/CX-IA-DESIGN-2026-07-09.md) | all | CX·IA 디자인 안 — 제3자 UX 컨설턴트 리뷰 (2026-07-09) | 🟢 active |
 | [`working/plans/HEAVY-PREMISE-CONTRACT.md`](working/plans/HEAVY-PREMISE-CONTRACT.md) | all | HEAVY-PREMISE CONTRACT — Testing 단순화 (Model B) 공유 계약 | 🟢 active |
 | [`working/plans/IA-BUILD-CONTRACT.md`](working/plans/IA-BUILD-CONTRACT.md) | the IA-build agents (Catalog · Modeling · Reporting) + integration owner | IA build contract — "그림 하나, 여러 얼굴" parallel build |  superseded (이행 완료된 빌드 계약 — 확정 IA 빌드 완료) |
 | [`working/plans/PARALLEL-EXECUTION-PLAN.md`](working/plans/PARALLEL-EXECUTION-PLAN.md) | all | Parallel execution plan — staged foundations + per-VPC lanes (DRAFT) |  superseded (드래프트 설계 — 1.0 의존-DAG 스케줄러로 실현됨) |

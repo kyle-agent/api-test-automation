@@ -13,10 +13,11 @@
           "expect_status": [
             200
           ],
-          "capture": {
+          "_note": "run-377e 실측: 이 계정의 GET /v1/accounts/{acct}/users = users:[] (count 0) — IAM 유저가 없어 user-SRN Principal 경로는 죽은 길 (iam-group-member류가 user_id로 blocked였던 기지 사실과 정합). 관측·커버리지용 optional 리드로 강등; 유저가 생기면 capture가 살아나 향후 user 경로 재고 가능.",
+          "optional": true,
+          "capture_soft": {
             "iam_user_id": "$.users[0].id"
-          },
-          "_note": "owner 가이드 후속 (2026-07-09, userguide iam/role + json_guides): trust policy의 Principal은 필수이고 형식은 {\"scp\": \"srn:e::<account>:::scp-iam:user/<userId>\"} (json_guides 예시 그대로). 실사용자 id를 계정 유저 목록에서 캡처해 Principal을 구성 — account_id 리터럴은 knowledge/services.md 기록 상수."
+          }
         },
         {
           "name": "create-role",
@@ -41,7 +42,7 @@
                   "Condition": {},
                   "Resource": [],
                   "Principal": {
-                    "scp": "srn:e::ec11538abf8f46d2953539521f745366:::scp-iam:user/{iam_user_id}"
+                    "scp": "srn:e::ec11538abf8f46d2953539521f745366:::scp-iam:root"
                   }
                 }
               ]
@@ -63,7 +64,7 @@
             "path": "/v1/roles/{role_id}",
             "service": "iam"
           },
-          "_note": "PF-20/PF-31 재시도 (owner 가이드 2026-07-09): 종전 body는 trust policy에 Principal이 없고 principals=[] — userguide role 페이지는 principal 연결(계정/유저SRN/서비스, 최대 20)을 전제하고 json_guides는 Principal 필수+형식을 명시. 실유저 SRN을 Principal로 추가. 여전히 500이면 PF-31(백엔드) 확정 증거가 강해진다. Version 2024-07-01은 json_guides가 유효 확인."
+          "_note": "PF-20/31 재시도 v2 (2026-07-09 밤): v1(실유저 SRN)은 run-377e에서 계정 유저 목록이 비어 capture 실패로 좌초 — userguide role 페이지의 'Current Account' principal 유형을 json_guides SRN 문법(srn:e::<acct>:::scp-iam:<주체>)에 대입한 root 추정형으로 전환. **미검증**: 다음 런이 판정 — 400 ValidationError면 그 메시지가 정형을 알려줄 것이고, 여전히 500이면 PF-31(백엔드) 확정 증거."
         },
         {
           "name": "get-role",
