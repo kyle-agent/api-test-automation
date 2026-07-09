@@ -5,7 +5,7 @@
       "service": "storage/filestorage",
       "enabled": true,
       "heavy": true,
-      "_note": "FileStorage SNAPSHOT + SNAPSHOT-SCHEDULE + REPLICATION lifecycle (billable NFS volume -> heavy, gated by SCP_RUN_HEAVY). LIVE VALIDATED 2026-06-24 covering 17/21 endpoints. Flow: create NFS volume (202) -> snapshot (202) -> restore snapshot (202) -> set-volume (202) -> snapshot-schedule create (202) + list (200) + set (202) + delete (202) -> replication create (202) + list (200) + show (200) + set (400 product-constraint) + delete (400 product-constraint) -> delete snapshot (202) -> delete volume (blocked if replication exists). KEY FINDINGS: (1) Volume create: {name, protocol:NFS, type_name:HDD} -> 202. Response has $.volume_id (flat). Volume name auto-appended with suffix (regrfsr001 -> regrfsr001_fwfufh). (2) Volume immediately available (state:available right after create, no poll needed for create-snapshot). (3) snapshot create: {volume_id} -> 202, $.snapshot.id. (4) snapshot restore: PUT /v1/snapshots/{id}/restore?volume_id=... with body {} -> 202. (5) snapshot-schedule create: {volume_id, snapshot_retention_count, snapshot_schedule:{frequency, day_of_week, hour}} -> 202. No id in create response; get id from list response $.snapshot_schedule[0].id. (6) replication create: {name, volume_id, region:kr-east1, replication_frequency:5min, replication_type:replication, backup_retention_count:2} -> 202. Captures $.replication_id. (7) PRODUCT CONSTRAINT: setvolumereplication AND deletevolumereplication BOTH return 400 filestorage.BadRequest.Invalid.volume.purpose when volume.purpose=original (source of active replication). Cannot be done from source side — requires DR region access or console. (8) PRODUCT CONSTRAINT: deletevolume returns 400 'cannot delete volume because replication is in use' while replication exists. Teardown sequence (DR-side, needs 'filestorage-dr' host): set-replication-dr policy=paused -> delete-replication-dr -> delete-replica-volume-dr (ADDED 2026-07-08: the kr-east1 replica volume survives replication deletion and must be deleted itself) -> source delete-volume. Without the filestorage-dr host each run strands the source+replica volume pair (live-observed 2026-07-08) requiring supervised/console cleanup. (9) setaccessrule: SCALAR body {object_id, object_type, action}. Returns 404 NotFound for fake VM uuid — needs real VM id (needs-peer blocker).",
+      "_note": "FileStorage SNAPSHOT + SNAPSHOT-SCHEDULE + REPLICATION lifecycle (billable NFS volume -> heavy, gated by SCP_RUN_HEAVY). LIVE VALIDATED 2026-06-24 covering 17/21 endpoints. Flow: create NFS volume (202) -> snapshot (202) -> restore snapshot (202) -> set-volume (202) -> snapshot-schedule create (202) + list (200) + set (202) + delete (202) -> replication create (202) + list (200) + show (200) + set (400 product-constraint) + delete (400 product-constraint) -> delete snapshot (202) -> delete volume (blocked if replication exists). KEY FINDINGS: (1) Volume create: {name, protocol:NFS, type_name:HDD} -> 202. Response has $.volume_id (flat). Volume name auto-appended with suffix (regrfsr001 -> regrfsr001_fwfufh). (2) Volume immediately available (state:available right after create, no poll needed for create-snapshot). (3) snapshot create: {volume_id} -> 202, $.snapshot.id. (4) snapshot restore: PUT /v1/snapshots/{id}/restore?volume_id=... with body {} -> 202. (5) snapshot-schedule create: {volume_id, snapshot_retention_count, snapshot_schedule:{frequency, day_of_week, hour}} -> 202. No id in create response; get id from list response $.snapshot_schedule[0].id. (6) replication create: {name, volume_id, region:kr-east1, replication_frequency:5min, replication_type:replication, backup_retention_count:2} -> 202. Captures $.replication_id. (7) PRODUCT CONSTRAINT: setvolumereplication AND deletevolumereplication BOTH return 400 filestorage.BadRequest.Invalid.volume.purpose when volume.purpose=original (source of active replication). Cannot be done from source side — requires DR region access or console. (8) PRODUCT CONSTRAINT: deletevolume returns 400 'cannot delete volume because replication is in use' while replication exists. Teardown sequence (DR-side, needs 'filestorage-dr' host): set-replication-dr policy=paused -> delete-replication-dr -> delete-replica-volume-dr (ADDED 2026-07-08: the kr-east1 replica volume survives replication deletion and must be deleted itself) -> source delete-volume. Without the filestorage-dr host each run strands the source+replica volume pair (live-observed 2026-07-08) requiring supervised/console cleanup. (9) setaccessrule: SCALAR body {object_id, object_type, action}. Returns 404 NotFound for fake VM uuid — needs real VM id (needs-peer blocker). (10) OWNER PROCEDURE (2026-07-09, live-proven end-to-end same day, every step 2xx): 교차리전 복제 정리는 상대(복제본) 리전에서 복제 정책을 두 번 변경 — ① 일시중지(set, policy=paused) ② 삭제(delete) — 한 뒤 ③ snapshot 등 부속 정리(복제가 양쪽 볼륨에 snapmirror.* 시스템 스냅샷을 자동 누적; replica 측은 복제 삭제 후에야 list에 노출)가 되어야 ④ west/east 볼륨 둘 다 삭제 가능 (source purpose original→none 전이 후 202→404). REPAIR 2026-07-09: create-replication의 capture를 hard로 승격 — create가 실패하면(스테이터스든 envelope 미스든) 그룹 fs-replication 전체가 함께 스킵되어 dr 스텝들이 리터럴 {replication_id}로 발화하다 죽는 계급(2026-07-08 런 사망: filestorage-dr alias 미설정 시 템플릿 호스트 filestorage-dr.<region>...가 DNS 부재(NXDOMAIN 실측) → ConnectionError → 라이프사이클 즉사)을 차단. dr 3스텝은 create 성공 시에만 실 id로 발화. alias 미설정 런의 정리 안전망: SCP_SWEEP_REGIONS=kr-east1 python -m cleanup.reconciler (스냅샷 인지 east 패스).",
       "steps": [
         {
           "name": "create-volume",
@@ -71,7 +71,7 @@
           "capture": {"snapshot_id": "$.snapshot.id"},
           "cleanup": {
             "method": "DELETE",
-            "path": "/v1/snapshots/{snapshot_id}",
+            "path": "/v1/snapshots/{snapshot_id}?volume_id={volume_id}",
             "service": "filestorage"
           }
         },
@@ -149,8 +149,8 @@
             "backup_retention_count": 2
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {"replication_id": "$.replication_id", "dr_volume_id": "$.replication_volume_id"},
-          "_note": "CONFIRMED LIVE 2026-06-24: createvolumereplication returns 202 with real volume_id. Response has $.replication_id and $.replication_volume_id (the DR volume in kr-east1). TEARDOWN: Once created, volume.purpose='original'. The DR side (kr-east1) must be used for set/delete. Teardown sequence: use SCP_REGION=kr-east1 or SCP_SERVICE_HOSTS to set policy=paused via $.replication_volume_id, then delete replication, then delete volume. The set-replication-dr and delete-replication-dr steps below use the 'filestorage-dr' service alias -- set SCP_SERVICE_HOSTS='{\"filestorage-dr\":\"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' at runtime to enable cleanup."
+          "capture": {"replication_id": "$.replication_id", "dr_volume_id": "$.replication_volume_id"},
+          "_note": "CONFIRMED LIVE 2026-06-24: createvolumereplication returns 202 with real volume_id. Response has $.replication_id and $.replication_volume_id (the DR volume in kr-east1). GROUP-RIDE (2026-07-09 repair): capture는 의도적으로 HARD — create가 400 등으로 실패하거나 202인데 envelope이 비면 optional+capture 미스 규칙으로 그룹 fs-replication 전체가 스킵되어, 후속 스텝들(특히 dr 3스텝)이 리터럴 {replication_id}/{dr_volume_id}로 발화하지 않는다 (2026-07-08 런의 set-replication-dr 리터럴 사망 수리). TEARDOWN = 오너 절차 (2026-07-09): 상대(복제본) 리전에서 ① 일시중지(set-replication-dr) ② 삭제(delete-replication-dr) → ③ snapshot 정리 → ④ 양 리전 볼륨 삭제 (source purpose original→none 전이). dr 스텝들은 'filestorage-dr' service alias 사용 — SCP_SERVICE_HOSTS='{\"filestorage-dr\":\"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' 를 런타임에 설정해야 동작."
         },
         {
           "name": "list-replications",
@@ -162,7 +162,7 @@
           "params": {"volume_id": "{volume_id}"},
           "expect_status": [200, 400, 403, 404],
           "capture_soft": {"replication_id": "$.replications[0].replication_id"},
-          "_note": "Closes listvolumereplications (GET /v1/replications) — probe_reads skips it (no path params, only the required ?volume_id= query). volume_id is a REQUIRED query param (PROVEN 200 with real volume_id). capture_soft fallback: grabs replication_id from the list response ($.replications[0].replication_id) in case the create step 4xx'd (DR region unavailable) — needed by get-replication, set-replication, delete-replication steps."
+          "_note": "Closes listvolumereplications (GET /v1/replications) — probe_reads skips it (no path params, only the required ?volume_id= query). volume_id is a REQUIRED query param (PROVEN 200 with real volume_id; 이번 런 west bare GET 400의 원인 = 이 쿼리 누락). GROUP-RIDE 후(2026-07-09) 이 스텝은 create-replication 성공 시에만 돈다 — capture_soft는 동일 id 재확인(무해)일 뿐 4xx-fallback 용도가 아님. 레코드의 replica id 필드명은 replication_volume_id (라이브 실측 2026-07-09)."
         },
         {
           "name": "get-replication",
@@ -189,6 +189,17 @@
           "_note": "볼륨 purpose 전제 (재현 2026-07-08 라이브 런: 400 'Check the volume purpose.' — 2026-06-24 CONFIRMED filestorage.BadRequest.Invalid.volume.purpose와 동일 제약의 영문 메시지 변형). PRODUCT CONSTRAINT: source 측에서 SET 불가. 근거 확정 (2026-07-08 docs+라이브 대조): purpose는 VolumeCreateRequest에 존재하지 않는 서버 관리 상태 필드 (volumecreaterequest 필수 = name/protocol/type_name뿐) — 생성 body에 purpose를 보강하는 수리는 불가능. 라이브 관찰: 복제 source 볼륨 purpose='original'(regrfsr31d73bd7, kr-west1) / DR replica purpose='replication'(kr-east1). 이 스텝은 optional+관용(400 예상)으로 격리 유지 — 엔드포인트 도달만 기록; 2xx는 DR 측 set-replication-dr에서. Valid body: {replication_update_type: 'policy'|'modify_schedule', replication_policy: 'use'|'paused' (policy형), replication_frequency: '5min'|'hourly'|'daily'|'weekly'|'monthly' (modify_schedule형)}."
         },
         {
+          "name": "delete-replication",
+          "method": "DELETE",
+          "path": "/v1/replications/{replication_id}",
+          "group": "fs-replication",
+          "optional": true,
+          "destructive": true,
+          "params": {"volume_id": "{volume_id}"},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "_note": "CONFIRMED LIVE 2026-06-24: deletevolumereplication returns 400 filestorage.BadRequest.Invalid.volume.purpose from source side. PRODUCT CONSTRAINT: cannot delete from source (오너 절차 2026-07-09가 근거를 확정 — 복제 정리는 상대 리전에서 일시중지→삭제 두 번의 정책 변경으로만 가능; source 측 400의 소급 원인 = pause 선행 누락 + source 호출). 이 스텝은 알려진-400 커버리지 프로브로서 dr 정리(아래 3스텝)보다 먼저, 복제가 아직 active일 때 발화하도록 배치 (2026-07-09 reorder — paused 상태에서 source delete의 거동은 미정의라 순서 고정). See delete-replication-dr for the working teardown path."
+        },
+        {
           "name": "set-replication-dr",
           "method": "PUT",
           "path": "/v1/replications/{replication_id}",
@@ -201,18 +212,12 @@
             "replication_policy": "paused"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "_note": "CONFIRMED LIVE 2026-06-24: setvolumereplication returns 202 from DR side (kr-east1) using the DR volume_id. Uses 'filestorage-dr' service alias. Set SCP_SERVICE_HOSTS='{\"filestorage-dr\": \"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' to enable. Pausing the replication policy is required before deletion (deletevolumereplication also requires paused state). Uses dr_volume_id captured from $.replication_volume_id in create response."
-        },
-        {
-          "name": "delete-replication",
-          "method": "DELETE",
-          "path": "/v1/replications/{replication_id}",
-          "group": "fs-replication",
-          "optional": true,
-          "destructive": true,
-          "params": {"volume_id": "{volume_id}"},
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "CONFIRMED LIVE 2026-06-24: deletevolumereplication returns 400 filestorage.BadRequest.Invalid.volume.purpose from source side. PRODUCT CONSTRAINT: cannot delete from source. The step reaches the endpoint but gets 400. See delete-replication-dr step for the working teardown path."
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/replications/{replication_id}?volume_id={dr_volume_id}",
+            "service": "filestorage-dr"
+          },
+          "_note": "오너 절차 ① 일시중지 (2026-07-09; 2026-06-24 CONFIRMED LIVE 202 + 2026-07-09 정리 런 재실증: 202 후 show가 policy/status 둘 다 paused 전이). 상대(복제본=DR) 리전에서 복제 정책을 두 번 변경하는 것의 첫 번째 — deletevolumereplication은 paused 상태를 요구한다. enum은 use|paused (docs ReplicationUpdateRequest; PAUSE/SUSPEND 아님). LIMITATION (스텝 레벨 리전 라우팅): 'filestorage-dr' service alias는 SCP_SERVICE_HOSTS='{\"filestorage-dr\": \"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' 가 런타임에 설정된 경우에만 동작 — 미설정이면 리전 템플릿이 filestorage-dr.<region>.e...(DNS 부재, NXDOMAIN 실측 2026-07-09)를 만들어 ConnectionError로 라이프사이클이 죽는다 (전송예외는 expect_status 관용 밖). GROUP-RIDE로 create 실패 런에서는 아예 발화하지 않으며, alias 미설정 런의 잔존은 reconciler east 패스(SCP_SWEEP_REGIONS=kr-east1, 스냅샷 인지)가 안전망. cleanup(202 시 등록): pause 후 라이프사이클이 죽으면 teardown 스택이 dr 측 replication DELETE를 마저 시도."
         },
         {
           "name": "delete-replication-dr",
@@ -224,7 +229,7 @@
           "destructive": true,
           "params": {"volume_id": "{dr_volume_id}"},
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "CONFIRMED LIVE 2026-06-24: deletevolumereplication returns 202 from DR side (kr-east1) using the DR volume_id. MUST be called after set-replication-dr (policy=paused). Uses 'filestorage-dr' service alias — set SCP_SERVICE_HOSTS='{\"filestorage-dr\": \"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' to enable. When enabled, this step enables proper teardown so the source volume (purpose reverts to 'none') can then be deleted."
+          "_note": "오너 절차 ② 삭제 (2026-07-09; 2026-06-24 CONFIRMED LIVE 202 + 2026-07-09 재실증: 202, 레코드가 양 리전 list에서 ~20s 내 소멸). MUST follow set-replication-dr (policy=paused). 같은 'filestorage-dr' alias/SCP_SERVICE_HOSTS 한계 — set-replication-dr _note 참조. 성공 시 source volume purpose가 original→none으로 전이해(라이브 실증) delete-volume이 뚫린다."
         },
         {
           "name": "delete-replica-volume-dr",
@@ -238,7 +243,7 @@
           "retry_on_status": [400, 409],
           "retries": 4,
           "retry_interval": 15,
-          "_note": "교차리전 replica 잔존 수리 (2026-07-08): replication 삭제 후에도 DR 볼륨(purpose='replication')이 kr-east1에 남는다 — 오늘 잔존 실측: source regrfsr31d73bd7(kr-west1, purpose=original) + replica regrfsrepl31d73bd7(kr-east1, purpose=replication) 쌍이 통째로 잔존, replication 존속 중 replica delete는 400. 카탈로그 확인: deletevolume(DELETE /v1/volumes/{volume_id})이 DR 호스트에서 replica 삭제에 그대로 쓰인다 → delete-replication-dr 직후 이 스텝이 replica 볼륨을 선삭제 (source delete-volume보다 앞). retry [400,409] 4×15s: replication 삭제 직후 replica가 detach/전이 중이면 400 not-deletable. 'filestorage-dr' alias 미설정 런에서는 sibling DR 스텝들(set/delete-replication-dr)과 동일하게 무해 실패로 격리(optional)."
+          "_note": "오너 절차 ④의 replica 측 (2026-07-09; ③ snapshot 정리는 후속 delete-snapshot 스텝 + reconciler가 담당). 교차리전 replica 잔존 수리 (2026-07-08): replication 삭제 후에도 DR 볼륨(purpose='replication')이 kr-east1에 남는다 — 2026-07-08 잔존 실측: source regrfsr31d73bd7(kr-west1, purpose=original) + replica regrfsrepl31d73bd7(kr-east1, purpose=replication) 쌍이 통째로 잔존, replication 존속 중 replica delete는 400. deletevolume(DELETE /v1/volumes/{volume_id})이 DR 호스트에서 replica 삭제에 그대로 쓰인다 → delete-replication-dr 직후 이 스텝이 replica 볼륨을 선삭제 (source delete-volume보다 앞; 2026-07-09 정리 런에서 202→404 실증). retry [400,409] 4×15s: replication 삭제 직후 전이 중이거나 replica에 누적된 snapmirror.* 시스템 스냅샷(2026-07-09 실측 3개 — 복제 삭제 후에야 list에 노출)이 아직 있으면 400 가능 — 스냅샷 잔존 시 reconciler east 패스(스냅샷 인지)가 마무리. 'filestorage-dr' alias 미설정/GROUP-RIDE 한계는 set-replication-dr _note 참조."
         },
         {
           "name": "probe-reads",
@@ -264,9 +269,10 @@
           "optional": true,
           "destructive": true,
           "expect_status": [200, 202, 204, 404, 409],
-          "retry_on_status": [409, 500],
+          "retry_on_status": [400, 409, 500],
           "retries": 6,
-          "retry_interval": 20
+          "retry_interval": 20,
+          "_note": "오너 절차 ④의 source 측: 상대 리전에서 ①일시중지→②삭제 + ③스냅샷 정리가 끝나야 지워진다 (2026-07-09 실증: purpose original→none 전이 후 202→404). retry에 400 포함 (2026-07-09): replication 비동기 삭제 직후의 settle 레이스 및 잔존 snapmirror.* 스냅샷 400을 재시도로 흡수 — 6×20s 후에도 400이면 잔존으로 기록되고 reconciler(west 패스 스냅샷 인지 + SCP_SWEEP_REGIONS=kr-east1)가 마무리."
         },
         {
           "name": "wait-volume-gone",

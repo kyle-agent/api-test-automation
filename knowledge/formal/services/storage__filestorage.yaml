@@ -26,6 +26,12 @@ constraints:
   - id: fs-snapshot-then-restore
     rule: "Snapshot creation is immediately possible once the volume exists; snapshot RESTORE (PUT /v1/snapshots/{id}/restore) is only possible after a snapshot has been created (owner 2026-06-12)."
     provenance: docs
+  - id: fs-replication-teardown-counterpart-region
+    rule: "교차리전 복제 정리는 해당(상대=복제본) 리전에서 복제 정책을 두 번 변경 — ① 일시중지 PUT /v1/replications/{rid}?volume_id={replica_id} body {replication_update_type: policy, replication_policy: paused} (enum use|paused; PAUSE/SUSPEND 아님) ② 삭제 DELETE 동일 경로 — 한 뒤 ③ snapshot 등 부속 정리(양 리전; 복제가 만든 snapmirror.* 시스템 스냅샷 포함, DELETE /v1/snapshots/{sid}?volume_id= 쿼리 필수)가 되어야 ④ west/east 볼륨 둘 다 삭제 가능 (owner 2026-07-09). 라이브 전 단계 2xx 실증 2026-07-09: pause 202→policy/status paused, delete 202(양 리전 list서 ~20s 내 소멸), source purpose original→none 전이 후 양 볼륨 delete 202→404."
+    provenance: VALIDATED
+  - id: fs-replication-400-purpose-root-cause
+    rule: "replica/source volume delete 400 및 source 측 set/deletevolumereplication 400 'Check the volume purpose.'(Invalid.volume.purpose, 2026-06-24/07-08 관찰)의 소급 원인 = 일시중지(pause) 선행 누락 + 상대 리전이 아닌 source 측 호출. purpose는 서버 관리 상태 필드(source=original, replica=replication; 정리 후 none)로 생성 body에 없음. 모든 replication op(list/show/set/delete)는 ?volume_id= 필수 쿼리 — bare GET /v1/replications 400의 원인."
+    provenance: VALIDATED
 
 captures:
   filestorage-volume: $.volume_id   # FLAT — and DIFFERENT from virtualserver block volume ($.id)!
@@ -41,3 +47,9 @@ quirks:
   - id: snapshot-schedule-no-id
     note: "snapshot-schedule create returns NO id — recover via list"
     provenance: docs
+  - id: replication-record-replica-id-field
+    note: "replication list/show 레코드의 replica id 필드명은 replication_volume_id (+ replication_volume_region 짝; create 응답의 $.replication_volume_id와 동일) — replica_volume_id/destination_volume_id 류가 아님 (라이브 레코드 실측 2026-07-09; reconciler _replica_id_of 1순위 후보로 반영)"
+    provenance: VALIDATED
+  - id: replication-snapmirror-system-snapshots
+    note: "복제 가동 중 양 리전 볼륨에 snapmirror.* 시스템 스냅샷이 자동 누적된다(5min 주기 관찰; east replica 측은 복제 삭제 후에야 list에 노출됨, 3개 실측 2026-07-09) — regr 접두가 아니므로 이름 기반 sweep에 안 잡히며, 볼륨 삭제 전 ?volume_id= 스코프로 정리해야 한다 (owner 절차 ③)"
+    provenance: VALIDATED

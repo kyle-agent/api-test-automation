@@ -721,45 +721,52 @@ def _vpc_409_holder(client, vid) -> str | None:
 # ---------------------------------------------------------------------------
 # filestorage replication teardown (Bug 2b) — pause + delete from the REPLICA
 # ---------------------------------------------------------------------------
-# A filestorage volume that participates in cross-region replication CANNOT be
-# deleted while the replication is live: DELETE /v1/volumes/{id} -> 400
-# filestorage.BadRequest.Invalid.volume.purpose ("Check the volume purpose";
-# replication is in use). The replication must be PAUSED then DELETED, and that
-# is only accepted from the REPLICA side (the source side always 400s "Check the
-# volume purpose"). Proven call sequence (field 2026-06-22), all against the
-# REPLICA volume's region/host:
-#   PUT    /v1/replications/{rid}?volume_id={replica_id}
-#          body {"replication_update_type":"policy","replication_policy":"paused"} -> 202
-#   DELETE /v1/replications/{rid}?volume_id={replica_id}                            -> 202
-#   then DELETE the source + replica volumes (retry after the async replication
-#   delete finishes; an immediate volume delete still 400s on the race).
+# OWNER-GRANTED PROCEDURE (2026-07-09, live-proven end-to-end the same day —
+# every step 2xx): "파일스토리지는 다른 리전으로 복제를 한 경우 해당(상대)
+# 리전에서 복제 정책: 일시중지 → 삭제 로 두 번 변경한 후 snapshot 등이 정리
+# 되어야 west/east 둘 다 정리 가능". I.e. from the COUNTERPART (replica) region:
+#   ① PUT    /v1/replications/{rid}?volume_id={replica_id}
+#            body {"replication_update_type":"policy","replication_policy":"paused"} -> 202
+#            (enum is use|paused — docs ReplicationUpdateRequest; NOT PAUSE/SUSPEND)
+#   ② DELETE /v1/replications/{rid}?volume_id={replica_id}                            -> 202
+#            (record vanishes from BOTH regions' lists within ~20s)
+#   ③ clean up snapshots etc. on BOTH volumes (replication auto-accrues
+#            `snapmirror.*` SYSTEM snapshots on both sides — the replica's only
+#            become listable AFTER ②; DELETE /v1/snapshots/{sid}?volume_id= —
+#            the volume_id query is REQUIRED)
+#   ④ only then are BOTH volumes deletable: replica (kr-east1) 202->404, source
+#            (kr-west1) purpose reverts original->none then 202->404.
+#
+# RETROACTIVE ROOT CAUSE of the historical replica/volume delete 400
+# (filestorage.BadRequest.Invalid.volume.purpose / "Check the volume purpose",
+# observed 2026-06-24 + 2026-07-08): the PAUSE (①) was never issued and/or the
+# calls were made from the SOURCE side — set/delete only take from the replica
+# region host with the replica volume_id; the source side always 400s while
+# purpose=original.
 #
 # NOTE ON DIRECTIONALITY: listvolumereplications (GET /v1/replications?volume_id=)
 # returns the pair for EITHER endpoint, but the destructive PUT/DELETE only take
 # from the replica. This helper is therefore called for the volume the sweep is
 # CURRENTLY looking at; when that volume is the replica it tears the pair down,
 # when it is the source the replica-side calls 400 harmlessly and the pair is
-# reaped on the kr-east1 (replica-region) pass instead. Owned-only: the caller
-# only invokes this for a volume already selected as ours by _select.
+# reaped on the kr-east1 (replica-region) pass instead (SCP_SWEEP_REGIONS=kr-east1
+# builds that pass — see _sweep_regions). Owned-only: the caller only invokes
+# this for a volume already selected as ours by _select.
 #
-# TODO(verify-live, 2026-06-22): the account was clean when this was written, so
-# this teardown is built from the hand-resolved live evidence above but NOT
-# re-run end-to-end here. The two things to confirm on the next live filestorage
-# replication leak: (1) the REPLICA-id field name on a listvolumereplications
-# record — _replica_id_of tries several (replica_volume_id / destination_… /
-# target_… / dst_… / secondary_…); if none match it falls back to addressing the
-# volume the sweep is looking at, which still works because the kr-east1 pass
-# hits the replica directly. (2) That a single pause+delete clears it (the source
-# side should keep 400ing "Check the volume purpose"). The calls themselves are
-# proven: PUT/DELETE /v1/replications/{rid}?volume_id={replica_id} (pause body
-# {"replication_update_type":"policy","replication_policy":"paused"}), then the
-# volume deletes. Best-effort + owned-only, so a wrong-side call just 4xxs
-# harmlessly — safe to ship un-re-verified.
+# RESOLVED (was TODO verify-live 2026-06-22; both points settled by the
+# 2026-07-09 live teardown): (1) the REPLICA-id field on a list/show record is
+# `replication_volume_id` (paired with `replication_volume_region`; same name as
+# the create response field) — now the FIRST candidate in _replica_id_of; the
+# legacy guesses are kept as fallbacks only. (2) one pause+delete DOES clear the
+# pair — but per owner step ③ the snapmirror.* system snapshots must also be
+# reaped before the volume deletes (handled in _sweep_filestorage_volumes).
 
 def _replica_id_of(rep: dict):
     """Best-effort: the REPLICA (destination) volume id in a replication record.
-    Field shapes vary; try the documented/observed keys, newest-first."""
-    for k in ("replica_volume_id", "destination_volume_id", "target_volume_id",
+    `replication_volume_id` is the live-confirmed field (2026-07-09; matches the
+    docs Replication model + create response); the rest are legacy fallbacks."""
+    for k in ("replication_volume_id", "replica_volume_id",
+              "destination_volume_id", "target_volume_id",
               "dst_volume_id", "secondary_volume_id"):
         v = rep.get(k)
         if v:
@@ -823,14 +830,43 @@ def _teardown_filestorage_replication(client, volume_id: str) -> bool:
     return issued
 
 
+def _reap_filestorage_snapshots(client, volume_id: str) -> None:
+    """Owner step ③ (2026-07-09): delete the snapshots of an OWNED filestorage
+    volume before the volume delete. Replication auto-accrues ``snapmirror.*``
+    SYSTEM snapshots on both the source and the replica (the replica's only list
+    once the replication is deleted); they are not regr-prefixed, so they are
+    only reachable here — scoped strictly through ``?volume_id=`` of a volume
+    _select already confirmed as ours (no name-guessing). The volume_id query is
+    REQUIRED on both the list and the delete (docs + live 400 without it).
+    Best-effort: any error just leaves the volume delete to 4xx and retry."""
+    try:
+        snaps = _items(client.get(f"/v1/snapshots?volume_id={volume_id}",
+                                  service="filestorage").body)
+    except Exception as exc:
+        print(f"  list snapshots for {volume_id} error: {exc}")
+        return
+    for s in snaps:
+        if not isinstance(s, dict):
+            continue
+        sid = s.get("id") or s.get("snapshot_id")
+        if not sid:
+            continue
+        st = _delete(client, "filestorage",
+                     f"/v1/snapshots/{sid}?volume_id={volume_id}")
+        print(f"  fs snapshot {s.get('name') or sid} (vol {volume_id}) "
+              f"delete -> {st}")
+
+
 def _sweep_filestorage_volumes(client) -> int:
     """Reap owned (regrfs*) filestorage volumes, replication-aware. For each
-    owned volume: tear down its replication FROM THE REPLICA SIDE first (pause +
-    delete), then DELETE the volume — counting ONLY a genuine 2xx/404 as deleted
-    (a 400 'volume.purpose' / replication-in-use is NOT progress and feeds the
-    stuck detector). The async replication delete races the volume delete, so a
-    same-round volume delete may still 400; the round loop retries next pass once
-    the replication delete has settled. Returns this collection's deletion count.
+    owned volume, follow the owner-granted order (2026-07-09, live-proven):
+    ①② tear down its replication FROM THE REPLICA SIDE (pause + delete), ③ reap
+    its snapshots (snapmirror.* system ones included), ④ then DELETE the volume
+    — counting ONLY a genuine 2xx/404 as deleted (a 400 'volume.purpose' /
+    replication-in-use is NOT progress and feeds the stuck detector). The async
+    replication delete races the volume delete, so a same-round volume delete
+    may still 400; the round loop retries next pass once the replication delete
+    has settled. Returns this collection's deletion count.
     """
     deleted = 0
     for it in _select(client, "filestorage", "/v1/volumes",
@@ -838,9 +874,11 @@ def _sweep_filestorage_volumes(client) -> int:
         vid = it.get("volume_id") or it.get("id")
         if not vid:
             continue
-        # Pause + delete any replication this volume is in (replica-side); makes
-        # the volume deletable. Best-effort; safe (owned volume only).
+        # ①② Pause + delete any replication this volume is in (replica-side);
+        # makes the volume deletable. Best-effort; safe (owned volume only).
         _teardown_filestorage_replication(client, str(vid))
+        # ③ snapshots must be cleaned before the volume can go (owner 2026-07-09).
+        _reap_filestorage_snapshots(client, str(vid))
         st = _delete(client, "filestorage", f"/v1/volumes/{vid}")
         if _note_progress(st, it):
             deleted += 1

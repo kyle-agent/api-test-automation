@@ -1822,3 +1822,47 @@ variants) — all **UNVERIFIED LIVE**, apply + observe in HB1b/HB2b:
   teardown은 delete-replication-dr 뒤 replica 볼륨 자체를 지워야 함
   (`delete-replica-volume-dr` 스텝, 2026-07-08 추가; replication 존속 중
   replica delete는 400).
+
+## filestorage 교차리전 복제 정리 절차 — 오너 하사 (2026-07-09), 즉시 라이브 재현 성공
+
+> conf: 0.9 · seen: 2026-07-09 · obs: 1 (owner-granted + 동일 세션 라이브 전 단계 2xx 실증)
+
+**오너 하사 원문 (2026-07-09, 원문 그대로):** "파일스토리지는 다른 리전으로 복제를
+한 경우 **해당(상대) 리전에서 복제 정책: 일시중지 → 삭제 로 두 번 변경**한 후
+**snapshot 등이 정리**되어야 west/east **둘 다** 정리 가능"
+
+teardown 순서 (상대=복제본 리전 kr-east1 호스트에서):
+① 복제정책 **일시중지**: `PUT /v1/replications/{rid}?volume_id={replica_id}`
+   body `{"replication_update_type":"policy","replication_policy":"paused"}`
+   — enum은 docs ReplicationUpdateRequest 그대로 **`use|paused`** (PAUSE/SUSPEND
+   아님) → **202 실증**, show가 `replication_policy/status` 둘 다 `paused`로 전이.
+② 복제정책 **삭제**: `DELETE /v1/replications/{rid}?volume_id={replica_id}` →
+   **202 실증**; 레코드가 양 리전 list에서 ~20s 내 소멸.
+③ **snapshot 등 부속 정리**: 양 리전 `GET/DELETE /v1/snapshots/{sid}?volume_id=`
+   (volume_id 쿼리 필수). 실측: 복제 가동 중 **양쪽 볼륨에 `snapmirror.*` 시스템
+   스냅샷이 자동 누적** (east replica에 3개 — 이전 조회에서 0이었다가 복제 삭제
+   후 노출; west에도 5분마다 재생성) — 전부 DELETE 202.
+④ 그 후에야 **양 리전 볼륨 삭제 가능**: east replica DELETE 202→404, west source는
+   ②직후 **purpose가 `original`→`none`으로 전이(라이브 실증)** 하고 DELETE 202→404.
+   ①∼③ 없이 지우려 하면 400 (아래 소급 설명).
+
+**소급 설명 — 과거 replica/volume delete 400의 뿌리:** (기존 관찰 2026-06-24
+`filestorage.BadRequest.Invalid.volume.purpose` / 2026-07-08 "Check the volume
+purpose.") = **pause 선행 누락 + source 측 호출**. set/delete는 상대(복제본)
+리전 호스트 + replica volume_id로만 2xx; source 측은 purpose=original 인 동안
+항상 400. "replication 존속 중 replica delete 400"도 ①②를 안 거친 상태의 같은
+현상. 또한 **모든 replication op(list/show/set/delete)는 `?volume_id=` 필수
+쿼리** — 이번 런 west의 bare `GET /v1/replications` 400도 이것(누락) 때문이며
+docs listvolumereplications에 required로 명기돼 있다.
+
+부속 실증 (2026-07-09 정리 런, 실측 레코드):
+- list/show 레코드의 **replica id 필드명은 `replication_volume_id`**
+  (`replication_volume_region`과 짝) — reconciler `_replica_id_of`의 종전 후보
+  (replica_volume_id/destination_… 등)는 전부 불일치였고 이 필드를 1순위로 보강
+  (2026-07-09). create 응답의 동명 필드($.replication_volume_id) 캡처와 일치.
+- east 접근: `dataclasses.replace(settings, region="kr-east1")` + `core.ApiClient`
+  (reconciler `_extra_region_clients` 패턴) — 동일 자격증명으로 전 호출 2xx.
+  시나리오 스텝 레벨은 `filestorage-dr` service alias + `SCP_SERVICE_HOSTS` 로만
+  가능; alias 미설정이면 템플릿이 `filestorage-dr.kr-west1...`(DNS 부재, 실측
+  NXDOMAIN)을 만들어 **ConnectionError로 라이프사이클이 즉사**한다 (PUT/DELETE는
+  전송예외 재시도 후 raise) — storage__filestorage.json의 그룹 동승 수리 참조.

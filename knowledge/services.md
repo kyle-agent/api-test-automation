@@ -311,8 +311,18 @@ lifecycle `heavy-asg-full-coverage` in
   done from the DR region (kr-east1) side using the DR volume id and the kr-east1 endpoint.
   To manage from DR side: use `SCP_SERVICE_HOSTS={"filestorage-dr":
   "https://filestorage.kr-east1.e.samsungsdscloud.com"}` and call with `?volume_id={dr_volume_id}`.
-  Teardown sequence: set policy=paused (kr-east1) → delete replication (kr-east1) →
-  delete DR volume (kr-east1) → delete source volume (kr-west1, now unblocked).
+  **Teardown sequence (owner 2026-07-09, live-proven end-to-end same day):** from the
+  counterpart (replica) region change the replication POLICY twice — ① pause
+  (`PUT .../replications/{rid}?volume_id={replica_id}` `{replication_update_type:
+  "policy", replication_policy: "paused"}`; enum `use|paused`) ② delete
+  (`DELETE`, same path/query) — then ③ clean up snapshots etc. on BOTH volumes
+  (`DELETE /v1/snapshots/{sid}?volume_id=`; replication auto-accrues `snapmirror.*`
+  system snapshots on both sides — the replica's only list AFTER the replication is
+  deleted) → ④ only then are BOTH volumes deletable: replica (kr-east1) then source
+  (kr-west1, `purpose` reverts `original`→`none`). Skipping ①–③ is the retroactive
+  root cause of the historical replica/volume delete 400s (`Invalid.volume.purpose`).
+  Ops fallback when the `filestorage-dr` alias isn't set: `SCP_SWEEP_REGIONS=kr-east1
+  python -m cleanup.reconciler` (region-swapped client, same credentials).
 - **`setaccessrule` (PUT /v1/access-rules/{volume_id}):** Body is SCALAR (not array):
   `{object_id: UUID, object_type: VM|BM|GPU|GPU_NODE|ENDPOINT, action: add|remove}`.
   Returns 404 VirtualServer.VirtualServerNotFound for fake UUIDs. Requires real VM id

@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 60 docs · 19 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 61 docs · 19 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -33,6 +33,7 @@
 |-----|-----|---------|--------|
 | [`working/plans/CAMPAIGN-C3-100-docs-research.md`](working/plans/CAMPAIGN-C3-100-docs-research.md) | 워크스트림 A 후속 에이전트 (HB2/HB6/HB7 실행자) — body 초안 입력 | CAMPAIGN-C3-100 — body 미상 7건 docs-research |  DONE (docs-research, read-only) — 2026-07-04 |
 | [`working/plans/CAMPAIGN-C3-100-repair-log.md`](working/plans/CAMPAIGN-C3-100-repair-log.md) | 워크스트림 A 오케스트레이터 — HB1b/HB2b crud_ids 구성 입력 | CAMPAIGN-C3-100 — 결정적 재실패 갭 수리 로그 (2026-07-04) |  DONE (repair pass, OFFLINE — no live SCP calls this session) — 2026-07-04 |
+| [`working/plans/CAMPAIGN-C3-100-waivers.md`](working/plans/CAMPAIGN-C3-100-waivers.md) | 오너 — CAMPAIGN-C3-100 waiver 일괄 심사용 단일 문서 | CAMPAIGN-C3-100 — Waiver 제안 통합 (오너 결정용) |  PROPOSED (오너 결정 대기) — 2026-07-07, OFFLINE 세션 (라이브 호출 없음) |
 | [`working/plans/CAMPAIGN-C3-100.md`](working/plans/CAMPAIGN-C3-100.md) | orchestrator + all campaign agents (다른 세션이 이어받을 때 이 문서가 진입점) | CAMPAIGN — C3 100% · 플랫폼 dogfood 개선 · 리포 정비 (3 워크스트림 병렬) |  ACTIVE campaign (2026-07-04, owner-directed autonomous run) |
 | [`working/plans/COVERAGE-GETID-PLAN.md`](working/plans/COVERAGE-GETID-PLAN.md) | coverage | the id-bound GET gap, classified and attacked |  superseded (2026-06-12 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체) |
 | [`working/plans/COVERAGE-WAVE-PLAN.md`](working/plans/COVERAGE-WAVE-PLAN.md) | coverage | the remaining static gap, prioritized |  superseded (2026-06-11 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체) |
