@@ -126,11 +126,15 @@ basis: V2-DECISIONS.md(D2 확정) + 정찰 실측 4건 (2026-07-09, 발행물/�
   이 규칙의 반면교사). LIVE 기동 시 mutations 토글 없음(항상 ON 표기).
 - **read-only 기동 = 열람 모드**: 실행 CTA 비활성 + "이 서버는 열람용
   (read-only)으로 기동됨 — 실행하려면 관리자 설정 필요" 표기.
-- **v1은 발사 없음**: 계획(선택) 화면은 v2에, 발사는 "Run in legacy console ↗"
-  핸드오프(선택값을 기존 `/testing?…` prefill 쿼리로 전달). **v2 자체 발사**
-  (누름 → pre-flight 컨펌 모달 → 기존 발사 API 재사용: CI=`POST /runs/trigger`,
-  이 서버=`POST /api/local-run`)는 **오너 검수 게이트 통과 후에만 활성화** —
-  실제 클라우드에 작용하는 기능은 검수 없이 켜지 않는다.
+- **계획 경험은 v2의 핵심** (오너 확인 2026-07-10: "test planning으로 선택하고
+  DAG 확인하는 게 이 플랫폼의 핵심"): 선택 트리(/api/model, 원자 단위=node id)
+  → 조합 DAG(/api/graph + resource_graph.js **scene() 계약**, 컨트롤러 1개
+  유지+update()만) → 견적(/api/plan + /api/capacity) → pre-flight 모달
+  (**plan+capacity+preflight 3-fetch 필수** — 우회한 발사 UI 금지).
+  선택→lifecycle 확장은 서버(_resolve_lifecycle_ids)만 한다(클라 재구현 금지).
+- **발사 버튼은 오너 검수 게이트 통과 후에만 활성화** — pre-flight 모달까지
+  완성하되 [Run live]는 disabled + legacy 콘솔 딥링크 병기. 실제 클라우드에
+  작용하는 기능은 검수 없이 켜지 않는다.
 
 | 요소 | 출처 | 비고 |
 |---|---|---|
