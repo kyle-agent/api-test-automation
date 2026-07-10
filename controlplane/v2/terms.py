@@ -48,6 +48,8 @@ TERMS: dict[str, dict] = {
                    "tip": "결함 = 계약 위반 등 실제 구현 버그"},
     "defect_yellow": {"label": "Improvement", "code": None,
                       "tip": "개선 = 설계·문서상 아쉬운 점(구현 버그는 아님)"},
+    "fold_evidence": {"label": "Unfolded evidence", "code": None,
+                      "tip": "이 런 시간창에서 관측된 2xx이지만 아직 발행 검증 집계에 반영되지 않은 항목 수 (시간창 근사)"},
     # Model 축(③) — provenance/완성도 (L1 계약 §2.7)
     "prov_validated": {"label": "Validated", "code": None,
                        "tip": "이 리소스 노드 정의가 실제 라이브 실행(lifecycle 검증)에서 역추출됨 — 문서만이 아니라 실행 근거가 있음"},

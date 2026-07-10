@@ -77,7 +77,7 @@
       {% for r in runs %}
       <tr>
         <td>{{ badge('local') if r.is_local else badge('published') }}</td>
-        <td class="mono">{{ r.gh_run_id or '(대기)' }}</td>
+        <td class="mono">{% if r.gh_run_id %}<a href="/v2/runs/{{ r.gh_run_id }}">{{ r.gh_run_id }}</a>{% else %}(대기){% endif %}</td>
         <td>{{ r.suite }}{% if r.profile %} · {{ r.profile }}{% endif %}</td>
         <td><span class="st st-{{ r.status }}">{{ terms_run_status.get(r.status, r.status) }}</span></td>
         <td class="mono">{{ r.when or '' }}</td>
@@ -105,7 +105,7 @@
     <tbody>
       {% for r in local_runs %}
       <tr>
-        <td class="mono">{{ r.gh_run_id }}</td>
+        <td class="mono"><a href="/v2/runs/{{ r.gh_run_id }}">{{ r.gh_run_id }}</a></td>
         <td>{{ r.suite }}</td>
         <td><span class="st st-{{ r.status }}">{{ terms_run_status.get(r.status, r.status) }}</span></td>
         <td class="mono">{{ r.finished_at or r.requested_at or '' }}</td>

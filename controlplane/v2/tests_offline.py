@@ -266,6 +266,26 @@ def test_model_data_shape():
         assert {"gid", "node_count", "validated", "docs", "incomplete", "nodes"} <= g.keys()
 
 
+def test_run_detail_local_renders():
+    db.record_local_run("local-detail-test-0001", suite="console2", status="done")
+    r = client.get("/v2/runs/local-detail-test-0001")
+    assert r.status_code == 200, r.status_code
+    assert "Official aggregation" in r.text  # 로컬 런 전용 fold 섹션 (§2.4)
+
+
+def test_run_detail_unknown_is_404():
+    r = client.get("/v2/runs/local-no-such-run")
+    assert r.status_code == 404, r.status_code
+    assert "찾을 수 없" in r.text
+
+
+def test_run_detail_ci_hides_fold_section():
+    db.create_run("smoke", "default", trigger="external", gh_run_id="999001")
+    r = client.get("/v2/runs/999001")
+    assert r.status_code == 200, r.status_code
+    assert "Official aggregation" not in r.text  # fold 동선은 로컬 런 전용
+
+
 def test_search_axis_empty_state_for_short_query():
     r = client.get("/v2/search?q=a")
     assert r.status_code == 200, r.status_code

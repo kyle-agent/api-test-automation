@@ -13,8 +13,9 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from controlplane import db, snapshots
-from controlplane.v2 import (model_data, published, results_data, runs_data,
-                             search_data, services_data, terms)
+from controlplane.v2 import (model_data, published, results_data,
+                             run_detail_data, runs_data, search_data,
+                             services_data, terms)
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -165,6 +166,19 @@ def run(request: Request):
         "service": (request.query_params.get("service") or "").strip(),
     }
     return templates.TemplateResponse(request, "runs.html", ctx)
+
+
+@router.get("/runs/{gh_run_id}", response_class=HTMLResponse)
+def run_detail(request: Request, gh_run_id: str):
+    """런 상세 — S3 스냅샷 + (로컬 런) fold 동선 (L1 계약 §2.3·§2.4)."""
+    ctx = _ctx(request, "run")
+    data = run_detail_data.get_run_detail(gh_run_id)
+    if data is None:
+        ctx.update(gh_run_id=gh_run_id)
+        return templates.TemplateResponse(
+            request, "run_not_found.html", ctx, status_code=404)
+    ctx.update(data)
+    return templates.TemplateResponse(request, "run_detail.html", ctx)
 
 
 @router.get("/results", response_class=HTMLResponse)
