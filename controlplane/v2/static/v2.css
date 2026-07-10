@@ -1,0 +1,119 @@
+/* v2 셸 — 외부 CDN 금지(기존 관례), 시스템 폰트, 라이트 뉴트럴 */
+:root {
+  --bg: #f7f8fa; --card: #ffffff; --ink: #1a202c; --sub: #64748b;
+  --line: #e2e8f0; --link: #2563eb;
+  --pub: #2563eb; --loc: #16a34a; --run: #7c3aed; --stale: #ca8a04;
+  --good-bg: #ecfdf5; --good-ink: #065f46; --good-line: #a7f3d0;
+  --bad-bg: #fef2f2; --bad-ink: #991b1b; --bad-line: #fecaca;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+
+/* 셸 헤더 */
+.shell-head {
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  background: var(--card); border-bottom: 1px solid var(--line);
+  padding: 10px 22px; position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: baseline; gap: 6px; }
+.brand-name { font-weight: 700; font-size: 16px; color: var(--ink); }
+.brand-tag {
+  font-size: 11px; font-weight: 700; color: #fff; background: var(--ink);
+  border-radius: 4px; padding: 1px 5px;
+}
+.axis-nav { display: flex; gap: 2px; flex: 1; }
+.axis {
+  padding: 6px 12px; border-radius: 6px; color: var(--sub); font-weight: 600;
+}
+.axis:hover { background: var(--bg); text-decoration: none; }
+.axis.on { background: var(--ink); color: #fff; }
+.ctx-strip { margin-left: auto; }
+
+/* 출처 배지 3종 + 노후 */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; border-radius: 999px;
+  padding: 2px 9px; border: 1px solid; white-space: nowrap; cursor: default;
+}
+.badge .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.badge-published { color: var(--pub); border-color: #bfdbfe; background: #eff6ff; }
+.badge-published .dot { background: var(--pub); }
+.badge-local { color: var(--loc); border-color: #bbf7d0; background: #f0fdf4; }
+.badge-local .dot { background: var(--loc); }
+.badge-run { color: var(--run); border-color: #ddd6fe; background: #f5f3ff; }
+.badge-run .dot { background: var(--run); }
+.badge-stale { color: var(--stale); border-color: #fde68a; background: #fffbeb; }
+.badge-stale .dot { background: var(--stale); }
+.badge-none { color: var(--sub); border-color: var(--line); background: var(--bg); }
+
+/* 본문 */
+.shell-main { max-width: 1080px; margin: 0 auto; padding: 26px 22px 60px; }
+.page-q { font-size: 22px; margin: 0 0 18px; }
+
+/* 판정 헤드라인 (단일 출처) */
+.headline {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap; border: 1px solid; border-radius: 10px; padding: 16px 20px;
+  margin-bottom: 20px; font-size: 17px;
+}
+.headline.good { background: var(--good-bg); color: var(--good-ink); border-color: var(--good-line); }
+.headline.bad { background: var(--bad-bg); color: var(--bad-ink); border-color: var(--bad-line); }
+.headline.empty { background: var(--card); color: var(--sub); border-color: var(--line); font-size: 15px; }
+.headline-sub { font-size: 13px; margin-left: 12px; opacity: .85; }
+.headline-meta { display: flex; align-items: center; gap: 10px; }
+.chip {
+  font-size: 12px; font-weight: 600; color: var(--loc);
+  border: 1px dashed #86efac; background: #f0fdf4; border-radius: 999px; padding: 3px 10px;
+}
+
+/* 노후: 값 회색화 (원칙 1-4 — 배지만 노랑이면 눈은 값만 읽는다) */
+.is-stale .kpi-value, .headline.is-stale strong { color: var(--sub); }
+
+/* KPI */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.kpi-label { font-size: 13px; color: var(--sub); font-weight: 600; margin-bottom: 4px; }
+.kpi-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.kpi-sub { font-size: 12px; color: var(--sub); margin: 2px 0 8px; }
+.kpi .badge { margin-top: 6px; }
+
+/* 용어(정의 툴팁 발견 가능성 — 점선 밑줄 + ⓘ) */
+.term { border-bottom: 1px dotted var(--sub); cursor: help; }
+.term-code { color: var(--sub); font-size: .85em; margin-left: 1px; }
+.term-i { color: var(--sub); font-size: 9px; margin-left: 1px; }
+
+/* 패널/표 */
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 20px; }
+.panel-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.panel-head h2 { font-size: 16px; margin: 0; }
+.panel-note { font-size: 12.5px; color: var(--sub); }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th { text-align: left; font-size: 12px; color: var(--sub); border-bottom: 1px solid var(--line); padding: 6px 8px; }
+.tbl td { border-bottom: 1px solid var(--line); padding: 7px 8px; vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: 0; }
+.st { font-size: 12px; font-weight: 700; border-radius: 4px; padding: 1px 7px; }
+.st-done { color: var(--good-ink); background: var(--good-bg); }
+.st-failed { color: var(--bad-ink); background: var(--bad-bg); }
+.st-running { color: var(--pub); background: #eff6ff; }
+.st-dispatched, .st-archived { color: var(--sub); background: var(--bg); }
+
+/* empty-state ≠ 0 (원칙 1-3) */
+.empty-state { color: var(--sub); font-size: 14px; padding: 14px 4px; margin: 0; }
+.empty-note { color: var(--sub); }
+
+/* 스텁 */
+.stub-desc { font-size: 15px; margin-top: 0; }
+.stub-links { margin: 8px 0 0; padding-left: 18px; }
+
+/* 푸터 */
+.shell-foot {
+  max-width: 1080px; margin: 0 auto; padding: 14px 22px 40px;
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  color: var(--sub); font-size: 12.5px; border-top: 1px solid var(--line);
+}

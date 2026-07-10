@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ product }} — {% block title %}{% endblock %}</title>
+<link rel="stylesheet" href="/v2/static/v2.css">
+</head>
+<body>
+{% from "_badges.html" import badge %}
+<header class="shell-head">
+  <div class="brand">
+    <a href="/v2" class="brand-name">{{ product }}</a>
+    <span class="brand-tag">v2</span>
+  </div>
+  <nav class="axis-nav">
+    {% for item in nav %}
+    <a href="{{ item.path }}" class="axis{% if active == item.key %} on{% endif %}"
+       {% if item.q %}title="{{ item.q }}"{% endif %}>{{ item.label }}</a>
+    {% endfor %}
+  </nav>
+  <div class="ctx-strip">
+    {% if pub.ok %}
+      {{ badge('published', ts=pub.updated_label, ident=('dd:' ~ pub.sha if pub.sha else None), stale=pub.stale) }}
+    {% else %}
+      <span class="badge badge-none" title="발행 저장소(dashboard-data)에 접근하지 못했습니다">발행본 접근 불가</span>
+    {% endif %}
+  </div>
+</header>
+<main class="shell-main">
+{% block content %}{% endblock %}
+</main>
+<footer class="shell-foot">
+  <span>기존 화면: <a href="/">홈</a> · <a href="/testing">콘솔</a> · <a href="/reporting">리포팅</a></span>
+  <span class="foot-note">v2는 구축 중 — 데이터 계약: V2-L1-DATA-CONTRACT</span>
+</footer>
+</body>
+</html>

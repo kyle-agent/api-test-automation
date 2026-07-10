@@ -88,6 +88,10 @@ app.mount("/testing/console",
 from controlplane import catalog_routes, reporting_routes  # noqa: E402
 app.include_router(catalog_routes.router)
 app.include_router(reporting_routes.router)
+# /v2 strangler shell (question-centric IA rebuild) — self-contained package;
+# owner decisions + data contract live in docs/working/plans/V2-*.md.
+from controlplane.v2 import routes as v2_routes  # noqa: E402
+app.include_router(v2_routes.router)
 # shared scene renderer (controlplane/static/resource_graph.js) for the graph faces —
 # Modeling's model-map and Reporting's coverage-map load it from /static/.
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
