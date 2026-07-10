@@ -1783,6 +1783,13 @@ function pfRender(plan, capacity, sel, opts) {
     ? '<p class="muted small" style="color:var(--amber)">→ VPC 여유(' + headroom + ') 초과: 즉시 실행되지 않고 <b>대기 큐</b>에 들어갑니다.</p>' : "";
   const skipped = (plan.skipped_disabled || []).length
     ? '<p class="muted small">disabled 로 건너뜀: ' + plan.skipped_disabled.map(esc).join(", ") + "</p>" : "";
+  // P2C-26: 선택한 리소스가 계획에서 조용히 빠지면 반드시 보여준다 (stale 매핑/
+  // 비활성 — "3개 선택했는데 iam만 실행" 실측 구멍의 재발 방지).
+  const dropped = (plan.dropped || []).length
+    ? '<div class="note" style="border-left-color:var(--amber)"><b style="color:var(--amber)">⚠ 선택 중 ' +
+      plan.dropped.length + '개 리소스가 계획에 포함되지 못했습니다:</b><br>' +
+      plan.dropped.map(d => "<code>" + esc(d.node) + "</code> — " + esc(d.why)).join("<br>") + "</div>"
+    : "";
   const heavyBlock = heavy
     ? '<div class="note" style="border-color:var(--red);border-left-color:var(--red)"><b style="color:var(--red)">과금 라이프사이클 ' + heavyIds.length + "개:</b> " +
       heavyIds.map(id => "<code>" + esc(id) + "</code>").join(" · ") +
@@ -1803,7 +1810,7 @@ function pfRender(plan, capacity, sel, opts) {
     '<p class="muted small" style="margin:7px 0 0">행 ETA = 라이프사이클 실측 평균의 순차 합산 · <b>합계 ETA = 병렬 makespan 추정</b>' +
     (opts.pf ? "" : " (견적 API 미응답 — 순차 합산 표시)") + " · " +
     "VPC 소모(peak) <b>" + peak + "</b> vs 현재 여유 <b>" + headroom + "</b></p>" +
-    queueNote + skipped + heavyBlock;
+    queueNote + skipped + dropped + heavyBlock;
   $("pf-foot").innerHTML =
     '<span class="muted small">취소해도 선택은 유지됩니다.</span>' +
     '<button class="btn ghost" id="pf-cancel">취소</button>' +

@@ -843,6 +843,38 @@ def _resolve_lifecycle_ids(sel: dict) -> list[str]:
     return sorted(explicit | scoped)
 
 
+def _selection_dropped(sel: dict, resolved: list[str]) -> list[dict]:
+    """P2C-26 (오너 2026-07-10 실측): 리소스 개별 선택이 stale 매핑/비활성
+    lifecycle 때문에 계획에서 **조용히** 빠지던 구멍 — private-nat가 폐기된
+    gen-wave5-privnat를, apigw-privatelink-endpoint가 파일명(generated__wave5-
+    appsvc)을 가리켜 3개 선택 중 iam만 실행됐다. 빠진 노드는 사유와 함께
+    pre-flight에 표시한다 (숨은 축소는 없어야 한다)."""
+    m = _model()
+    nodes, lcs = m["nodes"], m["lifecycles"]
+    rs, out = set(resolved), []
+    for nid in (sel.get("node_ids") or []):
+        n = nodes.get(nid)
+        if n is None:
+            out.append({"node": nid, "why": "모델에 없는 리소스 id"})
+            continue
+        lid = n.get("lifecycle")
+        if not lid:
+            out.append({"node": nid, "why": "매핑된 시나리오 없음(의존전용 리소스)"})
+        elif lid in rs:
+            continue
+        elif lid not in lcs:
+            out.append({"node": nid,
+                        "why": f"시나리오 '{lid}' 부재 — stale 매핑 (수리 대상)"})
+        elif not lcs[lid].get("enabled"):
+            out.append({"node": nid, "why": f"'{lid}' 비활성(은퇴/유예)"})
+        elif lcs[lid].get("role") != "verify":
+            out.append({"node": nid,
+                        "why": f"'{lid}'는 probe — 시나리오 명시 선택으로만 실행"})
+        elif lcs[lid].get("_scope_exclude"):
+            out.append({"node": nid, "why": f"'{lid}' 운영 유예(_scope_exclude)"})
+    return out
+
+
 def _graph_targets(sel: dict) -> list[str]:
     """A selection (node_ids / services / categories) -> the set of resource-node
     ids to feed ``composer.graph_view`` as targets. A selected service contributes
@@ -2710,7 +2742,9 @@ class Handler(BaseHTTPRequestHandler):
                 sel.get("node_ids") or sel.get("services") or sel.get("categories")) \
                 else _resolve_lifecycle_ids(sel)
             try:
-                return self._json(200, {"lifecycle_ids": ids, **_plan(ids)})
+                return self._json(200, {"lifecycle_ids": ids,
+                                        "dropped": _selection_dropped(sel, ids),
+                                        **_plan(ids)})
             except Exception as exc:  # noqa: BLE001
                 return self._json(500, {"error": f"plan failed: {exc}"})
         if p == "/api/run":

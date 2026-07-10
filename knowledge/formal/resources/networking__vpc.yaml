@@ -73,7 +73,7 @@ resources:
     ready: {field: "$.subnet.state", until: ACTIVE, timeout: 180, interval: 10}
     delete: {endpoint: "DELETE /v1/subnets/{subnet_id}", destructive: true}
     provenance: VALIDATED
-    source: {lifecycle: gen-wave5-vpce,
+    source: {lifecycle: gen-vpc-endpoint,
              steps: [create-endpoint-subnet, wait-endpoint-subnet, delete-endpoint-subnet]}
     notes: >
       VPC Endpoint 전용 subnet (subnet type=VPC_ENDPOINT). vpc-endpoint create가
@@ -206,7 +206,7 @@ resources:
          note: "id-bound GET getid 갭 (private-nat IP 목록). 동일 관용 근거"}
     delete: {endpoint: "DELETE /v1/private-nats/{private_nat_id}", destructive: true}
     provenance: docs
-    source: {lifecycle: gen-wave5-privnat, steps: [create-private-nat, delete-private-nat]}
+    source: {lifecycle: gen-private-nat, steps: [create-private-nat, delete-private-nat]}
     notes: >
       READY FOR LIVE RE-VALIDATION (IB-012). §1의 OR-의존 사례
       (direct-connect OR tgw-vpc-connection). 핵심 수정: TGW 분기를 bare
@@ -314,7 +314,7 @@ resources:
     delete: {endpoint: "DELETE /v1/privatelink-services/{privatelink_service_id}",
              destructive: true}
     provenance: VALIDATED  # evidence: networking/vpc/createprivatelinkservice
-    source: {lifecycle: generated__wave5-appsvc,
+    source: {lifecycle: vpc-privatelink-service,
              steps: [create-privatelink-service, wait-privatelink-service,
                      delete-privatelink-service]}
     notes: "UNPROVEN (docs DTO PrivateLinkServiceCreateRequest 그대로 — 라이브 2xx 미관측, R3 과제였던 privatelink-service 노드 신설). approval_type AUTO + connected_resource_type IP 조합이 LB/실서버 없이 자기완결로 만들 수 있는 최소 형태 — 엔드포인트 요청이 자동 승인되어 apigw/scf privatelink-endpoint 패밀리의 2xx 확률을 높인다. state enum CREATING/ACTIVE/DELETING/DELETED/ERROR (PrivateLinkServiceDetail). 과금 여부 미확인 — 라이프사이클 내 생성·즉시 삭제 전제."
@@ -428,7 +428,7 @@ resources:
              destructive: true,
              retry_on_status: [409], retries: 4, retry_interval: 15}
     provenance: VALIDATED  # evidence: networking/vpc/createtransitgatewayvpcconnection (run 28648339307)
-    source: {lifecycle: gen-wave5-privnat,
+    source: {lifecycle: gen-private-nat,
              steps: [create-tgw-vpc-connection, wait-tgw-vpc-connection,
                      delete-tgw-vpc-connection]}
     notes: >

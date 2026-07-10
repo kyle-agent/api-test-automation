@@ -15,7 +15,7 @@ resources:
       - {name: read, endpoint: "GET /v1/account-quotas/{account_quota_id}",
          expect_status: [200]}
     provenance: VALIDATED
-    source: {lifecycle: quota-reads, steps: [list-account-quotas]}
+    source: {lifecycle: quota-read-coverage, steps: [list-account-quotas]}
     notes: "조회 전용 lookup task — capture는 quota-reads에서 라이브 검증된 envelope verbatim. 계정에 quota 항목이 항상 존재(빈 리스트면 capture 실패로 표면화)."
 
   quota-request:
@@ -31,5 +31,5 @@ resources:
       - {name: read, endpoint: "GET /v1/quota-requests/{request_id}",
          expect_status: [200, 404]}
     provenance: VALIDATED  # 소스 quota/support-reads는 capture_soft였고 리스트가 비어 있어 envelope 미증명 (run 27428457582); 그 후 라이브 GET 2xx 확보
-    source: {lifecycle: quota-reads, steps: [list-quota-requests]}
+    source: {lifecycle: quota-read-coverage, steps: [list-quota-requests]}
     notes: "조회 전용 lookup task — 요청 이력이 없는 계정이면 capture 실패 가능 (env 의존). live-validated run 27583285457 (2026-06-15)"
