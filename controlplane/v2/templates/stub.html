@@ -2,6 +2,19 @@
 {% block title %}{{ stub_title }}{% endblock %}
 {% block content %}
 <h1 class="page-q">{{ stub_title }}</h1>
+{% if notice %}
+{% from "_badges.html" import badge %}
+<section class="headline bad">
+  <div class="headline-main">
+    <strong>새 회귀 {{ notice.fail_new }}건</strong>
+    <span class="headline-sub">이미 알던 실패 {{ notice.fail_known }}건 (추적 중)</span>
+  </div>
+  <div class="headline-meta">
+    {{ badge('published', ts=pub.updated_label, stale=pub.stale) }}
+    <a class="headline-link" href="/reporting" title="회귀·트리아지 화면 구축 전까지 기존 Reporting의 트리아지에서 상세 확인">기존 Reporting에서 상세 확인 ↗</a>
+  </div>
+</section>
+{% endif %}
 <section class="panel">
   <p class="stub-desc">{{ stub_desc }}</p>
   <p class="panel-note">이 축은 화면 단위로 순차 구축됩니다. 그때까지는 기존 화면을 이용하세요:</p>

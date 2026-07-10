@@ -91,7 +91,14 @@ def situation(request: Request):
             if dt is not None and dt > pub_dt:
                 chip_n += 1
 
-    ctx.update(head=head, runs=runs, local_runs=local_runs[:10], chip_n=chip_n)
+    # 호출(C2) 커버리지 % — 발행 필드 tested/total에서 계산 (dashboard.build:433
+    # 의 정의: tested = 응답이 관측된(4xx 포함) 엔드포인트 수)
+    called_pct = None
+    if head and head.get("tested") is not None and head.get("total"):
+        called_pct = round(head["tested"] / head["total"] * 100, 1)
+
+    ctx.update(head=head, runs=runs, local_runs=local_runs[:10], chip_n=chip_n,
+               called_pct=called_pct)
     return templates.TemplateResponse(request, "situation.html", ctx)
 
 
@@ -148,7 +155,19 @@ def run(request: Request):
 
 @router.get("/results", response_class=HTMLResponse)
 def results(request: Request):
-    return _stub(request, "results")
+    # 회귀·트리아지 화면이 지어지기 전에도 "새 회귀 → 상세" 동선이 끊기지 않게
+    # 발행 헤드라인의 회귀 요약 + 기존 화면으로의 연결을 예고로 제공한다.
+    title, desc, links = _STUBS["results"]
+    ctx = _ctx(request, "results")
+    head = published.headline()
+    notice = None
+    if head and head.get("fail_new"):
+        notice = {
+            "fail_new": head["fail_new"],
+            "fail_known": head.get("fail_known", 0),
+        }
+    ctx.update(stub_title=title, stub_desc=desc, stub_links=links, notice=notice)
+    return templates.TemplateResponse(request, "stub.html", ctx)
 
 
 @router.get("/tools", response_class=HTMLResponse)

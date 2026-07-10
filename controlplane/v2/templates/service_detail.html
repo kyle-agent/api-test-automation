@@ -39,7 +39,8 @@
     </div>
   </div>
   <p class="run-cta-wrap">
-    <a class="run-cta" href="/testing?service={{ svc.category }}/{{ svc.service }}">이 서비스 실행 →</a>
+    <a class="run-cta" href="/testing?service={{ svc.category }}/{{ svc.service }}"
+       title="기존 실행 콘솔로 이동 — 선택이 미리 채워지며, 실행은 사전 확인 후 수동으로 시작됩니다">이 서비스 실행 (기존 콘솔) ↗</a>
   </p>
 </section>
 
@@ -89,7 +90,7 @@
         <td class="mono">
           {% if r.status is not none %}
             {{ r.status }}{% if r.elapsed_s is not none %} · {{ r.elapsed_s }}s{% endif %}
-            <span class="mut" title="발행 누적 관측(이 화면이 직접 실행한 값이 아님)">{% if r.sha %} (dd:{{ r.sha }}){% else %} (발행 누적){% endif %}</span>
+            <span class="mut" title="발행 누적 관측 — 괄호는 이 관측을 남긴 런의 소스 버전(커밋). 이 화면이 직접 실행한 값이 아님">{% if r.sha %} (관측 @{{ r.sha }}){% else %} (발행 누적){% endif %}</span>
           {% else %}
             <span class="mut">—</span>
           {% endif %}
