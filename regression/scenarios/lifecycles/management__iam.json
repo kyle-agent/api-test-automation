@@ -39,10 +39,10 @@
                   "Action": [
                     "sts:AssumeRole"
                   ],
-                  "Condition": {},
-                  "Resource": [],
                   "Principal": {
-                    "scp": "srn:e::ec11538abf8f46d2953539521f745366:::scp-iam:root"
+                    "scp": [
+                      "srn:e::ec11538abf8f46d2953539521f745366:::scp-iam:root"
+                    ]
                   }
                 }
               ]
@@ -64,7 +64,7 @@
             "path": "/v1/roles/{role_id}",
             "service": "iam"
           },
-          "_note": "PF-20/31 재시도 v2 (2026-07-09 밤): v1(실유저 SRN)은 run-377e에서 계정 유저 목록이 비어 capture 실패로 좌초 — userguide role 페이지의 'Current Account' principal 유형을 json_guides SRN 문법(srn:e::<acct>:::scp-iam:<주체>)에 대입한 root 추정형으로 전환. **미검증**: 다음 런이 판정 — 400 ValidationError면 그 메시지가 정형을 알려줄 것이고, 여전히 500이면 PF-31(백엔드) 확정 증거."
+          "_note": "PF-20/31 재시도 v2 (2026-07-09 밤): v1(실유저 SRN)은 run-377e에서 계정 유저 목록이 비어 capture 실패로 좌초 — userguide role 페이지의 'Current Account' principal 유형을 json_guides SRN 문법(srn:e::<acct>:::scp-iam:<주체>)에 대입한 root 추정형으로 전환. **미검증**: 다음 런이 판정 — 400 ValidationError면 그 메시지가 정형을 알려줄 것이고, 여전히 500이면 PF-31(백엔드) 확정 증거. || v3 (run 2137 400 해독): ValidationError ['Input should be a valid string','Input should be a valid list'] — Principal.scp를 리스트로(apigw resource-policy 가이드와 동형), 트러스트 정책에 불필요한 Resource[]/Condition{} 제거. 500→400 전이 자체가 Principal 필수설 입증 (PF-31 재분류 후보)."
         },
         {
           "name": "get-role",

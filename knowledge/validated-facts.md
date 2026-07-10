@@ -1957,3 +1957,17 @@ iam-user-policy-binding이 user_id 부재로 blocked-owner였던 기지 사실�
 ValidationError가 정형을 알려줄 것. apigw resource-policy는 같은 런에서
 **정식 SRN 수리로 500→200 착지** (PF-19 = 우리 입력 형식 오류가 뿌리, 남는
 결함은 '불량 입력에 400 아닌 500'뿐).
+
+## Private NAT의 'Connectable' TGW = 물리 Uplink 회선 전제 — 이 계정 구조적 불가 (2026-07-10 확정)
+
+> conf: 0.9 · seen: 2026-07-10 · obs: userguide 명문 + 3런 실증 (재배열·재시도 전부 무효)
+
+userguide(vpc/private_nat): **"Transit Gateway는 Uplink 회선 연결 후 선택할 수
+있음"** — private-nat가 요구하는 'Connectable state'는 상태 전이가 아니라
+**물리 전용회선(Uplink)이 붙은 TGW**라는 전제조건. VPC connection만 있는
+TGW는 ACTIVE까지만 가고 CONNECTED로 전이하지 않으며(43폴/883s 실측), create
+400 재시도(937s)도 무의미. 이 계정엔 실회선이 없어 **구조적 불가** — 사다리
+전부 제거하고 400 관용 도달-증거로 재분류 (waiver 후보). API 에러("Cannot
+found ... in Connectable state")가 이 전제를 설명하지 않는 것은 에러-가이드
+갭 (PF 후보로 볼 여지). 같은 이유로 Direct Connect 경유 private-nat도 실회선
+없이는 동일 게이트로 추정.

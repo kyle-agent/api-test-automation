@@ -497,30 +497,6 @@
           "_note": "REPAIR 2026-07-09 (live run): TGW CONNECTED 대기 보강 후에도 create-private-nat 400 scp-network.private-nat.connectable-transit-gateway-not-found 재발 — 요구 조건은 TGW 본체가 아니라 TGW-VPC 연결(자식 객체)의 정착 상태로 판단. 정적 근거: knowledge/formal/resources/networking__vpc.yaml private-nat 노드 'private-nat needs the TGW in Connectable state — which only happens once a VPC connection on it is ACTIVE' + 동일 시그니처 run 27466988779('Cannot find the Transit Gateway in Connectable state'). 첫 wait-tgw-vpc-connection의 ACTIVE 관측 뒤 TGW가 EDITING→CONNECTED로 전이하는 동안 연결이 재전이할 수 있어, create 직전에 연결 상태를 재폴(직전 TGW 본체 폴 2개는 유지). 상태 소스: per-id show가 catalog에 없어(listtransitgatewayvpcconnections가 유일) nested list [0] 재사용 — 이 lifecycle의 TGW엔 연결이 1개뿐. state 필드는 api_docs transitgatewayvpcconnection 모델(예시 ACTIVE, enum 미문서) — 기존 wait-tgw-vpc-connection 패턴 복사(ERROR/DELETED terminal-bad, give_up 400/404). 라이브 재실측은 불가(2026-07-09 GET /v1/transit-gateways → 200 count 0, 계정에 TGW 부재)라 정적 근거로 작성. {transit_gateway_id}는 create-tgw-vpc-connection 재캡처 재사용."
         },
         {
-          "name": "wait-transit-gateway-connected",
-          "service": "vpc",
-          "method": "GET",
-          "path": "/v1/transit-gateways/{transit_gateway_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.transit_gateway.state",
-            "until": [
-              "CONNECTED",
-              "ERROR",
-              "DELETED"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ]
-          },
-          "_note": "REPAIR 2026-07-08 (live run): create-private-nat 400 'Cannot found the Transit Gateway(...) in Connect...' — 요구 상태는 ACTIVE 가 아니라 CONNECTED (connection 부착 완료 후의 settle 상태; 직전 wait 가 ACTIVE 를 잡고 조기 통과하면 TGW 가 아직 EDITING→CONNECTED 전이 전). TGW show 를 CONNECTED 까지 재폴링 (ERROR/DELETED = terminal-bad 즉시 종료, give_up_status 400/404 = 선행 실패 시 타임아웃 소진 방지 — 파일 내 wait-transit-gateway 패턴 복사, timeout 600/20). CONNECTED enum 이 없는 환경이면 폴 타임아웃 후 expect_status 200 으로 통과해 기존 동작으로 저하(무해). {transit_gateway_id} 캡처는 create-transit-gateway 및 create-tgw-vpc-connection 재캡처로 이 체인에 이미 존재. || 재배열 2026-07-09 (run-2c/85b2 실측: connection이 12분+ CREATING인 동안 이 대기가 먼저 소진돼 TGW CONNECTED를 못 봄): rewait-tgw-vpc-connection-active 뒤로 이동 — connection ACTIVE 후에 CONNECTED 전이를 기다린다."
-        },
-        {
           "name": "create-private-nat",
           "service": "vpc",
           "method": "POST",
@@ -533,15 +509,11 @@
             "service_type": "TRANSIT_GATEWAY",
             "tags": []
           },
-          "retry_on_status": [
-            400
-          ],
-          "retries": 20,
-          "retry_interval": 45,
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
           "capture": {
             "private_nat_id": "$.private_nat.id"
@@ -551,7 +523,9 @@
             "path": "/v1/private-nats/{private_nat_id}",
             "service": "vpc"
           },
-          "_note": "2026-07-09b 벨트: TGW가 Connectable로 전이하는 마지막 구간의 레이스를 400 사다리 6×30s로 흡수 (wait-tgw-vpc-connection 1500s 재상향과 별개의 최종 방어선 — connectable-transit-gateway-not-found는 시간이 해결하는 상태 대기 계열). || 2026-07-09: 'Connectable state' 400 재시도 사다리(20x45s≈15분) — TGW ACTIVE+connection ACTIVE에서도 즉시 거부된 2런 실측; Connectable 전이가 늦거나 CONNECTED 상태를 요구하는 것으로 보임 (재배열된 connected-wait와 이중 방어)."
+          "_note": "2026-07-09b 벨트: TGW가 Connectable로 전이하는 마지막 구간의 레이스를 400 사다리 6×30s로 흡수 (wait-tgw-vpc-connection 1500s 재상향과 별개의 최종 방어선 — connectable-transit-gateway-not-found는 시간이 해결하는 상태 대기 계열). || 2026-07-09: 'Connectable state' 400 재시도 사다리(20x45s≈15분) — TGW ACTIVE+connection ACTIVE에서도 즉시 거부된 2런 실측; Connectable 전이가 늦거나 CONNECTED 상태를 요구하는 것으로 보임 (재배열된 connected-wait와 이중 방어). || 환경-게이트 확정 (2026-07-10, userguide vpc/private_nat): 'Transit Gateway는 Uplink 회선 연결 후 선택할 수 있음' — Connectable = 물리 전용회선(Uplink)이 붙은 TGW. 이 계정엔 실회선이 없어 구조적 불가: 상태 대기·재시도 무의미(3런 실증, 런당 ~30분 소모). 사다리 전부 제거, 400 관용 도달-증거로 기록. TGW/connection 스텝은 실커버리지라 유지. waiver 후보.",
+          "optional": true,
+          "group": "private-nat"
         },
         {
           "name": "verify-private-nat-read",
@@ -564,7 +538,9 @@
             403,
             404
           ],
-          "_note": "id-bound GET getid 갭. private_nat_id가 create에서 잡히나 service_resource_id가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status"
+          "_note": "id-bound GET getid 갭. private_nat_id가 create에서 잡히나 service_resource_id가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status",
+          "group": "private-nat",
+          "optional": true
         },
         {
           "name": "verify-private-nat-read-ips",
@@ -577,7 +553,9 @@
             403,
             404
           ],
-          "_note": "id-bound GET getid 갭 (private-nat IP 목록). 동일 관용 근거"
+          "_note": "id-bound GET getid 갭 (private-nat IP 목록). 동일 관용 근거",
+          "group": "private-nat",
+          "optional": true
         },
         {
           "name": "delete-private-nat",
@@ -589,7 +567,9 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "group": "private-nat",
+          "optional": true
         },
         {
           "name": "delete-tgw-vpc-connection",
@@ -1100,7 +1080,6 @@
                 "member_ip": "10.124.0.101",
                 "member_port": 80,
                 "member_state": "ENABLE",
-                
                 "object_id": "",
                 "object_type": "VM"
               }
@@ -1163,7 +1142,6 @@
                 "member_ip": "10.124.0.102",
                 "member_port": 80,
                 "member_state": "ENABLE",
-                
                 "object_id": "",
                 "object_type": "VM"
               }
