@@ -1971,3 +1971,20 @@ TGW는 ACTIVE까지만 가고 CONNECTED로 전이하지 않으며(43폴/883s 실
 found ... in Connectable state")가 이 전제를 설명하지 않는 것은 에러-가이드
 갭 (PF 후보로 볼 여지). 같은 이유로 Direct Connect 경유 private-nat도 실회선
 없이는 동일 게이트로 추정.
+
+## SCR 이미지 픽스처 (오너 수동 준비, 2026-07-10)
+
+- 오너가 콘솔에서 레지스트리 `sample` (id `nayvugfp4154447ab0ab61279cba3d72`,
+  public endpoint enabled) + 리포지토리 `test` (id `6c910ed5195842739f9c98a569982064`)
+  를 만들어 둠. 목적: image/tags 계열 ~19개 API는 실제 이미지가 있어야 검증 가능.
+- docker 경로: `sample-nayvugfp.scr.public.kr-west1.e.samsungsdscloud.com/test/<image>:<tag>`.
+- **SCR docker 토큰 인증은 우리 서비스-계정 키를 거부한다** (2026-07-10 실측):
+  `auth.scr.public...:/auth/token` (Bearer realm, service=nayvugfp)에
+  SCP_ACCESS_KEY/SECRET Basic → 401 invalid credentials (HMAC 서명도 동일).
+  scope 형식은 `repository:test/<image>:pull,push` (repo만 쓰면 400
+  "you must specify image not repository only"). archivestorage 401
+  ("Service Account catalog…")과 같은 축 — 레지스트리 인증은 콘솔 사용자
+  인증키 필요 추정. 이미지 push는 오너 로컬 docker 또는 사용자 키 발급 후.
+- 레시피 측은 준비 완료: scr-read/image-write/tags-write 시드가 sample/test를
+  prefix-지정으로 잡고 `$.images[0].id`/`$.tagses[0].id` 실 캡처. delete류는
+  의도적 미해결 토큰({image_delete_id}/{tags_delete_id})으로 픽스처 보호.
