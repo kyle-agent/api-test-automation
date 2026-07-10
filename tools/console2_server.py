@@ -2187,6 +2187,20 @@ def _run_worker(rec: dict) -> None:
                                 "아래 +5m/+15m 재스캔이 감시, 다음 런 종료 스윕이 "
                                 "정리합니다.\n")
                 f.flush()
+                # run-end 자동수리 루프의 원료 (owner 2026-07-10 '알아서 응답
+                # 보고 고치는 구조' 1단계): events 대장을 oplog 버킷에 미러 —
+                # 오케스트레이터 세션의 시간별 auto-repair Routine이 집어간다.
+                try:
+                    from core import oplog as _oplog
+                    _ev_text = Path(rec["events"]).read_text()
+                    if _oplog.put_text(
+                            f"runs/{rec['id']}/artifact/events.jsonl", _ev_text,
+                            "application/x-ndjson"):
+                        f.write("\n=== events 미러 완료 — 자동수리 루프가 "
+                                "다음 사이클에 이 런을 트리아지합니다 ===\n")
+                except Exception as exc:  # noqa: BLE001
+                    f.write(f"\n  events 미러 실패(무시): {exc}\n")
+                f.flush()
         with _LOCK:
             rec["status"] = "aborted" if aborted else "done"
             rec["rc"], rec["ended"] = rc, time.time()

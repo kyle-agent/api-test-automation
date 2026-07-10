@@ -143,6 +143,24 @@ def _put(c, cfg, key, payload: dict) -> bool:
         return False
 
 
+def put_text(key: str, text: str, content_type: str = "text/plain") -> bool:
+    """임의 텍스트 객체 업로드 (run-end 자동수리 루프의 events 미러용).
+    _put과 같은 ACL 폴백; 실패는 조용히 False (런을 절대 방해하지 않음)."""
+    c, cfg = _client()
+    if not c:
+        return False
+    body = text.encode("utf-8")
+    for kw in ({"ACL": "public-read"}, {}):
+        try:
+            c.put_object(Bucket=cfg["bucket"], Key=key, Body=body,
+                         ContentType=content_type, **kw)
+            return True
+        except Exception:
+            continue
+    print(f"[oplog] put_text {key} failed")
+    return False
+
+
 LOGSINK_BUCKET = "apitest-logsink"  # shared pre-existing OBS sink for
 # network-logging storages and loggingaudit trails (owner 2026-06-13: both
 # need a pre-defined Object Storage bucket). Plain private bucket — no CORS/
