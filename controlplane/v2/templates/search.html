@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from "_badges.html" import badge, term %}
+{% block title %}Search{% endblock %}
+{% block content %}
+
+<h1 class="page-q">Search</h1>
+
+<section class="panel search-panel">
+  <form action="/v2/search" method="get" class="search-form">
+    <input type="text" name="q" value="{{ data.q }}" minlength="2"
+           placeholder="Search services, endpoints, runs…" autocomplete="off" autofocus>
+    <button type="submit" class="run-cta">Search</button>
+  </form>
+  <p class="panel-note">서비스명·카테고리, 엔드포인트 경로·API명·메서드, run id·suite를 한 번에 검색합니다 (2자 이상).</p>
+</section>
+
+{% if data.too_short %}
+<section class="panel">
+  <p class="empty-state">검색어를 2자 이상 입력해 주세요.</p>
+</section>
+{% else %}
+
+{# ── Services ─────────────────────────────────────────────────────────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Services</h2>
+    <span class="panel-note">{{ data.services.total }}건</span>
+    {% if data.services.ok %}{{ badge('published', ts=pub.updated_label, stale=pub.stale) }}{% endif %}
+  </div>
+  {% if not data.services.ok %}
+  <p class="empty-state">발행된 공식 수치를 가져올 수 없습니다 — 서비스 검색을 수행할 수 없습니다.</p>
+  {% elif not data.services['items'] %}
+  <p class="empty-state">"{{ data.q }}"와 일치하는 서비스가 없습니다.</p>
+  {% else %}
+  <div class="tbl-scroll">
+  <table class="tbl">
+    <thead>
+      <tr><th>Service</th><th>Category</th><th>{{ term('cov_c3', terms) }}</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for s in data.services['items'] %}
+      <tr class="{{ 'unt-row' if s.untestable else '' }}">
+        <td>
+          <a href="/v2/services/{{ s.slug }}">{{ s.service }}</a>
+          {% if s.untestable %}<span class="badge badge-none" title="{{ s.untestable }}">{{ terms['untestable'].label }}</span>{% endif %}
+        </td>
+        <td>{{ s.category }}</td>
+        <td class="mono">{{ s.covered }}/{{ s.total }} · {{ s.pct_label }}</td>
+        <td><a href="/v2/services/{{ s.slug }}">Details &rarr;</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+
+{# ── Endpoints ────────────────────────────────────────────────────────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Endpoints</h2>
+    <span class="panel-note">{{ data.endpoints.total }}건{% if data.endpoints.more %} (상위 {{ data.endpoints['items']|length }}건 표시, {{ data.endpoints.more }}건 더 있음){% endif %}</span>
+  </div>
+  {% if not data.endpoints.ok %}
+  <p class="empty-state">카탈로그를 읽을 수 없습니다 — 엔드포인트 검색을 수행할 수 없습니다.</p>
+  {% elif not data.endpoints['items'] %}
+  <p class="empty-state">"{{ data.q }}"와 일치하는 엔드포인트가 없습니다.</p>
+  {% else %}
+  <div class="tbl-scroll">
+  <table class="tbl">
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>API</th><th>Service</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for e in data.endpoints['items'] %}
+      <tr>
+        <td><span class="mb mb-{{ e.method }}">{{ e.method }}</span></td>
+        <td class="mono">{{ e.path }}</td>
+        <td class="mono">{{ e.api }}</td>
+        <td>{{ e.category }}/{{ e.service }}</td>
+        <td><a href="/v2/services/{{ e.slug }}">Service details &rarr;</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if data.endpoints.more %}
+  <p class="empty-note">{{ data.endpoints.more }}건 더 있습니다 — 검색어를 좁혀 주세요.</p>
+  {% endif %}
+  {% endif %}
+</section>
+
+{# ── Runs (이 서버) ───────────────────────────────────────────────────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Runs</h2>
+    <span class="panel-note">{{ data.runs.total }}건{% if data.runs.more %} (상위 {{ data.runs['items']|length }}건 표시, {{ data.runs.more }}건 더 있음){% endif %}</span>
+    {% if data.runs.ok %}{{ badge('local') }}{% endif %}
+  </div>
+  {% if not data.runs.ok %}
+  <p class="empty-state">이 서버의 런 기록을 읽을 수 없습니다.</p>
+  {% elif not data.runs['items'] %}
+  <p class="empty-state">"{{ data.q }}"와 일치하는 런이 없습니다.</p>
+  {% else %}
+  <div class="tbl-scroll">
+  <table class="tbl">
+    <thead>
+      <tr><th>Run</th><th>Suite</th><th>Profile</th><th>{{ term('run_result', terms) }}</th><th>When</th></tr>
+    </thead>
+    <tbody>
+      {% for r in data.runs['items'] %}
+      <tr>
+        {# 런 상세 화면(/v2/runs/<id>)은 병렬 개발 중 — 링크는 걸되 존재를 보장하지 않는다 #}
+        <td class="mono"><a href="/v2/runs/{{ r.gh_run_id or r.id }}">{{ r.gh_run_id or ('#' ~ r.id) }}</a></td>
+        <td>{{ r.suite or '—' }}</td>
+        <td>{{ r.profile or '—' }}</td>
+        <td><span class="st st-{{ r.status }}">{{ terms_run_status.get(r.status, r.status) }}</span></td>
+        <td class="mono">{{ r.when or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+
+{% endif %}
+{% endblock %}

@@ -112,7 +112,7 @@ def test_results_axis_renders():
     assert "Results" in body
     # 회귀 섹션은 실제 목록 또는 empty-state 중 하나로 반드시 성립 (L1 §2.5/§3)
     assert ("Status then" in body) or ("없음 — 배포 안전" in body) \
-        or ("상세 목록을 가져올 수 없습니다" in body) \
+        or ("현재 발행본에 포함되어 있지 않습니다" in body) \
         or ("발행된 공식 수치를 가져올 수 없습니다" in body)
     assert "Conformance changes" in body
     assert ("Known issues" in body)
@@ -247,6 +247,23 @@ def test_run_axis_no_post_route():
     # v1은 발사 없음 — /v2/run은 조회 전용, POST 라우트가 존재하지 않는다.
     r = client.post("/v2/run")
     assert r.status_code in (404, 405), r.status_code
+
+
+def test_search_axis_empty_state_for_short_query():
+    r = client.get("/v2/search?q=a")
+    assert r.status_code == 200, r.status_code
+    assert "검색어를 2자 이상 입력해 주세요" in r.text
+
+
+def test_search_axis_finds_service_and_endpoint():
+    r = client.get("/v2/search?q=load")
+    assert r.status_code == 200, r.status_code
+    body = r.text
+    assert "Services" in body and "Endpoints" in body and "Runs" in body
+    from controlplane.v2 import search_data
+    data = search_data.search("load")
+    if data["services"]["items"]:
+        assert data["services"]["items"][0]["slug"] in body
 
 
 def test_existing_home_untouched():

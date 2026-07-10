@@ -20,6 +20,9 @@
     {% endfor %}
   </nav>
   <div class="ctx-strip">
+    <form action="/v2/search" method="get" class="hdr-search">
+      <input type="text" name="q" placeholder="⌕ Search" minlength="2" autocomplete="off">
+    </form>
     {% if pub.ok %}
       {{ badge('published', ts=pub.updated_label, ident=('dd:' ~ pub.sha if pub.sha else None), stale=pub.stale) }}
     {% else %}

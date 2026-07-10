@@ -13,16 +13,16 @@
   </div>
   {% if gate.ok %}
     <div class="gate-row">
-      <span class="gate-item {{ 'on' if gate.mutations else 'off' }}">Mutations {{ 'ON' if gate.mutations else 'OFF' }}</span>
-      <span class="gate-item {{ 'on' if gate.heavy else 'off' }}">Heavy {{ 'ON' if gate.heavy else 'OFF' }}</span>
-      <span class="gate-item {{ 'on' if gate.destructive else 'off' }}">Destructive {{ 'ON' if gate.destructive else 'OFF' }}</span>
+      <span class="gate-item {{ 'on' if gate.mutations else 'off' }}" title="실행이 실제 자원 생성·변경·삭제(POST/PUT/DELETE)를 수행할 수 있는지">Mutations {{ 'ON' if gate.mutations else 'OFF' }}</span>
+      <span class="gate-item {{ 'on' if gate.heavy else 'off' }}" title="과금이 큰(heavy·billable) 라이프사이클의 실행 허용 여부 — 별도 opt-in">Heavy {{ 'ON' if gate.heavy else 'OFF' }}</span>
+      <span class="gate-item {{ 'on' if gate.destructive else 'off' }}" title="삭제(teardown) 단계의 실행 허용 여부">Destructive {{ 'ON' if gate.destructive else 'OFF' }}</span>
       <span class="gate-profile">Profile:
-        <span class="mono">{{ gate.profile_id or '(repo 기본값)' }}</span>
+        <span class="mono">{{ gate.profile_id or '(repo default)' }}</span>
         {% if gate.forbid %}<span class="mut" title="이 프로파일이 강제로 막은 게이트 — SCP_PROFILE_FORBID">forbid: {{ gate.forbid|join(', ') }}</span>{% endif %}
       </span>
     </div>
     {% if gate.mutations %}
-      <p class="warn-live">LIVE — 누르면 실제 클라우드에 작용합니다. 이 서버는 실행(mutations)이 켜진 상태입니다.</p>
+      <p class="warn-live">LIVE — 이 서버는 실행(mutations)이 켜져 있습니다. 실행은 이 화면이 아니라 legacy 콘솔에서 사전 확인을 거쳐 시작되며, 시작되면 실제 클라우드에 작용합니다.</p>
     {% else %}
       <p class="readonly-banner">이 서버는 열람용(read-only)으로 기동되어 실행이 비활성화되어 있습니다.</p>
     {% endif %}
@@ -40,7 +40,7 @@
   <div class="plan-form">
     <label>Suite
       <select id="planSuite">
-        <option value="">(repo 기본)</option>
+        <option value="">(repo default)</option>
         {% for s in suites %}<option value="{{ s }}" {% if prefill.suite == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
       </select>
     </label>
@@ -117,7 +117,7 @@
   <p class="empty-state">이 서버에서 진행 중인 런이 없습니다.</p>
   {% endif %}
   {% if capacity %}
-  <p class="panel-note">Capacity — VPC cap {{ capacity.cap }} · baseline {{ capacity.baseline }} ·
+  <p class="panel-note"><span title="이 서버가 동시에 다룰 수 있는 VPC 수 상한(cap)과 이미 존재(baseline)·예약(reserved)된 수, 남은 여유(headroom)">Capacity</span> — VPC cap {{ capacity.cap }} · baseline {{ capacity.baseline }} ·
     reserved {{ capacity.reserved }} · headroom {{ capacity.headroom }}
     {% if capacity.queued %} · queued {{ capacity.queued|length }}{% endif %}</p>
   {% else %}

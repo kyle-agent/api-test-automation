@@ -44,7 +44,7 @@
         <td>
           {% if s.defect_red %}<span class="defc red">{{ terms['defect_red'].label }} {{ s.defect_red }}</span>{% endif %}
           {% if s.defect_yellow %}<span class="defc yellow">{{ terms['defect_yellow'].label }} {{ s.defect_yellow }}</span>{% endif %}
-          {% if not s.defect_red and not s.defect_yellow %}<span class="mut">—</span>{% endif %}
+          {% if not s.defect_red and not s.defect_yellow %}<span class="mut" title="발견된 결함 없음">0 / 0</span>{% endif %}
         </td>
         <td><a href="/v2/services/{{ s.slug }}">Details →</a></td>
       </tr>

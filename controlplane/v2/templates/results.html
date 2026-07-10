@@ -82,7 +82,7 @@
       </table>
       </div>
     {% else %}
-      <p class="empty-state">새 회귀 상세 목록을 가져올 수 없습니다 — 발행 대시보드 참조 → <a href="/reporting">Open published dashboard ↗</a></p>
+      <p class="empty-state">판정 런(@{{ verdict_ts or '알 수 없음' }})의 상세 목록이 현재 발행본에 포함되어 있지 않습니다 — 발행 산출물 간 불일치로 수리 요청 중(전용 상세 파일 발행). 그때까지는 기존 화면에서 확인하세요. <a href="/reporting">Open published dashboard ↗</a></p>
     {% endif %}
   {% elif head %}
     <p class="empty-state">{{ term('regression_new', terms) }} 없음 — 배포 안전</p>
@@ -157,7 +157,7 @@
 <section class="panel">
   <div class="panel-head">
     <h2>{{ term('regression_known', terms) }} (tracked)</h2>
-    <span class="panel-note">저장소 baseline{% if known_issues %} · {{ known_issues|length }}건{% endif %}</span>
+    <span class="panel-note">저장소 baseline{% if known_issues %} · 추적 등록 총 {{ known_issues|length }}건 (이번 런의 실패 수가 아님){% endif %}</span>
   </div>
   {% if known_issues is none %}
     <p class="empty-state">기지 실패 baseline을 가져올 수 없습니다 — data/baselines/known_issues.json 확인이 필요합니다.</p>

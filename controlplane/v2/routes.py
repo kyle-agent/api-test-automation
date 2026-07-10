@@ -13,7 +13,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from controlplane import db, snapshots
-from controlplane.v2 import published, results_data, runs_data, services_data, terms
+from controlplane.v2 import (published, results_data, runs_data, search_data,
+                             services_data, terms)
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -108,10 +109,10 @@ def situation(request: Request):
 
 _STUBS = {
     "model": ("Model", "테스트 정의 · 리소스 모델 — 모델 표·작업 큐·노드 에디터·인벤토리가 이 축에 들어옵니다.",
-              [("Legacy Modeling screen", "/planning")]),
+              [("Legacy Modeling screen ↗", "/planning")]),
     "tools": ("Tools", "부가 도구 — AI 초안·지식 문서·발행 대시보드 링크 모음.",
               [("Published dashboard (read-only sharing) ↗", "/reporting"),
-               ("AI tools", "/ai"), ("Legacy Home", "/")]),
+               ("AI tools ↗", "/ai"), ("Legacy Home ↗", "/")]),
 }
 
 
@@ -174,6 +175,15 @@ def results(request: Request):
     ctx.setdefault("verdict_ts",
                    published.headline_ts_label(data.get("head")))
     return templates.TemplateResponse(request, "results.html", ctx)
+
+
+@router.get("/search", response_class=HTMLResponse)
+def search(request: Request):
+    """전역 검색(⌕) — 서비스·엔드포인트·run (CX-IA-DESIGN §4.2, 계약 §2.8)."""
+    ctx = _ctx(request, "search")
+    q = (request.query_params.get("q") or "").strip()
+    ctx.update(data=search_data.search(q))
+    return templates.TemplateResponse(request, "search.html", ctx)
 
 
 @router.get("/tools", response_class=HTMLResponse)

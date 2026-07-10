@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% from "_badges.html" import badge, term %}
+{% block title %}Model{% endblock %}
+{% block content %}
+
+<h1 class="page-q">Model</h1>
+
+{% if data is none %}
+<section class="panel">
+  <p class="empty-state">리소스 모델 데이터를 불러오지 못했습니다 — knowledge/formal/resources/를 확인해 주세요.</p>
+</section>
+{% else %}
+
+<section class="panel">
+  <p class="panel-note">저장소(main) 기준 — 이 화면의 수치는 발행본(Published)이 아니라 이 코드
+    저장소의 <span class="mono">knowledge/formal/resources/</span> 파일을 직접 읽습니다
+    (배지 3종 어디에도 해당하지 않아 별도 표기).</p>
+</section>
+
+{# ── KPI 4장 — 스펙 2a ────────────────────────────────────────────────── #}
+<section class="kpis">
+  <div class="kpi">
+    <div class="kpi-label">Nodes</div>
+    <div class="kpi-value">{{ data.total_nodes }}</div>
+    <div class="kpi-sub">정의된 리소스 task 노드 총수</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">{{ term('prov_validated', terms) }}</div>
+    <div class="kpi-value">{{ data.validated }} <span style="font-size:14px;color:var(--sub);font-weight:600;">({{ data.validated_pct }}%)</span></div>
+    <div class="kpi-sub">실제 실행(lifecycle 검증)에서 역추출된 노드 수/비율</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">{{ term('prov_docs', terms) }}</div>
+    <div class="kpi-value">{{ data.docs_only }}</div>
+    <div class="kpi-sub">문서만으로 정의되어 아직 실행 확인이 없는 노드 수</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Groups</div>
+    <div class="kpi-value">{{ data.group_count }}</div>
+    <div class="kpi-sub">노드가 속한 그룹 수(서비스보다 세분화된 저작 단위)</div>
+  </div>
+</section>
+
+{# ── 노드 에디터 핸드오프 + 인벤토리 한 줄 — 스펙 2d (중복 화면 금지) ─────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Node editor</h2>
+  </div>
+  <p class="panel-note">이 화면은 조회 전용입니다 — 노드 정의를 추가·수정하려면 기존 편집기를 여세요.
+    <a href="{{ data.map_href }}">Node editor (legacy) ↗</a></p>
+  {% if data.catalog_total %}
+  <p class="panel-note">카탈로그 인벤토리: 전체 API {{ data.catalog_total }}개 — 엔드포인트별 커버리지·결함은
+    <a href="/v2/services">Services →</a>에서 확인하세요.</p>
+  {% endif %}
+</section>
+
+{# ── Model table — 그룹별 노드 집계 + 행 펼침(스펙 2b·2c) ─────────────────── #}
+{% if not data.groups %}
+<section class="panel">
+  <p class="empty-state">정의된 리소스 모델 노드가 없습니다 — knowledge/formal/resources/에 아직 파일이 없을 수 있습니다.</p>
+</section>
+{% else %}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Model table</h2>
+  </div>
+  <div class="svc-toolbar">
+    <div class="search"><input id="model-search" type="text" placeholder="Search group · category" oninput="modelFilter()" autocomplete="off"></div>
+    <span class="panel-note">{{ data.group_count }}개 그룹 · {{ data.total_nodes }}개 노드 · 행을 클릭하면 노드 목록이 펼쳐집니다</span>
+  </div>
+  <div class="tbl-scroll">
+  <table class="tbl" id="model-table">
+    <thead>
+      <tr>
+        <th></th><th>Group</th><th>Category</th><th>Nodes</th>
+        <th>{{ term('prov_validated', terms) }} / {{ term('prov_docs', terms) }}</th>
+        <th>{{ term('model_incomplete', terms) }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in data.groups %}
+      <tr class="grp-row" data-name="{{ (g.label ~ ' ' ~ g.gid ~ ' ' ~ g.category)|lower }}"
+          onclick="modelToggle('grp-{{ loop.index }}')">
+        <td class="grp-caret" id="care-grp-{{ loop.index }}">▸</td>
+        <td>{{ g.label }} <span class="mut mono">{{ g.gid }}</span></td>
+        <td>{{ g.category or '—' }}</td>
+        <td class="mono">{{ g.node_count }}</td>
+        <td>
+          <div class="prov-bar" title="{{ terms['prov_validated'].label }} {{ g.validated }} · {{ terms['prov_docs'].label }} {{ g.docs }}{% if g.other %} · (미지정) {{ g.other }}{% endif %}">
+            <span class="prov-seg prov-validated" style="width:{{ g.validated_pct }}%"></span>
+            <span class="prov-seg prov-docs" style="width:{{ g.docs_pct }}%"></span>
+            {% if g.other %}<span class="prov-seg prov-other" style="width:{{ g.other_pct }}%"></span>{% endif %}
+          </div>
+          <span class="panel-note">{{ g.validated }}/{{ g.node_count }}</span>
+        </td>
+        <td class="mono">{{ g.incomplete if g.incomplete else '—' }}</td>
+      </tr>
+      <tr class="grp-detail" id="grp-{{ loop.index }}" style="display:none">
+        <td></td>
+        <td colspan="5">
+          <table class="tbl node-list">
+            <thead><tr><th>Node</th><th>Service</th><th>Provenance</th><th>Create endpoint</th><th></th></tr></thead>
+            <tbody>
+              {% for n in g.nodes %}
+              <tr class="{{ 'unt-row' if n.incomplete else '' }}">
+                <td class="mono">{{ n.id }}</td>
+                <td>{{ n.service }}</td>
+                <td>
+                  {% if n.is_validated %}<span class="provbadge pv-validated" title="{{ terms['prov_validated'].tip }}">{{ terms['prov_validated'].label }}</span>
+                  {% elif n.is_docs %}<span class="provbadge pv-docs" title="{{ terms['prov_docs'].tip }}">{{ terms['prov_docs'].label }}</span>
+                  {% else %}<span class="mut">{{ n.provenance }}</span>{% endif %}
+                  {% if n.incomplete %}<span class="provbadge pv-incomplete" title="{{ terms['model_incomplete'].tip }}">{{ terms['model_incomplete'].label }}</span>{% endif %}
+                </td>
+                <td class="mono">{{ n.create_endpoint or '—' }}</td>
+                <td><a href="{{ n.editor_href }}">Edit ↗</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="empty-state model-no-match" id="model-no-match" style="display:none">검색 결과가 없습니다.</p>
+</section>
+{% endif %}
+
+{# ── D6 각주 ──────────────────────────────────────────────────────────── #}
+<section class="panel">
+  <p class="panel-note">의존 그래프는 이 화면에 없습니다(D6 — 전체를 모은 독립 탭은 전체 그림을
+    보는 데 의미가 없다는 판단) — 개별 노드의 의존은 <a href="{{ data.map_href }}">노드 편집기 ↗</a>에서
+    수정 가능한 형태로, 서비스별 의존 개요는 서비스 상세의 미니그래프(후속)로 제공될 예정입니다.</p>
+</section>
+
+{% endif %}
+
+<script>
+function modelToggle(id){
+  var row = document.getElementById(id);
+  var caret = document.getElementById('care-' + id);
+  if (!row) return;
+  var show = row.style.display === 'none';
+  row.style.display = show ? '' : 'none';
+  if (caret) caret.textContent = show ? '▾' : '▸';
+}
+function modelFilter(){
+  var q = (document.getElementById('model-search').value || '').toLowerCase().trim();
+  var rows = document.querySelectorAll('#model-table tbody tr.grp-row');
+  var shown = 0;
+  rows.forEach(function(tr){
+    var hit = !q || tr.dataset.name.indexOf(q) >= 0;
+    tr.style.display = hit ? '' : 'none';
+    var detail = tr.nextElementSibling;
+    if (!hit && detail && detail.classList.contains('grp-detail')) {
+      detail.style.display = 'none';
+    }
+    if (hit) shown++;
+  });
+  var nm = document.getElementById('model-no-match');
+  if (nm) nm.style.display = shown ? 'none' : '';
+}
+</script>
+{% endblock %}

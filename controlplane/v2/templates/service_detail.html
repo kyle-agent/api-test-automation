@@ -92,7 +92,7 @@
         <td class="mono">
           {% if r.status is not none %}
             {{ r.status }}{% if r.elapsed_s is not none %} · {{ r.elapsed_s }}s{% endif %}
-            <span class="mut" title="발행 누적 관측 — 괄호는 이 관측을 남긴 런의 소스 버전(커밋). 이 화면이 직접 실행한 값이 아님">{% if r.sha %} (관측 @{{ r.sha }}){% else %} (발행 누적){% endif %}</span>
+            <span class="mut" title="발행 누적 관측 — 괄호는 이 관측을 남긴 런의 소스 버전(커밋). 이 화면이 직접 실행한 값이 아님">{% if r.sha %} (observed @{{ r.sha }}){% else %} (발행 누적){% endif %}</span>
           {% else %}
             <span class="mut">—</span>
           {% endif %}
