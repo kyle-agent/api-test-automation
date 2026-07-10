@@ -2005,3 +2005,18 @@ GET /v1/access-keys의 $.access_keys[0].account_id로 자가발견 (리터럴 �
 카탈로그 키 미해석 — validate WARN으로 확인된 제약). 다음 런 판정 대상 9키:
 createiamuser·getiamuser·updateiamuser·updateiamuserpassword·deleteiamuser·
 addgroupmember·removegroupmember·adduserpolicybinding·removeuserpolicybinding.
+
+## SCR public 엔드포인트 — 두 가지 미해결 결함 (2026-07-10, PF-37/38)
+
+- **PF-37**: public 토큰 서버(auth.scr.public...)가 문서대로의 유효 인증키
+  (AccessKey/SecretKey Basic)를 일관 401 거부. 키 유효성은 HMAC Open API 200으로
+  증명, scr:LoginContainerRegistry 권한 보유(ScrPullPushOnlyAccess 기본 포함 —
+  콘솔 JSON 실측: scr:LoginContainerRegistry/PullRepositoryImages/PushRepositoryImages),
+  owner 구키 로컬 docker login도 동일 실패. → **이미지 push 픽스처는 SDS 문의
+  해소 전까지 보류**. SCR 커버리지 배선(sample/test 캡처)은 이미지가 들어오는
+  즉시 동작 (무퇴행).
+- **PF-38**: enable-public-endpoint 토글 후 API 상태는 Running/enabled인데
+  실제 엔드포인트 TCP reset 2시간+ (컨트롤/데이터플레인 불일치). 복구는 콘솔
+  재토글 또는 SDS 문의.
+- SCR push 유저 regrscr856f95 (fd0328e2…) + 정책 3종(regrscrall/regrscrlogin/
+  regrscrselfkey) + 인증키는 유지 중 — 해소 후 재사용, 불필요 시 삭제.
