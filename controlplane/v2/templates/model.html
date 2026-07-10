@@ -82,7 +82,7 @@
       <tr class="grp-row" data-name="{{ (g.label ~ ' ' ~ g.gid ~ ' ' ~ g.category)|lower }}"
           onclick="modelToggle('grp-{{ loop.index }}')">
         <td class="grp-caret" id="care-grp-{{ loop.index }}">▸</td>
-        <td>{{ g.label }} <span class="mut mono">{{ g.gid }}</span></td>
+        <td><span class="mono"{% if g.label and g.label != g.gid %} title="{{ g.label }}"{% endif %}>{{ g.gid }}</span>{% if g.services %} <span class="mut">{{ g.services|join(' · ') }}</span>{% endif %}</td>
         <td>{{ g.category or '—' }}</td>
         <td class="mono">{{ g.node_count }}</td>
         <td>

@@ -131,7 +131,11 @@ def _build() -> dict | None:
         n = len(node_ids)
         groups_out.append({
             "gid": gid,
+            # 원천 label은 한국어 제목 — 화면 1급은 영어 식별자(gid·service),
+            # 한국어 제목은 툴팁 보조 (오너 지시 2026-07-10: 서비스명·카테고리는
+            # 원래 제공되는 영어 그대로)
             "label": str(meta.get("label") or gid),
+            "services": sorted({n["service"] for n in nodes_out if n["service"]}),
             "category": str(meta.get("category") or ""),
             "node_count": n,
             "validated": v, "docs": d, "other": o, "incomplete": inc,
