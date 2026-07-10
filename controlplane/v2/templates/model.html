@@ -37,7 +37,7 @@
   <div class="kpi">
     <div class="kpi-label">Groups</div>
     <div class="kpi-value">{{ data.group_count }}</div>
-    <div class="kpi-sub">노드가 속한 그룹 수(서비스보다 세분화된 저작 단위)</div>
+    <div class="kpi-sub">노드가 속한 그룹 수(서비스보다 굵은 저작 단위 — 실측 각주 참고)</div>
   </div>
 </section>
 
@@ -54,8 +54,13 @@
   {% endif %}
 </section>
 
-{# ── Model table — 그룹별 노드 집계 + 행 펼침(스펙 2b·2c) ─────────────────── #}
-{% if not data.groups %}
+{# ── Model table — category ▸ service ▸ node 3단 접기(스펙 2b·2c).
+   legacy Modeling(/planning/resources/map)의 category▸service 계층을 이식 —
+   category=node.service의 첫 세그먼트, service=node.service 전체 문자열
+   (예: database/mariadb). 그룹(gid)은 실측 결과 service보다 세분화된 단위가
+   아니라 오히려 더 굵은 단위(57개 중 2개는 service 여러 개를 한 그룹으로 묶음)
+   라서 별도 접기 레벨을 두지 않고 service 행의 태그로만 남긴다. ───────────── #}
+{% if not data.categories %}
 <section class="panel">
   <p class="empty-state">정의된 리소스 모델 노드가 없습니다 — knowledge/formal/resources/에 아직 파일이 없을 수 있습니다.</p>
 </section>
@@ -65,54 +70,90 @@
     <h2>Model table</h2>
   </div>
   <div class="svc-toolbar">
-    <div class="search"><input id="model-search" type="text" placeholder="Search group · category" oninput="modelFilter()" autocomplete="off"></div>
-    <span class="panel-note">{{ data.group_count }}개 그룹 · {{ data.total_nodes }}개 노드 · 행을 클릭하면 노드 목록이 펼쳐집니다</span>
+    <div class="search"><input id="model-search" type="text" placeholder="Search category · service · node id" oninput="modelFilter()" autocomplete="off"></div>
+    <button type="button" class="minibtn" id="model-collapse-all">Collapse all</button>
+    <span class="panel-note">{{ data.categories|length }}개 카테고리 · {{ data.group_count }}개 그룹 · {{ data.total_nodes }}개 노드 ·
+      카테고리/서비스 행을 클릭하면 펼쳐집니다</span>
   </div>
   <div class="tbl-scroll">
   <table class="tbl" id="model-table">
     <thead>
       <tr>
-        <th></th><th>Group</th><th>Category</th><th>Nodes</th>
+        <th></th><th>Category / Service</th><th>Group</th><th>Nodes</th>
         <th>{{ term('prov_validated', terms) }} / {{ term('prov_docs', terms) }}</th>
         <th>{{ term('model_incomplete', terms) }}</th>
       </tr>
     </thead>
     <tbody>
-      {% for g in data.groups %}
-      <tr class="grp-row" data-name="{{ (g.label ~ ' ' ~ g.gid ~ ' ' ~ g.category)|lower }}"
-          onclick="modelToggle('grp-{{ loop.index }}')">
-        <td class="grp-caret" id="care-grp-{{ loop.index }}">▸</td>
-        <td><span class="mono"{% if g.label and g.label != g.gid %} title="{{ g.label }}"{% endif %}>{{ g.gid }}</span>{% if g.services %} <span class="mut">{{ g.services|join(' · ') }}</span>{% endif %}</td>
-        <td>{{ g.category or '—' }}</td>
-        <td class="mono">{{ g.node_count }}</td>
+      {% for c in data.categories %}
+      <tr class="grp-row cat-row" data-level="cat" data-key="{{ c.category }}"
+          data-name="{{ c.category|lower }}" onclick="modelToggleRow(this)">
+        <td class="grp-caret">▸</td>
+        <td><span class="cat-name">{{ c.category }}</span> <span class="mut">({{ c.service_count }} services)</span></td>
+        <td class="mut">—</td>
+        <td class="mono">{{ c.node_count }}</td>
         <td>
-          <div class="prov-bar" title="{{ terms['prov_validated'].label }} {{ g.validated }} · {{ terms['prov_docs'].label }} {{ g.docs }}{% if g.other %} · (미지정) {{ g.other }}{% endif %}">
-            <span class="prov-seg prov-validated" style="width:{{ g.validated_pct }}%"></span>
-            <span class="prov-seg prov-docs" style="width:{{ g.docs_pct }}%"></span>
-            {% if g.other %}<span class="prov-seg prov-other" style="width:{{ g.other_pct }}%"></span>{% endif %}
+          <div class="prov-bar" title="{{ terms['prov_validated'].label }} {{ c.validated }} · {{ terms['prov_docs'].label }} {{ c.docs }}{% if c.other %} · (미지정) {{ c.other }}{% endif %}">
+            <span class="prov-seg prov-validated" style="width:{{ (c.validated / c.node_count * 100) if c.node_count else 0 }}%"></span>
+            <span class="prov-seg prov-docs" style="width:{{ (c.docs / c.node_count * 100) if c.node_count else 0 }}%"></span>
+            {% if c.other %}<span class="prov-seg prov-other" style="width:{{ (c.other / c.node_count * 100) if c.node_count else 0 }}%"></span>{% endif %}
           </div>
-          <span class="panel-note">{{ g.validated }}/{{ g.node_count }}</span>
+          <span class="panel-note">{{ c.validated }}/{{ c.node_count }}</span>
         </td>
-        <td class="mono">{{ g.incomplete if g.incomplete else '—' }}</td>
+        <td class="mono">{{ c.incomplete if c.incomplete else '—' }}</td>
       </tr>
-      <tr class="grp-detail" id="grp-{{ loop.index }}" style="display:none">
+      <tr class="grp-detail cat-detail" style="display:none">
         <td></td>
         <td colspan="5">
           <table class="tbl node-list">
-            <thead><tr><th>Node</th><th>Service</th><th>Provenance</th><th>Create endpoint</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th></th><th>Service</th><th>Group</th><th>Nodes</th>
+                <th>{{ term('prov_validated', terms) }} / {{ term('prov_docs', terms) }}</th>
+                <th>{{ term('model_incomplete', terms) }}</th>
+              </tr>
+            </thead>
             <tbody>
-              {% for n in g.nodes %}
-              <tr class="{{ 'unt-row' if n.incomplete else '' }}">
-                <td class="mono">{{ n.id }}</td>
-                <td>{{ n.service }}</td>
+              {% for s in c.services %}
+              <tr class="grp-row svc-row" data-level="svc" data-key="{{ s.service }}"
+                  data-name="{{ (c.category ~ ' ' ~ s.service ~ ' ' ~ s.gid)|lower }}"
+                  onclick="event.stopPropagation(); modelToggleRow(this)">
+                <td class="grp-caret">▸</td>
+                <td class="mono">{{ s.service }}</td>
+                <td><span class="mono"{% if s.group_label %} title="{{ s.group_label }}"{% endif %}>{{ s.gid }}</span></td>
+                <td class="mono">{{ s.node_count }}</td>
                 <td>
-                  {% if n.is_validated %}<span class="provbadge pv-validated" title="{{ terms['prov_validated'].tip }}">{{ terms['prov_validated'].label }}</span>
-                  {% elif n.is_docs %}<span class="provbadge pv-docs" title="{{ terms['prov_docs'].tip }}">{{ terms['prov_docs'].label }}</span>
-                  {% else %}<span class="mut">{{ n.provenance }}</span>{% endif %}
-                  {% if n.incomplete %}<span class="provbadge pv-incomplete" title="{{ terms['model_incomplete'].tip }}">{{ terms['model_incomplete'].label }}</span>{% endif %}
+                  <div class="prov-bar" title="{{ terms['prov_validated'].label }} {{ s.validated }} · {{ terms['prov_docs'].label }} {{ s.docs }}{% if s.other %} · (미지정) {{ s.other }}{% endif %}">
+                    <span class="prov-seg prov-validated" style="width:{{ s.validated_pct }}%"></span>
+                    <span class="prov-seg prov-docs" style="width:{{ s.docs_pct }}%"></span>
+                    {% if s.other %}<span class="prov-seg prov-other" style="width:{{ s.other_pct }}%"></span>{% endif %}
+                  </div>
+                  <span class="panel-note">{{ s.validated }}/{{ s.node_count }}</span>
                 </td>
-                <td class="mono">{{ n.create_endpoint or '—' }}</td>
-                <td><a href="{{ n.editor_href }}">Edit ↗</a></td>
+                <td class="mono">{{ s.incomplete if s.incomplete else '—' }}</td>
+              </tr>
+              <tr class="grp-detail" style="display:none">
+                <td></td>
+                <td colspan="5">
+                  <table class="tbl node-list">
+                    <thead><tr><th>Node</th><th>Provenance</th><th>Create endpoint</th><th></th></tr></thead>
+                    <tbody>
+                      {% for n in s.nodes %}
+                      <tr class="{{ 'unt-row' if n.incomplete else '' }}" data-name="{{ (c.category ~ ' ' ~ s.service ~ ' ' ~ n.id)|lower }}">
+                        <td class="mono">{{ n.id }}</td>
+                        <td>
+                          {% if n.is_validated %}<span class="provbadge pv-validated" title="{{ terms['prov_validated'].tip }}">{{ terms['prov_validated'].label }}</span>
+                          {% elif n.is_docs %}<span class="provbadge pv-docs" title="{{ terms['prov_docs'].tip }}">{{ terms['prov_docs'].label }}</span>
+                          {% else %}<span class="mut">{{ n.provenance }}</span>{% endif %}
+                          {% if n.incomplete %}<span class="provbadge pv-incomplete" title="{{ terms['model_incomplete'].tip }}">{{ terms['model_incomplete'].label }}</span>{% endif %}
+                        </td>
+                        <td class="mono">{{ n.create_endpoint or '—' }}</td>
+                        <td><a href="{{ n.editor_href }}">Edit ↗</a></td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -132,34 +173,117 @@
   <p class="panel-note">의존 그래프는 이 화면에 없습니다(D6 — 전체를 모은 독립 탭은 전체 그림을
     보는 데 의미가 없다는 판단) — 개별 노드의 의존은 <a href="{{ data.map_href }}">노드 편집기 ↗</a>에서
     수정 가능한 형태로, 서비스별 의존 개요는 서비스 상세의 미니그래프(후속)로 제공될 예정입니다.</p>
+  <p class="panel-note">실측 각주: legacy Modeling(<span class="mono">/planning/resources/map</span>)의 계층은
+    category ▸ service 2단(카테고리 기본 접힘 · 서비스 기본 펼침)이었다 — 이 화면도 같은 기본값을 그대로 따른다.
+    "그룹"(<span class="mono">_groups.yaml</span>)은 서비스보다 <em>세분화된</em> 단위가 아니라 대부분 1:1이고
+    일부(nw-vpc·ai-ml)는 오히려 여러 service를 묶는 더 굵은 단위였다 — 그래서 그룹은 별도 접기 레벨 없이
+    service 행의 태그(Group 컬럼)로만 남겼다.</p>
 </section>
 
 {% endif %}
 
 <script>
-function modelToggle(id){
-  var row = document.getElementById(id);
-  var caret = document.getElementById('care-' + id);
-  if (!row) return;
-  var show = row.style.display === 'none';
-  row.style.display = show ? '' : 'none';
+// ── 접기/펼치기 — 헤더 행 바로 다음 형제(.grp-detail)를 토글. 중첩 깊이와
+// 무관하게 동작(카테고리·서비스 두 레벨 모두 같은 함수 재사용).
+function modelToggleRow(row) {
+  var detail = row.nextElementSibling;
+  if (!detail || !detail.classList.contains('grp-detail')) return;
+  var show = detail.style.display === 'none';
+  detail.style.display = show ? '' : 'none';
+  var caret = row.querySelector('.grp-caret');
   if (caret) caret.textContent = show ? '▾' : '▸';
+  if (show) row.classList.add('is-open'); else row.classList.remove('is-open');
+  persistCollapse();
 }
-function modelFilter(){
-  var q = (document.getElementById('model-search').value || '').toLowerCase().trim();
-  var rows = document.querySelectorAll('#model-table tbody tr.grp-row');
-  var shown = 0;
-  rows.forEach(function(tr){
-    var hit = !q || tr.dataset.name.indexOf(q) >= 0;
-    tr.style.display = hit ? '' : 'none';
-    var detail = tr.nextElementSibling;
-    if (!hit && detail && detail.classList.contains('grp-detail')) {
-      detail.style.display = 'none';
-    }
-    if (hit) shown++;
+
+// ── 접힘 상태 기억(세션 동안) — 기본값: 카테고리 접힘 · 서비스 펼침
+// (legacy /planning/resources/map 실측과 동일).
+var MODEL_SS = 'v2model.collapsed';
+function persistCollapse() {
+  try {
+    var open = {};
+    document.querySelectorAll('#model-table tr.grp-row').forEach(function (row) {
+      open[row.dataset.key] = row.classList.contains('is-open');
+    });
+    sessionStorage.setItem(MODEL_SS, JSON.stringify(open));
+  } catch (e) {}
+}
+
+function modelInit() {
+  var stored = null;
+  try { stored = JSON.parse(sessionStorage.getItem(MODEL_SS) || 'null'); } catch (e) {}
+  document.querySelectorAll('#model-table tr.grp-row').forEach(function (row) {
+    var isCat = row.dataset.level === 'cat';
+    var wantOpen = stored ? !!stored[row.dataset.key] : !isCat; // 기본: cat 접힘, svc 펼침
+    var detail = row.nextElementSibling;
+    if (!detail || !detail.classList.contains('grp-detail')) return;
+    detail.style.display = wantOpen ? '' : 'none';
+    var caret = row.querySelector('.grp-caret');
+    if (caret) caret.textContent = wantOpen ? '▾' : '▸';
+    row.classList.toggle('is-open', wantOpen);
   });
-  var nm = document.getElementById('model-no-match');
-  if (nm) nm.style.display = shown ? 'none' : '';
 }
+
+// ── 검색 — 매치는 레벨 불문(카테고리명·서비스명·그룹·노드 id) 텍스트 포함
+// 검사. 매치가 있으면 그 경로(카테고리→서비스)를 강제로 펼쳐 보여준다(자동
+// 펼침) — 검색 중엔 저장된 접힘 상태를 무시한다(legacy와 동일한 원칙).
+function modelFilter() {
+  var q = (document.getElementById('model-search').value || '').toLowerCase().trim();
+  var table = document.getElementById('model-table');
+  if (!q) {
+    modelInit();
+    document.getElementById('model-no-match').style.display = 'none';
+    return;
+  }
+  var shownNodes = 0;
+  table.querySelectorAll('tr.cat-row').forEach(function (catRow) {
+    var catDetail = catRow.nextElementSibling;
+    var catHit = catRow.dataset.name.indexOf(q) >= 0;
+    var catAnyChildVisible = false;
+    catDetail.querySelectorAll('tr.svc-row').forEach(function (svcRow) {
+      var svcDetail = svcRow.nextElementSibling;
+      var svcHit = catHit || svcRow.dataset.name.indexOf(q) >= 0;
+      var svcAnyNodeVisible = false;
+      svcDetail.querySelectorAll('tbody tr').forEach(function (nodeRow) {
+        var nodeHit = svcHit || nodeRow.dataset.name.indexOf(q) >= 0;
+        nodeRow.style.display = nodeHit ? '' : 'none';
+        if (nodeHit) { svcAnyNodeVisible = true; shownNodes++; }
+      });
+      var svcVisible = svcHit || svcAnyNodeVisible;
+      svcRow.style.display = svcVisible ? '' : 'none';
+      svcDetail.style.display = svcVisible ? '' : 'none';
+      var svcCaret = svcRow.querySelector('.grp-caret');
+      if (svcCaret) svcCaret.textContent = svcVisible ? '▾' : '▸';
+      if (svcVisible) catAnyChildVisible = true;
+    });
+    var catVisible = catHit || catAnyChildVisible;
+    catRow.style.display = catVisible ? '' : 'none';
+    catDetail.style.display = catVisible ? '' : 'none';
+    var catCaret = catRow.querySelector('.grp-caret');
+    if (catCaret) catCaret.textContent = catVisible ? '▾' : '▸';
+  });
+  document.getElementById('model-no-match').style.display = shownNodes ? 'none' : '';
+}
+
+(function () {
+  var table = document.getElementById('model-table');
+  if (!table) return;
+  modelInit();
+  var btn = document.getElementById('model-collapse-all');
+  var allOpen = false;
+  btn.addEventListener('click', function () {
+    allOpen = !allOpen;
+    table.querySelectorAll('tr.grp-row').forEach(function (row) {
+      var detail = row.nextElementSibling;
+      if (!detail || !detail.classList.contains('grp-detail')) return;
+      detail.style.display = allOpen ? '' : 'none';
+      var caret = row.querySelector('.grp-caret');
+      if (caret) caret.textContent = allOpen ? '▾' : '▸';
+      row.classList.toggle('is-open', allOpen);
+    });
+    btn.textContent = allOpen ? 'Collapse all' : 'Expand all';
+    persistCollapse();
+  });
+})();
 </script>
 {% endblock %}

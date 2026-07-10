@@ -67,6 +67,23 @@ TERMS: dict[str, dict] = {
     # 서비스 목록/상세의 "기능 테스트 제외" 배지 — 사유는 호출부가 title에 동적으로 채움
     "untestable": {"label": "Untestable", "code": None,
                    "tip": "기능 테스트가 불가능한 서비스 — 사유는 배지 안내(title)에 표시"},
+    # 서비스 상세 히어로 + 필터 바 — 발행 페이지 패리티 리디자인(2026-07-10, owner 판정)
+    "cov_hero": {"label": "Verified (2xx) coverage", "code": None,
+                 "tip": "이 서비스의 공식 커버리지 링 — 실제 2xx 응답으로 동작이 확인된 op 비율"},
+    "read_get": {"label": "Read (GET)", "code": None,
+                 "tip": "GET 엔드포인트 중 검증(2xx)된 비율"},
+    "write_ops": {"label": "Write (POST/PUT/DELETE)", "code": None,
+                  "tip": "쓰기(POST/PUT/DELETE/PATCH) 엔드포인트 중 검증(2xx)된 비율"},
+    "svc_defects_only": {"label": "Defects only", "code": None,
+                         "tip": "결함 또는 개선 항목이 있는 엔드포인트만 표시"},
+    "svc_slow": {"label": "Slow (≥ 3s)", "code": None,
+                "tip": "마지막 관측 응답시간이 3초 이상인 호출만 표시"},
+    "svc_resource_groups": {"label": "Resource groups", "code": None,
+                            "tip": "경로 세그먼트(리소스) 기준으로 엔드포인트를 접어서 묶어 보기"},
+    "defect_ok": {"label": "OK", "code": None,
+                 "tip": "이 API에 특정된 결함·개선 항목이 없음"},
+    "defect_unevaluated": {"label": "Not evaluated", "code": None,
+                           "tip": "이 발행에는 API별 컨포먼스 점검 결과가 없어 판정 근거가 없습니다 — 근거 없음 ≠ 정상"},
 }
 
 # 출처 배지 3종 (L1 계약 §1) — 라벨과 뜻. 배지 마크업은 _badges.html 매크로가 유일한 구현

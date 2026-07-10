@@ -15,8 +15,10 @@ empty-state로 성립해야 한다 (계약 §3).
 """
 from __future__ import annotations
 
+import html
 import json
 import time
+from collections import Counter
 from pathlib import Path
 
 from controlplane import dashdata
@@ -122,13 +124,31 @@ _COV_LABEL = {
 _COV_ICON = {"verified": "✓", "reached": "◑", "failed": "⛔", "none": "·"}
 
 
-def _endpoint_rows(service: dict, conf_by_endpoint: dict, status_map: dict) -> list[dict]:
+def _resource_group(path: str) -> str:
+    """경로 세그먼트 기반 그룹명 — 발행 페이지 JS의 ``r.p.split('/')[2]||'기타'``
+    (``dashboard/build.py`` SVC_TEMPLATE 내 render() 함수, 이식 원본:
+    ``origin/dashboard-data:services/networking__loadbalancer.html``)를
+    서버 사이드로 그대로 옮긴 것 — 세그먼트가 없으면 "other"(D7: 값은 영어)."""
+    parts = (path or "").split("/")
+    return parts[2] if len(parts) > 2 and parts[2] else "other"
+
+
+def _endpoint_rows(service: dict, conf_by_endpoint: dict, status_map: dict,
+                    evidence: dict) -> list[dict]:
     """per_service()가 반환한 s['rows'] 튜플(method, path, name, covered,
     status, elapsed_ms, verdict, src)을 화면용 dict로 편다 — 집계 로직 없음,
     표시용 매핑뿐. 최근 status/응답시간은 per_service의 내부 called/merged
     오버레이(src="this run" 가정)를 쓰지 않고 status_map을 직접 조회한다:
     v2는 "이번 런"을 실행하지 않으므로 그 구분이 성립하지 않기 때문 —
-    보이는 값은 전부 발행 누적 관측이다."""
+    보이는 값은 전부 발행 누적 관측이다.
+
+    ``ev`` (검증 근거 run id)는 ``origin/claude/continuation-uk2rwc``의
+    ``dashboard/build.py`` per_service() durable-evidence override(owner
+    2026-07-10, "stale-cell fix")를 재현한다: covered==True인데 최근 관측
+    status가 없거나 2xx가 아니면(발행 캐시가 stale), 누적 근거 저장소
+    (``verified_endpoints_evidence.json`` — dashdata root)에서 그 키의
+    last_run/first_run을 찾아 화면이 "이 run에서 검증됨"을 보여줄 수 있게 한다.
+    실패(파일 없음/키 없음) 시 조용히 생략 — 계약 §3 empty-state 원칙."""
     out = []
     for method, path, title, covered, status, elapsed_ms, verdict, *_src in service["rows"]:
         cov = ("verified" if covered
@@ -140,16 +160,65 @@ def _endpoint_rows(service: dict, conf_by_endpoint: dict, status_map: dict) -> l
         pub_status = pub[0] if isinstance(pub, (list, tuple)) and pub else None
         pub_elapsed = pub[1] if isinstance(pub, (list, tuple)) and len(pub) > 1 else None
         pub_sha = pub[2] if isinstance(pub, (list, tuple)) and len(pub) > 2 else None
+        elapsed_s = round(pub_elapsed / 1000, 1) if pub_elapsed is not None else None
+        ev_run = None
+        if covered and (pub_status is None or not (200 <= pub_status < 300)):
+            dur = evidence.get(key) or {}
+            ev_run = dur.get("last_run") or dur.get("first_run") or None
         out.append({
             "method": method, "path": path, "api": title,
             "cov": cov, "cov_label": _COV_LABEL[cov], "cov_icon": _COV_ICON[cov],
-            "status": pub_status,
-            "elapsed_s": round(pub_elapsed / 1000, 1) if pub_elapsed is not None else None,
-            "sha": pub_sha,
+            "status": pub_status, "elapsed_s": elapsed_s, "sha": pub_sha,
+            "ev": ev_run or None,
+            "slow": elapsed_s is not None and elapsed_s >= 3,
+            "group": _resource_group(path),
             "defect_status": rec.get("status", "green"),
             "defects": rec.get("items", []),
         })
     return out
+
+
+def _action_banner(svc: dict, rows: list[dict]) -> str:
+    """자동 액션 배너 — ``dashboard/build.py`` ``render_service_page()``의
+    생성 로직(약한 축 판정 · 최빈 결함 · 신규 5xx/auth, L675 부근, untestable
+    분기 L705-711 / 일반 분기 L738-755)을 그대로 이식한다(문장·상수 동일,
+    파이썬 재작성만). 반환값은 이미 html.escape로 안전화된 HTML 문자열."""
+    if svc.get("untestable"):
+        n_reachable = sum(1 for r in rows if r["status"] is not None)
+        return (f"<b>기능 테스트 제외 서비스</b> — {html.escape(svc['untestable'])} "
+                f"(owner 2026-06-13). smoke가 각 API의 <b>접근성만</b> 확인한다: "
+                f"{n_reachable}/{svc['total']}개 엔드포인트가 응답(4xx 포함 = 도달). "
+                "커버리지 분모에서는 waiver로 제외되어 있다.")
+
+    gtot, gcov = svc.get("gtot") or 0, svc.get("gcov") or 0
+    wtot, wcov = svc.get("wtot") or 0, svc.get("wcov") or 0
+    gpct = gcov / gtot * 100 if gtot else 0
+    wpct = wcov / wtot * 100 if wtot else 0
+    n_failed = sum(1 for r in rows if r["cov"] == "failed")
+    def_count: Counter = Counter()
+    for r in rows:
+        for it in r["defects"]:
+            def_count[it.get("type", "")] += 1
+
+    bits = []
+    if n_failed:
+        bits.append(f"<b>신규 5xx/auth 실패 {n_failed}건 — 조치 필요.</b>")
+    weak_write = wpct <= gpct
+    axis = (f"쓰기 커버리지 {wpct:.0f}%가 약점" if weak_write
+            else f"읽기 커버리지 {gpct:.0f}%가 약점")
+    bits.append(
+        f"<b>다음 작업 후보:</b> {axis}. 미검증 쓰기 대부분은 부모 리소스 "
+        "ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능."
+        if weak_write else
+        f"<b>다음 작업 후보:</b> {axis} — read-chain/probe 보강 대상.")
+    if not n_failed:
+        bits.append("회귀 위험은 없음(신규 5xx/auth 0).")
+    top = def_count.most_common(2)
+    if top:
+        bits.append("문서/설계 결함 중 가장 흔한 건 "
+                    + "와 ".join(f"<b>{html.escape(t)}({n})</b>" for t, n in top)
+                    + ".")
+    return " ".join(bits)
 
 
 def _pct(n: int, d: int) -> str:

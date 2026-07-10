@@ -159,9 +159,71 @@ def _build() -> dict | None:
         "incomplete": incomplete_total,
         "group_count": len(groups_out),
         "groups": groups_out,
+        "categories": _build_categories(groups_out),
         "map_href": MAP_HANDOFF,
         "catalog_total": _catalog_total(),
     }
+
+
+def _build_categories(groups_out: list[dict]) -> list[dict]:
+    """category ▸ service ▸ node 트리 — legacy Modeling(``resource_routes._modeling_tree``,
+    실측 2026-07-10)의 계층 단위를 이식.
+
+    실측 결과(오너 지시 "그룹이 서비스보다 세분화된 단위" 가정을 데이터로 검증):
+    ``resource_model.group_of``가 만드는 그룹(gid)은 대개 service 1개와 1:1이지만
+    57개 중 2개(nw-vpc, ai-ml)는 **여러 service를 한 그룹으로 묶는다** — 그룹이
+    service보다 세분화된 게 아니라 오히려 더 굵은 단위다(반대 방향). 반면 한
+    service가 여러 그룹에 걸치는 경우는 0건 — service는 항상 정확히 그룹 하나에
+    속한다. 그래서 legacy와 동일하게 실제 ``node.service`` 문자열(예:
+    "database/mariadb")로 category/service를 쪼개고(legacy
+    ``_modeling_tree``: category = service.split('/')[0]), gid/그룹 라벨은 각
+    service 행에 태그로만 남긴다(별도 접기 레벨을 두지 않음) — 3단 접기의 실제
+    두 그룹 레벨(category, service)이 legacy와 정확히 일치한다.
+
+    category/service 정렬은 legacy와 동일하게 알파벳순(legacy
+    ``sorted(cats)``/``sorted(services)``) — 기존 flat groups(``-node_count``
+    정렬)와는 별개 축이라 이 함수가 groups_out을 재사용하되 독자적으로 재정렬한다.
+    """
+    cats: dict[str, dict] = {}
+    for g in groups_out:
+        for n in g["nodes"]:
+            service = n["service"] or "(uncategorized)"
+            category = service.split("/")[0] if "/" in service else "(uncategorized)"
+            c = cats.setdefault(category, {"category": category, "services": {},
+                                           "node_count": 0, "validated": 0,
+                                           "docs": 0, "other": 0, "incomplete": 0})
+            s = c["services"].setdefault(service, {
+                "service": service, "category": category, "nodes": [],
+                "node_count": 0, "validated": 0, "docs": 0, "other": 0,
+                "incomplete": 0, "gid": g["gid"], "group_label": g["label"],
+            })
+            s["nodes"].append(n)
+            for scope in (c, s):
+                scope["node_count"] += 1
+                if n["is_validated"]:
+                    scope["validated"] += 1
+                elif n["is_docs"]:
+                    scope["docs"] += 1
+                else:
+                    scope["other"] += 1
+                if n["incomplete"]:
+                    scope["incomplete"] += 1
+
+    out = []
+    for cat in sorted(cats):
+        c = cats[cat]
+        services_out = []
+        for svc in sorted(c["services"]):
+            s = c["services"][svc]
+            n = s["node_count"]
+            s["validated_pct"] = _pct(s["validated"], n)
+            s["docs_pct"] = _pct(s["docs"], n)
+            s["other_pct"] = _pct(s["other"], n)
+            services_out.append(s)
+        c["services"] = services_out
+        c["service_count"] = len(services_out)
+        out.append(c)
+    return out
 
 
 def get_model_data() -> dict | None:
