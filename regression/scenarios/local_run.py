@@ -269,7 +269,8 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
            "SCP_ALLOW_DESTRUCTIVE": "true" if destructive else "false",
            "SCP_RUN_HEAVY": "true" if heavy else "false"}
     # 워커 캡 10 (owner 2026-07-08; console2_server._run_worker와 동일 근거)
-    n = str(parallel or max(1, min(18, len(ids) or 2)))
+    _cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
+    n = str(parallel or max(1, min(_cap, len(ids) or 2)))
     with open(log_path, "w", encoding="utf-8") as f:
         f.write(f"# local live run  lifecycle_ids={ids}\n"
                 f"# gates: mutations={mutations} destructive={destructive} heavy={heavy}  parallel={n}\n")
