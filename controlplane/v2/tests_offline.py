@@ -364,6 +364,21 @@ def test_existing_home_untouched():
     assert r.status_code == 200, r.status_code
 
 
+def test_service_detail_dependencies_panel():
+    """D6 인스펙터 — 서비스 상세 하단의 의존 미니그래프 패널(기본 접힘·지연 로드)."""
+    from controlplane.v2 import services_data
+    data = services_data.get_services_data()
+    if not data or not data.get("services"):
+        print("  (skip: 발행본 접근 불가)")
+        return
+    svc = data["services"][0]
+    r = client.get(f"/v2/services/{svc['slug']}")
+    assert r.status_code == 200
+    assert '<details class="svc-deps" id="dep-panel"' in r.text
+    assert 'data-service="' in r.text
+    assert "svc_graph.js" in r.text
+
+
 if __name__ == "__main__":
     for name, fn in sorted(
             {k: v for k, v in globals().items() if k.startswith("test_")}.items()):

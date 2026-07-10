@@ -267,4 +267,43 @@
   render();
 })();
 </script>
+
+{# ── Dependencies — 의존 미니그래프 인스펙터 (D6: "의존이 가치 있는 순간은
+     개별 서비스를 눌렀을 때" · L2 그래프 단일화의 서비스 축). 기본 접힘(details
+     관례 — services_list의 known-fold와 동일 패턴) — 펼침 전에는 그래프를
+     로딩하지 않아 페이지 무게가 늘지 않는다. 렌더러는 console2 소유 원본을
+     그대로 로드해 재사용(복붙 금지) — runs_plan.js와 동일 계약
+     (window.ResourceGraph.scene). 동적 로직은 전부 svc_graph.js. #}
+<style>
+.svc-deps summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--sub); padding: 4px 0; user-select: none; }
+.svc-deps summary:hover { color: var(--ink); }
+.svc-deps[open] summary { margin-bottom: 8px; }
+.svc-deps .panel-note { margin: 0 0 10px; }
+.dep-stage-wrap { position: relative; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--card); }
+.dep-stage { position: relative; width: 100%; height: min(46vh, 340px); min-height: 200px; overflow: hidden; cursor: grab; background: radial-gradient(circle, var(--bg) 1px, transparent 1px); background-size: 26px 26px; }
+.dep-stage.grabbing { cursor: grabbing; }
+.dep-stage svg { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+#dep-stage-wrap g.rg-unit { cursor: pointer; }
+#dep-stage-wrap g.rg-unit .nrect { transition: opacity .12s; }
+#dep-stage-wrap g.rg-unit.dimmed { opacity: .13; }
+#dep-stage-wrap .rg-edge { stroke: #8a93a0; stroke-width: 1.3; fill: none; }
+#dep-stage-wrap .rg-edge.hot { stroke: var(--link); stroke-width: 2.2; }
+#dep-stage-wrap .rg-edge.dim { opacity: .08; }
+#dep-stage-wrap .rg-active { filter: drop-shadow(0 0 3px rgba(37, 99, 235, .45)); }
+.dep-insp { margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 12.5px; display: none; background: var(--bg); }
+.dep-insp.on { display: block; }
+.dep-insp-row { display: flex; gap: 8px; padding: 2px 0; }
+.dep-insp-row .k { color: var(--sub); min-width: 52px; }
+.dep-insp-row .v { color: var(--ink); }
+.dep-insp-row a { font-weight: 600; }
+</style>
+<section class="panel svc-deps-panel">
+  <details class="svc-deps" id="dep-panel" data-service="{{ svc.category }}/{{ svc.service }}">
+    <summary>Dependencies</summary>
+    <p class="panel-note">이 서비스를 실행할 때 함께 생성·정리되는 의존 리소스입니다. 의존 정의 수정은 <a href="/planning/resources/map">Node editor</a>에서.</p>
+    <div id="dep-graph-root"><p class="empty-state">펼치면 의존 그래프를 불러옵니다…</p></div>
+  </details>
+</section>
+<script src="/testing/console/assets/resource_graph.js"></script>
+<script src="/v2/static/svc_graph.js"></script>
 {% endblock %}
