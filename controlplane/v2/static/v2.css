@@ -181,6 +181,14 @@ tr.cov-none .cbar { background: var(--line); }
 .defitem .meta { color: var(--sub); font-size: 11px; margin-left: 4px; }
 .defitem .dd { color: var(--sub); }
 
+/* 결과 축 — 기지 실패 접힘 목록 */
+.known-fold summary {
+  cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--sub);
+  padding: 4px 0; user-select: none;
+}
+.known-fold summary:hover { color: var(--ink); }
+.known-fold[open] summary { margin-bottom: 8px; }
+
 /* 푸터 */
 .shell-foot {
   max-width: 1080px; margin: 0 auto; padding: 14px 22px 40px;

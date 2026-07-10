@@ -91,39 +91,7 @@
   {% endif %}
 </section>
 
-{# ── 섹션 2: 기지 실패 (추적 중) ─────────────────────────────────────── #}
-<section class="panel">
-  <div class="panel-head">
-    <h2>{{ term('regression_known', terms) }} (추적 중)</h2>
-    <span class="panel-note">저장소 baseline</span>
-  </div>
-  {% if known_issues is none %}
-    <p class="empty-state">기지 실패 baseline을 가져올 수 없습니다 — data/baselines/known_issues.json 확인이 필요합니다.</p>
-  {% elif not known_issues %}
-    <p class="empty-state">등록된 기지 실패가 없습니다.</p>
-  {% else %}
-  <div class="tbl-scroll">
-  <table class="tbl">
-    <thead>
-      <tr><th>항목</th><th>status</th><th>유형</th><th>등록</th><th>비고</th></tr>
-    </thead>
-    <tbody>
-      {% for it in known_issues %}
-      <tr>
-        <td class="mono">{{ it.key }}</td>
-        <td class="mono">{{ it.status if it.status is not none else '—' }}</td>
-        <td>{{ it.type or '—' }}</td>
-        <td class="mono">{{ it.since or '—' }}</td>
-        <td class="dd">{{ it.note or '—' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  {% endif %}
-</section>
-
-{# ── 섹션 3: 정합성(축2) 변화 — 회귀(축1)와 별도 ────────────────────────── #}
+{# ── 섹션 2: 정합성(축2) 변화 — 회귀(축1)와 별도 ────────────────────────── #}
 <section class="panel">
   <div class="panel-head">
     <h2>정합성 변화 (설계·문서 축)</h2>
@@ -181,6 +149,41 @@
     {% else %}
     <p class="empty-state">직전 발행 대비 정합성 변화가 없습니다.</p>
     {% endif %}
+  {% endif %}
+</section>
+
+{# ── 섹션 3: 기지 실패 (추적 중) — 목록이 길어 맨 아래 + 기본 접힘 ──────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{ term('regression_known', terms) }} (추적 중)</h2>
+    <span class="panel-note">저장소 baseline{% if known_issues %} · {{ known_issues|length }}건{% endif %}</span>
+  </div>
+  {% if known_issues is none %}
+    <p class="empty-state">기지 실패 baseline을 가져올 수 없습니다 — data/baselines/known_issues.json 확인이 필요합니다.</p>
+  {% elif not known_issues %}
+    <p class="empty-state">등록된 기지 실패가 없습니다.</p>
+  {% else %}
+  <details class="known-fold">
+    <summary>목록 펼치기 ({{ known_issues|length }}건)</summary>
+    <div class="tbl-scroll">
+    <table class="tbl">
+      <thead>
+        <tr><th>항목</th><th>status</th><th>유형</th><th>등록</th><th>비고</th></tr>
+      </thead>
+      <tbody>
+        {% for it in known_issues %}
+        <tr>
+          <td class="mono">{{ it.key }}</td>
+          <td class="mono">{{ it.status if it.status is not none else '—' }}</td>
+          <td>{{ it.type or '—' }}</td>
+          <td class="mono">{{ it.since or '—' }}</td>
+          <td class="dd">{{ it.note or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
   {% endif %}
 </section>
 
