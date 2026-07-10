@@ -100,6 +100,10 @@ SOURCES: dict[str, dict] = {
 RUN_STATUS: dict[str, str] = {
     "done": "Done", "failed": "Failed", "running": "Running",
     "dispatched": "Dispatched", "archived": "Archived",
+    # §2.9 실행 뷰 3상태 확장분 — console2 엔진 rec.status 어휘 그대로
+    # (tools/console2_server.py _new_rec/_admit_or_queue/_abort_run).
+    "queued": "Queued", "aborted": "Aborted", "aborting": "Aborting",
+    "error": "Error", "unknown": "Unknown",
 }
 
 # 질문 중심 6축 네비 (CX-IA-DESIGN §4.2). 축의 "질문"은 IA 설계 개념일 뿐,

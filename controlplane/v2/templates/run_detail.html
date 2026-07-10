@@ -6,8 +6,81 @@
 <p class="crumb"><a href="/v2">Overview</a> / Run detail</p>
 <h1 class="page-q">Run <span class="mono">{{ gh_run_id }}</span>
   {{ badge('run', ident=gh_run_id) }}
+  {% if bucket in ('running', 'queued') %}<span class="st st-{{ bucket }}">{{ terms_run_status.get(bucket, bucket) }}</span>{% endif %}
 </h1>
 
+{% if is_local and bucket in ('running', 'queued') %}
+{# ══════════════════════════════════════════════════════════════════════════
+   실행 뷰(§2.9) — 오너 승인 목업(V2-EXEC-VIEW-MOCKUP.html) 레이아웃 포팅.
+   A(이상 감지)·B(계획↔실행 연속성)·C(종료 후 다음 행동, done 전환 시)를
+   legacy 실행 화면 골격(체크리스트+now-playing) 위에 얹는다. 모든 동적
+   갱신은 static/run_exec.js — 여기는 초기 페인트(서버 계산 PLAN/capacity
+   seed) + 정적 골격만 렌더한다. #}
+<div id="rx-root" data-rid="{{ exec.rid }}" data-status="{{ bucket }}">
+<script type="application/json" id="rx-init-data">{{ exec | tojson }}</script>
+
+<div class="plan-strip" id="rx-plan-strip">
+  <div class="plan-col"><div class="k">PLAN (사전 점검에서 확정)</div>
+    <div class="v" id="rx-plan-v">{{ exec.lifecycle_ids|length }} lifecycle{{ 's' if exec.lifecycle_ids|length != 1 else '' }} — 견적 계산 중…</div></div>
+  <div class="plan-mid" id="rx-plan-mid">{% if bucket == 'queued' %}대기 {{ exec.queue_position or '?' }}번째{% else %}실행 중{% endif %}</div>
+  <div class="plan-col" style="text-align:right">
+    <div class="k">{{ 'WHY QUEUED' if bucket == 'queued' else 'ACTUAL (지금)' }}</div>
+    <div class="v" id="rx-actual-v">확인 중…</div>
+  </div>
+</div>
+
+{% if bucket == 'queued' %}
+<div class="nowplay" id="rx-nowplay" style="background:#1c2430">
+  <span class="dotp" style="background:#93c5fd;animation:none"></span>
+  <span class="step" style="color:#93c5fd">대기 중 — 슬롯이 나면 자동 시작됩니다</span>
+  <span class="meta" id="rx-queue-meta">앞선 실행의 잔여 시간을 확인하는 중…</span>
+  <div class="prog"><i style="width:0%"></i></div>
+  <button class="abort" id="rx-cancel" title="이 대기를 취소합니다 — 이미 시작된 실행이 아니라 시작 전 대기열에서 즉시 제거됩니다">✕ 대기 취소</button>
+</div>
+<p class="panel-note">대기 중에도 계획(선택·견적)은 위 스트립에 고정됩니다 — 시작되면 이 화면이 실행 중 상태로 전환됩니다(자동 새로고침).</p>
+{% else %}
+<div class="nowplay" id="rx-nowplay"><span style="color:#8b98a8">이벤트를 불러오는 중…</span></div>
+
+<div id="rx-alerts"></div>
+
+<div class="exec-cols">
+  <div class="rail">
+    <div class="ring-mini" id="rx-ring-mini"></div>
+    <div class="rail-h" id="rx-rail-filters">
+      <span class="fchip on" data-f="all">전체</span><span class="fchip" data-f="running">진행</span>
+      <span class="fchip" data-f="fail">실패</span><span class="fchip" data-f="queued">대기</span>
+    </div>
+    <div id="rx-rail-rows">
+      {% for lid in exec.lifecycle_ids %}
+      <div class="lc-row" data-lc="{{ lid }}"><span class="g">·</span><span class="nm">{{ lid }}</span></div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="ticker">
+    <h3>최근 호출 (API 탭 요약 — 아래 탭에서 전체 확인)</h3>
+    <div id="rx-ticker-rows"><p class="empty-state">아직 호출 없음</p></div>
+  </div>
+</div>
+
+<div class="dtl-tabs" id="rx-tabs">
+  <button class="on" data-tab="resources">Resources <span class="cnt" id="rx-cnt-res">0</span></button>
+  <button data-tab="api">API calls <span class="cnt" id="rx-cnt-api">0</span></button>
+  <button data-tab="logs">Logs</button>
+  <a class="run-cta" style="margin-left:auto;font-size:12px;padding:5px 12px" href="/runtime" target="_blank" rel="noopener"
+     title="계정 실측 토폴로지 — 무거운 조회라 온디맨드로 새 창에서 엽니다(iframe 임베드 제거, M6 원칙)">Account runtime ↗</a>
+</div>
+<div id="rx-tab-body" class="panel"><p class="empty-state">이벤트를 불러오는 중…</p></div>
+{% endif %}
+
+<div id="rx-done-banner" class="done-card" style="display:none;margin-top:12px">
+  <div class="done-h">✅ Run finished</div>
+  <p class="panel-note">이 페이지의 폴링을 멈췄습니다 — 최신 종료 요약(fail·fold·쿼터 스킵·잔존 대조)을 보려면 새로고침하세요.</p>
+  <p><button class="run-cta" type="button" onclick="location.reload()">↻ 새로고침</button></p>
+</div>
+</div>
+<script src="/v2/static/run_exec.js"></script>
+
+{% else %}
 {# ── 헤더 — run id·suite·trigger·시각 (계약 §2.3, db.get_run 기준) ───────── #}
 <section class="panel">
   <div class="panel-head">
@@ -164,4 +237,75 @@
 </section>
 {% endif %}
 
+{# ── C. 종료 → 다음 행동 (§2.9, 로컬 런 전용) — fail→Results, +검증→Fold,
+     쿼터 스킵→아래 표, 생성/삭제 대조. 목업 .done-card/.next-act 그대로. ── #}
+{% if is_local %}
+{% set qskips = (skip_details or []) | selectattr('quota') | list %}
+<section class="panel done-card" id="next-actions">
+  <div class="panel-head"><h2>Next actions</h2>{{ badge('run', ident=gh_run_id) }}</div>
+  <div class="next-act">
+    {% if summary and summary.lifecycles.failed %}
+    <a href="/v2/results" title="이 런의 실패 lifecycle: {{ summary.lifecycles.failed_ids|join(', ') }}">
+      <span class="tagn bad">FAIL {{ summary.lifecycles.failed }}</span>
+      {{ summary.lifecycles.failed_ids[:3]|join(', ') }}{% if summary.lifecycles.failed_ids|length > 3 %} 외 {{ summary.lifecycles.failed_ids|length - 3 }}건{% endif %} —
+      <b>Results 트리아지에서 확인</b><span style="margin-left:auto">→</span>
+    </a>
+    {% endif %}
+    {% if fold and fold.count %}
+    <a href="#official-aggregation">
+      <span class="tagn good">+{{ fold.count }} 검증</span> 새 2xx 검증 증거 약 {{ fold.count }}건 — 아직 공식 집계 미반영,
+      <b>{{ term('fold', terms) }} 검토</b><span style="margin-left:auto">→</span>
+    </a>
+    {% endif %}
+    {% if qskips %}
+    <a href="#quota-skips">
+      <span class="tagn" style="background:#fff8c5;color:#9a6700">⊘ 쿼터 스킵 {{ qskips|length }}</span>
+      {{ qskips|map(attribute='lifecycle')|join(', ') }} — VPC/쿼터 여유 부족으로 스킵됨(실패 아님, Hard Rule 6) ·
+      <b>여유 시 재실행 후보</b><span style="margin-left:auto">→</span>
+    </a>
+    {% endif %}
+    {% if resource_tally %}
+    <span>
+      <span class="tagn {{ 'info' if resource_tally.balanced else 'bad' }}">생성 {{ resource_tally.created }} / 삭제 {{ resource_tally.deleted }}</span>
+      {% if resource_tally.balanced %}per-run 자동 정리 대조 일치 — 확인 불필요{% else %}대조 불일치 — 잔존 의심, 상황실의 "이 서버의 런" 섹션에서 수동 재확인을 권장합니다{% endif %}
+    </span>
+    {% endif %}
+  </div>
+  {% if not ((summary and summary.lifecycles.failed) or (fold and fold.count) or qskips) %}
+  <p class="empty-state">추가로 검토할 다음 행동이 없습니다 — fail·미반영 검증·쿼터 스킵이 모두 0건입니다.</p>
+  {% endif %}
+</section>
+
+{% if skip_details %}
+<section class="panel" id="quota-skips">
+  <div class="panel-head">
+    <h2>Skipped lifecycles</h2>
+    {{ badge('run', ident=gh_run_id) }}
+  </div>
+  <div class="tbl-scroll">
+  <table class="tbl">
+    <thead><tr><th>Lifecycle</th><th>Reason</th>
+      <th title="Hard Rule 6: 쿼터/세마포어 한도로 인한 스킵은 실패가 아닙니다 — ⊘ 글리프로 fail과 구분합니다">Kind</th></tr></thead>
+    <tbody>
+      {% for s in skip_details %}
+      <tr>
+        <td class="mono">{{ s.lifecycle }}</td>
+        <td class="mut">{{ s.reason or '—' }}</td>
+        <td>
+          {% if s.quota %}
+          <span class="tagn" style="background:#fff8c5;color:#9a6700" title="세마포어/budget 한도 초과 — 실패가 아니라 스킵">⊘ 쿼터 스킵</span>
+          {% else %}
+          <span class="mut">스킵</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+
+{% endif %}
 {% endblock %}

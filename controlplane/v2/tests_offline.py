@@ -379,6 +379,125 @@ def test_service_detail_dependencies_panel():
     assert "svc_graph.js" in r.text
 
 
+def test_run_detail_running_shows_exec_view():
+    """§2.9 — running rec(가짜 인메모리 rec 주입)이면 실행 뷰(체크리스트 +
+    now-playing + PLAN 스트립 + 4탭)로 렌더된다. 실제 백그라운드 워커는
+    전혀 돌리지 않는다 — rec 상태만 흉내(offline)."""
+    import time as _time
+    from tools import console2_server as c2
+    rid = "offlinetest-running-0001"
+    rec = {"id": rid, "kind": "lifecycle", "mode": "live", "status": "running",
+           "lifecycle_ids": ["networking__vpc-full"], "heavy": False,
+           "mutations": True, "destructive": True, "started": _time.time(),
+           "ended": None, "rc": None, "log": "/dev/null", "events": "/dev/null",
+           "peak_vpcs": 1, "queued": False}
+    with c2._LOCK:
+        c2._RUNS[rid] = rec
+    try:
+        r = client.get(f"/v2/runs/local-{rid}")
+        assert r.status_code == 200, r.status_code
+        body = r.text
+        assert 'id="rx-root"' in body
+        assert 'data-status="running"' in body
+        assert "plan-strip" in body
+        assert 'data-tab="resources"' in body
+        assert 'data-tab="api"' in body
+        assert 'data-tab="logs"' in body
+        assert "Account runtime" in body and "/runtime" in body
+        assert "run_exec.js" in body
+    finally:
+        with c2._LOCK:
+            c2._RUNS.pop(rid, None)
+
+
+def test_run_detail_queued_shows_why_queued_and_cancel():
+    """§2.9 — queued rec은 WHY QUEUED(슬롯 미터 + 대기 순번) + 대기 취소
+    버튼을 보여준다(체크리스트/탭은 없음 — 목업과 동일)."""
+    import time as _time
+    from tools import console2_server as c2
+    rid = "offlinetest-queued-0001"
+    rec = {"id": rid, "kind": "lifecycle", "mode": "live", "status": "queued",
+           "lifecycle_ids": ["networking__vpc-full"], "heavy": False,
+           "mutations": True, "destructive": True, "started": _time.time(),
+           "ended": None, "rc": None, "log": "/dev/null", "events": "/dev/null",
+           "peak_vpcs": 3, "queued": True}
+    with c2._LOCK:
+        c2._RUNS[rid] = rec
+    with c2._ADMIT:
+        c2._QUEUE.append(rid)
+    try:
+        r = client.get(f"/v2/runs/local-{rid}")
+        assert r.status_code == 200, r.status_code
+        body = r.text
+        assert 'id="rx-root"' in body
+        assert 'data-status="queued"' in body
+        assert "WHY QUEUED" in body
+        assert "대기 취소" in body
+        assert "대기 1번째" in body   # 대기열 1번째(방금 넣은 것 하나뿐)
+        assert 'data-tab="resources"' not in body   # queued는 체크리스트/탭 없음(목업 그대로)
+    finally:
+        with c2._LOCK:
+            c2._RUNS.pop(rid, None)
+        with c2._ADMIT:
+            if rid in c2._QUEUE:
+                c2._QUEUE.remove(rid)
+
+
+def test_run_detail_done_shows_next_actions_and_quota_skip():
+    """§2.9 C카드 — done 로컬 런에 Next actions(fail→Results, 쿼터 스킵→
+    아래 표, 생성/삭제 대조) + Skipped lifecycles 표가 실측 이벤트 기준으로
+    렌더된다. 쿼터 스킵 사유 문자열은 engine.py의 실제 LifecycleSkip 메시지
+    포맷(VPC quota semaphore)을 그대로 흉내낸다."""
+    import json as _json
+    from tools import console2_server as c2
+    rid = "offlinetest-done-0001"
+    events = [
+        {"kind": "lifecycle-start", "lifecycle": "networking__vpc-full", "service": "networking/vpc"},
+        {"kind": "resource-tracked", "lifecycle": "networking__vpc-full",
+         "resource_type": "vpc", "resource_id": "v-1", "path": "/v1/vpcs"},
+        {"kind": "resource-deleted", "lifecycle": "networking__vpc-full",
+         "resource_type": "vpc", "path": "/v1/vpcs/v-1"},
+        {"kind": "lifecycle-end", "lifecycle": "networking__vpc-full", "status": "passed"},
+        {"kind": "lifecycle-start", "lifecycle": "networking__vpc-peering", "service": "networking/vpc"},
+        {"kind": "lifecycle-end", "lifecycle": "networking__vpc-peering", "status": "skipped",
+         "reason": ("[networking__vpc-peering] VPC quota semaphore: no slot within "
+                    "1800s (limit=5) — skipping rather than racing the account VPC cap")},
+    ]
+    c2.RUN_DIR.mkdir(parents=True, exist_ok=True)
+    ev_path = c2.RUN_DIR / f"{rid}.events.jsonl"
+    ev_path.write_text("\n".join(_json.dumps(e) for e in events) + "\n", encoding="utf-8")
+    db.record_local_run(f"local-{rid}", suite="console2", status="done")
+    try:
+        r = client.get(f"/v2/runs/local-{rid}")
+        assert r.status_code == 200, r.status_code
+        body = r.text
+        assert "Next actions" in body
+        assert "Skipped lifecycles" in body
+        assert "⊘ 쿼터 스킵" in body
+        assert "생성 1 / 삭제 1" in body
+        assert "대조 일치" in body
+    finally:
+        try:
+            ev_path.unlink()
+        except OSError:
+            pass
+
+
+def test_run_exec_js_and_runs_plan_js_syntax():
+    """JS 문법 검사(node --check) — node가 없는 환경이면 건너뛴다."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        print("  (skip: node 미설치)")
+        return
+    for rel in ("controlplane/v2/static/run_exec.js",
+                "controlplane/v2/static/runs_plan.js",
+                "controlplane/v2/static/svc_graph.js"):
+        out = subprocess.run([node, "--check", rel], capture_output=True, text=True)
+        assert out.returncode == 0, f"{rel}: {out.stderr}"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(
             {k: v for k, v in globals().items() if k.startswith("test_")}.items()):

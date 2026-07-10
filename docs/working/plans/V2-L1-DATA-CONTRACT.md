@@ -46,7 +46,7 @@ basis: V2-DECISIONS.md(D2 확정) + 정찰 실측 4건 (2026-07-09, 발행물/�
 ### S3 — 런 스냅샷 (배지: 보라 `이 런 @run-id`)
 
 - **실체**: CI 런 = `controlplane.snapshots`(oplog 버킷: `meta/observations/index`).
-  로컬 런 = `reports/controlplane-local/<rid>.events.jsonl` + `_events_summary`.
+  로컬 런 = `reports/console2-runs/<rid>.events.jsonl` (실측 교정 2026-07-10 — 구 문서의 controlplane-local 경로는 현 코드에 없음) + `_events_summary`.
 - **규칙**: 런 상세 화면의 모든 값은 이 출처. 판정 배너 재계산 금지, 과거형 표기.
 
 ## 2. 화면별 수치 계약
