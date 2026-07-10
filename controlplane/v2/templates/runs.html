@@ -22,7 +22,7 @@
       </span>
     </div>
     {% if gate.mutations %}
-      <p class="warn-live">LIVE — 이 서버는 실행(mutations)이 켜져 있습니다. 실행은 이 화면이 아니라 legacy 콘솔에서 사전 확인을 거쳐 시작되며, 시작되면 실제 클라우드에 작용합니다.</p>
+      <p class="warn-live">LIVE — 이 서버는 실행(mutations)이 켜져 있습니다. 실행은 이 화면이 아니라 legacy 콘솔에서 사전 확인을 거쳐 시작되며, 시작되면 실제 클라우드에 작용합니다. 이 게이트는 이 서버 프로세스 기준이며, 핸드오프된 실행의 게이트는 선택(라이프사이클·스위트)과 프로파일 제약에 따라 실행기에서 결정됩니다.</p>
     {% else %}
       <p class="readonly-banner">이 서버는 열람용(read-only)으로 기동되어 실행이 비활성화되어 있습니다.</p>
     {% endif %}
@@ -51,7 +51,7 @@
       </select>
     </label>
     <label>Service
-      <input type="text" id="planService" placeholder="category/service" value="{{ prefill.service }}">
+      <input type="text" id="planService" placeholder="service 이름 (예: loadbalancer)" title="category/service 형식을 붙여넣어도 service 이름만 전달됩니다" value="{{ prefill.service }}">
     </label>
   </div>
   <p class="plan-cta-wrap">
@@ -114,7 +114,7 @@
   </table>
   </div>
   {% else %}
-  <p class="empty-state">이 서버에서 진행 중인 런이 없습니다.</p>
+  <p class="empty-state">이 서버(console2 엔진)에서 진행 중인 런이 없습니다 — CI·워크플로 실행은 History에서 확인하세요.</p>
   {% endif %}
   {% if capacity %}
   <p class="panel-note"><span title="이 서버가 동시에 다룰 수 있는 VPC 수 상한(cap)과 이미 존재(baseline)·예약(reserved)된 수, 남은 여유(headroom)">Capacity</span> — VPC cap {{ capacity.cap }} · baseline {{ capacity.baseline }} ·
@@ -169,7 +169,7 @@
     var params = new URLSearchParams();
     if (suite.value) { params.set('suite', suite.value); }
     if (profile.value) { params.set('profile', profile.value); }
-    if (service.value.trim()) { params.set('service', service.value.trim()); }
+    var svc = service.value.trim().split('/').pop(); if (svc) { params.set('service', svc); }
     var qs = params.toString();
     link.setAttribute('href', '/testing' + (qs ? ('?' + qs) : ''));
   }

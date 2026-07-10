@@ -45,8 +45,8 @@ def test_situation_renders():
 
 
 def test_axes_render():
-    # /v2/run은 실화면으로 전환됨(§2.6) — 아래 전용 테스트로 분리
-    for path in ("/v2/model", "/v2/results", "/v2/tools"):
+    # /v2/run·/v2/model은 실화면으로 전환됨(§2.6·§2.7) — 전용 테스트로 분리
+    for path in ("/v2/tools",):
         r = client.get(path)
         assert r.status_code == 200, f"{path} -> {r.status_code}"
         assert "기존 화면" in r.text or "이용하세요" in r.text
@@ -247,6 +247,23 @@ def test_run_axis_no_post_route():
     # v1은 발사 없음 — /v2/run은 조회 전용, POST 라우트가 존재하지 않는다.
     r = client.post("/v2/run")
     assert r.status_code in (404, 405), r.status_code
+
+
+def test_model_renders():
+    r = client.get("/v2/model")
+    assert r.status_code == 200, r.status_code
+    body = r.text
+    assert "Model table" in body or "정의된 리소스 모델 노드가 없습니다" in body
+    assert "Node editor (legacy)" in body
+
+
+def test_model_data_shape():
+    from controlplane.v2 import model_data
+    d = model_data.get_model_data()
+    assert d is None or isinstance(d.get("groups"), list)
+    if d and d.get("groups"):
+        g = d["groups"][0]
+        assert {"gid", "node_count", "validated", "docs", "incomplete", "nodes"} <= g.keys()
 
 
 def test_search_axis_empty_state_for_short_query():

@@ -13,8 +13,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from controlplane import db, snapshots
-from controlplane.v2 import (published, results_data, runs_data, search_data,
-                             services_data, terms)
+from controlplane.v2 import (model_data, published, results_data, runs_data,
+                             search_data, services_data, terms)
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -108,8 +108,6 @@ def situation(request: Request):
 # ── 나머지 축 (골격 — 화면 단위로 채워진다) ─────────────────────────────────
 
 _STUBS = {
-    "model": ("Model", "테스트 정의 · 리소스 모델 — 모델 표·작업 큐·노드 에디터·인벤토리가 이 축에 들어옵니다.",
-              [("Legacy Modeling screen ↗", "/planning")]),
     "tools": ("Tools", "부가 도구 — AI 초안·지식 문서·발행 대시보드 링크 모음.",
               [("Published dashboard (read-only sharing) ↗", "/reporting"),
                ("AI tools ↗", "/ai"), ("Legacy Home ↗", "/")]),
@@ -145,7 +143,10 @@ def service_detail(request: Request, slug: str):
 
 @router.get("/model", response_class=HTMLResponse)
 def model(request: Request):
-    return _stub(request, "model")
+    """Model 축(③ 테스트 정의) — L1 계약 §2.7. D6: 독립 의존그래프 없음."""
+    ctx = _ctx(request, "model")
+    ctx.update(data=model_data.get_model_data())
+    return templates.TemplateResponse(request, "model.html", ctx)
 
 
 @router.get("/run", response_class=HTMLResponse)

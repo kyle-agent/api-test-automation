@@ -48,6 +48,13 @@ TERMS: dict[str, dict] = {
                    "tip": "결함 = 계약 위반 등 실제 구현 버그"},
     "defect_yellow": {"label": "Improvement", "code": None,
                       "tip": "개선 = 설계·문서상 아쉬운 점(구현 버그는 아님)"},
+    # Model 축(③) — provenance/완성도 (L1 계약 §2.7)
+    "prov_validated": {"label": "Validated", "code": None,
+                       "tip": "이 리소스 노드 정의가 실제 라이브 실행(lifecycle 검증)에서 역추출됨 — 문서만이 아니라 실행 근거가 있음"},
+    "prov_docs": {"label": "Docs-only", "code": None,
+                  "tip": "API 문서만으로 정의된 노드 — 아직 실제 실행으로 확인되지 않음"},
+    "model_incomplete": {"label": "Incomplete", "code": None,
+                         "tip": "create 엔드포인트가 없거나(no_api 예외) 의존 대상이 모델에 없어 완성되지 않은 노드 정의"},
     # 결과 축(⑤) — 정합성(축2) 변화 (L1 계약 §2.5)
     "conformance_new": {"label": "New", "code": None,
                         "tip": "직전 발행 기준선(초록)에서 이번 발행에 새로 결함(빨강/노랑)으로 바뀐 엔드포인트"},

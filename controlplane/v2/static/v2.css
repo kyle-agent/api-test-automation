@@ -241,6 +241,23 @@ tr.cov-none .cbar { background: var(--line); }
   margin-right: 4px; display: inline-block; background: #fff8c5; color: #9a6700;
 }
 
+/* Model 축 — 그룹 표(provenance 분포 바) + 행 펼침 + 노드 목록 (D6) */
+tr.grp-row { cursor: pointer; }
+tr.grp-row:hover { background: var(--bg); }
+.grp-caret { width: 14px; color: var(--sub); font-size: 11px; text-align: center; }
+tr.grp-detail > td { background: var(--bg); padding: 10px 8px 14px; }
+table.node-list { margin-top: 2px; }
+table.node-list th { font-size: 11px; }
+table.node-list td { padding: 5px 8px; font-size: 13px; }
+.prov-bar { display: flex; width: 120px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); }
+.prov-seg.prov-validated { background: var(--loc); }
+.prov-seg.prov-docs { background: var(--stale); }
+.prov-seg.prov-other { background: var(--sub); }
+.provbadge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; display: inline-block; margin-right: 4px; white-space: nowrap; }
+.provbadge.pv-validated { background: var(--good-bg); color: var(--good-ink); }
+.provbadge.pv-docs { background: var(--bg); color: var(--sub); border: 1px solid var(--line); }
+.provbadge.pv-incomplete { background: #fff8c5; color: #9a6700; }
+
 /* 푸터 */
 .shell-foot {
   max-width: 1080px; margin: 0 auto; padding: 14px 22px 40px;

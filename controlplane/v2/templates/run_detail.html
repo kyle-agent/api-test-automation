@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "_badges.html" import badge, term %}
+{% block title %}Run {{ gh_run_id }}{% endblock %}
+{% block content %}
+
+<p class="crumb"><a href="/v2">Overview</a> / Run detail</p>
+<h1 class="page-q">Run <span class="mono">{{ gh_run_id }}</span>
+  {{ badge('run', ident=gh_run_id) }}
+</h1>
+
+{# ── 헤더 — run id·suite·trigger·시각 (계약 §2.3, db.get_run 기준) ───────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Run header</h2>
+  </div>
+  <table class="tbl">
+    <tbody>
+      <tr><th>Suite</th><td>{{ header.suite or '—' }}{% if header.profile %} · {{ header.profile }}{% endif %}</td></tr>
+      <tr><th>Trigger</th><td>{{ header.trigger or '—' }}</td></tr>
+      <tr><th title="실행의 진행 단계 — 판정(pass/fail)이 아니라 상태 흐름">Status</th>
+          <td><span class="st st-{{ header.status }}">{{ terms_run_status.get(header.status, header.status or '—') }}</span></td></tr>
+      <tr><th>Time</th><td class="mono">{{ header.when or '—' }}</td></tr>
+    </tbody>
+  </table>
+  <p class="panel-note">이 페이지의 모든 수치는 이 런 1건에 고정된 스냅샷입니다(과거형 — 판정 재계산 금지). 전체 최신 판정은 <a href="/v2">Overview</a> 또는 <a href="/v2/results">Results</a>에서 확인하세요.</p>
+</section>
+
+{# ── 결과 요약 — CI: ok/soft/fail · 로컬: lifecycle pass/fail/skip + api (계약 §2.3) ─ #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>{{ term('run_result', terms) }}</h2>
+    {{ badge('run', ident=gh_run_id) }}
+  </div>
+
+  {% if is_local %}
+    {% if summary %}
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">Lifecycles</div>
+        <div class="kpi-value">{{ summary.lifecycles.passed }}/{{ summary.lifecycles.total }}</div>
+        <div class="kpi-sub">passed{% if summary.lifecycles.failed %} · {{ summary.lifecycles.failed }} failed{% endif %}{% if summary.lifecycles.skipped %} · {{ summary.lifecycles.skipped }} skipped{% endif %}{% if summary.lifecycles.unfinished %} · {{ summary.lifecycles.unfinished }} unfinished{% endif %}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">API calls</div>
+        <div class="kpi-value">{{ summary.api.ok }}/{{ summary.api.ok + summary.api.soft + summary.api.fail }}</div>
+        <div class="kpi-sub">ok {{ summary.api.ok }} · soft {{ summary.api.soft }} · fail {{ summary.api.fail }}</div>
+      </div>
+    </div>
+    {% else %}
+    <p class="empty-state">이 런의 이벤트 요약을 가져올 수 없습니다 — 이벤트 파일이 없거나(오래된 로컬 런), 이 서버가 재기동되어 인메모리 기록이 소실되었을 수 있습니다.</p>
+    {% endif %}
+  {% else %}
+    {% if result %}
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">API calls</div>
+        <div class="kpi-value">{{ result.counts.ok }}/{{ result.total }}</div>
+        <div class="kpi-sub">ok {{ result.counts.ok }} · soft {{ result.counts.soft }} · fail {{ result.counts.fail }}</div>
+      </div>
+    </div>
+    {% if meta %}
+    <p class="panel-note">
+      {% if meta.sha %}sha {{ meta.sha }} · {% endif %}{% if meta.branch %}branch {{ meta.branch }} · {% endif %}{% if meta.event %}event {{ meta.event }} · {% endif %}{% if meta.catalog and meta.catalog.endpoints %}catalog {{ meta.catalog.endpoints }} endpoints{% endif %}
+    </p>
+    {% endif %}
+    {% else %}
+    <p class="empty-state">이 런의 관측 데이터를 가져올 수 없습니다 — 원격 스냅샷 버킷(oplog)에 접근하지 못했거나, 이 런이 관측을 남기지 않았습니다.</p>
+    {% endif %}
+  {% endif %}
+</section>
+
+{# ── Fail 목록 — CI: endpoint_key·status · 로컬: 실패 lifecycle id (계약 §2.3) ── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Fail list</h2>
+  </div>
+  {% if is_local %}
+    {% if not summary %}
+      <p class="empty-state">Fail 목록을 가져올 수 없습니다 — 위 결과 요약과 같은 이유입니다.</p>
+    {% elif summary.lifecycles.failed_ids %}
+      <div class="tbl-scroll">
+      <table class="tbl">
+        <thead><tr><th title="실패로 종료되었거나 열린 채로 남아있다 실패 처리된 lifecycle의 id">Lifecycle</th></tr></thead>
+        <tbody>
+          {% for lid in summary.lifecycles.failed_ids %}
+          <tr><td class="mono">{{ lid }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    {% else %}
+      <p class="empty-state">이 런에서 실패한 lifecycle이 없습니다.</p>
+    {% endif %}
+  {% else %}
+    {% if not result %}
+      <p class="empty-state">Fail 목록을 가져올 수 없습니다 — 위 결과 요약과 같은 이유입니다.</p>
+    {% elif result.fails %}
+      <div class="tbl-scroll">
+      <table class="tbl">
+        <thead><tr><th>Endpoint</th><th>Method</th><th>Path</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for f in result.fails %}
+          <tr>
+            <td class="mono">{{ f.endpoint_key }}</td>
+            <td>{% if f.method %}<span class="mb mb-{{ f.method }}">{{ f.method }}</span>{% else %}<span class="mut">—</span>{% endif %}</td>
+            <td class="mono">{{ f.path or '—' }}</td>
+            <td class="mono">{{ f.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    {% else %}
+      <p class="empty-state">이 런에서 fail로 분류된 관측이 없습니다.</p>
+    {% endif %}
+  {% endif %}
+</section>
+
+{# ── 공식 반영(fold) — 로컬 런 전용, D2 오너 추가 요구 (계약 §2.4) ────────── #}
+{% if is_local %}
+<section class="panel" id="official-aggregation">
+  <div class="panel-head">
+    <h2>Official aggregation</h2>
+    {{ badge('local') }}
+  </div>
+
+  {% if fold is none %}
+    <p class="empty-state">이 런의 시간창을 확인할 수 없거나 이 서버에 관측 파일(reports/results/observations.jsonl)이 없어 공식 반영 여부를 계산할 수 없습니다.</p>
+  {% elif fold.count == 0 %}
+    <p class="empty-state">이 런의 2xx 관측은 (시간창 근사 기준) 이미 발행본 검증 집계에 반영되어 있습니다 — 추가로 fold할 항목이 없습니다.</p>
+  {% else %}
+    <p>
+      <span class="badge badge-local"
+            title="런 시간창(started~ended, ±30초 여유) 내 2xx 관측 기준 근사입니다 — 로컬 런은 Observation.run이 비어 있어(GITHUB_RUN_ID 없음) 정확한 런 조인이 아니라 시간창 근사만 가능합니다. 그래서 '약'으로 표기합니다.">
+        {{ term('fold_evidence', terms) }}: 약 {{ fold.count }}건
+      </span>
+    </p>
+    <div class="tbl-scroll">
+    <table class="tbl">
+      <thead><tr><th>Endpoint</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for p in fold.preview %}
+        <tr><td class="mono">{{ p.endpoint_key }}</td><td class="mono">{{ p.status }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if fold.truncated %}
+    <p class="panel-note">미리보기는 최대 {{ fold.preview|length }}건까지만 표시됩니다 — 전체 약 {{ fold.count }}건 중 일부입니다.</p>
+    {% endif %}
+  {% endif %}
+
+  <p class="panel-note" style="margin-top:12px"><b>{{ term('fold', terms) }} 절차 (v2는 실행하지 않음 — 안내만, Hard Rule 준수)</b></p>
+  <ol class="stub-links">
+    <li><code>python -m tools.derive_verified</code> — 이 서버의 2xx 관측을 evidence 파일(<code>data/baselines/verified_endpoints.json</code>)에 병합</li>
+    <li><code>python -m tools.promote_validated --apply</code> — evidence를 근거로 리소스 모델의 provenance를 VALIDATED로 승격</li>
+    <li>변경분을 검토 후 커밋 · push — 다음 CI 턴에 발행 파이프라인이 자동으로 공식 집계에 반영합니다(Hard Rule 7)</li>
+  </ol>
+
+  <p class="run-cta-wrap">
+    <a class="run-cta" href="{{ rerun_link }}"
+       title="이 런과 같은 suite/profile을 기존 실행 콘솔에 프리필합니다 — 재현 확인 겸, CI 실행 결과는 다음 발행에 자동 반영됩니다. 자동 발사 아님(사전 확인 유지).">CI로 재실행 ↗</a>
+  </p>
+</section>
+{% endif %}
+
+{% endblock %}
