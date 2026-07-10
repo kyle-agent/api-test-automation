@@ -106,6 +106,18 @@ basis: V2-DECISIONS.md(D2 확정) + 정찰 실측 4건 (2026-07-09, 발행물/�
   절차 유지, Hard Rules 정합).
 - 용어: 화면 라벨은 "공식 반영(fold)" — D7 규약(한글 1급 + 코드 보조).
 
+### 2.5 결과 축 — 회귀·트리아지 (2026-07-10 보강, 정찰 실측 기반)
+
+| 요소 | 출처 | 필드/계산 | 비고 |
+|---|---|---|---|
+| 회귀 카운트 | S1 | `history.jsonl` 마지막 줄 `fail_new`/`fail_known` | 현황 헤드라인과 동일 원천 (불일치 원천 차단) |
+| **새 회귀 상세 목록** | S1(임시 우회) | 발행 `index.html`의 회귀 배너 블록(`action bad`) 파싱 → (key, status) | ⚠️ **임시**: 전용 발행 파일이 없음(실측). 정공법 = 발행 파이프라인이 `fail_new.json` 발행 — V2-REQUESTS-TO-ENGINE.md #1. 파싱 실패 시 "상세 목록 없음 — 발행 대시보드 참조" empty-state |
+| 각 항목의 현재 상태 | S1 | `endpoint_status.json`의 같은 키 최신 [status] — "그때 500 → 지금 201(복구됨)" 병기 | 누적 최신은 재시도 복구를 숨기므로 **"당시"와 "현재"를 반드시 분리 표기** |
+| 항목→서비스 연결 | — | 카탈로그 키(`cat/svc/op`)면 서비스 상세 딥링크. 합성 키(`lifecycle:step`)면 라이프사이클 라벨로 표기(링크 없음, 후속) | 같은 호출이 두 키 포맷으로 이중 기록되는 기존 패턴 존재 — 중복 병합(같은 status+유사 키) 시도하되 실패해도 정직하게 둘 다 표시 |
+| 기지 실패 목록 | 저장소 | `data/baselines/known_issues.json` | "이미 알던 실패 — 추적 중" 섹션 |
+| 정합성(축2) 변화 | S1 | `conformance_new.json` new/regressed/fixed + `conformance.json` summary | 회귀(축1)와 별도 섹션 — 축 혼동 금지 |
+| 트리아지 분류 | 후속 | `controlplane.triage` 스키마(환경/스펙변경/테스트버그/실회귀) 재사용 가치 있음. 단 발행 1건 ↔ GH run 1..N 매핑 계약이 선행 — 후속 결정 지점 | v1 범위 제외 |
+
 ## 3. empty-state 표준 문구
 
 | 상황 | 문구 |
