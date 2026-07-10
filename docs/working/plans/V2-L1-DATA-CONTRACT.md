@@ -141,6 +141,27 @@ basis: V2-DECISIONS.md(D2 확정) + 정찰 실측 4건 (2026-07-09, 발행물/�
 | 용량/큐 | `console_api.api_capacity()` | VPC 큐·용량 요약 |
 | 기록 | Overview 병합 타임라인과 동일 원천 (limit 100) | 행별 출처 배지 |
 
+### 2.7 Model 축 (2026-07-10 보강)
+
+- 원천: `controlplane.resource_model.load_model()/load_groups()` (저장소 HEAD
+  기준 — 발행/로컬 관측이 아니므로 배지 3종 대신 "저장소(main) 기준"
+  panel-note로 표기. 새 배지 종류 발명 금지).
+- 요약 KPI: 총 노드 · Validated 수/% · docs-only 수 · 그룹 수.
+- Model table: 그룹/서비스별 노드 수·provenance 분포, 검색, 행 펼침으로
+  노드 목록. D6: 독립 의존그래프 없음 — 의존은 노드 편집기(legacy 핸드오프)
+  와 서비스 상세 인스펙터(후속)로.
+- Inventory(구 카탈로그)는 중복 화면을 만들지 않는다 — 카탈로그 통계 한 줄
+  + Services 축 링크로 갈음.
+
+### 2.8 전역 검색 (2026-07-10 보강)
+
+- GET `/v2/search?q=` — 3종: Services(services_data 재사용) ·
+  Endpoints(`data/api_catalog.json` 캐시, 상한 50+총계 표시) ·
+  Runs(`db.list_runs(200)` 부분일치, 상한 20).
+- 셸 헤더에 컴팩트 검색폼(GET). 2자 미만은 안내 empty-state.
+- 결과 행의 출처 배지: Services/Endpoints = 발행/저장소 기준 표기,
+  Runs = This server.
+
 ## 3. empty-state 표준 문구
 
 | 상황 | 문구 |
