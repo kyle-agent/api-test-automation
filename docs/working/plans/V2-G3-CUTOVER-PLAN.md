@@ -1,5 +1,5 @@
 ---
-status: owner-review (G3 게이트 — 승인 필요)
+status: phase-1 실행됨 (루트 전환) · 나머지 리다이렉트는 L4(노드 에디터 흡수) 후
 for: v2-session
 date: 2026-07-10
 ---
@@ -70,3 +70,21 @@ date: 2026-07-10
 
 승인해 주시면 위 5단계를 병렬 배치로 진행하고, 전환 직후 구 URL 리다이렉트가
 실제로 도는 스크린샷/테스트로 보고한다.
+
+
+---
+
+## 실행 기록 — Phase 1 (2026-07-10, 오너 "작업해")
+
+- **루트 전환 실행**: `/` → 302 `/v2`. 구 홈은 `/legacy/home` 로 보존.
+  v2 footer·Tools 링크를 `/legacy/home` 으로 갱신. 엔진 테스트 1건(구 홈
+  가정)을 `/legacy/home` 기준으로 갱신 — 양 스위트 통과(21/21·v2 전체).
+- **나머지 리다이렉트 보류 이유(실측)**: v2가 아직 legacy에 의존한다 —
+  `/planning/resources/map`(노드 에디터, v2 대체 없음)·`/reporting`(발행
+  대시보드 핸드오프)·`/testing`(legacy 콘솔 핸드오프). 이들을 지금 v2로
+  돌리면 v2 자신의 링크가 루프·파손된다. 따라서 `/planning`·`/testing`·
+  `/reporting` 리다이렉트는 **L4(노드 에디터·잔여 기능 흡수) 완료 후**로 미룸.
+- **되돌리기**: app.py의 `root_to_v2()` 제거 + `home()` 경로를 `/`로 복귀
+  (2줄). 완전 가역.
+- 검증: `/`=302→/v2, `/legacy/home`·`/testing`·`/planning/resources/map`·
+  `/reporting`=200 유지 확인.

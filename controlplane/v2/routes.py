@@ -111,7 +111,7 @@ def situation(request: Request):
 _STUBS = {
     "tools": ("Tools", "부가 도구 — AI 초안·지식 문서·발행 대시보드 링크 모음.",
               [("Published dashboard (read-only sharing) ↗", "/reporting"),
-               ("AI tools ↗", "/ai"), ("Legacy Home ↗", "/")]),
+               ("AI tools ↗", "/ai"), ("Legacy Home ↗", "/legacy/home")]),
 }
 
 

@@ -231,7 +231,8 @@ def test_reporting_subtabs_single_include():
 def test_ia_catalog_absorbed_into_modeling():
     """2026-07-07 IA 개정 — Catalog는 네비 단계에서 우측 유틸 링크(📖 카탈로그)로,
     Modeling이 서비스별 카탈로그 엔드포인트를 인라인(집계 + lazy 드로어)으로 품는다."""
-    home = client.get("/").text
+    # G3 전환(2026-07-10): 루트 /는 /v2로 302, 구 홈은 /legacy/home 로 보존.
+    home = client.get("/legacy/home").text
     assert "📖 카탈로그" in home                       # 유틸 링크
     assert '<a href="/catalog" class=' in home         # 딥링크 유지
     assert "3단계 현황" in home                        # 파이프라인 4칸 → 3칸
