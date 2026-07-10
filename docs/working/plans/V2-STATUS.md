@@ -34,11 +34,17 @@ Model=카테고리▸서비스 계층, Runs=선택→DAG→견적→pre-flight) 
 표면 2곳: Runs 계획 DAG · 서비스 상세 의존 인스펙터 — D6대로 Model 그래프
 없음) + main 병합(6fae7db3). 테스트 30종.
 
-1. **v2 자체 발사([Run live] 활성화) — 오너 검수 게이트** (§2.6, 활성화 1줄).
-2. **L3 네비 전환 + 리다이렉트 — G3 오너 게이트** (계획안 문서 작성 후 승인 요청).
-3. L4 legacy 흡수(ops.html 등) — 이식 검증 전 제거 금지.
-4. 잔존 자원 수집 캐시(M5) — 현재 Overview KPI는 legacy 뷰 링크만.
-5. 커버리지 오버레이(색칠지도 대체) — Results 후속 결정 지점.
+완료 추가(2026-07-10 최종): [Run live] 활성화(LIVE 2회 실증) · 실행 뷰
+3상태 · **G3 Phase 1(루트 전환: / → /v2, 구 홈 /legacy/home 보존)** · D5
+개정(GHA 미사용) · 서비스/런 재실행을 /v2/run 프리필로.
+
+1. **L4: legacy 기능 흡수** — 노드 에디터(/planning/resources/map)를 v2
+   Model에 흡수해야 G3 나머지 리다이렉트(/planning·/testing·/reporting →
+   v2)가 가능. 흡수 검증 전 legacy 제거 금지.
+2. 잔존 자원 수집 캐시(M5) — Overview KPI 실데이터화 + Runs Leftover 패널.
+3. 실행 중 이상 감지(A)의 세마포어 대기 구분 — 엔진 요청 #5 처리 후 정식화.
+4. 커버리지 오버레이(색칠지도 대체) — Results 후속 결정 지점.
+5. 스케줄 방식 결정(D5 후속) — GHA 아닌 대안(controlplane 스케줄러?).
 
 ## 운영 메모
 
