@@ -1346,32 +1346,44 @@ def run_sweep(client) -> int:
 
     # 10. secrets (regrsec) — delete needs a waiting_time_ndays body. Sweep
     # these before their KMS keys, since a secret references a kms_id.
+    _sec_pending = 0
     for it in _select(c, "secretsmanager", "/v1/secrets",
                       name_prefixes=("regrsec",)):
         if _is_pending_deletion(it):
+            _sec_pending += 1
             continue  # PF-09: already scheduled — re-DELETE is a no-op
         if it.get("id") and _delete(
                 c, "secretsmanager", f"/v1/secrets/{it['id']}",
                 json={"waiting_time_ndays": 7}):
             deleted += 1
+    if _sec_pending:
+        print(f"  /v1/secrets: {_sec_pending} already scheduled-for-deletion "
+              f"(PF-09 대기 소멸) — 재삭제 안 함")
 
     # 11. KMS keys. Lifecycles stamp several shapes (regrkms / regrskms /
     # regrswkms / regrkmsc — field sweep 2026-06-10 showed 15 skipped as
     # name-mismatch under the old two-prefix loop), so match the broad regr*
     # prefix in ONE pass like the other collections.
+    _kms_pending = 0
     for it in _select(c, "kms", "/v1/kms/transit",
                       name_prefixes=("regr",)):
         if _is_pending_deletion(it):
+            _kms_pending += 1
             continue  # PF-09: already scheduled — re-DELETE is a no-op
         if it.get("id") and _delete(
                 c, "kms", f"/v1/kms/transit/{it['id']}"):
             deleted += 1
+    if _kms_pending:
+        print(f"  /v1/kms/transit: {_kms_pending} already scheduled-for-deletion "
+              f"(To_Be_Terminated, PF-09) — 재삭제 안 함")
 
     # 12. light create->read lifecycle types (scf, apigateway, iam, servicewatch).
-    # scf cloud functions (regrscf): delete each function's triggers first,
+    # scf cloud functions (regrscf + wave5의 regrw5scf/regrw5trg — 2026-07-10
+    # 오너 실측: regrw5* 4건이 name-mismatch로 영구 스킵되던 커버리지 갭):
+    # delete each function's triggers first,
     # then the function itself.
     for it in _select(c, "scf", "/v1/cloud-functions",
-                      name_prefixes=("regrscf",)):
+                      name_prefixes=("regrscf", "regrw5scf", "regrw5trg")):
         fid = it.get("id")
         if not fid:
             continue

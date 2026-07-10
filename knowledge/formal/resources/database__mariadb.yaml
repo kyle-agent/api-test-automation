@@ -40,7 +40,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/engine-versions", expect_status: [200]}
     provenance: VALIDATED
-    source: {lifecycle: heavy-shared-dbaas, steps: [maria-find-version]}
+    source: {lifecycle: mariadb-cluster-subops-full, steps: [maria-find-version]}
     notes: "EngineListResponse $.contents[] (api_docs — PG와 동일 DTO). 소스 스텝은 optional이지만 run e3ba190에서 클러스터 생성에 maria_ver를 공급했으므로 라이브 통과 확정. contents[0] 순서 미문서. 구버전 고정 업그레이드 체인은 mariadb-engine-version-10 분리 노드 (PG -16 패턴)."
 
   # 구버전 전용 LOOKUP — PG pg-engine-version-16 미러. mariadb 라이브 구버전
@@ -76,7 +76,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/server-types", expect_status: [200]}
     provenance: VALIDATED
-    source: {lifecycle: heavy-shared-dbaas, steps: [maria-find-stype]}
+    source: {lifecycle: mariadb-cluster-subops-full, steps: [maria-find-stype]}
     notes: "mariadb 호스트의 /v1/server-types — DBaaS 전용 타입 목록, NAME으로 소비. run e3ba190 클러스터 생성에 maria_stype 공급으로 라이브 통과 확정."
 
   mariadb-cluster:
@@ -221,7 +221,7 @@ resources:
          retry_on_status: [400, 409], retries: 10, retry_interval: 30}
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
     provenance: VALIDATED
-    source: {lifecycle: heavy-shared-dbaas,
+    source: {lifecycle: mariadb-cluster-subops-full,
              steps: [maria-create, maria-wait, maria-delete]}
     notes: "HEAVY 과금. capture 변수는 소스의 maria_cid를 노드 표준 cluster_id로 개명(공유 lifecycle의 충돌회피 명명 — envelope $.resource.id 동일). 소스 body는 instances에 service_ip_address가 없다(자동 할당; mysql/pg 표준형과의 차이) — verbatim 유지. 삭제가 매우 느림: run e3ba190에서 소멸까지 ~90분 — 기존 delete 시맨틱 유지(재시도 스택 추가 안 함): -gone 폴은 900s 캡 + 잔여는 subnet 삭제 409 재시도로 흡수(소스 _note); 합성 teardown은 composer 기본(의존 노드 있는 delete에 409×40×30s)에 맡긴다 — 90분 drain이 그 예산(20분)을 넘으면 cleanup 패스가 백스톱 (라이브 정제 예상). 폴딩 setter body들은 mysql 체인 검증형 이전이지만 mariadb에서는 미검증 — guarded sub-op가 placeholder id에 500을 던진 비대칭(HANDOFF-fail-new-triage §B)도 있어 라이브 정제 예상. 알려진 quirk family: backups/backup-histories 401 (services/database__*.yaml). MySQL과 마찬가지로 비번 정책/2866 포트; character_set은 utf8 (mysql은 utf8mb4). requires는 body 소비 기준 subnet + lookup 2종 (cross-service 발산 경고 의도)."
 

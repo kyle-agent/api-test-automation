@@ -91,6 +91,28 @@ def test_reap_runs_fs_replication_procedure_for_volumes(tmp_path, monkeypatch):
     assert ("rep", "6ed3a8be") in called and ("snap", "6ed3a8be") in called
 
 
+def test_reap_forces_gates_on_even_when_host_env_is_gated_off(tmp_path, monkeypatch):
+    """콘솔 서버가 게이트 env 없이 떠 있어도 리퍼의 DELETE는 차단되면 안 된다
+    (run-0099 실측 버그: 'DELETE blocked' 후 TGW/VPC 잔존)."""
+    import dataclasses
+
+    p = _events(tmp_path, [
+        {"kind": "resource-tracked", "service": "vpc", "path": "/v1/vpcs/aaa", "lifecycle": "x"},
+    ])
+    gated_off = dataclasses.replace(
+        rs.core.settings, allow_mutations=False, allow_destructive=False)
+    monkeypatch.setattr(rs.core, "settings", gated_off)
+    cfgs = []
+    cli = _FakeClient({("DELETE", "/v1/"): _Resp(202)})
+    monkeypatch.setattr(rs.core, "ApiClient",
+                        lambda cfg, *a, **k: cfgs.append(cfg) or cli)
+    monkeypatch.setattr(rs.r, "_wait_gone", lambda *a, **k: True)
+    monkeypatch.setattr(rs.time, "sleep", lambda s: None)
+    issued = rs.reap_run_leftovers(p, log=lambda m: None)
+    assert issued == 1
+    assert cfgs and all(c.allow_mutations and c.allow_destructive for c in cfgs)
+
+
 def test_reap_skips_already_gone(tmp_path, monkeypatch):
     p = _events(tmp_path, [
         {"kind": "resource-tracked", "service": "vpc", "path": "/v1/vpcs/aaa", "lifecycle": "x"},

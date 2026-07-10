@@ -11,7 +11,9 @@
           "name": "list-registries-borrow",
           "method": "GET",
           "path": "/v1/container-registries",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture": {
             "registry_id": "$.registries[0].id"
           }
@@ -32,7 +34,9 @@
               "untagged_rule_enabled": false,
               "untagged_rule_duration": 90
             },
-            "lock_policy": {"locked": false},
+            "lock_policy": {
+              "locked": false
+            },
             "pull_policy": {
               "critical_limit": 0,
               "high_limit": 0,
@@ -50,7 +54,11 @@
             },
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "repo_id": "$.id"
           },
@@ -64,8 +72,14 @@
           "name": "repo-update-description",
           "method": "PUT",
           "path": "/v1/repositories/{repo_id}/description",
-          "json": {"description": "API regression suite (updated)"},
-          "expect_status": [200, 202, 204],
+          "json": {
+            "description": "API regression suite (updated)"
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-repo-puts"
         },
@@ -73,8 +87,16 @@
           "name": "repo-update-lock-policy",
           "method": "PUT",
           "path": "/v1/repositories/{repo_id}/lock-policy",
-          "json": {"lock_policy": {"locked": false}},
-          "expect_status": [200, 202, 204],
+          "json": {
+            "lock_policy": {
+              "locked": false
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-repo-puts"
         },
@@ -91,7 +113,11 @@
               "vulnerable_image_pull_prevented": false
             }
           },
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-repo-puts"
         },
@@ -109,7 +135,11 @@
               "severity_limit": "High"
             }
           },
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-repo-puts"
         },
@@ -127,7 +157,11 @@
               "untagged_rule_duration": 90
             }
           },
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-repo-puts"
         },
@@ -139,7 +173,11 @@
             "private_acl_enabled": false,
             "private_acl_resources": []
           },
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-registry-private-acl",
           "_note": "private-acl can be set without public endpoint enabled"
@@ -148,8 +186,15 @@
           "name": "registry-enable-public-endpoint",
           "method": "PUT",
           "path": "/v1/container-registries/{registry_id}/enable-public-endpoint",
-          "json": {"public_endpoint_enabled": true},
-          "expect_status": [200, 201, 202, 204],
+          "json": {
+            "public_endpoint_enabled": true
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-registry-public-endpoint",
           "_note": "updatepublicendpointenabled: enable public endpoint first so public-acl can be set (409 otherwise)"
@@ -162,7 +207,11 @@
             "public_acl_enabled": false,
             "public_acl_resources": []
           },
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-registry-public-acl",
           "_note": "updatepublicacl: requires public endpoint enabled first; using public_acl_enabled:false (no-op/safe)"
@@ -171,8 +220,15 @@
           "name": "registry-disable-public-endpoint",
           "method": "PUT",
           "path": "/v1/container-registries/{registry_id}/enable-public-endpoint",
-          "json": {"public_endpoint_enabled": false},
-          "expect_status": [200, 201, 202, 204],
+          "json": {
+            "public_endpoint_enabled": false
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            204
+          ],
           "optional": true,
           "group": "scr-registry-disable-pe",
           "_note": "restore public endpoint to disabled (default state of sample registry)"
@@ -188,9 +244,16 @@
           "name": "delete-repo",
           "method": "DELETE",
           "path": "/v1/repositories/{repo_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 3,
           "retry_interval": 10
         }
@@ -206,31 +269,60 @@
           "name": "seed-registry-id",
           "method": "GET",
           "path": "/v1/container-registries",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "capture_soft": {
-            "registry_id": "$.registries[0].id"
+            "registry_id": {
+              "list": "$.registries",
+              "where_prefix": {
+                "name": "sample"
+              },
+              "get": "id"
+            }
           }
         },
         {
           "name": "seed-repository-id",
           "method": "GET",
           "path": "/v1/container-registries/{registry_id}/repositories",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "capture_soft": {
-            "repository_id": "$.repositories[0].id"
+            "repository_id": {
+              "list": "$.repositories",
+              "where_prefix": {
+                "name": "test"
+              },
+              "get": "id"
+            }
           }
         },
         {
-          "name": "seed-image-placeholder",
+          "name": "seed-image-id",
           "method": "GET",
           "path": "/v1/repositories/{repository_id}/images",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "capture_soft": {
-            "image_id": "$.images[0].nonexistent_image_seed"
-          }
+            "image_id": "$.images[0].id",
+            "image_delete_id": "$.images[0].nonexistent_delete_seed"
+          },
+          "_note": "오너 2026-07-10: sample 레지스트리(nayvugfp…)/test 리포에 실이미지 픽스처 등록 — 실 id를 잡아 image/tags API를 살린다. 이미지가 아직 없으면 capture miss → 기존 placeholder 경로로 동일 동작(퇴행 없음)."
         },
         {
           "name": "update-image-description",
@@ -239,7 +331,17 @@
           "json": {
             "description": "API regression suite"
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-image-desc"
         },
@@ -252,7 +354,17 @@
               "locked": false
             }
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-image-lock"
         },
@@ -269,7 +381,17 @@
               "vulnerable_image_pull_prevented": false
             }
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-image-pull"
         },
@@ -287,7 +409,17 @@
               "severity_limit": "High"
             }
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-image-scan"
         },
@@ -305,7 +437,17 @@
               "untagged_rule_duration": 90
             }
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-image-lcp"
         },
@@ -323,7 +465,17 @@
               "untagged_rule_duration": 90
             }
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-image-preview"
         },
@@ -337,11 +489,22 @@
         {
           "name": "delete-image",
           "method": "DELETE",
-          "path": "/v1/images/{image_id}",
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "path": "/v1/images/{image_delete_id}",
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-image-delete",
-          "destructive": true
+          "destructive": true,
+          "_note": "픽스처 보호(오너 2026-07-10): image_id가 실 id로 잡히게 되면서 delete가 픽스처를 지울 위험 → 의도적 미해결 토큰 {image_delete_id} (catalog '*' 정규화로 커버리지는 기록, 404 무해). 실 delete 검증은 run별 일회용 이미지 push 체계가 생기면 승격."
         }
       ]
     },
@@ -355,48 +518,92 @@
           "name": "seed-registry-id",
           "method": "GET",
           "path": "/v1/container-registries",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "capture_soft": {
-            "registry_id": "$.registries[0].id"
+            "registry_id": {
+              "list": "$.registries",
+              "where_prefix": {
+                "name": "sample"
+              },
+              "get": "id"
+            }
           }
         },
         {
           "name": "seed-repository-id",
           "method": "GET",
           "path": "/v1/container-registries/{registry_id}/repositories",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "capture_soft": {
-            "repository_id": "$.repositories[0].id"
+            "repository_id": {
+              "list": "$.repositories",
+              "where_prefix": {
+                "name": "test"
+              },
+              "get": "id"
+            }
           }
         },
         {
           "name": "seed-image-id",
           "method": "GET",
           "path": "/v1/repositories/{repository_id}/images",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "capture_soft": {
-            "image_id": "$.images[0].nonexistent_image_seed"
+            "image_id": "$.images[0].id"
           }
         },
         {
-          "name": "seed-tags-placeholder",
+          "name": "seed-tags-id",
           "method": "GET",
           "path": "/v1/images/{image_id}/tagses",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "capture_soft": {
-            "tags_id": "$.tagses[0].nonexistent_tags_seed"
-          }
+            "tags_id": "$.tagses[0].id",
+            "tags_delete_id": "$.tagses[0].nonexistent_delete_seed"
+          },
+          "_note": "오너 2026-07-10: sample 레지스트리(nayvugfp…)/test 리포에 실이미지 픽스처 등록 — 실 id를 잡아 image/tags API를 살린다. 이미지가 아직 없으면 capture miss → 기존 placeholder 경로로 동일 동작(퇴행 없음)."
         },
         {
           "name": "check-tags-vulnerability",
           "method": "PUT",
           "path": "/v1/tagses/{tags_id}/check-vulnerability",
           "json": {},
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-tags-checkvuln"
         },
@@ -409,7 +616,17 @@
               "locked": false
             }
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-tags-lock"
         },
@@ -425,21 +642,45 @@
           "method": "DELETE",
           "path": "/v1/tagses",
           "json": {
-            "ids": ["{tags_id}"]
+            "ids": [
+              "{tags_delete_id}"
+            ]
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-tags-bulkdelete",
-          "destructive": true
+          "destructive": true,
+          "_note": "픽스처 보호 — 의도적 미해결 토큰 (delete-image와 동일 사유)."
         },
         {
           "name": "delete-tags",
           "method": "DELETE",
-          "path": "/v1/tagses/{tags_id}",
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "path": "/v1/tagses/{tags_delete_id}",
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scr-tags-delete",
-          "destructive": true
+          "destructive": true,
+          "_note": "픽스처 보호 — 의도적 미해결 토큰 (delete-image와 동일 사유)."
         }
       ]
     },
@@ -448,19 +689,30 @@
       "service": "container/scr",
       "enabled": true,
       "heavy": false,
-      "_note": "COVERAGE-ONLY (READ-ONLY). Fills coverage for the remaining id-bound SCR GET endpoints by CALLING each one so it is recorded at runtime. Harvests real ids best-effort from the SCR list endpoints (capture_soft, never fails): registries (-> registry_id, $.registries[0].id), that registry's repositories (-> repository_id, $.repositories[0].id), that repository's images (-> image_id, $.images[0].id), and that image's tagses (-> tags_id, $.tagses[0].id). It then fires every uncovered id-GET explicitly; when a list is empty the placeholder stays LITERAL -> a 4xx that still counts as 'reached'. A final probe_reads catch-all replays every catalog GET whose path params are all in {registry_id,image_id,tags_id,repository_id}. The SCR `/v1/repositories` listing has returned 403 for this service account; the repository show step is added anyway since 403/404 still records coverage. Every step is optional + grouped + expect_status [200,400,403,404] so nothing reds the run. No writes — all GET, non-billable."
-      ,
+      "_note": "COVERAGE-ONLY (READ-ONLY). Fills coverage for the remaining id-bound SCR GET endpoints by CALLING each one so it is recorded at runtime. Harvests real ids best-effort from the SCR list endpoints (capture_soft, never fails): registries (-> registry_id, $.registries[0].id), that registry's repositories (-> repository_id, $.repositories[0].id), that repository's images (-> image_id, $.images[0].id), and that image's tagses (-> tags_id, $.tagses[0].id). It then fires every uncovered id-GET explicitly; when a list is empty the placeholder stays LITERAL -> a 4xx that still counts as 'reached'. A final probe_reads catch-all replays every catalog GET whose path params are all in {registry_id,image_id,tags_id,repository_id}. The SCR `/v1/repositories` listing has returned 403 for this service account; the repository show step is added anyway since 403/404 still records coverage. Every step is optional + grouped + expect_status [200,400,403,404] so nothing reds the run. No writes — all GET, non-billable.",
       "steps": [
         {
           "name": "list-registries-harvest",
           "method": "GET",
           "path": "/v1/container-registries",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "capture_soft": {
-            "registry_id": "$.registries[0].id"
-          }
+            "registry_id": {
+              "list": "$.registries",
+              "where_prefix": {
+                "name": "sample"
+              },
+              "get": "id"
+            }
+          },
+          "_note": "오너 2026-07-10: sample 레지스트리(nayvugfp…)/test 리포에 실이미지 픽스처 등록 — 실 id를 잡아 image/tags API를 살린다. 이미지가 아직 없으면 capture miss → 기존 placeholder 경로로 동일 동작(퇴행 없음)."
         },
         {
           "name": "check-repository-name-duplication",
@@ -470,7 +722,12 @@
             "registry_id": "{registry_id}",
             "name": "regrcheck"
           },
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "_note": "checkrepositorynameduplication: requires registry_id (captured from list-registries-harvest) + name. Returns 200 {result:false} when registry_id is real; falls back to 400 if registry_id placeholder stays unfilled."
@@ -479,18 +736,34 @@
           "name": "get-registry-repositories",
           "method": "GET",
           "path": "/v1/container-registries/{registry_id}/repositories",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "capture_soft": {
-            "repository_id": "$.repositories[0].id"
+            "repository_id": {
+              "list": "$.repositories",
+              "where_prefix": {
+                "name": "test"
+              },
+              "get": "id"
+            }
           }
         },
         {
           "name": "list-repositories-harvest",
           "method": "GET",
           "path": "/v1/repositories",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "capture_soft": {
@@ -501,7 +774,12 @@
           "name": "get-repository",
           "method": "GET",
           "path": "/v1/repositories/{repository_id}",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read"
         },
@@ -509,7 +787,12 @@
           "name": "list-images-harvest",
           "method": "GET",
           "path": "/v1/repositories/{repository_id}/images",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "capture_soft": {
@@ -521,7 +804,12 @@
           "method": "GET",
           "path": "/v1/images/{image_id}",
           "params": {},
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "_note": "id-bound read (showimage). params:{} forces catalog-key recording under container/scr/showimage even for a GET. When image_id is unresolved (no docker push) this fires with literal placeholder -> 4xx, still records as reached."
@@ -531,7 +819,12 @@
           "method": "GET",
           "path": "/v1/images/{image_id}/lifecycle-policy/preview",
           "params": {},
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "_note": "showimagelifecyclepolicypreview: params:{} forces catalog-key recording."
@@ -541,7 +834,12 @@
           "method": "GET",
           "path": "/v1/images/{image_id}/tagses",
           "params": {},
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "capture_soft": {
@@ -554,7 +852,12 @@
           "method": "GET",
           "path": "/v1/tagses/{tags_id}",
           "params": {},
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "_note": "showtags: params:{} forces catalog-key recording."
@@ -564,7 +867,12 @@
           "method": "GET",
           "path": "/v1/tagses/{tags_id}/download/manifest",
           "params": {},
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "_note": "downloadmanifest: params:{} forces catalog-key recording."
@@ -574,7 +882,12 @@
           "method": "GET",
           "path": "/v1/tagses/{tags_id}/packages",
           "params": {},
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "_note": "showtagspackages: params:{} forces catalog-key recording."
@@ -584,7 +897,12 @@
           "method": "GET",
           "path": "/v1/tagses/{tags_id}/secrets",
           "params": {},
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "_note": "showtagssecrets: params:{} forces catalog-key recording."
@@ -594,7 +912,12 @@
           "method": "GET",
           "path": "/v1/tagses/{tags_id}/vulnerabilities",
           "params": {},
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "scr-read",
           "_note": "showtagsvulnerabilities: params:{} forces catalog-key recording."

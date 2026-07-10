@@ -45,5 +45,5 @@ resources:
     delete: {endpoint: "DELETE /v1/certificatemanager/{cert_id}", destructive: true}
     provenance: docs
     gated: credential  # 실제 CA-signed 인증서 자료 주입 경로 필요
-    source: {lifecycle: security-certificatemanager-import, steps: [create, delete]}
+    source: {lifecycle: security-certificatemanager-import-cover, steps: [create, delete]}
     notes: "외부 인증서 IMPORT — needs_cert_material: {cert_body}/{private_key}/{cert_chain}은 엔진이 openssl로 런타임 발급하는 cert-material builtin (openssl 없으면 env-skip). 단, 이 계정에선 KNOWN-UNSATISFIABLE: SCP check-validation/import가 런타임 발급 self-signed keypair를 PEM 인코딩과 무관하게 거부('This private key is not a PEM format')하고 CI에 실제 CA-signed cert가 없다 — 소스 lifecycle은 disabled, 활성 sibling(security-certificatemanager-import-cover)은 정적 placeholder로 endpoint CALL만 기록. body/capture는 라이브 2xx 미확인(docs). PEM 규칙: 복호화된 RSA key + 단일 cert body + Intermediate→Root 체인 순서. 합성 대상이 되려면 실제 CA-signed 자료의 credential 주입 경로가 필요하다 (R3+)."

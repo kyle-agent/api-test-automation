@@ -280,7 +280,7 @@ resources:
     delete: {endpoint: "DELETE /v1/privatelink-endpoints/{privatelink_endpoint_id}",
              destructive: true}
     provenance: docs
-    source: {lifecycle: generated__wave5-appsvc,
+    source: {lifecycle: gen-wave5-apigw-privatelink,
              steps: [create-apigw-privatelink-endpoint, show-apigw-privatelink-endpoint,
                      set-apigw-privatelink-endpoint, delete-apigw-privatelink-endpoint]}
     notes: "컨트롤플레인 객체(시간당 과금 없음). R3 해소: networking privatelink-service 노드(AUTO 승인, IP 타입)가 생겨 합성 id 대신 cross-file ref로 배선 — name 패턴 ^[a-zA-Z0-9]*$ 3..20 (하이픈 불가). request(CANCEL|RE_REQUEST)/connection(api_id+DISCONNECT|RECONNECT)/approval(api_id+APPROVE|REJECT) PUT은 상태기계 의존이라 lifecycle 영역(gen-wave5의 gated probe) — DTO는 PrivateLinkEndpoint{Request,Connection,Approval}Request. capture envelope $.privatelink_endpoint.id는 docs 파생 — UNPROVEN. userguide how_to(2026-06-14) 확정: endpoint name 영문+숫자 3~20자(하이픈 불가, 기존 패턴 일치), privatelink_service_id 영문+숫자 3~60자, description 최대 50자 → set PUT의 'String should have at most 50 characters' 400은 description 50자 초과가 원인으로 확정(48자 미만 description으로 좁히면 200 기대). status 값(상태기계): Requesting/Active/Creating/Deleting/Disconnected/Rejected/Error/Canceled."

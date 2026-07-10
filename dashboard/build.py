@@ -251,12 +251,27 @@ def _load_untestable():
 _UNTESTABLE = _load_untestable()
 
 
-def per_service(cat, tsv_rows, prior_verified=None, prior_status=None, sha=""):
+def per_service(cat, tsv_rows, prior_verified=None, prior_status=None, sha="",
+                durable_evidence=None):
     """prior_status: cumulative key -> [status, elapsed_ms, run_sha] from past
     runs (endpoint_status.json on dashboard-data). The cumulative-verified
     overlay marks endpoints ✓ that THIS run never called; without this map
     their status/time cells go blank on every scoped run (field report:
-    'covered checked but no HTTP status/time for POST/PUT/DELETE')."""
+    'covered checked but no HTTP status/time for POST/PUT/DELETE').
+
+    durable_evidence: data/baselines/verified_endpoints.json (endpoint_key ->
+    {method,path,first_run,last_run,count}) — the cumulative cross-session 2xx
+    evidence store. A key can land here (e.g. via a local console2 run) WITHOUT
+    a matching dashboard-data endpoint_status.json refresh (that only happens on
+    a full `dashboard.build` publish) — so the last-known-observation cell can
+    go stale and show an old 4xx/5xx even though the endpoint IS durably
+    verified (owner 2026-07-10 field report: container/ske/createclusterkubeconfig
+    showed "400 @fe79059" while data/baselines/verified_endpoints.json already
+    carried a local-run 2xx). Rule: durable evidence wins the COVERED verdict
+    (never contradicted by a stale cell), and the stale observation is kept
+    alongside as a second, dated data point rather than silently dropped —
+    CX-IA-DESIGN principle 1 (every number carries its source + timestamp)."""
+    durable_evidence = durable_evidence or {}
     called = {}
     for status, _category, key, _method, _path, *_rest in tsv_rows:
         called[key] = (status, _rest[0] if _rest else None)
@@ -303,8 +318,19 @@ def per_service(cat, tsv_rows, prior_verified=None, prior_status=None, sha=""):
                     st_el, src = (pst[0], pst[1]), (pst[2] or "이전 런")
                 else:
                     st_el = (None, None)
+            # durable-evidence override (owner 2026-07-10): if this endpoint has
+            # cross-session 2xx evidence (covered==True, incl. via the
+            # prior_verified union upstream) but the last-known OBSERVATION cell
+            # is stale/disagreeing (missing, or not itself 2xx), carry the
+            # evidence run id so the UI can show "✅ 검증 (<run>)" alongside the
+            # stale reading instead of letting the stale 4xx/5xx stand alone.
+            ev_run = ""
+            if covered:
+                dur = durable_evidence.get(e["key"])
+                if dur and (st_el[0] is None or not (200 <= st_el[0] < 300)):
+                    ev_run = dur.get("last_run") or dur.get("first_run") or "evidence"
             rows.append((e["method"], e["http_path"], e.get("name", ""),
-                         bool(covered), st_el[0], st_el[1], v or "", src))
+                         bool(covered), st_el[0], st_el[1], v or "", src, ev_run))
         unt_reason = _UNTESTABLE.get(f"{category}/{service}")
         services.append({
             "category": category, "service": service, "slug": slug(category, service),
@@ -682,8 +708,7 @@ def render_service_page(s, meta):
     conf = (meta.get("conf") or {}).get("by_endpoint", {})
     rows, n_def_items, n_red, def_count = [], 0, 0, Counter()
     n_failed = 0
-    for method, path, title, covered, st, el, verd, *_src in s["rows"]:
-        src = _src[0] if _src else ""
+    for method, path, title, covered, st, el, verd, src, ev_run in s["rows"]:
         key = f'{s["category"]}/{s["service"]}/{title}'
         rec = conf.get(key, {})
         crit = rec.get("status") == "red"
@@ -700,7 +725,7 @@ def render_service_page(s, meta):
         n_failed += (verd == "failed")
         rows.append({"m": method, "p": path, "api": title or "", "c": c,
                      "s": st, "t": round(el / 1000, 1) if el is not None else None,
-                     "src": src, "d": items})
+                     "src": src, "d": items, "ev": ev_run or None})
 
     # ---- untestable service: reachability-only framing ------------------
     if s.get("untestable"):
@@ -1033,10 +1058,22 @@ function toggleDetail(btn){
 }
 function rowHTML(r){
   var covSym={y:'✓',p:'◑',n:'·',f:'⛔'}[r.c];
-  var st=r.s==null?'<span class="st none">—</span>':'<span class="st '+stClass(r.s)+'">'+r.s+'</span>';
+  var st;
+  if(r.ev){
+    // durable-evidence override (owner 2026-07-10): a cross-session 2xx exists
+    // in data/baselines/verified_endpoints.json even though the last-known
+    // OBSERVATION cell below is stale/missing/non-2xx — show BOTH, dated, per
+    // CX-IA-DESIGN principle 1 (every number carries its source + timestamp).
+    st='<span class="st s2" title="durable evidence — data/baselines/verified_endpoints.json">✅ 검증 ('+esc(r.ev)+')</span>';
+    if(r.s!=null&&!(r.s>=200&&r.s<300)){
+      st+='<span class="prev" title="대시보드 관측 이력(endpoint_status.json)에는 아직 이 값이 남아있음 — durable evidence가 우선">· 직전 관측 '+r.s+(r.src?' @'+esc(r.src):'')+'</span>';
+    }
+  } else {
+    st=r.s==null?'<span class="st none">—</span>':'<span class="st '+stClass(r.s)+'">'+r.s+'</span>';
+  }
   var ms=r.t!=null?'<span class="ms '+msClass(r.t)+'">'+(r.t<1?Math.round(r.t*1000)+'ms':r.t+'s')+'</span>':'';
   var probe=(r.c==='n'&&r.s===404)?'<span class="probe">probe 미도달</span>':'';
-  var prev=(r.src&&r.s!=null)?'<span class="prev" title="이번 런 미호출 — 마지막 관측 런">@'+esc(r.src)+'</span>':'';
+  var prev=(!r.ev&&r.src&&r.s!=null)?'<span class="prev" title="이번 런 미호출 — 마지막 관측 런">@'+esc(r.src)+'</span>':'';
   return '<tr class="cov-'+r.c+'">'
     +'<td class="cbar"></td>'
     +'<td><span class="mb '+r.m+'">'+r.m+'</span></td>'
@@ -1645,6 +1682,13 @@ def build(
     known: str = "data/baselines/known_issues.json",
     waivers: str = "data/baselines/coverage_waivers.json",
     prior: str = "data/verified_endpoints.json",
+    # Durable cross-session 2xx evidence (IB-041, tools/derive_verified) —
+    # committed to main independently of a dashboard publish, so it can be
+    # AHEAD of `prior` (owner 2026-07-10: local console2 runs land evidence
+    # here without a matching dashboard-data endpoint_status.json refresh,
+    # which only happens on the next full publish). Consulted so a stale
+    # last-known-observation cell never contradicts a durably-verified key.
+    evidence: str = "data/baselines/verified_endpoints.json",
     # Platform-wide systemic conformance findings (not per-endpoint; the static
     # axis writes them here — merged into the unified findings for the banner).
     conformance: str = "data/conformance.json",
@@ -1745,6 +1789,22 @@ def build(
         except (ValueError, OSError):
             pass
 
+    # Durable cross-session evidence store (data/baselines/verified_endpoints.json)
+    # can be AHEAD of the dashboard-data `prior` snapshot — it is updated by
+    # tools/derive_verified independently of a dashboard publish (e.g. a local
+    # console2 run). Union its catalog-scoped keys into prior_verified so the
+    # COVERED verdict (and the stale-cell override below) never lags behind
+    # evidence already committed to main (owner 2026-07-10 field report).
+    durable_evidence = {}
+    if evidence and os.path.exists(evidence):
+        try:
+            durable_evidence = json.load(open(evidence))
+        except (ValueError, OSError):
+            durable_evidence = {}
+    cat_keys_for_evidence = {e["key"] for e in cat}
+    durable_cat_keys = set(durable_evidence) & cat_keys_for_evidence
+    prior_verified |= durable_cat_keys
+
     # cumulative last-known observation per endpoint (status/elapsed/run). Loaded
     # BEFORE compute() so the reachability-covered tally (which keys on "touched")
     # is cumulative like `verified` — a reachability waiver REACHED by any past
@@ -1777,7 +1837,8 @@ def build(
     # prior_status (loaded above) also fills the drill-down status cells for
     # endpoints this run didn't call.
     services, merged_status = per_service(cat, tsv_rows, prior_verified=prior_verified,
-                                          prior_status=prior_status, sha=sha)
+                                          prior_status=prior_status, sha=sha,
+                                          durable_evidence=durable_evidence)
 
     meta = {
         "branch": branch,
@@ -1851,6 +1912,9 @@ def main():
                     help="C3 waiver list (docs/COVERAGE-CRITERIA.md)")
     ap.add_argument("--prior", default="data/verified_endpoints.json",
                     help="cumulative verified set from the dashboard-data branch")
+    ap.add_argument("--evidence", default="data/baselines/verified_endpoints.json",
+                    help="durable cross-session 2xx evidence store (IB-041) — "
+                         "unioned into --prior so it can never lag behind main")
     ap.add_argument("--conformance", default="data/conformance.json",
                     help="Platform-wide systemic conformance findings (banner)")
     ap.add_argument("--history", default="dashboard/history.jsonl")
@@ -1868,6 +1932,7 @@ def main():
         known=args.known,
         waivers=args.waivers,
         prior=args.prior,
+        evidence=args.evidence,
         conformance=args.conformance,
         history=args.history,
         out=args.out,

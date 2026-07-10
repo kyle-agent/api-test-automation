@@ -49,7 +49,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/engine-versions", expect_status: [200]}
     provenance: VALIDATED
-    source: {lifecycle: heavy-shared-dbaas, steps: [epas-find-version]}
+    source: {lifecycle: epas-cluster-subops-full, steps: [epas-find-version]}
     notes: "EngineListResponse $.contents[] (api_docs — PG와 동일 DTO). 소스 스텝은 optional group이라 epas 레그의 2xx 기록이 없음 — 클러스터와 함께 R3 run에서 승격. EPAS userguide(2026-06-14 overview) 재확정: 노출 라인 14.17-14.19 / 15.12-15.14 / 16.8-16.10 / 17.6 (PG는 16/17만; EPAS는 14·15 메이저도 보유). EOS/EoTS 표 verbatim: 14.x EOS 2026-05-20(★현재일 2026-06-14 기준 이미 경과 → 14 라인은 신규생성 중단 가능 — contents[]에서 사라졌을 수 있음, 라이브 확인 필요) / 15.x EoTS 2028-02-13 / 16.x EoTS 2028-11-09 / 17.6 EoTS 2029-11-08. 차기 15.15/16.11/17.17은 2026-07 이후 예정. end_of_service 필드로 노출 가능. 구버전 고정 업그레이드 체인은 epas-engine-version-16 분리 노드 (PG -16 패턴). live-validated run 27583285457 (2026-06-15)"
 
   # 구버전 전용 LOOKUP — PG pg-engine-version-16 미러. epas 라이브 구버전
@@ -85,7 +85,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/server-types", expect_status: [200]}
     provenance: VALIDATED
-    source: {lifecycle: heavy-shared-dbaas, steps: [epas-find-stype]}
+    source: {lifecycle: epas-cluster-subops-full, steps: [epas-find-stype]}
     notes: "epas 호스트의 /v1/server-types — DBaaS 전용 타입 목록, NAME으로 소비. contents[0] 선택은 소스와 동일. epas 레그 2xx 미기록 → docs. EPAS userguide(2026-06-14 overview/servertype) 확정: 타입 NAME = [Category][Spec][vCore][Memory] (예 'Standard db1v2m4'); Category=Standard|High Capacity, Spec=db1(표준)|dbh2(대용량 24+ vCore). resize-server-type override 시 이 형식 NAME 사용. live-validated run 27583285457 (2026-06-15)"
 
   epas-cluster:
@@ -157,7 +157,7 @@ resources:
          expect_status: [200]}
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
     provenance: VALIDATED  # epas first live 2xx + replica family — run 27478985079 (gen-heavy-epas-replica PASSED)
-    source: {lifecycle: heavy-shared-dbaas,
+    source: {lifecycle: epas-cluster-subops-full,
              steps: [epas-create, epas-wait, epas-delete]}
     notes: "HEAVY 과금. body는 PG형 relational 템플릿 (database_encoding/locale, audit_enabled boolean, service_watch_log_collection 없음, instances에 service_ip_address 없음) — heavy-shared-dbaas verbatim이지만 epas 레그 자체의 2xx 기록이 없어 docs (같은 run에 포함됐으나 optional group이라 성공이 기록으로 안 남음 — R3 scoped run에서 승격). ** gen-heavy-epas-replica가 우선 체인: 이 노드의 첫 라이브 증명 기회 — 성공 시 provenance 승격 + cross-service epas-cluster 승격 트리거. capture 변수는 소스 epas_cid → cluster_id 개명. 주의: epas/mariadb guarded sub-op는 placeholder cluster_id에 500을 던진다(cachestore는 400 soft — HANDOFF-fail-new-triage §B 비대칭). dbaas_parameter_group_id는 cluster detail DTO에 없음 — epas-parameter-group lookup에서만 발견 가능. requires는 body 소비 기준 subnet + lookup 2종 (cross-service 발산 경고 의도). EPAS userguide(2026-06-14 overview) 확정 선행: VPC(+subnet) 필수 — subnet require로 그래프 충족 (VPC는 subnet의 상위, cross-service에 이미 엣지). ha_enabled:false = single-node; HA(Active-Standby 동기복제+자동 failover)는 ha_enabled:true 변형 필요. instances[].service_ip_address 없음(PG와 차이)은 epas body verbatim — _note: docs DTO상 optional이나 epas 레그 라이브 미증명."
   epas-instance-group:

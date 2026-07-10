@@ -1103,7 +1103,7 @@
               "name": "regrsg{ualpha}",
               "description": "API regression suite",
               "lb_health_check_id": "{lb_health_check_id}",
-              "lb_method": "ROUND_ROBIN",
+              "lb_method": "WEIGHTED_ROUND_ROBIN",
               "protocol": "TCP",
               "subnet_id": "{subnet_id}",
               "vpc_id": "{vpc_id}",
@@ -1122,7 +1122,8 @@
             "method": "DELETE",
             "path": "/v1/lb-server-groups/{lb_server_group_id}",
             "service": "loadbalancer"
-          }
+          },
+          "_note": "2026-07-10: ROUND_ROBIN→WEIGHTED_ROUND_ROBIN — member weight가 100도(run 377e) 부재도(run 2137) InvalidRequestMemberWeight로 거부돼(docs: optional·1~1000·예시100), 가중 알고리즘 그룹+weight 조합으로 전환해 검증 (PF-35 추적)."
         },
         {
           "name": "verify-lb-server-group-read",
@@ -1152,14 +1153,15 @@
           "json": {
             "lb_server_group": {
               "description": "API regression suite (set)",
-              "lb_method": "ROUND_ROBIN"
+              "lb_method": "WEIGHTED_ROUND_ROBIN"
             }
           },
           "expect_status": [
             200,
             202
           ],
-          "group": "lb-server-group"
+          "group": "lb-server-group",
+          "_note": "2026-07-10: ROUND_ROBIN→WEIGHTED_ROUND_ROBIN — member weight가 100도(run 377e) 부재도(run 2137) InvalidRequestMemberWeight로 거부돼(docs: optional·1~1000·예시100), 가중 알고리즘 그룹+weight 조합으로 전환해 검증 (PF-35 추적)."
         },
         {
           "name": "create-lb-listener",
@@ -1247,9 +1249,17 @@
           "service": "virtualserver",
           "method": "GET",
           "path": "/v1/servers",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture_soft": {
-            "member_vm_id": {"list": "$.servers", "where_prefix": {"name": "regrsrv"}, "get": "id"}
+            "member_vm_id": {
+              "list": "$.servers",
+              "where_prefix": {
+                "name": "regrsrv"
+              },
+              "get": "id"
+            }
           },
           "optional": true,
           "_note": "owner 방향 (2026-07-09, run-2c 403 InvalidVmInMember x2 실측): member 등록은 직접 IP만으로 불가 — 실제 VM object_id 필수 (구모델 'VM 불필요' 반증). 런에 살아있는 우리 VM(regrsrv*, 공유 VPC adopt류 — compute-virtualserver-full 등)을 잡아 id를 캡처. 없으면 soft-miss로 리터럴이 남고 member create는 그대로 하드-fail한다 (VM 있는 풀런 창에서 실검증하는 설계 — expect는 strict 유지)."
@@ -1259,7 +1269,11 @@
           "service": "virtualserver",
           "method": "GET",
           "path": "/v1/servers/{member_vm_id}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "capture_soft": {
             "member_vm_ip": "$.addresses[0].ip_addresses[0].ip_address"
           },
@@ -1277,11 +1291,11 @@
               {
                 "name": "regrmember1",
                 "member_ip": "{member_vm_ip}",
-              "object_id": "{member_vm_id}",
+                "object_id": "{member_vm_id}",
                 "member_port": 80,
                 "member_state": "ENABLE",
-                
-                "object_type": "VM"
+                "object_type": "VM",
+                "member_weight": 10
               }
             ]
           },
@@ -1329,24 +1343,30 @@
             200,
             202
           ],
-          "group": "lb-member"
+          "group": "lb-member",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "2026-07-10 오너 실측(run 라이브): member 반영 중 서버그룹이 잠시 Not-Active → 후속 member op가 409 NotUpdatableState. settle 409 재시도 사다리(8x15s) — batch-2 'ExistInprogress pacing' 규약과 동형. 참고: 이 409의 존재 자체가 member create 성공 증거 (PF-35 해결: WEIGHTED_ROUND_ROBIN+weight 10)."
         },
         {
           "name": "create-lb-member-bulk",
           "service": "loadbalancer",
           "method": "POST",
           "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-          "_note": "REPAIR 2026-07-09: create-lb-member와 동일 409 NotUpdatableState 계열 대비 — 직전 member 쓰기가 LB를 다시 업데이트 상태로 만들 수 있어 같은 6×20s 재시도 사다리 적용. || 2026-07-09b (run-2b 실측 403 InvalidVmInMember \"object_id: ''\"): 빈 object_id 필드가 그 자체로 검증에 걸림 — docs(membercreaterequestv1dot1)상 object_id는 optional이라 필드 제거(미전송). object_type=VM은 required라 유지. 직접 IP 멤버가 여전히 거부되면(=실 VM 필수 반증 확정) 다음 시그니처로 재수리 — 그 경우 knowledge/formal/resources/networking__loadbalancer.yaml의 'VM 불필요 직접 입력' 전제도 반증 처리할 것.",
+          "_note": "REPAIR 2026-07-09: create-lb-member와 동일 409 NotUpdatableState 계열 대비 — 직전 member 쓰기가 LB를 다시 업데이트 상태로 만들 수 있어 같은 6×20s 재시도 사다리 적용. || 2026-07-09b (run-2b 실측 403 InvalidVmInMember \"object_id: ''\"): 빈 object_id 필드가 그 자체로 검증에 걸림 — docs(membercreaterequestv1dot1)상 object_id는 optional이라 필드 제거(미전송). object_type=VM은 required라 유지. 직접 IP 멤버가 여전히 거부되면(=실 VM 필수 반증 확정) 다음 시그니처로 재수리 — 그 경우 knowledge/formal/resources/networking__loadbalancer.yaml의 'VM 불필요 직접 입력' 전제도 반증 처리할 것. || 2026-07-10 오너 실측(run 라이브): member 반영 중 서버그룹이 잠시 Not-Active → 후속 member op가 409 NotUpdatableState. settle 409 재시도 사다리(8x15s) — batch-2 'ExistInprogress pacing' 규약과 동형. 참고: 이 409의 존재 자체가 member create 성공 증거 (PF-35 해결: WEIGHTED_ROUND_ROBIN+weight 10).",
           "json": {
             "members": [
               {
                 "name": "regrmember2",
                 "member_ip": "{member_vm_ip}",
-              "object_id": "{member_vm_id}",
+                "object_id": "{member_vm_id}",
                 "member_port": 80,
                 "member_state": "ENABLE",
-                
-                "object_type": "VM"
+                "object_type": "VM",
+                "member_weight": 10
               }
             ]
           },
@@ -1358,8 +1378,8 @@
           "retry_on_status": [
             409
           ],
-          "retries": 6,
-          "retry_interval": 20,
+          "retries": 8,
+          "retry_interval": 15,
           "capture": {
             "member_bulk_id": "$.members[0].id"
           },
@@ -1659,7 +1679,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "2026-07-10 오너 실측(run 라이브): member 반영 중 서버그룹이 잠시 Not-Active → 후속 member op가 409 NotUpdatableState. settle 409 재시도 사다리(8x15s) — batch-2 'ExistInprogress pacing' 규약과 동형. 참고: 이 409의 존재 자체가 member create 성공 증거 (PF-35 해결: WEIGHTED_ROUND_ROBIN+weight 10)."
         },
         {
           "name": "delete-lb-member-bulk",
@@ -1676,7 +1702,13 @@
             "member_id_list": [
               "{member_bulk_id}"
             ]
-          }
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "2026-07-10 오너 실측(run 라이브): member 반영 중 서버그룹이 잠시 Not-Active → 후속 member op가 409 NotUpdatableState. settle 409 재시도 사다리(8x15s) — batch-2 'ExistInprogress pacing' 규약과 동형. 참고: 이 409의 존재 자체가 member create 성공 증거 (PF-35 해결: WEIGHTED_ROUND_ROBIN+weight 10)."
         },
         {
           "name": "delete-lb-server-group",

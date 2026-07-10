@@ -1957,3 +1957,51 @@ iam-user-policy-binding이 user_id 부재로 blocked-owner였던 기지 사실�
 ValidationError가 정형을 알려줄 것. apigw resource-policy는 같은 런에서
 **정식 SRN 수리로 500→200 착지** (PF-19 = 우리 입력 형식 오류가 뿌리, 남는
 결함은 '불량 입력에 400 아닌 500'뿐).
+
+## Private NAT의 'Connectable' TGW = 물리 Uplink 회선 전제 — 이 계정 구조적 불가 (2026-07-10 확정)
+
+> conf: 0.9 · seen: 2026-07-10 · obs: userguide 명문 + 3런 실증 (재배열·재시도 전부 무효)
+
+userguide(vpc/private_nat): **"Transit Gateway는 Uplink 회선 연결 후 선택할 수
+있음"** — private-nat가 요구하는 'Connectable state'는 상태 전이가 아니라
+**물리 전용회선(Uplink)이 붙은 TGW**라는 전제조건. VPC connection만 있는
+TGW는 ACTIVE까지만 가고 CONNECTED로 전이하지 않으며(43폴/883s 실측), create
+400 재시도(937s)도 무의미. 이 계정엔 실회선이 없어 **구조적 불가** — 사다리
+전부 제거하고 400 관용 도달-증거로 재분류 (waiver 후보). API 에러("Cannot
+found ... in Connectable state")가 이 전제를 설명하지 않는 것은 에러-가이드
+갭 (PF 후보로 볼 여지). 같은 이유로 Direct Connect 경유 private-nat도 실회선
+없이는 동일 게이트로 추정.
+
+## SCR 이미지 픽스처 (오너 수동 준비, 2026-07-10)
+
+- 오너가 콘솔에서 레지스트리 `sample` (id `nayvugfp4154447ab0ab61279cba3d72`,
+  public endpoint enabled) + 리포지토리 `test` (id `6c910ed5195842739f9c98a569982064`)
+  를 만들어 둠. 목적: image/tags 계열 ~19개 API는 실제 이미지가 있어야 검증 가능.
+- docker 경로: `sample-nayvugfp.scr.public.kr-west1.e.samsungsdscloud.com/test/<image>:<tag>`.
+- **SCR docker 토큰 인증은 우리 서비스-계정 키를 거부한다** (2026-07-10 실측):
+  `auth.scr.public...:/auth/token` (Bearer realm, service=nayvugfp)에
+  SCP_ACCESS_KEY/SECRET Basic → 401 invalid credentials (HMAC 서명도 동일).
+  scope 형식은 `repository:test/<image>:pull,push` (repo만 쓰면 400
+  "you must specify image not repository only"). archivestorage 401
+  ("Service Account catalog…")과 같은 축 — 레지스트리 인증은 콘솔 사용자
+  인증키 필요 추정. 이미지 push는 오너 로컬 docker 또는 사용자 키 발급 후.
+- 레시피 측은 준비 완료: scr-read/image-write/tags-write 시드가 sample/test를
+  prefix-지정으로 잡고 `$.images[0].id`/`$.tagses[0].id` 실 캡처. delete류는
+  의도적 미해결 토큰({image_delete_id}/{tags_delete_id})으로 픽스처 보호.
+
+## IAM 트러스트 정책 v4 확정 — createrole 202 (run-90e2, 2026-07-10)
+
+Principal `{"scp":["srn:e::<acct>:::scp-iam:root"]}` + `Resource:["*"]` 조합으로
+POST /v1/roles **202 성공** (500→400→400→202 사다리 완주). get/set/set-trust-policy
+200, delete 204. PF-20/31은 백엔드 버그가 아니라 **입력 정형** 문제로 최종 확정.
+createrole/deleterole 검증 fold (+2 → 2,421).
+
+## IAM 유저 라이프사이클 (오너 승인 2026-07-10 "만들어")
+
+iam-user-full 신설 — M5 iam-user 노드의 owner-credential 게이트가 오너 승인으로
+해제됨. 안전 설계: 권한 0 유저(그룹/정책 빈 배열) + temporary_password:true +
+바인딩 테스트는 **Deny-전용 정책**만 연결 + 전 자원 run 내 삭제. account_id는
+GET /v1/access-keys의 $.access_keys[0].account_id로 자가발견 (리터럴 경로는
+카탈로그 키 미해석 — validate WARN으로 확인된 제약). 다음 런 판정 대상 9키:
+createiamuser·getiamuser·updateiamuser·updateiamuserpassword·deleteiamuser·
+addgroupmember·removegroupmember·adduserpolicybinding·removeuserpolicybinding.

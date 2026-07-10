@@ -92,3 +92,52 @@ distinct hosts — see `dependencies.json:vpc_schedule.fixed_ip_map`).
 
 Never let two VPC-mutating runs overlap (they compete for the same 3 VPCs).
 Trigger one CRUD run at a time; wait for the prior run's regression job to finish.
+
+## retry_on_status 규칙 — 401은 절대 넣지 말 것 (2026-07-10, run-85b2/377e 실측)
+
+401(인증/인가 실패)은 호출 자체가 거부된 것이라 재시도로 수렴하지 않는다.
+DBaaS delete/unset류 27개 스텝이 관성적으로 `retry_on_status: [400, 401, …]`
+× 20회 × 60s를 갖고 있었고, run-377e에서 `unset-backup` 2건이 각 1,220초를
+태우고 그대로 401-fail — 같은 워커 직렬화와 겹쳐 **makespan을 40분 늘렸다**
+(94.2분의 43%). 27곳 전부에서 401 제거(2026-07-10). 재시도가 정당한 것은
+상태-전이성 코드뿐: 400(EDITING류 반려)·409(충돌)·429·5xx. 만약 미래에
+"401 후 수렴" 패턴이 관측되면 그 서비스 한정으로 근거와 함께 재도입하고
+이 항목에 기록할 것.
+
+## 400-as-409 클래스 — 상태-전이 반려가 400으로 오는 서비스들 (2026-07-10, run-0099 실측)
+
+일부 서비스는 "지금 상태에서는 그 연산 불가"(의미상 409)를 **400**으로 반환한다.
+이 클래스는 settle 사다리/대기로 수렴한다 — 스키마 수리 대상이 아니다:
+
+- **vpc transit-gateway DELETE**: vpc-connection DELETE 202 직후 TGW DELETE가
+  400 "not deletable state" (detach 비동기). 수리: connection 404 gone-폴 후
+  삭제 + `retry_on_status: [400, 409]` (generated__light-batch2 gen-private-nat).
+- **cloud-function PLE sub-ops**: scf PLE **생성이 함수를 DEPLOYING으로 되돌리고**
+  (재배포), 그동안 request/approve/connect가 전부 400
+  `function-not-editable-error`. PLE 자신도 CREATING 동안 cancel/delete가 400
+  `privatelink-endpoint-invalid-state-error`. 수리: 생성 직후 함수 state settle
+  폴 + sub-op 400 사다리 (generated__wave5-appsvc gen-wave5-apigw-privatelink).
+  delete-function의 "PL service disabled AND PLE 부재" 전제조건은 이 체인이
+  풀려야 충족된다.
+- **apigw privatelink-endpoint PUT**: 400 `modify-restricted-state`가 허용 상태
+  enum을 명시해 준다 — Requesting/Canceled/Rejected/Active/Disconnected.
+  CREATING settle 폴 후 set/approve 진행.
+
+## IAM 트러스트 정책 — Resource가 필수다 (2026-07-10, 400 사다리 3단 해독)
+
+createrole/setroletrustpolicy의 `assume_role_policy_document.Statement[]`는
+문서와 달리 **Principal과 Resource 둘 다 필수**: ① v2(root SRN, dict Principal)
+→ 400 ValidationError "valid string/valid list" ② v3(Principal.scp 리스트형,
+Resource 제거) → 400 "Value error, 'Resource' is required" ③ v4 =
+Principal `{"scp": ["srn:e::<acct>:::scp-iam:root"]}` + `Resource: ["*"]`.
+에러가 단계마다 다음 필수 필드를 밝혀준 케이스 — 500이 아니라 400이 나오기
+시작하면 정형에 근접한 것.
+
+## run-end 리퍼는 게이트를 스스로 켠다 (2026-07-10, run-0099 실측 버그)
+
+콘솔 서버 프로세스는 SCP_ALLOW_MUTATIONS/DESTRUCTIVE env 없이 떠 있을 수 있어
+`cleanup/run_scoped.py`가 서버 settings로 클라이언트를 만들면 run-end DELETE가
+전부 "blocked"로 무력화된다 (TGW→VPC 잔존의 뿌리). 리퍼는 자기 런의 원장에
+기록된 자원만 지우므로(Hard Rule 3) `dataclasses.replace(settings,
+allow_mutations=True, allow_destructive=True)`로 게이트를 강제한다 — 회귀 테스트
+`tests/offline/test_run_scoped_reap.py::test_reap_forces_gates_on_*`.

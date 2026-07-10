@@ -721,7 +721,20 @@
           "expect_status": [
             200
           ],
-          "group": "apigw-ple"
+          "group": "apigw-ple",
+          "poll": {
+            "field": "$.privatelink_endpoint.status",
+            "until": [
+              "ACTIVE",
+              "REQUESTING",
+              "CANCELED",
+              "REJECTED",
+              "DISCONNECTED"
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "_note": "run-0099: set 400 modify-restricted-state가 허용 상태를 명시(Requesting/Canceled/Rejected/Active/Disconnected) — CREATING이 풀릴 때까지 여기서 settle 후 set/approve 진행."
         },
         {
           "name": "list-apigw-privatelink-endpoints",
@@ -997,6 +1010,29 @@
           }
         },
         {
+          "name": "wait-function-editable-after-scf-ple",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "scf-ple",
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 420,
+            "interval": 15
+          },
+          "_note": "run-0099 실측: scf PLE 생성이 함수를 DEPLOYING으로 되돌림 → 후속 PLE sub-op 전부 400 function-not-editable. 재배포가 끝날 때까지 settle."
+        },
+        {
           "name": "list-scf-privatelink-endpoints",
           "service": "scf",
           "method": "GET",
@@ -1011,7 +1047,7 @@
           "service": "scf",
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/request",
-          "_note": "GATED PROBES — scf PrivateLinkEndpoint{Request,Approval,Connection} are single-field {type} enums mirroring the apigw family (no api_id). Same ordering rationale: RE_REQUEST / APPROVE / DISCONNECT->RECONNECT, CANCEL last.",
+          "_note": "GATED PROBES — scf PrivateLinkEndpoint{Request,Approval,Connection} are single-field {type} enums mirroring the apigw family (no api_id). Same ordering rationale: RE_REQUEST / APPROVE / DISCONNECT->RECONNECT, CANCEL last. || run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리.",
           "json": {
             "type": "RE_REQUEST"
           },
@@ -1025,7 +1061,12 @@
             422
           ],
           "optional": true,
-          "group": "scf-ple-actions"
+          "group": "scf-ple-actions",
+          "retry_on_status": [
+            400
+          ],
+          "retries": 8,
+          "retry_interval": 15
         },
         {
           "name": "approve-scf-privatelink-endpoint",
@@ -1045,7 +1086,13 @@
             422
           ],
           "optional": true,
-          "group": "scf-ple-actions"
+          "group": "scf-ple-actions",
+          "retry_on_status": [
+            400
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리."
         },
         {
           "name": "connect-scf-privatelink-endpoint-disconnect",
@@ -1065,7 +1112,13 @@
             422
           ],
           "optional": true,
-          "group": "scf-ple-actions"
+          "group": "scf-ple-actions",
+          "retry_on_status": [
+            400
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리."
         },
         {
           "name": "connect-scf-privatelink-endpoint-reconnect",
@@ -1085,7 +1138,13 @@
             422
           ],
           "optional": true,
-          "group": "scf-ple-actions"
+          "group": "scf-ple-actions",
+          "retry_on_status": [
+            400
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리."
         },
         {
           "name": "cancel-scf-privatelink-endpoint-request",
@@ -1105,14 +1164,20 @@
             422
           ],
           "optional": true,
-          "group": "scf-ple-actions"
+          "group": "scf-ple-actions",
+          "retry_on_status": [
+            400
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "_note": "run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리."
         },
         {
           "name": "delete-scf-privatelink-endpoint",
           "service": "scf",
           "method": "DELETE",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}",
-          "_note": "runs even when the create 4xx'd ({endpoint_id} stays literal -> 404, still records); 404 tolerated for exactly that case.",
+          "_note": "runs even when the create 4xx'd ({endpoint_id} stays literal -> 404, still records); 404 tolerated for exactly that case. || run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리.",
           "expect_status": [
             200,
             202,
@@ -1122,7 +1187,12 @@
           ],
           "optional": true,
           "group": "scf-ple",
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400
+          ],
+          "retries": 8,
+          "retry_interval": 15
         },
         {
           "name": "wait-function-before-delete",
