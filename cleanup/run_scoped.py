@@ -76,8 +76,14 @@ def reap_run_leftovers(events_path: str | Path, log=print) -> int:
     if not leftovers:
         log("  run-scoped reap: 잔존 후보 0 — 정리 완료 상태")
         return 0
-    west = core.ApiClient(core.settings)
-    east = core.ApiClient(dataclasses.replace(core.settings, region="kr-east1"))
+    # 호스트 프로세스(콘솔 서버 등)는 게이트 env 없이 떠 있을 수 있다. 리퍼는
+    # 이 런의 원장에 기록된 자원만 지우므로(Hard Rule 3 준수) 게이트를 강제로
+    # 켠 클라이언트를 쓴다 — 안 그러면 run-end 정리가 통째로 무력화된다
+    # (2026-07-10 run-0099에서 실측: "DELETE blocked" 후 TGW/VPC 잔존).
+    _gated = dataclasses.replace(
+        core.settings, allow_mutations=True, allow_destructive=True)
+    west = core.ApiClient(_gated)
+    east = core.ApiClient(dataclasses.replace(_gated, region="kr-east1"))
     by_col: dict[str, list[dict]] = {}
     for it in leftovers:
         by_col.setdefault(_collection(it["path"] or ""), []).append(it)

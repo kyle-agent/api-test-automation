@@ -685,6 +685,24 @@
           "retry_interval": 15
         },
         {
+          "name": "wait-tgw-vpc-connection-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 15
+          },
+          "_note": "run-0099 실측: vpc-connection DELETE 202 직후 TGW DELETE가 400 'not deletable state' — detach가 비동기. 연결 404 확인 후 TGW 삭제."
+        },
+        {
           "name": "delete-transit-gateway",
           "service": "vpc",
           "method": "DELETE",
@@ -698,10 +716,12 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "_note": "400도 사다리에 포함 (run-0099: detach 진행 중 'not deletable state'가 400으로 옴 — 409 의미의 400)."
         },
         {
           "name": "delete-vpc",
