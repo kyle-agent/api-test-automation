@@ -36,7 +36,7 @@ def test_situation_renders():
     r = client.get("/v2")
     assert r.status_code == 200, r.status_code
     body = r.text
-    assert "지금 어떤가?" in body
+    assert "플랫폼 현황" in body  # 격식 명사형 — 구어체·질문형 금지 (D7 추가, 2026-07-10)
     assert "SCP API Regression" in body
     # 판정 헤드라인 또는 empty-state 중 하나는 반드시 존재 (L1 §2.1/§3)
     assert ("새 회귀" in body) or ("발행된 공식 수치가 아직 없습니다" in body)

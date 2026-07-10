@@ -43,12 +43,13 @@ SOURCES: dict[str, dict] = {
     "run": {"label": "이 런", "tip": "특정 실행 1건에 고정된 값 (과거형)"},
 }
 
-# 질문 중심 6축 네비 (CX-IA-DESIGN §4.2)
+# 질문 중심 6축 네비 (CX-IA-DESIGN §4.2). 축의 "질문"은 IA 설계 개념일 뿐,
+# 화면 문구는 격식 명사형만 쓴다 — 구어체·비유·질문형 금지 (오너 지시 2026-07-10).
 NAV: list[dict] = [
-    {"key": "situation", "label": "상황실", "q": "지금 어떤가?", "path": "/v2"},
-    {"key": "services", "label": "서비스", "q": "이 서비스는 어떤가?", "path": "/v2/services"},
-    {"key": "model", "label": "모델", "q": "테스트를 어떻게 정의했나?", "path": "/v2/model"},
-    {"key": "run", "label": "실행", "q": "돌리자", "path": "/v2/run"},
-    {"key": "results", "label": "결과", "q": "무엇이 나왔나?", "path": "/v2/results"},
-    {"key": "tools", "label": "도구", "q": "", "path": "/v2/tools"},
+    {"key": "situation", "label": "현황", "q": "플랫폼 전체 현황 요약", "path": "/v2"},
+    {"key": "services", "label": "서비스", "q": "서비스별 테스트 현황", "path": "/v2/services"},
+    {"key": "model", "label": "모델", "q": "테스트 정의 · 리소스 모델", "path": "/v2/model"},
+    {"key": "run", "label": "실행", "q": "테스트 실행 · 모니터링", "path": "/v2/run"},
+    {"key": "results", "label": "결과", "q": "실행 결과 · 회귀 분석", "path": "/v2/results"},
+    {"key": "tools", "label": "도구", "q": "부가 도구 링크 모음", "path": "/v2/tools"},
 ]
