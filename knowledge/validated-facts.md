@@ -1988,3 +1988,20 @@ found ... in Connectable state")가 이 전제를 설명하지 않는 것은 에
 - 레시피 측은 준비 완료: scr-read/image-write/tags-write 시드가 sample/test를
   prefix-지정으로 잡고 `$.images[0].id`/`$.tagses[0].id` 실 캡처. delete류는
   의도적 미해결 토큰({image_delete_id}/{tags_delete_id})으로 픽스처 보호.
+
+## IAM 트러스트 정책 v4 확정 — createrole 202 (run-90e2, 2026-07-10)
+
+Principal `{"scp":["srn:e::<acct>:::scp-iam:root"]}` + `Resource:["*"]` 조합으로
+POST /v1/roles **202 성공** (500→400→400→202 사다리 완주). get/set/set-trust-policy
+200, delete 204. PF-20/31은 백엔드 버그가 아니라 **입력 정형** 문제로 최종 확정.
+createrole/deleterole 검증 fold (+2 → 2,421).
+
+## IAM 유저 라이프사이클 (오너 승인 2026-07-10 "만들어")
+
+iam-user-full 신설 — M5 iam-user 노드의 owner-credential 게이트가 오너 승인으로
+해제됨. 안전 설계: 권한 0 유저(그룹/정책 빈 배열) + temporary_password:true +
+바인딩 테스트는 **Deny-전용 정책**만 연결 + 전 자원 run 내 삭제. account_id는
+GET /v1/access-keys의 $.access_keys[0].account_id로 자가발견 (리터럴 경로는
+카탈로그 키 미해석 — validate WARN으로 확인된 제약). 다음 런 판정 대상 9키:
+createiamuser·getiamuser·updateiamuser·updateiamuserpassword·deleteiamuser·
+addgroupmember·removegroupmember·adduserpolicybinding·removeuserpolicybinding.

@@ -11888,9 +11888,9 @@
   "path": "/v1/instances"
  },
  "management/iam/accesskeylist": {
-  "count": 33,
+  "count": 34,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/access-keys",
   "path": "/v1/access-keys"
@@ -11904,177 +11904,193 @@
   "path": "/v1/access-keys/send-otp"
  },
  "management/iam/accesskeyshow": {
-  "count": 35,
+  "count": 36,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/access-keys/*",
   "path": "/v1/access-keys/{access_key_id}"
  },
  "management/iam/addgrouppolicybinding": {
-  "count": 53,
+  "count": 55,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "POST",
   "norm_path": "v1/groups/*/policy-bindings",
   "path": "/v1/groups/{group_id}/policy-bindings"
  },
  "management/iam/addpermission": {
-  "count": 35,
+  "count": 36,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "POST",
   "norm_path": "v1/resource-policies/*/statements",
   "path": "/v1/resource-policies/{iam_srn_b64}/statements"
  },
  "management/iam/addrolepolicybindings": {
-  "count": 16,
+  "count": 18,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "POST",
   "norm_path": "v1/roles/*/policy-bindings",
   "path": "/v1/roles/{existing_role_id}/policy-bindings"
  },
  "management/iam/creategroup": {
-  "count": 137,
+  "count": 140,
   "first_run": "27583285457",
-  "last_run": "27599547083",
+  "last_run": "local-90e2",
   "method": "POST",
   "norm_path": "v1/groups",
   "path": "/v1/groups"
  },
  "management/iam/createpolicy": {
-  "count": 197,
+  "count": 203,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "POST",
   "norm_path": "v1/policies",
   "path": "/v1/policies"
  },
+ "management/iam/createrole": {
+  "count": 1,
+  "first_run": "local-90e2",
+  "last_run": "local-90e2",
+  "method": "POST",
+  "norm_path": "v1/roles",
+  "path": "/v1/roles"
+ },
  "management/iam/deletebulkiamuser": {
-  "count": 8,
+  "count": 9,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/accounts/*/users/bulk",
   "path": "/v1/accounts/{account_id}/users/bulk"
  },
  "management/iam/deletebulkrole": {
-  "count": 8,
+  "count": 9,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/roles/bulk",
   "path": "/v1/roles/bulk"
  },
  "management/iam/deletegroup": {
-  "count": 137,
+  "count": 140,
   "first_run": "27583285457",
-  "last_run": "27599547083",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/groups/*",
   "path": "/v1/groups/{group_id}"
  },
  "management/iam/deletepolicy": {
-  "count": 171,
+  "count": 177,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/policies/*",
   "path": "/v1/policies/{policy_id}"
  },
  "management/iam/deleteresourcepolicy": {
-  "count": 35,
+  "count": 36,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/resource-policies/*",
   "path": "/v1/resource-policies/{iam_srn_b64}"
  },
+ "management/iam/deleterole": {
+  "count": 1,
+  "first_run": "local-90e2",
+  "last_run": "local-90e2",
+  "method": "DELETE",
+  "norm_path": "v1/roles/*",
+  "path": "/v1/roles/{role_id}"
+ },
  "management/iam/listendpoints": {
-  "count": 33,
+  "count": 34,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/endpoints",
   "path": "/v1/endpoints"
  },
  "management/iam/listgroup": {
-  "count": 32,
+  "count": 33,
   "first_run": "27583285457",
-  "last_run": "",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/groups",
   "path": "/v1/groups"
  },
  "management/iam/listgroupmember": {
-  "count": 83,
+  "count": 84,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/groups/*/members",
   "path": "/v1/groups/{group_id}/members"
  },
  "management/iam/listgrouppolicybinding": {
-  "count": 83,
+  "count": 84,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/groups/*/policy-bindings",
   "path": "/v1/groups/{group_id}/policy-bindings"
  },
  "management/iam/listiamuser": {
-  "count": 5,
+  "count": 6,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/accounts/ec11538abf8f46d2953539521f745366/users",
   "path": "/v1/accounts/ec11538abf8f46d2953539521f745366/users"
  },
  "management/iam/listpolicy": {
-  "count": 33,
+  "count": 34,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/policies",
   "path": "/v1/policies"
  },
  "management/iam/listpolicybinding": {
-  "count": 134,
+  "count": 135,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/policies/*/bindings",
   "path": "/v1/policies/{policy_id}/bindings"
  },
  "management/iam/listrole": {
-  "count": 33,
+  "count": 34,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/roles",
   "path": "/v1/roles"
  },
  "management/iam/listrolepolicybindings": {
-  "count": 37,
+  "count": 38,
   "first_run": "27583285457",
-  "last_run": "",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/roles/*/policy-bindings",
   "path": "/v1/roles/{role_id}/policy-bindings"
  },
  "management/iam/listsamlprovider": {
-  "count": 33,
+  "count": 34,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/saml-providers",
   "path": "/v1/saml-providers"
  },
  "management/iam/listserviceaccount": {
-  "count": 33,
+  "count": 34,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/service-accounts",
   "path": "/v1/service-accounts"
@@ -12088,137 +12104,137 @@
   "path": "/v1/users/00000000000000000000000000000000/policy-bindings"
  },
  "management/iam/querypolicy": {
-  "count": 62,
+  "count": 64,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "POST",
   "norm_path": "v1/policies/list",
   "path": "/v1/policies/list"
  },
  "management/iam/removebulkrolepolicybindings": {
-  "count": 8,
+  "count": 9,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/roles/*/policy-bindings",
   "path": "/v1/roles/{existing_role_id}/policy-bindings"
  },
  "management/iam/removegrouppolicybinding": {
-  "count": 87,
+  "count": 89,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/groups/*/policy-bindings/*",
   "path": "/v1/groups/{group_id}/policy-bindings/{unique}"
  },
  "management/iam/removepermission": {
-  "count": 35,
+  "count": 36,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/resource-policies/*/statements/*",
   "path": "/v1/resource-policies/{iam_srn_b64}/statements/{rp_statement_sid}"
  },
  "management/iam/removerolepolicybinding": {
-  "count": 8,
+  "count": 10,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "DELETE",
   "norm_path": "v1/roles/*/policy-bindings/*",
   "path": "/v1/roles/{existing_role_id}/policy-bindings/{temp_policy_id}"
  },
  "management/iam/setgroup": {
-  "count": 59,
+  "count": 61,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "PUT",
   "norm_path": "v1/groups/*",
   "path": "/v1/groups/{group_id}"
  },
  "management/iam/setpermission": {
-  "count": 35,
+  "count": 36,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "PUT",
   "norm_path": "v1/resource-policies/*/statements/*",
   "path": "/v1/resource-policies/{iam_srn_b64}/statements/{rp_statement_sid}"
  },
  "management/iam/setpolicy": {
-  "count": 45,
+  "count": 46,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "PUT",
   "norm_path": "v1/policies/*",
   "path": "/v1/policies/{policy_id}"
  },
  "management/iam/setpolicygroupbinding": {
-  "count": 66,
+  "count": 68,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "PUT",
   "norm_path": "v1/policies/*/bindings",
   "path": "/v1/policies/{policy_id_2}/bindings"
  },
  "management/iam/setresourcepolicy": {
-  "count": 35,
+  "count": 36,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "PUT",
   "norm_path": "v1/resource-policies/*",
   "path": "/v1/resource-policies/{iam_srn_b64}"
  },
  "management/iam/setrole": {
-  "count": 16,
+  "count": 19,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "PUT",
   "norm_path": "v1/roles/*",
   "path": "/v1/roles/{existing_role_id}"
  },
  "management/iam/setroletrustpolicy": {
-  "count": 8,
+  "count": 10,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "PUT",
   "norm_path": "v1/roles/*/trust-policy",
   "path": "/v1/roles/{existing_role_id}/trust-policy"
  },
  "management/iam/showgroup": {
-  "count": 82,
+  "count": 83,
   "first_run": "27583285457",
-  "last_run": "27599547083",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/groups/*",
   "path": "/v1/groups/{group_id}"
  },
  "management/iam/showpolicy": {
-  "count": 134,
+  "count": 135,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/policies/*",
   "path": "/v1/policies/{policy_id}"
  },
  "management/iam/showresourcepolicy": {
-  "count": 23,
+  "count": 24,
   "first_run": "",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/resource-policies/*",
   "path": "/v1/resource-policies/{srn}"
  },
  "management/iam/showrole": {
-  "count": 37,
+  "count": 38,
   "first_run": "27583285457",
-  "last_run": "",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/roles/*",
   "path": "/v1/roles/{role_id}"
  },
  "management/iam/showserviceaccount": {
-  "count": 38,
+  "count": 39,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/service-accounts/*",
   "path": "/v1/service-accounts/{service_account_id}"
@@ -12424,9 +12440,9 @@
   "path": "/v1/resource-groups"
  },
  "management/resourcemanager/listresources": {
-  "count": 60,
+  "count": 61,
   "first_run": "27583285457",
-  "last_run": "local-f282acdb",
+  "last_run": "local-90e2",
   "method": "GET",
   "norm_path": "v1/resources",
   "path": "/v1/resources"

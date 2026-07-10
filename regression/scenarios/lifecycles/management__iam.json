@@ -1602,6 +1602,294 @@
           "_note": "listsamlprovider — GET /v1/saml-providers (zero-required-param global list; size/page/sort/federation_type/saml_provider_name all optional). SAML WRITES stay in the heavy probe lane (iam-credentials-heavy) — this is the bare list only. LIVE-CONFIRMED 200 2026-07-08 (count 0, empty saml_providers[] — empty-list 200 is the expected steady state on this account). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         }
       ]
+    },
+    {
+      "id": "iam-user-full",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "오너 승인 2026-07-10 ('만들어') — M5 iam-user 노드의 owner-credential 게이트 해제 구현. 실 로그인 principal을 만들므로 안전 설계: 권한 0 (group_ids/policy_ids 빈 배열), temporary_password:true(첫 로그인 시 변경 강제), 합성 1회용 비밀번호(9-20자 정책 충족), 정책 바인딩 테스트는 Deny-전용 정책만 연결, 전 자원 run 내 삭제. 언락 대상: createiamuser/getiamuser/updateiamuser/updateiamuserpassword/deleteiamuser/addgroupmember/removegroupmember/adduserpolicybinding/removeuserpolicybinding (9키, 계정 유저 0명이라 전부 404-soft였던 클래스).",
+      "steps": [
+        {
+          "name": "seed-account-id",
+          "method": "GET",
+          "path": "/v1/access-keys",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "account_id": "$.access_keys[0].account_id"
+          },
+          "_note": "account_id 자가발견 (iam-readonly-shows 검증 패턴) — 리터럴 경로는 카탈로그 키 해석이 안 돼 커버리지 미집계 (validate WARN)."
+        },
+        {
+          "name": "create-iam-user",
+          "method": "POST",
+          "path": "/v1/accounts/{account_id}/users",
+          "group": "user-real",
+          "optional": true,
+          "json": {
+            "user_name": "regrusr{ualpha}",
+            "password": "Regr9x!{ualpha}",
+            "temporary_password": true,
+            "description": "API regression suite",
+            "group_ids": [],
+            "policy_ids": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "user_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/accounts/{account_id}/users/{user_id}",
+            "service": "iam"
+          },
+          "_note": "envelope FLAT $.id (iamcreateuserresponse). 비밀번호 정책: 9-20자, 대/소/숫/특 각 1+ (userguide 2026-06-15)."
+        },
+        {
+          "name": "get-iam-user",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}/users/{user_id}",
+          "group": "user-real",
+          "optional": true,
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "update-iam-user",
+          "method": "PUT",
+          "path": "/v1/accounts/{account_id}/users/{user_id}",
+          "group": "user-real",
+          "optional": true,
+          "json": {
+            "description": "updated by API regression suite",
+            "password_reuse_count": 0
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "_note": "iamuserupdaterequest: password_reuse_count REQUIRED인 특이 DTO (0=Maximum 24 기본)."
+        },
+        {
+          "name": "update-iam-user-password",
+          "method": "PUT",
+          "path": "/v1/accounts/{account_id}/users/{user_id}/password",
+          "group": "user-real",
+          "optional": true,
+          "json": {
+            "password": "Regr8y!{ualpha}",
+            "temporary_password": true
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "create-group-for-user",
+          "method": "POST",
+          "path": "/v1/groups",
+          "group": "user-real",
+          "optional": true,
+          "json": {
+            "name": "regrusrg{ualpha}",
+            "description": "API regression suite (user-member test)",
+            "policy_ids": [],
+            "user_ids": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "ugroup_id": "$.group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/groups/{ugroup_id}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "add-group-member",
+          "method": "POST",
+          "path": "/v1/groups/{ugroup_id}/members",
+          "group": "user-real",
+          "optional": true,
+          "json": {
+            "user_id": "{user_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "실 유저로 addgroupmember 최초 실검증 (기존엔 0값 user_id로 404-soft만 기록)."
+        },
+        {
+          "name": "verify-group-members",
+          "method": "GET",
+          "path": "/v1/groups/{ugroup_id}/members",
+          "group": "user-real",
+          "optional": true,
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "remove-group-member",
+          "method": "DELETE",
+          "path": "/v1/groups/{ugroup_id}/members/{user_id}",
+          "group": "user-real",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "create-deny-policy-for-user",
+          "method": "POST",
+          "path": "/v1/policies",
+          "group": "user-real",
+          "optional": true,
+          "json": {
+            "policy_name": "regrusrpol{ualpha}",
+            "description": "API regression suite (user-binding test, Deny-only)",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Deny",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "upolicy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{upolicy_id}",
+            "service": "iam"
+          },
+          "_note": "Deny-전용 — 바인딩돼도 유저에게 아무 권한도 부여하지 않는다 (권한 표면 0 유지)."
+        },
+        {
+          "name": "add-user-policy-binding",
+          "method": "POST",
+          "path": "/v1/users/{user_id}/policy-bindings",
+          "group": "user-real",
+          "optional": true,
+          "json": {
+            "policy_ids": [
+              "{upolicy_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "list-user-policy-bindings",
+          "method": "GET",
+          "path": "/v1/users/{user_id}/policy-bindings",
+          "group": "user-real",
+          "optional": true,
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "remove-user-policy-binding",
+          "method": "DELETE",
+          "path": "/v1/users/{user_id}/policy-bindings/{upolicy_id}",
+          "group": "user-real",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "delete-deny-policy-for-user",
+          "method": "DELETE",
+          "path": "/v1/policies/{upolicy_id}",
+          "group": "user-real",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ]
+        },
+        {
+          "name": "delete-group-for-user",
+          "method": "DELETE",
+          "path": "/v1/groups/{ugroup_id}",
+          "group": "user-real",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ]
+        },
+        {
+          "name": "delete-iam-user",
+          "method": "DELETE",
+          "path": "/v1/accounts/{account_id}/users/{user_id}",
+          "group": "user-real",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "_note": "행복경로 즉시 삭제 — cleanup 등록과 이중 안전망."
+        }
+      ]
     }
   ]
 }
