@@ -205,11 +205,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-07-09 19:27 KST · branch <code>claude/continuation-uk2rwc</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-07-10 13:33 KST · branch <code>claude/continuation-uk2rwc</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "POST", "p": "/v1/assume-role", "api": "assumerole", "c": "n", "s": 404, "t": 1.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: role_indicator, role_session_name", "crit": false}]}, {"m": "POST", "p": "/v1/assume-role-with-saml", "api": "assumerolewithsaml", "c": "n", "s": 404, "t": 0.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: principal_indicator, role_indicator, saml_assertion", "crit": false}]}, {"m": "POST", "p": "/v1/object-store-authorization", "api": "objectstoreauthorization", "c": "n", "s": 404, "t": 0.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: method, url, x_amz_content_sha256, x_amz_date", "crit": false}]}];
+var R=[{"m": "POST", "p": "/v1/assume-role", "api": "assumerole", "c": "n", "s": 404, "t": 1.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: role_indicator, role_session_name", "crit": false}], "ev": null}, {"m": "POST", "p": "/v1/assume-role-with-saml", "api": "assumerolewithsaml", "c": "n", "s": 404, "t": 0.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: principal_indicator, role_indicator, saml_assertion", "crit": false}], "ev": null}, {"m": "POST", "p": "/v1/object-store-authorization", "api": "objectstoreauthorization", "c": "n", "s": 404, "t": 0.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: method, url, x_amz_content_sha256, x_amz_date", "crit": false}], "ev": null}];
 var CONF_EVAL=true;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
@@ -256,10 +256,22 @@ function toggleDetail(btn){
 }
 function rowHTML(r){
   var covSym={y:'✓',p:'◑',n:'·',f:'⛔'}[r.c];
-  var st=r.s==null?'<span class="st none">—</span>':'<span class="st '+stClass(r.s)+'">'+r.s+'</span>';
+  var st;
+  if(r.ev){
+    // durable-evidence override (owner 2026-07-10): a cross-session 2xx exists
+    // in data/baselines/verified_endpoints.json even though the last-known
+    // OBSERVATION cell below is stale/missing/non-2xx — show BOTH, dated, per
+    // CX-IA-DESIGN principle 1 (every number carries its source + timestamp).
+    st='<span class="st s2" title="durable evidence — data/baselines/verified_endpoints.json">✅ 검증 ('+esc(r.ev)+')</span>';
+    if(r.s!=null&&!(r.s>=200&&r.s<300)){
+      st+='<span class="prev" title="대시보드 관측 이력(endpoint_status.json)에는 아직 이 값이 남아있음 — durable evidence가 우선">· 직전 관측 '+r.s+(r.src?' @'+esc(r.src):'')+'</span>';
+    }
+  } else {
+    st=r.s==null?'<span class="st none">—</span>':'<span class="st '+stClass(r.s)+'">'+r.s+'</span>';
+  }
   var ms=r.t!=null?'<span class="ms '+msClass(r.t)+'">'+(r.t<1?Math.round(r.t*1000)+'ms':r.t+'s')+'</span>':'';
   var probe=(r.c==='n'&&r.s===404)?'<span class="probe">probe 미도달</span>':'';
-  var prev=(r.src&&r.s!=null)?'<span class="prev" title="이번 런 미호출 — 마지막 관측 런">@'+esc(r.src)+'</span>':'';
+  var prev=(!r.ev&&r.src&&r.s!=null)?'<span class="prev" title="이번 런 미호출 — 마지막 관측 런">@'+esc(r.src)+'</span>':'';
   return '<tr class="cov-'+r.c+'">'
     +'<td class="cbar"></td>'
     +'<td><span class="mb '+r.m+'">'+r.m+'</span></td>'

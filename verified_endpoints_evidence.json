@@ -511,6 +511,14 @@
   "norm_path": "v1/apis/*/resources/*/methods",
   "path": "/v1/apis/{api_id}/resources/{resource_id}/methods"
  },
+ "application-service/apigateway/createprivatelinkendpoint": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/privatelink-endpoints",
+  "path": "/v1/privatelink-endpoints"
+ },
  "application-service/apigateway/createresource": {
   "count": 124,
   "first_run": "27583285457",
@@ -574,6 +582,14 @@
   "method": "DELETE",
   "norm_path": "v1/apis/*/resources/*/methods/*",
   "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}"
+ },
+ "application-service/apigateway/deleteprivatelinkendpoint": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "DELETE",
+  "norm_path": "v1/privatelink-endpoints/*",
+  "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}"
  },
  "application-service/apigateway/deleteresource": {
   "count": 122,
@@ -2087,6 +2103,14 @@
   "norm_path": "v1/cloud-functions",
   "path": "/v1/cloud-functions"
  },
+ "compute/scf/listcloudfunctiontriggers": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/triggers",
+  "path": "/v1/triggers"
+ },
  "compute/scf/listenvironmentvariables": {
   "count": 32,
   "first_run": "27583285457",
@@ -2446,6 +2470,22 @@
   "method": "DELETE",
   "norm_path": "v1/server-groups/*",
   "path": "/v1/server-groups/{server_group_id}"
+ },
+ "compute/virtualserver/deleteserverinterface": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "DELETE",
+  "norm_path": "v1/servers/*/interfaces/*",
+  "path": "/v1/servers/{server_id}/interfaces/{port_id}"
+ },
+ "compute/virtualserver/deleteserverinterfacenat": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "DELETE",
+  "norm_path": "v1/servers/*/interfaces/*/static-nats/*",
+  "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats/{nat_id}"
  },
  "compute/virtualserver/deleteservervolume": {
   "count": 10,
@@ -2967,6 +3007,14 @@
   "norm_path": "v1/auto-scaling-groups/*/server-count",
   "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/server-count"
  },
+ "compute/virtualserver/updateserverinterface": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "PUT",
+  "norm_path": "v1/servers/*/interfaces/*",
+  "path": "/v1/servers/{server_id}/interfaces/{port_id}"
+ },
  "compute/virtualserver/updateservervolume": {
   "count": 10,
   "first_run": "27645841461",
@@ -3455,6 +3503,14 @@
   "norm_path": "v1/clusters",
   "path": "/v1/clusters"
  },
+ "container/ske/createclusterkubeconfig": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/clusters/*/kubeconfig",
+  "path": "/v1/clusters/{cluster_id}/kubeconfig"
+ },
  "container/ske/createnodepool": {
   "count": 18,
   "first_run": "27645841461",
@@ -3711,6 +3767,14 @@
   "norm_path": "v1/data-ops-services",
   "path": "/v1/data-ops-services"
  },
+ "data-analytics/eventstreams/eventstreamscreatecluster": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/clusters",
+  "path": "/v1/clusters"
+ },
  "data-analytics/eventstreams/eventstreamslistclusters": {
   "count": 44,
   "first_run": "27583285457",
@@ -3758,6 +3822,22 @@
   "method": "GET",
   "norm_path": "v1/server-types",
   "path": "/v1/server-types"
+ },
+ "data-analytics/eventstreams/eventstreamsshowcluster": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/clusters/*",
+  "path": "/v1/clusters/{cluster_id}"
+ },
+ "data-analytics/quick-query/checkduplicationquickquery": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/quick-query/*/check-duplication",
+  "path": "/v1/quick-query/{quick_query_name}/check-duplication"
  },
  "data-analytics/quick-query/getquickqueryimageversions": {
   "count": 41,
@@ -4583,6 +4663,14 @@
   "norm_path": "v1/clusters/*/maintenance",
   "path": "/v1/clusters/{cluster_id}/maintenance"
  },
+ "database/cachestore/cachestoresetservertype": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/instance-groups/*/resize",
+  "path": "/v1/instance-groups/{instance_group_id}/resize"
+ },
  "database/cachestore/cachestoreshowcluster": {
   "count": 11,
   "first_run": "27645841461",
@@ -4590,6 +4678,14 @@
   "method": "GET",
   "norm_path": "v1/clusters/*",
   "path": "/v1/clusters/{cluster_id}"
+ },
+ "database/cachestore/cachestoreshowrequest": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/requests/*",
+  "path": "/v1/requests/{request_id}"
  },
  "database/cachestore/cachestoresyncclusterstate": {
   "count": 2,
@@ -4614,6 +4710,14 @@
   "method": "DELETE",
   "norm_path": "v1/clusters/*/maintenance",
   "path": "/v1/clusters/{cluster_id}/maintenance"
+ },
+ "database/epas/epasaddblockstorages": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/instance-groups/*/block-storage-groups",
+  "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups"
  },
  "database/epas/epascreatecluster": {
   "count": 11,
@@ -4767,6 +4871,14 @@
   "norm_path": "v1/clusters/*/security-group-rules",
   "path": "/v1/clusters/{cluster_id}/security-group-rules"
  },
+ "database/epas/epassetservertype": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/instance-groups/*/resize",
+  "path": "/v1/instance-groups/{instance_group_id}/resize"
+ },
  "database/epas/epasshowarchiveconfig": {
   "count": 11,
   "first_run": "27645841461",
@@ -4782,6 +4894,22 @@
   "method": "GET",
   "norm_path": "v1/clusters/*",
   "path": "/v1/clusters/{cluster_id}"
+ },
+ "database/epas/epasshowrequest": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/requests/*",
+  "path": "/v1/requests/{request_id}"
+ },
+ "database/epas/epassyncclusterstate": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/clusters/*/sync-state",
+  "path": "/v1/clusters/{cluster_id}/sync-state"
  },
  "database/epas/epassyncparametervalues": {
   "count": 1,
@@ -4806,6 +4934,14 @@
   "method": "DELETE",
   "norm_path": "v1/clusters/*/maintenance",
   "path": "/v1/clusters/{cluster_id}/maintenance"
+ },
+ "database/epas/epasupgradekernel": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "PUT",
+  "norm_path": "v1/clusters/*/kernel-upgrade",
+  "path": "/v1/clusters/{cluster_id}/kernel-upgrade"
  },
  "database/mariadb/mariadbaddblockstorages": {
   "count": 2,
@@ -4983,6 +5119,14 @@
   "norm_path": "v1/clusters/*/security-group-rules",
   "path": "/v1/clusters/{cluster_id}/security-group-rules"
  },
+ "database/mariadb/mariadbsetservertype": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/instance-groups/*/resize",
+  "path": "/v1/instance-groups/{instance_group_id}/resize"
+ },
  "database/mariadb/mariadbshowarchiveconfig": {
   "count": 15,
   "first_run": "27588002895",
@@ -4998,6 +5142,14 @@
   "method": "GET",
   "norm_path": "v1/clusters/*",
   "path": "/v1/clusters/{cluster_id}"
+ },
+ "database/mariadb/mariadbshowrequest": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/requests/*",
+  "path": "/v1/requests/{request_id}"
  },
  "database/mariadb/mariadbstartcluster": {
   "count": 2,
@@ -5191,6 +5343,14 @@
   "norm_path": "v1/clusters/*/restart",
   "path": "/v1/clusters/{cluster_id}/restart"
  },
+ "database/mysql/mysqlsetarchiveconfig": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "PUT",
+  "norm_path": "v1/clusters/*/archive",
+  "path": "/v1/clusters/{cluster_id}/archive"
+ },
  "database/mysql/mysqlsetbackup": {
   "count": 9,
   "first_run": "27583285457",
@@ -5215,6 +5375,14 @@
   "norm_path": "v1/clusters/*/parameters",
   "path": "/v1/clusters/{cluster_id}/parameters"
  },
+ "database/mysql/mysqlsetservertype": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/instance-groups/*/resize",
+  "path": "/v1/instance-groups/{instance_group_id}/resize"
+ },
  "database/mysql/mysqlshowarchiveconfig": {
   "count": 10,
   "first_run": "27583285457",
@@ -5238,6 +5406,30 @@
   "method": "GET",
   "norm_path": "v1/requests/*",
   "path": "/v1/requests/{request_id}"
+ },
+ "database/mysql/mysqlstartcluster": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/clusters/*/start",
+  "path": "/v1/clusters/{cluster_id}/start"
+ },
+ "database/mysql/mysqlstopcluster": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/clusters/*/stop",
+  "path": "/v1/clusters/{cluster_id}/stop"
+ },
+ "database/mysql/mysqlsyncarchiveconfig": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/clusters/*/archive/sync",
+  "path": "/v1/clusters/{cluster_id}/archive/sync"
  },
  "database/mysql/mysqlsyncclusterstate": {
   "count": 7,
@@ -5367,6 +5559,14 @@
   "norm_path": "v1/parameter-groups",
   "path": "/v1/parameter-groups"
  },
+ "database/postgresql/postgresqllistparameters": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/parameters",
+  "path": "/v1/parameters"
+ },
  "database/postgresql/postgresqllistparametervalues": {
   "count": 7,
   "first_run": "27645841461",
@@ -5462,6 +5662,14 @@
   "method": "POST",
   "norm_path": "v1/clusters/*/security-group-rules",
   "path": "/v1/clusters/{cluster_id}/security-group-rules"
+ },
+ "database/postgresql/postgresqlsetservertype": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "POST",
+  "norm_path": "v1/instance-groups/*/resize",
+  "path": "/v1/instance-groups/{instance_group_id}/resize"
  },
  "database/postgresql/postgresqlshowarchiveconfig": {
   "count": 7,
@@ -12543,6 +12751,14 @@
   "norm_path": "v1/agents/download-link",
   "path": "/v1/agents/download-link"
  },
+ "management/servicewatch/showalert": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/alerts/*",
+  "path": "/v1/alerts/{id}"
+ },
  "management/servicewatch/showdashboard": {
   "count": 39,
   "first_run": "27583285457",
@@ -12550,6 +12766,14 @@
   "method": "GET",
   "norm_path": "v1/dashboards/*",
   "path": "/v1/dashboards/{dashboard_id}"
+ },
+ "management/servicewatch/showeventrule": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/event-rules/*",
+  "path": "/v1/event-rules/{event_rule_id}"
  },
  "management/servicewatch/showloggroup": {
   "count": 48,
@@ -14271,6 +14495,14 @@
   "norm_path": "v1/direct-connects",
   "path": "/v1/direct-connects"
  },
+ "networking/direct-connect/deletedirectconnect": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "DELETE",
+  "norm_path": "v1/direct-connects/*",
+  "path": "/v1/direct-connects/{direct_connect_id}"
+ },
  "networking/direct-connect/listdirectconnects": {
   "count": 25,
   "first_run": "27583285457",
@@ -14278,6 +14510,14 @@
   "method": "GET",
   "norm_path": "v1/direct-connects",
   "path": "/v1/direct-connects"
+ },
+ "networking/direct-connect/showdirectconnect": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/direct-connects/*",
+  "path": "/v1/direct-connects/{direct_connect_id}"
  },
  "networking/dns/createhostedzone": {
   "count": 6,
@@ -14407,6 +14647,14 @@
   "norm_path": "v1/firewalls/rules/*",
   "path": "/v1/firewalls/rules/{firewall_rule_id}"
  },
+ "networking/firewall/listfirewallrules": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/firewalls/rules",
+  "path": "/v1/firewalls/rules"
+ },
  "networking/firewall/listfirewalls": {
   "count": 28,
   "first_run": "27583285457",
@@ -14438,6 +14686,14 @@
   "method": "GET",
   "norm_path": "v1/firewalls/*",
   "path": "/v1/firewalls/{firewall_id}"
+ },
+ "networking/firewall/showfirewallrule": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "GET",
+  "norm_path": "v1/firewalls/rules/*",
+  "path": "/v1/firewalls/rules/{firewall_rule_id}"
  },
  "networking/gslb/creategslb": {
   "count": 11,
@@ -15047,6 +15303,22 @@
   "norm_path": "v1/subnets/*/vips/*",
   "path": "/v1/subnets/{subnet_id}/vips/{vip_id}"
  },
+ "networking/vpc/deletesubnetvipconnectedport": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "DELETE",
+  "norm_path": "v1/subnets/*/vips/*/connected-ports/*",
+  "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports/{connected_port_id}"
+ },
+ "networking/vpc/deletesubnetvipnatip": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "DELETE",
+  "norm_path": "v1/subnets/*/vips/*/static-nat-ips/*",
+  "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/static-nat-ips/{static_nat_id}"
+ },
  "networking/vpc/deletetransitgateway": {
   "count": 12,
   "first_run": "27593608514",
@@ -15510,6 +15782,14 @@
   "method": "PUT",
   "norm_path": "v1/vpn-gateways/*",
   "path": "/v1/vpn-gateways/{vpn_gateway_id}"
+ },
+ "networking/vpn/setvpntunnel": {
+  "count": 1,
+  "first_run": "local-02f524c7",
+  "last_run": "local-02f524c7",
+  "method": "PUT",
+  "norm_path": "v1/vpn-tunnels/*",
+  "path": "/v1/vpn-tunnels/{vpn_tunnel_id}"
  },
  "networking/vpn/showvpngateway": {
   "count": 2,
