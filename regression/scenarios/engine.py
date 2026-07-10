@@ -395,6 +395,17 @@ def _capture(body, expr):
     return None
 
 
+def _apply_b64_fields(step: dict, body):
+    """필드 단위 base64 인코딩 (step key ``json_b64_fields``) — IAM createiamuser가
+    평문 password를 400 "Password must be encoded base64"로 거부하는 문서 미기재
+    요구 (2026-07-10 실측, PF-36). 토큰({ualpha}) 치환 **후** 인코딩해야 하므로
+    레시피 리터럴이 아니라 엔진의 몫이다."""
+    for f in step.get("json_b64_fields") or []:
+        if isinstance(body, dict) and isinstance(body.get(f), str):
+            body[f] = base64.b64encode(body[f].encode()).decode()
+    return body
+
+
 def _fill(template: str, ctx: dict) -> str:
     def _sub(m):
         key = m.group(1)
@@ -1073,7 +1084,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 continue
 
             path = _fill(step["path"], ctx)
-            body = _fill_obj(step.get("json"), ctx)
+            body = _apply_b64_fields(step, _fill_obj(step.get("json"), ctx))
 
             # Kernel: stamp create bodies with owner/run/ttl tags.
             if _is_create(step):

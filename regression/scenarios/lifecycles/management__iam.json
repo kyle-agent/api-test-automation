@@ -1649,7 +1649,10 @@
             "path": "/v1/accounts/{account_id}/users/{user_id}",
             "service": "iam"
           },
-          "_note": "envelope FLAT $.id (iamcreateuserresponse). 비밀번호 정책: 9-20자, 대/소/숫/특 각 1+ (userguide 2026-06-15)."
+          "_note": "envelope FLAT $.id (iamcreateuserresponse). 비밀번호 정책: 9-20자, 대/소/숫/특 각 1+ (userguide 2026-06-15). || PF-36 (2026-07-10 라이브 실측): 평문 password → 400 'Password must be encoded base64' (문서 미기재) — json_b64_fields로 토큰 치환 후 인코딩. base64 재시도 → 201 확인 (regrscr 유저).",
+          "json_b64_fields": [
+            "password"
+          ]
         },
         {
           "name": "get-iam-user",
@@ -1690,7 +1693,11 @@
           "expect_status": [
             200,
             202
-          ]
+          ],
+          "json_b64_fields": [
+            "password"
+          ],
+          "_note": "PF-36 동형 — password base64 인코딩."
         },
         {
           "name": "create-group-for-user",
