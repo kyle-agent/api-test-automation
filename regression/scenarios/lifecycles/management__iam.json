@@ -1672,13 +1672,13 @@
           "optional": true,
           "json": {
             "description": "updated by API regression suite",
-            "password_reuse_count": 0
+            "password_reuse_count": 1
           },
           "expect_status": [
             200,
             202
           ],
-          "_note": "iamuserupdaterequest: password_reuse_count REQUIRED인 특이 DTO (0=Maximum 24 기본)."
+          "_note": "iamuserupdaterequest: password_reuse_count REQUIRED. run-85e8 실측: 0 → 400 'Input should be greater than 0' (Maximum 24, 최소 1) — 1로 수정. 이 400이 user-real 그룹 후속 전부를 스킵시켰던 원인."
         },
         {
           "name": "update-iam-user-password",
