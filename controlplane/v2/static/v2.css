@@ -153,6 +153,105 @@ tr.unt-row a { color: var(--sub); }
 }
 .seg button:last-child { border-right: 0; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+/* 서비스 상세 엔드포인트 필터 — method별 활성색(발행 페이지 패리티) */
+.seg button.m-get[aria-pressed="true"] { background: #2f78c4; }
+.seg button.m-post[aria-pressed="true"] { background: var(--loc); }
+.seg button.m-put[aria-pressed="true"] { background: #d97a0a; }
+.seg button.m-delete[aria-pressed="true"] { background: #d63a3a; }
+.seg button.m-patch[aria-pressed="true"] { background: #7a45c2; }
+
+/* ── 서비스 상세 히어로(커버리지 링) — 발행 페이지 패리티 (2026-07-10) ── */
+.svc-hero { padding: 18px 20px; }
+.hero-row { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; margin-top: 4px; }
+.ring-wrap { display: flex; align-items: center; gap: 14px; }
+.ring {
+  width: 62px; height: 62px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; position: relative;
+}
+.ring::after { content: ""; position: absolute; inset: 7px; background: var(--card); border-radius: 50%; }
+.ring span { position: relative; font-weight: 700; font-size: 15px; }
+.ring-lbl { font-size: 12.5px; color: var(--sub); }
+.ring-lbl b { color: var(--ink); font-size: 13.5px; }
+.reached-note { color: var(--stale); margin-left: 2px; }
+.hero-title { margin: 0; font-size: 21px; letter-spacing: -.2px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: #eff6ff; color: var(--pub); }
+.hero-split { margin-left: auto; display: flex; gap: 26px; flex-wrap: wrap; }
+.hero-split .k { font-size: 11.5px; color: var(--sub); }
+.hero-split .v { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+.hero-split .v .sub { font-size: 11.5px; font-weight: 500; color: var(--sub); }
+
+/* 자동 액션 배너 */
+.action-banner {
+  display: flex; gap: 10px; align-items: flex-start; background: #fdf3e2;
+  border: 1px solid #f0dcb6; border-radius: 11px; padding: 11px 14px;
+  margin-bottom: 20px; font-size: 13px; color: var(--ink);
+}
+.action-banner b { color: #8a5a08; }
+
+/* 필터 바 — chiptog(체크박스 토글 필) + reset + legend */
+.chiptog {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--card); padding: 6px 11px; font-size: 12.5px;
+  font-weight: 600; color: var(--sub); cursor: pointer; user-select: none;
+}
+.chiptog input { accent-color: var(--link); margin: 0; }
+.chiptog.on { border-color: var(--link); color: var(--link); background: #eff6ff; }
+.spacer { flex: 1; }
+.reset-btn { color: var(--sub); font-size: 12px; cursor: pointer; border: 0; background: none; text-decoration: underline; padding: 0; }
+.ep-row2 { display: flex; gap: 16px; align-items: center; margin-top: 9px; font-size: 12px; color: var(--sub); flex-wrap: wrap; }
+.ep-row2 .count b { color: var(--ink); font-size: 13px; }
+.legend { display: flex; gap: 13px; flex-wrap: wrap; margin-left: auto; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.legend-dot.g { background: var(--loc); }
+.legend-dot.a { background: var(--stale); }
+.legend-dot.r { background: #cf222e; }
+.legend-dot.s { background: var(--line); }
+
+/* 리소스 그룹 접기 카드 (경로 세그먼트 기준) */
+.grp { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
+.grp-h {
+  display: flex; align-items: center; gap: 11px; padding: 10px 14px; cursor: pointer;
+  background: var(--bg); border-bottom: 1px solid var(--line); user-select: none;
+}
+.grp-h .caret { transition: transform .15s; color: var(--sub); font-size: 11px; }
+.grp.collapsed .caret { transform: rotate(-90deg); }
+.grp.collapsed .grp-body { display: none; }
+.grp-h .name { font-weight: 700; font-size: 13.5px; }
+.grp-h .frac { font-size: 12px; color: var(--sub); }
+.grp-h .gd { margin-left: auto; font-size: 11.5px; color: #9a6700; font-weight: 600; }
+.mini { height: 6px; width: 130px; border-radius: 4px; background: var(--line); overflow: hidden; display: inline-block; }
+.mini i { display: block; height: 100%; background: var(--loc); }
+
+/* 엔드포인트 표 — HTTP status 배지 / 응답시간 / 근거 마커 (published 패리티) */
+.hst { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 6px; display: inline-block; }
+.hst-s2 { background: var(--good-bg); color: var(--good-ink); }
+.hst-s404 { background: var(--bg); color: var(--sub); }
+.hst-s4 { background: #fdf3e2; color: #b5740b; }
+.hst-s5 { background: var(--bad-bg); color: var(--bad-ink); }
+.hst-none { color: var(--sub); font-weight: 500; background: transparent; }
+.ms { font-size: 11px; color: var(--sub); margin-left: 6px; }
+.ms.warn { color: #b5740b; font-weight: 600; }
+.ms.slow { color: var(--bad-ink); font-weight: 700; }
+.probe { font-size: 10.5px; color: var(--sub); margin-left: 6px; }
+.prev { font-size: 10px; color: var(--sub); margin-left: 5px; }
+.ok { color: var(--loc); font-size: 12px; }
+.detailrow { display: none; }
+.detailrow.open { display: table-row; }
+.detailcell { background: var(--bg); padding: 9px 14px 12px; border-bottom: 1px solid var(--line); }
+.ep-tbl td.path { font-size: 12px; word-break: normal; overflow-wrap: break-word; }
+.ep-tbl thead th { text-transform: uppercase; letter-spacing: .3px; font-size: 11px; }
+.ep-tbl { table-layout: fixed; min-width: 640px; }
+.ep-tbl th:nth-child(2) { width: 84px; }
+.ep-tbl th:nth-child(3) { width: 30%; }
+.ep-tbl th:nth-child(4) { width: 220px; }
+.ep-tbl th:nth-child(5) { width: 130px; }
+.ep-tbl th:nth-child(6) { width: 170px; }
+.ep-tbl th:nth-child(7) { width: 110px; }
+@media (max-width: 640px) {
+  .ep-tbl { table-layout: auto; }
+  .ep-tbl td.path, .ep-tbl td.mono { white-space: nowrap; }
+}
 
 /* 엔드포인트 표 */
 .ep-tbl .cbar-h { width: 4px; padding: 0; }

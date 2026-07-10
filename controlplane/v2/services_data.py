@@ -237,10 +237,19 @@ def _build() -> dict | None:
         verified_doc = _load_dd_json("verified_endpoints.json")
         status_doc = _load_dd_json("endpoint_status.json")
         conf_doc = _load_dd_json("conformance.json")
+        # 검증 근거 run id (durable-evidence override 입력) — dashdata root 파일,
+        # 부재/파싱 실패 시 {} 로 조용히 생략(계약 §3). 파일명은 dashboard-data
+        # 발행 스크립트(origin/claude/continuation-uk2rwc)가 쓰는 이름 그대로.
+        evidence_doc = _load_dd_json("verified_endpoints_evidence.json")
 
         prior_verified = set(verified_doc.get("verified") or [])
         status_map = status_doc.get("status") or {}
         conf_by_endpoint = _merge_known_issues(dict(conf_doc.get("by_endpoint") or {}))
+        # dashboard/build.py build()의 conf["evaluated"] 재현(L1721) — 원본은
+        # 로컬 unified findings 존재 여부를 쓰지만(machine-local, v2는 접근 금지),
+        # v2 등가물은 "발행된 by_endpoint 컨포먼스 데이터가 있는가"이다: 있으면
+        # 결함 없는 행이 "OK", 없으면 "Not evaluated"(근거 없음 ≠ 정상, 원칙 1-4).
+        conf_evaluated = bool(conf_doc.get("by_endpoint"))
 
         tsv_rows = _synth_tsv_rows(status_map)
         services, _merged = per_service(
@@ -257,14 +266,39 @@ def _build() -> dict | None:
                     defect_red += 1
                 elif st == "yellow":
                     defect_yellow += 1
-            out_services.append({
+            endpoint_rows = _endpoint_rows(s, conf_by_endpoint, status_map, evidence_doc)
+            pct_num = s["covered"] / s["total"] * 100 if s["total"] else 0
+            gpct_num = s["gcov"] / s["gtot"] * 100 if s["gtot"] else 0
+            wpct_num = s["wcov"] / s["wtot"] * 100 if s["wtot"] else 0
+            svc_out = {
                 **s,
                 "pct_label": _pct(s["covered"], s["total"]),
                 "get_pct_label": _pct(s["gcov"], s["gtot"]),
                 "write_pct_label": _pct(s["wcov"], s["wtot"]),
                 "defect_red": defect_red, "defect_yellow": defect_yellow,
-                "endpoint_rows": _endpoint_rows(s, conf_by_endpoint, status_map),
-            })
+                "endpoint_rows": endpoint_rows,
+                "conf_evaluated": conf_evaluated,
+                # 히어로 커버리지 링 — 색 사다리는 dashboard/build.py
+                # render_service_page()의 ring_col과 동일(L679-680): <25 빨강,
+                # <55 amber, 그 외 green. untestable은 "—"/회색(L716-717 이식).
+                "ring_pct": "—" if s.get("untestable") else f"{pct_num:.0f}",
+                "ring_color": ("var(--line)" if s.get("untestable")
+                               else "#cf222e" if pct_num < 25
+                               else "var(--stale)" if pct_num < 55
+                               else "var(--loc)"),
+                "get_color": ("var(--line)" if s.get("untestable")
+                              else "var(--loc)" if gpct_num >= 55
+                              else "var(--stale)" if gpct_num >= 25 else "#cf222e"),
+                "write_color": ("var(--line)" if s.get("untestable")
+                                else "var(--loc)" if wpct_num >= 55
+                                else "var(--stale)" if wpct_num >= 25 else "#cf222e"),
+            }
+            svc_out["action_html"] = _action_banner(svc_out, endpoint_rows)
+            # 필터바/그룹 접기 JS가 소비하는 행 데이터 — "</"는 </script> 조기
+            # 종료 방지로 이스케이프(표준 JSON-in-<script> 안전화 관례).
+            svc_out["rows_json"] = (
+                json.dumps(endpoint_rows, ensure_ascii=False).replace("</", "<\\/"))
+            out_services.append(svc_out)
         # 발행본과 동일 정렬: 커버리지 오름차순(백로그 우선) — per_service()가
         # 이미 (category, pct, service)로 정렬해 두지만, 목록 화면 계약(§2.2)은
         # "정렬 기본 = 커버리지 오름차순" 단독 기준이라 카테고리 우선순위를 뺀

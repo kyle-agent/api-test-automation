@@ -80,6 +80,8 @@ TERMS: dict[str, dict] = {
                 "tip": "마지막 관측 응답시간이 3초 이상인 호출만 표시"},
     "svc_resource_groups": {"label": "Resource groups", "code": None,
                             "tip": "경로 세그먼트(리소스) 기준으로 엔드포인트를 접어서 묶어 보기"},
+    "svc_status_grade": {"label": "HTTP status", "code": None,
+                         "tip": "최근 관측된 응답의 HTTP status 등급으로 필터링"},
     "defect_ok": {"label": "OK", "code": None,
                  "tip": "이 API에 특정된 결함·개선 항목이 없음"},
     "defect_unevaluated": {"label": "Not evaluated", "code": None,

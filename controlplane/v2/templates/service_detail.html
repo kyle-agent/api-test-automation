@@ -4,38 +4,36 @@
 {% block content %}
 
 <p class="crumb"><a href="/v2/services">Service list</a> / {{ svc.category }}</p>
-<h1 class="page-q">{{ svc.service }}
-  {% if svc.untestable %}<span class="badge badge-none" title="{{ svc.untestable }}">{{ terms['untestable'].label }}</span>{% endif %}
-</h1>
 
-<section class="panel overview">
+{# ── 히어로 — 발행 페이지 패리티(2026-07-10, owner 판정: "발행 상세가 더 명확하다").
+     이식 원본: origin/dashboard-data:services/networking__loadbalancer.html의
+     .hero 블록(커버리지 링 + 서비스명 + 카테고리 칩 + Read/Write/Defects 분수). #}
+<section class="panel svc-hero">
   <div class="panel-head">
-    <h2>Overview</h2>
     {{ badge('published', ts=pub.updated_label, ident=('dd:' ~ pub.sha if pub.sha else None), stale=pub.stale) }}
   </div>
   {% if svc.untestable %}
   <p class="panel-note">기능 테스트 제외 서비스 — {{ svc.untestable }}. 아래 수치는 접근성(도달) 확인 결과다.</p>
   {% endif %}
-  <div class="kpis">
-    <div class="kpi">
-      <div class="kpi-label">{{ term('cov_c3', terms) }}</div>
-      <div class="kpi-value">{{ svc.pct_label }}</div>
-      <div class="kpi-sub">{{ svc.covered }}/{{ svc.total }}</div>
+  <div class="hero-row">
+    <div class="ring-wrap">
+      <div class="ring" style="background:conic-gradient({{ svc.ring_color }} calc({{ svc.ring_pct if svc.ring_pct != '—' else 0 }}*1%),var(--line) 0)">
+        <span>{{ svc.ring_pct }}{% if svc.ring_pct != '—' %}%{% endif %}</span>
+      </div>
+      <div class="ring-lbl">{{ term('cov_hero', terms) }}<br><b>{{ svc.covered }} / {{ svc.total }}</b> ops
+        {% if svc.reached %}<span class="reached-note">◑ {{ terms['cov_reached'].label }} {{ svc.reached }}</span>{% endif %}
+      </div>
     </div>
-    <div class="kpi">
-      <div class="kpi-label">Read (GET)</div>
-      <div class="kpi-value">{{ svc.get_pct_label }}</div>
-      <div class="kpi-sub">{{ svc.gcov }}/{{ svc.gtot }}</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Write (POST/PUT/DELETE)</div>
-      <div class="kpi-value">{{ svc.write_pct_label }}</div>
-      <div class="kpi-sub">{{ svc.wcov }}/{{ svc.wtot }}</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">{{ term('defect_red', terms) }} / {{ term('defect_yellow', terms) }}</div>
-      <div class="kpi-value">{{ svc.defect_red }} / {{ svc.defect_yellow }}</div>
-      <div class="kpi-sub">결함(구현 버그) / 개선(설계·문서)</div>
+    <h1 class="hero-title">{{ svc.service }} <span class="tag">{{ svc.category }}</span>
+      {% if svc.untestable %}<span class="badge badge-none" title="{{ svc.untestable }}">{{ terms['untestable'].label }}</span>{% endif %}
+    </h1>
+    <div class="hero-split">
+      <div><div class="k">{{ term('read_get', terms) }}</div>
+        <div class="v" style="color:{{ svc.get_color }}">{{ svc.get_pct_label }} <span class="sub">{{ svc.gcov }}/{{ svc.gtot }}</span></div></div>
+      <div><div class="k">{{ term('write_ops', terms) }}</div>
+        <div class="v" style="color:{{ svc.write_color }}">{{ svc.write_pct_label }} <span class="sub">{{ svc.wcov }}/{{ svc.wtot }}</span></div></div>
+      <div><div class="k">{{ term('defect_red', terms) }} / {{ term('defect_yellow', terms) }}</div>
+        <div class="v">{{ svc.defect_red }} / {{ svc.defect_yellow }}</div></div>
     </div>
   </div>
   <p class="run-cta-wrap">
@@ -46,108 +44,227 @@
   </p>
 </section>
 
+{# ── 자동 액션 배너 — 데이터/문장은 services_data.py:_action_banner()가 만든다
+     (출처: dashboard/build.py render_service_page() 생성 로직 이식, 주석 참조). #}
+<div class="action-banner">{{ svc.action_html|safe }}</div>
+
 <section class="panel">
   <div class="panel-head">
     <h2>Endpoints</h2>
-    <span class="panel-note">{{ rows|length }}개</span>
+    <span class="panel-note">{{ svc.endpoint_rows|length }}개</span>
   </div>
 
   <div class="svc-toolbar ep-toolbar">
     <div class="seg" id="m-seg">
-      <button type="button" data-m="" aria-pressed="true">All</button>
-      <button type="button" data-m="GET" aria-pressed="false">GET</button>
-      <button type="button" data-m="POST" aria-pressed="false">POST</button>
-      <button type="button" data-m="PUT" aria-pressed="false">PUT</button>
-      <button type="button" data-m="DELETE" aria-pressed="false">DELETE</button>
-      <button type="button" data-m="PATCH" aria-pressed="false">PATCH</button>
+      <button type="button" class="m-get" data-m="GET" aria-pressed="false">GET</button>
+      <button type="button" class="m-post" data-m="POST" aria-pressed="false">POST</button>
+      <button type="button" class="m-put" data-m="PUT" aria-pressed="false">PUT</button>
+      <button type="button" class="m-delete" data-m="DELETE" aria-pressed="false">DELETE</button>
+      <button type="button" class="m-patch" data-m="PATCH" aria-pressed="false">PATCH</button>
     </div>
     <select id="cov-filter">
       <option value="">All coverage</option>
-      <option value="verified">{{ terms['cov_verified'].label }}</option>
-      <option value="reached">{{ terms['cov_reached'].label }}</option>
-      <option value="failed">{{ terms['cov_failed'].label }}</option>
-      <option value="none">{{ terms['cov_none'].label }}</option>
+      <option value="verified">✓ {{ terms['cov_verified'].label }}</option>
+      <option value="reached">◑ {{ terms['cov_reached'].label }}</option>
+      <option value="failed">⛔ {{ terms['cov_failed'].label }}</option>
+      <option value="none">· {{ terms['cov_none'].label }}</option>
     </select>
+    <select id="status-filter" title="{{ terms['svc_status_grade'].tip }}">
+      <option value="">All HTTP status</option>
+      <option value="2">2xx</option>
+      <option value="404">404 (probe unreached)</option>
+      <option value="4">Other 4xx</option>
+      <option value="5">5xx</option>
+      <option value="none">Not observed</option>
+    </select>
+    <label class="chiptog" id="def-tog"><input type="checkbox">{{ term('svc_defects_only', terms) }}</label>
+    <label class="chiptog" id="slow-tog"><input type="checkbox">{{ term('svc_slow', terms) }}</label>
     <div class="search"><input id="ep-search" type="text" placeholder="Search path · API" autocomplete="off"></div>
+    <div class="spacer"></div>
+    <label class="chiptog on" id="grp-tog"><input type="checkbox" checked>{{ term('svc_resource_groups', terms) }}</label>
+    <button type="button" class="reset-btn" id="ep-reset">Reset</button>
+  </div>
+  <div class="ep-row2">
+    <span class="count"><b id="ep-shown"></b> / {{ svc.total }} endpoints</span>
+    <span class="legend">
+      <span><i class="legend-dot g"></i>Verified (2xx)</span>
+      <span><i class="legend-dot a"></i>Reached · unverified</span>
+      <span><i class="legend-dot s"></i>Not observed</span>
+      <span><i class="legend-dot r"></i>Fail / contract violation</span>
+    </span>
   </div>
 
-  <div class="tbl-scroll">
-  <table class="tbl ep-tbl" id="ep-table">
-    <thead>
-      <tr>
-        <th class="cbar-h"></th><th>Method</th><th>Path</th><th>API</th>
-        <th>Coverage</th><th>Last status · latency</th><th>{{ term('defect_red', terms) }}</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in rows %}
-      <tr class="ep-row cov-{{ r.cov }}"
-          data-method="{{ r.method }}" data-cov="{{ r.cov }}"
-          data-text="{{ (r.path ~ ' ' ~ r.api)|lower }}">
-        <td class="cbar"></td>
-        <td><span class="mb mb-{{ r.method }}">{{ r.method }}</span></td>
-        <td class="mono">{{ r.path }}</td>
-        <td class="mono">{{ r.api }}</td>
-        <td class="cov cov-{{ r.cov }}" title="{{ terms['cov_' ~ r.cov].tip }}">{{ r.cov_icon }} {{ r.cov_label }}</td>
-        <td class="mono">
-          {% if r.status is not none %}
-            {{ r.status }}{% if r.elapsed_s is not none %} · {{ r.elapsed_s }}s{% endif %}
-            <span class="mut" title="발행 누적 관측 — 괄호는 이 관측을 남긴 런의 소스 버전(커밋). 이 화면이 직접 실행한 값이 아님">{% if r.sha %} (observed @{{ r.sha }}){% else %} (발행 누적){% endif %}</span>
-          {% else %}
-            <span class="mut">—</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if r.defects %}
-          <details>
-            <summary class="defbtn {{ 'crit' if r.defect_status=='red' else '' }}">{{ terms['defect_red'].label if r.defect_status=='red' else terms['defect_yellow'].label }} {{ r.defects|length }}</summary>
-            <ul class="defitems">
-              {% for it in r.defects %}
-              <li class="defitem {{ 'crit' if r.defect_status=='red' else '' }}">
-                <b>{{ it.type }}</b> <span class="meta">[{{ it.src }}{% if it.issue %} · #{{ it.issue }}{% endif %}]</span>
-                <div class="dd">{{ it.detail }}</div>
-              </li>
-              {% endfor %}
-            </ul>
-          </details>
-          {% else %}<span class="mut">—</span>{% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
+  <div id="ep-out"></div>
   <p class="empty-state ep-no-match" id="ep-no-match" style="display:none">필터에 해당하는 엔드포인트가 없습니다.</p>
 </section>
 
+<script type="application/json" id="ep-rows-data">{{ svc.rows_json|safe }}</script>
 <script>
 (function(){
-  var state = {m:'', cov:'', q:''};
-  var rows = document.querySelectorAll('#ep-table tbody tr');
+  var dataEl = document.getElementById('ep-rows-data');
+  var ROWS = [];
+  try { ROWS = JSON.parse(dataEl.textContent || '[]'); } catch (e) { ROWS = []; }
+  var CONF_EVAL = {{ 'true' if svc.conf_evaluated else 'false' }};
+  var state = {methods: new Set(), cov: '', st: '', def: false, slow: false, q: '', group: true};
+  var out = document.getElementById('ep-out');
+  var shownEl = document.getElementById('ep-shown');
   var noMatch = document.getElementById('ep-no-match');
-  function apply(){
-    var shown = 0;
-    rows.forEach(function(tr){
-      var okM = !state.m || tr.dataset.method === state.m;
-      var okC = !state.cov || tr.dataset.cov === state.cov;
-      var okQ = !state.q || tr.dataset.text.indexOf(state.q) >= 0;
-      var vis = okM && okC && okQ;
-      tr.style.display = vis ? '' : 'none';
-      if (vis) shown++;
-    });
-    if (noMatch) noMatch.style.display = shown ? 'none' : '';
+
+  function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function stClass(s){ if(s==null) return 'none'; if(s>=200&&s<300) return 's2'; if(s===404) return 's404'; if(s>=500) return 's5'; return 's4'; }
+  function msClass(t){ if(t==null) return ''; if(t>=3) return 'slow'; if(t>=2) return 'warn'; return ''; }
+
+  function matches(r){
+    if (state.methods.size && !state.methods.has(r.method)) return false;
+    if (state.cov && r.cov !== state.cov) return false;
+    if (state.st){
+      if (state.st === '2' && !(r.status >= 200 && r.status < 300)) return false;
+      if (state.st === '404' && r.status !== 404) return false;
+      if (state.st === '4' && !(r.status >= 400 && r.status < 500 && r.status !== 404)) return false;
+      if (state.st === '5' && !(r.status >= 500)) return false;
+      if (state.st === 'none' && r.status != null) return false;
+    }
+    if (state.def && (!r.defects || !r.defects.length)) return false;
+    if (state.slow && !r.slow) return false;
+    if (state.q){
+      var q = state.q;
+      if (r.path.toLowerCase().indexOf(q) < 0 && r.api.toLowerCase().indexOf(q) < 0) return false;
+    }
+    return true;
   }
+
+  function defCell(r){
+    if (!r.defects || !r.defects.length){
+      return CONF_EVAL
+        ? '<span class="ok">{{ terms["defect_ok"].label }}</span>'
+        : '<span class="mut" title="{{ terms["defect_unevaluated"].tip }}">{{ terms["defect_unevaluated"].label }}</span>';
+    }
+    var crit = r.defect_status === 'red';
+    return '<button type="button" class="defbtn' + (crit ? ' crit' : '') + '" onclick="epToggleDetail(this)">'
+      + (crit ? '{{ terms["defect_red"].label }}' : '{{ terms["defect_yellow"].label }}') + ' ' + r.defects.length
+      + '<span class="ca">▾</span></button>';
+  }
+  function detailRowHTML(r){
+    if (!r.defects || !r.defects.length) return '';
+    var crit = r.defect_status === 'red';
+    var items = r.defects.map(function(i){
+      return '<div class="defitem' + (crit ? ' crit' : '') + '"><b>' + esc(i.type) + '</b>'
+        + '<span class="meta">' + (i.issue ? '#' + esc(i.issue) + ' · ' : '') + esc(i.src) + '</span>'
+        + '<div class="dd">' + esc(i.detail) + '</div></div>';
+    }).join('');
+    return '<tr class="detailrow"><td class="cbar"></td><td colspan="6" class="detailcell">' + items + '</td></tr>';
+  }
+  window.epToggleDetail = function(btn){
+    var dr = btn.closest('tr').nextElementSibling;
+    if (dr && dr.classList.contains('detailrow')) { dr.classList.toggle('open'); btn.classList.toggle('open'); }
+  };
+  function rowHTML(r){
+    var st;
+    if (r.ev){
+      // durable-evidence override — 이식 원본: dashboard-data 발행 페이지의
+      // "stale-cell fix"(owner 2026-07-10). 근거: verified_endpoints_evidence.json
+      st = '<span class="hst hst-s2" title="누적 검증 근거 — verified_endpoints_evidence.json">✅ Verified (run ' + esc(r.ev) + ')</span>';
+      if (r.status != null && !(r.status >= 200 && r.status < 300)){
+        st += '<span class="prev" title="발행 관측 이력에는 아직 이 값이 남아있음 — 검증 근거가 우선">· 직전 관측 ' + r.status + (r.sha ? ' @' + esc(r.sha) : '') + '</span>';
+      }
+    } else if (r.status == null){
+      st = '<span class="hst hst-none">—</span>';
+    } else {
+      st = '<span class="hst ' + stClass(r.status) + '">' + r.status + '</span>';
+      if (r.sha){ st += '<span class="prev" title="이번 발행의 누적 관측 — 마지막으로 이 값을 남긴 커밋">· 직전 관측 @' + esc(r.sha) + '</span>'; }
+    }
+    var ms = r.elapsed_s != null ? '<span class="ms ' + msClass(r.elapsed_s) + '">' + (r.elapsed_s < 1 ? Math.round(r.elapsed_s * 1000) + 'ms' : r.elapsed_s + 's') + '</span>' : '';
+    var probe = (r.cov === 'none' && r.status === 404) ? '<span class="probe">probe unreached</span>' : '';
+    return '<tr class="ep-row cov-' + r.cov + '">'
+      + '<td class="cbar"></td>'
+      + '<td><span class="mb mb-' + r.method + '">' + r.method + '</span></td>'
+      + '<td class="mono path">' + esc(r.path) + '</td>'
+      + '<td class="mono">' + esc(r.api) + '</td>'
+      + '<td class="cov cov-' + r.cov + '" title="' + esc(r.cov_label) + '">' + r.cov_icon + ' ' + esc(r.cov_label) + '</td>'
+      + '<td>' + st + ms + probe + '</td>'
+      + '<td>' + defCell(r) + '</td>'
+      + '</tr>' + detailRowHTML(r);
+  }
+  var THEAD = '<thead><tr><th class="cbar-h"></th><th>Method</th><th>Path</th><th>API</th><th>Coverage</th><th>Last status · latency</th><th>{{ terms["defect_red"].label }}</th></tr></thead>';
+
+  function render(){
+    var rows = ROWS.filter(matches);
+    if (shownEl) shownEl.textContent = rows.length;
+    if (!rows.length){
+      out.innerHTML = '';
+      if (noMatch) noMatch.style.display = '';
+      return;
+    }
+    if (noMatch) noMatch.style.display = 'none';
+    if (!state.group){
+      out.innerHTML = '<div class="grp"><div class="tbl-scroll"><table class="tbl ep-tbl">' + THEAD + '<tbody>' + rows.map(rowHTML).join('') + '</tbody></table></div></div>';
+      return;
+    }
+    var groups = {};
+    rows.forEach(function(r){ (groups[r.group] = groups[r.group] || []).push(r); });
+    var order = Object.keys(groups).sort(function(a, b){ return groups[b].length - groups[a].length; });
+    out.innerHTML = order.map(function(g){
+      var grows = groups[g];
+      var cov = grows.filter(function(r){ return r.cov === 'verified'; }).length;
+      var pct = Math.round(cov / grows.length * 100);
+      var defs = grows.reduce(function(n, r){ return n + (r.defects ? r.defects.length : 0); }, 0);
+      return '<div class="grp"><div class="grp-h" onclick="this.parentNode.classList.toggle(\'collapsed\')">'
+        + '<span class="caret">▼</span>'
+        + '<span class="name">' + esc(g) + '</span>'
+        + '<span class="frac">' + cov + '/' + grows.length + ' verified</span>'
+        + '<span class="mini"><i style="width:' + pct + '%"></i></span>'
+        + (defs ? '<span class="gd">{{ terms["defect_yellow"].label }} ' + defs + '</span>' : '')
+        + '</div><div class="grp-body"><div class="tbl-scroll"><table class="tbl ep-tbl">' + THEAD + '<tbody>' + grows.map(rowHTML).join('') + '</tbody></table></div></div></div>';
+    }).join('');
+  }
+
   document.querySelectorAll('#m-seg button').forEach(function(b){
     b.addEventListener('click', function(){
-      document.querySelectorAll('#m-seg button').forEach(function(x){ x.setAttribute('aria-pressed','false'); });
-      b.setAttribute('aria-pressed','true');
-      state.m = b.dataset.m; apply();
+      var m = b.dataset.m, on = b.getAttribute('aria-pressed') === 'true';
+      b.setAttribute('aria-pressed', String(!on));
+      on ? state.methods.delete(m) : state.methods.add(m);
+      render();
     });
   });
   var covSel = document.getElementById('cov-filter');
-  if (covSel) covSel.addEventListener('change', function(e){ state.cov = e.target.value; apply(); });
+  if (covSel) covSel.addEventListener('change', function(e){ state.cov = e.target.value; render(); });
+  var stSel = document.getElementById('status-filter');
+  if (stSel) stSel.addEventListener('change', function(e){ state.st = e.target.value; render(); });
+  function tog(id, key){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.querySelector('input').addEventListener('change', function(e){
+      state[key] = e.target.checked;
+      el.classList.toggle('on', e.target.checked);
+      render();
+    });
+  }
+  tog('def-tog', 'def');
+  tog('slow-tog', 'slow');
+  var grpTog = document.getElementById('grp-tog');
+  if (grpTog) grpTog.querySelector('input').addEventListener('change', function(e){
+    state.group = e.target.checked;
+    grpTog.classList.toggle('on', e.target.checked);
+    render();
+  });
   var epSearch = document.getElementById('ep-search');
-  if (epSearch) epSearch.addEventListener('input', function(e){ state.q = e.target.value.toLowerCase(); apply(); });
+  if (epSearch) epSearch.addEventListener('input', function(e){ state.q = e.target.value.toLowerCase(); render(); });
+  var resetBtn = document.getElementById('ep-reset');
+  if (resetBtn) resetBtn.addEventListener('click', function(){
+    state.methods.clear(); state.cov = ''; state.st = ''; state.def = false; state.slow = false; state.q = '';
+    document.querySelectorAll('#m-seg button').forEach(function(b){ b.setAttribute('aria-pressed', 'false'); });
+    if (covSel) covSel.value = '';
+    if (stSel) stSel.value = '';
+    if (epSearch) epSearch.value = '';
+    ['def-tog', 'slow-tog'].forEach(function(id){
+      var el = document.getElementById(id);
+      el.querySelector('input').checked = false;
+      el.classList.remove('on');
+    });
+    render();
+  });
+
+  render();
 })();
 </script>
 {% endblock %}
