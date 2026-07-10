@@ -34,6 +34,19 @@ TERMS: dict[str, dict] = {
                    "tip": "한 번의 실행이 남긴 성공/실패/스킵 판정"},
     "model_state": {"label": "모델 상태", "code": None,
                     "tip": "테스트 정의(리소스 모델)의 완성도 — 모델됨/검증됨"},
+    # 서비스 상세 엔드포인트 표의 커버 열 — 4개 상태 라벨 (L1 계약 §2.2)
+    "cov_verified": {"label": "검증(C3)", "code": None,
+                     "tip": "검증(C3) = 실제 2xx 응답으로 동작을 확인함"},
+    "cov_reached": {"label": "도달", "code": None,
+                    "tip": "도달 = 호출은 됐으나 2xx로 확인되지 않음(4xx 등)"},
+    "cov_failed": {"label": "실패", "code": None,
+                   "tip": "실패 = 5xx 등 하드 실패가 관측됨"},
+    "cov_none": {"label": "미관측", "code": None,
+                 "tip": "미관측 = 지금까지 어떤 런에서도 호출 기록이 없음"},
+    "defect_red": {"label": "결함", "code": None,
+                   "tip": "결함 = 계약 위반 등 실제 구현 버그"},
+    "defect_yellow": {"label": "개선", "code": None,
+                      "tip": "개선 = 설계·문서상 아쉬운 점(구현 버그는 아님)"},
 }
 
 # 출처 배지 3종 (L1 계약 §1) — 라벨과 뜻. 배지 마크업은 _badges.html 매크로가 유일한 구현.

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% from "_badges.html" import badge, term %}
+{% block title %}{{ svc.service }}{% endblock %}
+{% block content %}
+
+<p class="crumb"><a href="/v2/services">서비스 목록</a> / {{ svc.category }}</p>
+<h1 class="page-q">{{ svc.service }}
+  {% if svc.untestable %}<span class="badge badge-none" title="{{ svc.untestable }}">기능 테스트 제외</span>{% endif %}
+</h1>
+
+<section class="panel overview">
+  <div class="panel-head">
+    <h2>개요</h2>
+    {{ badge('published', ts=pub.updated_label, ident=('dd:' ~ pub.sha if pub.sha else None), stale=pub.stale) }}
+  </div>
+  {% if svc.untestable %}
+  <p class="panel-note">기능 테스트 제외 서비스 — {{ svc.untestable }}. 아래 수치는 접근성(도달) 확인 결과다.</p>
+  {% endif %}
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-label">{{ term('cov_c3', terms) }}</div>
+      <div class="kpi-value">{{ svc.pct_label }}</div>
+      <div class="kpi-sub">{{ svc.covered }}/{{ svc.total }}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">읽기(GET)</div>
+      <div class="kpi-value">{{ svc.get_pct_label }}</div>
+      <div class="kpi-sub">{{ svc.gcov }}/{{ svc.gtot }}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">쓰기(POST/PUT/DELETE)</div>
+      <div class="kpi-value">{{ svc.write_pct_label }}</div>
+      <div class="kpi-sub">{{ svc.wcov }}/{{ svc.wtot }}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">{{ term('defect_red', terms) }} / {{ term('defect_yellow', terms) }}</div>
+      <div class="kpi-value">{{ svc.defect_red }} / {{ svc.defect_yellow }}</div>
+      <div class="kpi-sub">결함(구현 버그) / 개선(설계·문서)</div>
+    </div>
+  </div>
+  <p class="run-cta-wrap">
+    <a class="run-cta" href="/testing?service={{ svc.category }}/{{ svc.service }}">이 서비스 실행 →</a>
+  </p>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>엔드포인트 목록</h2>
+    <span class="panel-note">{{ rows|length }}개</span>
+  </div>
+
+  <div class="svc-toolbar ep-toolbar">
+    <div class="seg" id="m-seg">
+      <button type="button" data-m="" aria-pressed="true">전체</button>
+      <button type="button" data-m="GET" aria-pressed="false">GET</button>
+      <button type="button" data-m="POST" aria-pressed="false">POST</button>
+      <button type="button" data-m="PUT" aria-pressed="false">PUT</button>
+      <button type="button" data-m="DELETE" aria-pressed="false">DELETE</button>
+      <button type="button" data-m="PATCH" aria-pressed="false">PATCH</button>
+    </div>
+    <select id="cov-filter">
+      <option value="">전체 커버</option>
+      <option value="verified">{{ terms['cov_verified'].label }}</option>
+      <option value="reached">{{ terms['cov_reached'].label }}</option>
+      <option value="failed">{{ terms['cov_failed'].label }}</option>
+      <option value="none">{{ terms['cov_none'].label }}</option>
+    </select>
+    <div class="search"><input id="ep-search" type="text" placeholder="경로 · API명 검색" autocomplete="off"></div>
+  </div>
+
+  <div class="tbl-scroll">
+  <table class="tbl ep-tbl" id="ep-table">
+    <thead>
+      <tr>
+        <th class="cbar-h"></th><th>메서드</th><th>경로</th><th>API명</th>
+        <th>커버</th><th>최근 status · 응답</th><th>{{ term('defect_red', terms) }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr class="ep-row cov-{{ r.cov }}"
+          data-method="{{ r.method }}" data-cov="{{ r.cov }}"
+          data-text="{{ (r.path ~ ' ' ~ r.api)|lower }}">
+        <td class="cbar"></td>
+        <td><span class="mb mb-{{ r.method }}">{{ r.method }}</span></td>
+        <td class="mono">{{ r.path }}</td>
+        <td class="mono">{{ r.api }}</td>
+        <td class="cov cov-{{ r.cov }}" title="{{ terms['cov_' ~ r.cov].tip }}">{{ r.cov_icon }} {{ r.cov_label }}</td>
+        <td class="mono">
+          {% if r.status is not none %}
+            {{ r.status }}{% if r.elapsed_s is not none %} · {{ r.elapsed_s }}s{% endif %}
+            <span class="mut" title="발행 누적 관측(이 화면이 직접 실행한 값이 아님)">{% if r.sha %} (dd:{{ r.sha }}){% else %} (발행 누적){% endif %}</span>
+          {% else %}
+            <span class="mut">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.defects %}
+          <details>
+            <summary class="defbtn {{ 'crit' if r.defect_status=='red' else '' }}">{{ '결함' if r.defect_status=='red' else '개선' }} {{ r.defects|length }}</summary>
+            <ul class="defitems">
+              {% for it in r.defects %}
+              <li class="defitem {{ 'crit' if r.defect_status=='red' else '' }}">
+                <b>{{ it.type }}</b> <span class="meta">[{{ it.src }}{% if it.issue %} · #{{ it.issue }}{% endif %}]</span>
+                <div class="dd">{{ it.detail }}</div>
+              </li>
+              {% endfor %}
+            </ul>
+          </details>
+          {% else %}<span class="mut">—</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="empty-state ep-no-match" id="ep-no-match" style="display:none">필터에 해당하는 엔드포인트가 없습니다.</p>
+</section>
+
+<script>
+(function(){
+  var state = {m:'', cov:'', q:''};
+  var rows = document.querySelectorAll('#ep-table tbody tr');
+  var noMatch = document.getElementById('ep-no-match');
+  function apply(){
+    var shown = 0;
+    rows.forEach(function(tr){
+      var okM = !state.m || tr.dataset.method === state.m;
+      var okC = !state.cov || tr.dataset.cov === state.cov;
+      var okQ = !state.q || tr.dataset.text.indexOf(state.q) >= 0;
+      var vis = okM && okC && okQ;
+      tr.style.display = vis ? '' : 'none';
+      if (vis) shown++;
+    });
+    if (noMatch) noMatch.style.display = shown ? 'none' : '';
+  }
+  document.querySelectorAll('#m-seg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#m-seg button').forEach(function(x){ x.setAttribute('aria-pressed','false'); });
+      b.setAttribute('aria-pressed','true');
+      state.m = b.dataset.m; apply();
+    });
+  });
+  var covSel = document.getElementById('cov-filter');
+  if (covSel) covSel.addEventListener('change', function(e){ state.cov = e.target.value; apply(); });
+  var epSearch = document.getElementById('ep-search');
+  if (epSearch) epSearch.addEventListener('input', function(e){ state.q = e.target.value.toLowerCase(); apply(); });
+})();
+</script>
+{% endblock %}

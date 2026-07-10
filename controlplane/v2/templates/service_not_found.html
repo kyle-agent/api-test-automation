@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}서비스 없음{% endblock %}
+{% block content %}
+<h1 class="page-q">서비스를 찾을 수 없음</h1>
+<section class="panel">
+  <p class="empty-state">요청한 서비스(<span class="mono">{{ slug }}</span>)를 찾을 수 없습니다 — 주소가 바뀌었거나 존재하지 않는 서비스입니다.</p>
+  <p><a href="/v2/services">서비스 목록으로 →</a></p>
+</section>
+{% endblock %}

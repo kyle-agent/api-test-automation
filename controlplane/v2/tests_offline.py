@@ -45,10 +45,42 @@ def test_situation_renders():
 
 
 def test_axes_render():
-    for path in ("/v2/services", "/v2/model", "/v2/run", "/v2/results", "/v2/tools"):
+    for path in ("/v2/model", "/v2/run", "/v2/results", "/v2/tools"):
         r = client.get(path)
         assert r.status_code == 200, f"{path} -> {r.status_code}"
         assert "기존 화면" in r.text or "이용하세요" in r.text
+
+
+def test_services_list_renders():
+    r = client.get("/v2/services")
+    assert r.status_code == 200, r.status_code
+    body = r.text
+    assert "서비스별 테스트 현황" in body
+    # 서비스 1개 이상 렌더되거나 empty-state 중 하나는 반드시 존재 (L1 §2.2/§3)
+    assert ("상세 보기" in body) or ("발행된 공식 수치를 가져올 수 없습니다" in body) \
+        or ("표시할 서비스가 없습니다" in body)
+
+
+def test_service_detail_renders_or_skips_offline():
+    from controlplane.v2 import services_data
+    data = services_data.get_services_data()
+    if not data or not data.get("services"):
+        print("  (skip: 발행본 접근 불가 - empty-state는 위 테스트에서 검증됨)")
+        return
+    svc_slug = data["services"][0]["slug"]
+    r = client.get(f"/v2/services/{svc_slug}")
+    assert r.status_code == 200, r.status_code
+    body = r.text
+    assert "엔드포인트 목록" in body
+    assert "이 서비스 실행" in body
+    assert "/testing?service=" in body  # 기존 prefill 계약 딥링크
+
+
+def test_service_detail_unknown_slug_is_404():
+    r = client.get("/v2/services/__no-such-service__")
+    assert r.status_code == 404, r.status_code
+    assert "찾을 수 없" in r.text
+    assert "/v2/services" in r.text
 
 
 def test_local_run_shows_in_isolated_section():

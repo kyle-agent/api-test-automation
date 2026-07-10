@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from controlplane import db, snapshots
-from controlplane.v2 import published, terms
+from controlplane.v2 import published, services_data, terms
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -98,8 +98,6 @@ def situation(request: Request):
 # ── 나머지 축 (골격 — 화면 단위로 채워진다) ─────────────────────────────────
 
 _STUBS = {
-    "services": ("서비스", "서비스별 테스트 현황 — 서비스 목록·상세 화면이 이 축에 들어옵니다.",
-                 [("발행 대시보드의 서비스 드릴다운", "/reporting")]),
     "model": ("모델", "테스트 정의 · 리소스 모델 — 모델 표·작업 큐·노드 에디터·인벤토리가 이 축에 들어옵니다.",
               [("기존 Modeling 화면", "/planning")]),
     "run": ("실행", "테스트 실행 · 모니터링 — 계획(선택→구성 확인)→실행 모니터링→기록이 이 축에 들어옵니다.",
@@ -120,7 +118,22 @@ def _stub(request: Request, key: str):
 
 @router.get("/services", response_class=HTMLResponse)
 def services(request: Request):
-    return _stub(request, "services")
+    ctx = _ctx(request, "services")
+    data = services_data.get_services_data()
+    ctx.update(data=data, services=(data or {}).get("services") or [])
+    return templates.TemplateResponse(request, "services_list.html", ctx)
+
+
+@router.get("/services/{slug}", response_class=HTMLResponse)
+def service_detail(request: Request, slug: str):
+    ctx = _ctx(request, "services")
+    svc = services_data.get_service(slug)
+    if svc is None:
+        ctx.update(slug=slug)
+        return templates.TemplateResponse(
+            request, "service_not_found.html", ctx, status_code=404)
+    ctx.update(svc=svc, rows=svc.get("endpoint_rows") or [])
+    return templates.TemplateResponse(request, "service_detail.html", ctx)
 
 
 @router.get("/model", response_class=HTMLResponse)
