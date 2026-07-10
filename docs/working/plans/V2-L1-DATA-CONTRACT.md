@@ -132,9 +132,11 @@ basis: V2-DECISIONS.md(D2 확정) + 정찰 실측 4건 (2026-07-09, 발행물/�
   유지+update()만) → 견적(/api/plan + /api/capacity) → pre-flight 모달
   (**plan+capacity+preflight 3-fetch 필수** — 우회한 발사 UI 금지).
   선택→lifecycle 확장은 서버(_resolve_lifecycle_ids)만 한다(클라 재구현 금지).
-- **발사 버튼은 오너 검수 게이트 통과 후에만 활성화** — pre-flight 모달까지
-  완성하되 [Run live]는 disabled + legacy 콘솔 딥링크 병기. 실제 클라우드에
-  작용하는 기능은 검수 없이 켜지 않는다.
+- **[Run live] 활성화됨 (오너 승인 2026-07-10, LIVE 실증 후)**: pre-flight
+  3-fetch 통과 모달에서만 노출. 과금(heavy) 선택이면 "과금 실행 확인"
+  체크박스가 [Run live] 잠금을 푼다(비과금은 즉시 활성). 발사 성공 시
+  `/v2/runs/local-<id>`(실행 뷰 running)로 이동. 서버측 안전 가드(mutations
+  자동 ON·중복 LIVE 409·heavy 자동 파생)는 그대로 유효 — UI는 그 위의 확인 층.
 
 | 요소 | 출처 | 비고 |
 |---|---|---|

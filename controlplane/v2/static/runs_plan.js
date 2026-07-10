@@ -10,7 +10,9 @@
  *
  * v2 경계: 이 스크립트는 어떤 실행도 발사하지 않는다. [Review & run] 은
  * plan+capacity+preflight 3-fetch pre-flight 모달까지만 열고, 그 안의
- * [Run live] 버튼은 항상 disabled — 오너 검수 후 활성화될 때까지는 모달의
+ * [Run live]는 오너 승인(2026-07-10)으로 활성화됨 — pre-flight 3-fetch를
+ * 통과한 모달에서만 노출되며, heavy(과금) 선택 시 확인 체크박스가 잠금을
+ * 푼다. 이전 비활성 정책 설명(참고용):
  * "Continue in legacy console" 딥링크로 legacy 콘솔(console2, /testing)에서
  * 같은 선택으로 실행한다. postRun()의 실제 POST /api/run 호출은 주석으로만
  * 남겨둔다(활성화 결정 시 1줄 해제).
@@ -513,14 +515,14 @@
       ? `<div class="rp-heavy-note"><b>과금 라이프사이클 ${heavyIds.length}개:</b> ${heavyIds.map(id => `<code>${esc(id)}</code>`).join(" · ")}` +
         `<br><label style="display:inline-flex;gap:6px;align-items:center;margin-top:7px;cursor:pointer">` +
         `<input type="checkbox" id="rp-heavy-ok"> <b>과금 실행임을 확인했습니다</b></label>` +
-        `<p class="panel-note" style="margin:6px 0 0">v2에서는 이 확인이 실행을 열지 않습니다 — Run live는 항상 비활성화되어 있습니다.</p></div>`
+        `<p class="panel-note" style="margin:6px 0 0">과금 실행 확인에 체크해야 [Run live]가 열립니다.</p></div>`
       : "";
     const etaTotal = (pf && pf.est && pf.est.p50_s != null)
       ? "~" + fmtDur(pf.est.p50_s) + ` <span class="panel-note">~ ${fmtDur(pf.est.p90_s)} (병렬 makespan · ${esc(pf.est.basis || "?")})</span>`
       : (tMeasured ? "~" + fmtDur(tDur) + (tMeasured < tN ? ` <span class="panel-note">(미측정 ${tN - tMeasured})</span>` : "") : '<span class="panel-note">미측정</span>');
 
     $("rp-mbody").innerHTML =
-      '<p class="panel-note">실제 클라우드 자원을 만들고 삭제하는 실행의 사전 점검입니다 — v2에서는 여기까지만 진행되며 실제 발사는 하지 않습니다.</p>' +
+      '<p class="panel-note">실제 클라우드 자원을 만들고 삭제하는 실행의 사전 점검입니다 — [Run live]를 누르면 실제 클라우드에 작용합니다.</p>' +
       gateChips +
       '<div class="tbl-scroll"><table class="tbl"><thead><tr><th>service</th><th>lifecycle</th><th>생성·삭제 예상</th><th>실측 ETA</th><th>과금</th></tr></thead>' +
       `<tbody>${rows}</tbody>` +
@@ -536,26 +538,40 @@
       '<button type="button" class="rp-allbtn" id="rp-pf-cancel">취소</button>' +
       `<a class="run-cta" href="${esc(legacyHref)}" target="_blank" rel="noopener"
           title="같은 선택으로 legacy 콘솔(console2)에서 사전 확인 후 실행">Continue in legacy console ↗</a>` +
-      '<button type="button" class="rp-review-btn" id="rp-pf-go" disabled ' +
-      'title="v2에서의 발사는 오너 검수 후 활성화 — 그때까지는 legacy 콘솔에서 실행">Run live ▶</button>';
+      '<button type="button" class="rp-review-btn" id="rp-pf-go"' + (heavy ? ' disabled' : '') +
+      ' title="사전 점검을 확인했으면 실행합니다 — 실제 클라우드에 작용합니다">Run live ▶</button>';
     $("rp-pf-cancel").onclick = pfClose;
 
-    // 발사 API 호출 — 활성화 결정 시 아래 두 줄의 주석만 해제한다(위 버튼의
-    // disabled 속성도 함께 제거):
-    // $("rp-pf-go").disabled = false;
-    // $("rp-pf-go").onclick = () => postRun(sel);
+    // 발사 배선 (오너 승인 2026-07-10). 과금(heavy) 선택이면 확인 체크박스가
+    // [Run live] 잠금을 푼다.
+    const go = $("rp-pf-go");
+    if (go) go.onclick = () => postRun(sel);
+    const bill = $("rp-heavy-ok");
+    if (bill && go) bill.onchange = () => { go.disabled = !bill.checked; };
   }
 
-  // 실제 LIVE 실행 트리거 (현재 미배선 — 위 pfRender()의 [Run live]는 항상
-  // disabled). 오너 검수로 v2 발사가 활성화되면 pfRender()의 주석을 해제해
-  // 이 함수를 연결한다. console2.js postRun()과 같은 계약(POST /api/run,
-  // mode:"live").
-  // function postRun(sel) {
-  //   fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify(Object.assign({ mode: "live" }, sel)) })
-  //     .then(r => r.json().then(j => ({ ok: r.ok, j })))
-  //     .then(({ ok, j }) => { /* drive report flow / redirect to run detail */ });
-  // }
+  // 실제 LIVE 실행 트리거 — 오너 승인(2026-07-10)으로 배선. console2.js
+  // postRun()과 같은 계약(POST /api/run, mode:"live"). 성공 시 v2 실행 뷰로 이동.
+  function postRun(sel) {
+    const go = $("rp-pf-go");
+    if (go) { go.disabled = true; go.textContent = "Starting…"; }
+    fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ mode: "live" }, sel)) })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok || j.error) {
+          if (go) { go.disabled = false; go.textContent = "Run live ▶"; }
+          alert("실행을 시작하지 못했습니다: " + (j.error || "unknown") +
+                (j.detail ? "\n" + j.detail : ""));
+          return;
+        }
+        window.location.href = "/v2/runs/local-" + j.id;  // 실행 뷰(running)로
+      })
+      .catch(e => {
+        if (go) { go.disabled = false; go.textContent = "Run live ▶"; }
+        alert("실행 요청 실패: " + e);
+      });
+  }
 
   // ---- static wiring (once, after TEMPLATE is injected) ----
   function wireStatic() {
