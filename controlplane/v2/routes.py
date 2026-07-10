@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from controlplane import db, snapshots
-from controlplane.v2 import published, results_data, services_data, terms
+from controlplane.v2 import published, results_data, runs_data, services_data, terms
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -109,8 +109,6 @@ def situation(request: Request):
 _STUBS = {
     "model": ("Model", "테스트 정의 · 리소스 모델 — 모델 표·작업 큐·노드 에디터·인벤토리가 이 축에 들어옵니다.",
               [("Legacy Modeling screen", "/planning")]),
-    "run": ("Runs", "테스트 실행 · 모니터링 — 계획(선택→구성 확인)→실행 모니터링→기록이 이 축에 들어옵니다.",
-            [("Legacy Testing console", "/testing")]),
     "tools": ("Tools", "부가 도구 — AI 초안·지식 문서·발행 대시보드 링크 모음.",
               [("Published dashboard (read-only sharing) ↗", "/reporting"),
                ("AI tools", "/ai"), ("Legacy Home", "/")]),
@@ -151,7 +149,20 @@ def model(request: Request):
 
 @router.get("/run", response_class=HTMLResponse)
 def run(request: Request):
-    return _stub(request, "run")
+    """실행 축(⑥) — 계획·모니터링·기록 (L1 계약 §2.6).
+
+    이 라우트는 어떤 실행도 발사하지 않는다 — 조회 전용(``runs_data``) + 폼
+    제출은 기존 ``/testing``으로의 GET 핸드오프뿐(경계 규약). ``?service=``
+    등은 서비스 상세 딥링크의 프리필로 그대로 수용한다.
+    """
+    ctx = _ctx(request, "run")
+    ctx.update(runs_data.get_run_data())
+    ctx["prefill"] = {
+        "suite": (request.query_params.get("suite") or "").strip(),
+        "profile": (request.query_params.get("profile") or "").strip(),
+        "service": (request.query_params.get("service") or "").strip(),
+    }
+    return templates.TemplateResponse(request, "runs.html", ctx)
 
 
 @router.get("/results", response_class=HTMLResponse)

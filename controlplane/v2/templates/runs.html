@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% from "_badges.html" import badge, term %}
+{% block title %}Runs{% endblock %}
+{% block content %}
+
+<h1 class="page-q">Runs</h1>
+
+{# ── Gate status — 실효 게이트는 core.config.settings 실측 (계약 §2.6) ──── #}
+<section class="panel gate-panel">
+  <div class="panel-head">
+    <h2>Gate status</h2>
+    {{ badge('local') }}
+  </div>
+  {% if gate.ok %}
+    <div class="gate-row">
+      <span class="gate-item {{ 'on' if gate.mutations else 'off' }}">Mutations {{ 'ON' if gate.mutations else 'OFF' }}</span>
+      <span class="gate-item {{ 'on' if gate.heavy else 'off' }}">Heavy {{ 'ON' if gate.heavy else 'OFF' }}</span>
+      <span class="gate-item {{ 'on' if gate.destructive else 'off' }}">Destructive {{ 'ON' if gate.destructive else 'OFF' }}</span>
+      <span class="gate-profile">Profile:
+        <span class="mono">{{ gate.profile_id or '(repo 기본값)' }}</span>
+        {% if gate.forbid %}<span class="mut" title="이 프로파일이 강제로 막은 게이트 — SCP_PROFILE_FORBID">forbid: {{ gate.forbid|join(', ') }}</span>{% endif %}
+      </span>
+    </div>
+    {% if gate.mutations %}
+      <p class="warn-live">LIVE — 누르면 실제 클라우드에 작용합니다. 이 서버는 실행(mutations)이 켜진 상태입니다.</p>
+    {% else %}
+      <p class="readonly-banner">이 서버는 열람용(read-only)으로 기동되어 실행이 비활성화되어 있습니다.</p>
+    {% endif %}
+  {% else %}
+    <p class="empty-state">이 서버의 실효 게이트를 확인할 수 없습니다 — core.config 접근에 실패했습니다.</p>
+  {% endif %}
+</section>
+
+{# ── Plan — 선택만, 발사는 기존 콘솔로 GET 핸드오프 (v1은 발사 없음) ────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Plan</h2>
+    <span class="panel-note">스위트·프로파일·서비스를 고르면 아래 링크가 그 값으로 갱신됩니다 (자동 발사 아님 — 프리필만)</span>
+  </div>
+  <div class="plan-form">
+    <label>Suite
+      <select id="planSuite">
+        <option value="">(repo 기본)</option>
+        {% for s in suites %}<option value="{{ s }}" {% if prefill.suite == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Profile
+      <select id="planProfile">
+        <option value="">(repo vars 기본)</option>
+        {% for p in profiles %}<option value="{{ p }}" {% if prefill.profile == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Service
+      <input type="text" id="planService" placeholder="category/service" value="{{ prefill.service }}">
+    </label>
+  </div>
+  <p class="plan-cta-wrap">
+    <a id="planLegacyLink" class="run-cta{{ ' disabled' if not gate.mutations }}" href="/testing"
+       {% if not gate.mutations %}
+       aria-disabled="true" tabindex="-1"
+       title="이 서버는 열람용(read-only)으로 기동되어 실행이 비활성화되어 있습니다"
+       {% else %}
+       title="기존 실행 콘솔로 이동 — 선택이 미리 채워지며, 실행은 사전 확인 후 수동으로 시작됩니다"
+       {% endif %}>Continue in legacy console ↗</a>
+  </p>
+  <p class="panel-note">v2에서의 직접 실행(사전 확인 포함)은 검수 후 제공 예정입니다.</p>
+</section>
+
+{# ── Live runs — This server 배지, console2 엔진 조회 직접 호출 ─────────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Live runs</h2>
+    {{ badge('local') }}
+  </div>
+  {% if live_runs %}
+  <div class="tbl-scroll">
+  <table class="tbl">
+    <thead>
+      <tr><th>Run</th><th>Mode</th><th>Status</th><th>Gates</th>
+          <th title="lifecycle pass/fail/skip">Lifecycles</th><th title="API 호출 ok/soft/fail">API</th></tr>
+    </thead>
+    <tbody>
+      {% for r in live_runs %}
+      <tr>
+        <td class="mono">{{ r.id }}</td>
+        <td>{{ r.mode or r.kind or '—' }}</td>
+        <td><span class="st st-{{ r.status }}">{{ terms_run_status.get(r.status, r.status) }}</span></td>
+        <td>
+          {% if r.mutations %}<span class="tagchip">mutations</span>{% endif %}
+          {% if r.heavy %}<span class="tagchip">heavy</span>{% endif %}
+          {% if r.destructive %}<span class="tagchip">destructive</span>{% endif %}
+          {% if not (r.mutations or r.heavy or r.destructive) %}<span class="mut">read-only</span>{% endif %}
+        </td>
+        <td class="mono">
+          {% if r.events_summary %}
+            {{ r.events_summary.lifecycles.passed }}/{{ r.events_summary.lifecycles.total }} passed
+            {% if r.events_summary.lifecycles.failed %}
+            · <span class="mut" title="failed_ids: {{ r.events_summary.lifecycles.failed_ids|join(', ') }}">{{ r.events_summary.lifecycles.failed }} failed</span>
+            {% endif %}
+          {% else %}
+            <span class="mut">{{ r.summary or '—' }}</span>
+          {% endif %}
+        </td>
+        <td class="mono">
+          {% if r.events_summary %}
+            ok {{ r.events_summary.api.ok }} · soft {{ r.events_summary.api.soft }} · fail {{ r.events_summary.api.fail }}
+          {% else %}
+            <span class="mut">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">이 서버에서 진행 중인 런이 없습니다.</p>
+  {% endif %}
+  {% if capacity %}
+  <p class="panel-note">Capacity — VPC cap {{ capacity.cap }} · baseline {{ capacity.baseline }} ·
+    reserved {{ capacity.reserved }} · headroom {{ capacity.headroom }}
+    {% if capacity.queued %} · queued {{ capacity.queued|length }}{% endif %}</p>
+  {% else %}
+  <p class="empty-state">용량/큐 정보를 가져올 수 없습니다 — 콘솔 엔진 미기동이거나 크리덴셜/리전 설정이 없을 수 있습니다.</p>
+  {% endif %}
+</section>
+
+{# ── History — 병합 기록 100건 (situation.html 타임라인 마크업 관례) ─────── #}
+<section class="panel">
+  <div class="panel-head">
+    <h2>History</h2>
+    <span class="panel-note">이 서버가 알고 있는 런 기록 최대 100건</span>
+  </div>
+  {% if history %}
+  <div class="tbl-scroll">
+  <table class="tbl">
+    <thead><tr><th>Source</th><th title="실행 1회의 식별자">Run</th><th title="실행한 테스트 묶음">Suite</th><th>Status</th><th>Time</th></tr></thead>
+    <tbody>
+      {% for r in history %}
+      <tr>
+        <td>{{ badge('local') if r.is_local else badge('published') }}</td>
+        <td class="mono">{{ r.gh_run_id or '(대기)' }}</td>
+        <td>{{ r.suite }}{% if r.profile %} · {{ r.profile }}{% endif %}</td>
+        <td><span class="st st-{{ r.status }}">{{ terms_run_status.get(r.status, r.status) }}</span></td>
+        <td class="mono">{{ r.when or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-state">런 기록이 없습니다 — 공식 실행 이력은 발행 대시보드에서 볼 수 있습니다. <a href="/reporting">발행 수치 보기 →</a></p>
+  {% endif %}
+</section>
+
+<script>
+(function () {
+  var suite = document.getElementById('planSuite');
+  var profile = document.getElementById('planProfile');
+  var service = document.getElementById('planService');
+  var link = document.getElementById('planLegacyLink');
+  if (!link) { return; }
+  var readOnly = link.classList.contains('disabled');
+  if (readOnly) {
+    link.addEventListener('click', function (e) { e.preventDefault(); });
+    return;
+  }
+  function update() {
+    var params = new URLSearchParams();
+    if (suite.value) { params.set('suite', suite.value); }
+    if (profile.value) { params.set('profile', profile.value); }
+    if (service.value.trim()) { params.set('service', service.value.trim()); }
+    var qs = params.toString();
+    link.setAttribute('href', '/testing' + (qs ? ('?' + qs) : ''));
+  }
+  suite.addEventListener('change', update);
+  profile.addEventListener('change', update);
+  service.addEventListener('input', update);
+  update();
+})();
+</script>
+
+{% endblock %}

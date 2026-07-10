@@ -190,6 +190,43 @@ tr.cov-none .cbar { background: var(--line); }
 .known-fold summary:hover { color: var(--ink); }
 .known-fold[open] summary { margin-bottom: 8px; }
 
+/* 실행 축 — 실효 게이트 패널 (§2.6) */
+.gate-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.gate-item {
+  font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px;
+  border: 1px solid var(--line);
+}
+.gate-item.on { background: var(--bad-bg); color: var(--bad-ink); border-color: var(--bad-line); }
+.gate-item.off { background: var(--good-bg); color: var(--good-ink); border-color: var(--good-line); }
+.gate-profile { font-size: 12.5px; color: var(--sub); }
+.warn-live {
+  color: var(--bad-ink); background: var(--bad-bg); border: 1px solid var(--bad-line);
+  border-radius: 8px; padding: 8px 12px; font-size: 13.5px; font-weight: 600; margin: 8px 0 0;
+}
+.readonly-banner {
+  color: var(--sub); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 12px; font-size: 13.5px; font-weight: 600; margin: 8px 0 0;
+}
+
+/* 실행 축 — Plan 폼 (v2 자체 발사 없음: 선택 -> 기존 콘솔 GET 핸드오프뿐) */
+.plan-form { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.plan-form label {
+  display: flex; flex-direction: column; gap: 4px; font-size: 12.5px;
+  color: var(--sub); font-weight: 600;
+}
+.plan-form select, .plan-form input[type="text"] {
+  border: 1px solid var(--line); border-radius: 8px; background: var(--card);
+  padding: 6px 10px; font-size: 13.5px; color: var(--ink); font-family: inherit; min-width: 180px;
+}
+.plan-cta-wrap { margin: 6px 0 4px; }
+.run-cta.disabled { background: var(--line); color: var(--sub); cursor: not-allowed; pointer-events: none; }
+
+/* 실행 축 — 라이브 런 표의 게이트 칩 */
+.tagchip {
+  font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px;
+  margin-right: 4px; display: inline-block; background: #fff8c5; color: #9a6700;
+}
+
 /* 푸터 */
 .shell-foot {
   max-width: 1080px; margin: 0 auto; padding: 14px 22px 40px;

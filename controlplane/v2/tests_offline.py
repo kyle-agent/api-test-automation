@@ -45,7 +45,8 @@ def test_situation_renders():
 
 
 def test_axes_render():
-    for path in ("/v2/model", "/v2/run", "/v2/results", "/v2/tools"):
+    # /v2/run은 실화면으로 전환됨(§2.6) — 아래 전용 테스트로 분리
+    for path in ("/v2/model", "/v2/results", "/v2/tools"):
         r = client.get(path)
         assert r.status_code == 200, f"{path} -> {r.status_code}"
         assert "기존 화면" in r.text or "이용하세요" in r.text
@@ -181,6 +182,71 @@ def test_conformance_changes_shape_or_none():
     from controlplane.v2 import results_data
     changes = results_data.get_conformance_changes()
     assert changes is None or all(k in changes for k in ("new", "regressed", "fixed"))
+
+
+def test_run_axis_renders_with_gate_panel():
+    r = client.get("/v2/run")
+    assert r.status_code == 200, r.status_code
+    body = r.text
+    assert "Gate status" in body
+    assert "Plan" in body
+    assert "Live runs" in body
+    assert "History" in body
+    assert "Continue in legacy console" in body
+    # v2 자체 발사는 아직 없음 (계약 §2.6 각주)
+    assert "검수 후 제공 예정" in body
+
+
+def test_run_axis_gate_values_match_settings_no_hardcoding():
+    # 실효 게이트는 core.config.settings에서 읽어야 한다(하드코딩 금지, §2.6).
+    # 테스트 env는 이 파일 상단에서 SCP_ALLOW_DESTRUCTIVE=false로 고정했다 —
+    # 화면 표기가 그 실측과 일치하는지 확인한다.
+    import core.config as _core_cfg
+    settings = _core_cfg.settings
+    assert settings.allow_destructive is False  # 이 테스트 스위트의 전제
+    r = client.get("/v2/run")
+    body = r.text
+    assert "Destructive OFF" in body
+    assert ("Mutations ON" in body) == bool(settings.allow_mutations)
+    assert ("Heavy ON" in body) == bool(settings.run_heavy)
+    if settings.allow_mutations:
+        assert "실제 클라우드에 작용합니다" in body
+    else:
+        assert "열람용(read-only)으로 기동되어 실행이 비활성화" in body
+
+
+def test_run_axis_readonly_mode_banner_and_disabled_cta():
+    # SCP_ALLOW_MUTATIONS=false 기동 = 열람 모드 (D2/pre-flight 결정) —
+    # 싱글턴을 임시로 monkeypatch해 그 분기를 직접 확인하고 원복한다.
+    import core.config as _core_cfg
+    settings = _core_cfg.settings
+    original = settings.allow_mutations
+    object.__setattr__(settings, "allow_mutations", False)
+    try:
+        r = client.get("/v2/run")
+        assert r.status_code == 200
+        body = r.text
+        assert "Mutations OFF" in body
+        assert "이 서버는 열람용(read-only)으로 기동되어 실행이 비활성화되어 있습니다" in body
+        assert "run-cta disabled" in body
+        assert "aria-disabled=\"true\"" in body
+    finally:
+        object.__setattr__(settings, "allow_mutations", original)
+
+
+def test_run_axis_prefill_query_reflected():
+    r = client.get("/v2/run?suite=smoke&profile=stage-kr-west1&service=vpc%2Fsubnet")
+    assert r.status_code == 200
+    body = r.text
+    assert 'value="smoke" selected' in body
+    assert 'value="stage-kr-west1" selected' in body
+    assert 'value="vpc/subnet"' in body
+
+
+def test_run_axis_no_post_route():
+    # v1은 발사 없음 — /v2/run은 조회 전용, POST 라우트가 존재하지 않는다.
+    r = client.post("/v2/run")
+    assert r.status_code in (404, 405), r.status_code
 
 
 def test_existing_home_untouched():
