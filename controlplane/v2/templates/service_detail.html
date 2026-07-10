@@ -46,7 +46,7 @@
 
 {# ── 자동 액션 배너 — 데이터/문장은 services_data.py:_action_banner()가 만든다
      (출처: dashboard/build.py render_service_page() 생성 로직 이식, 주석 참조). #}
-<div class="action-banner">{{ svc.action_html|safe }}</div>
+<div class="action-banner"><div>{{ svc.action_html|safe }}</div></div>
 
 <section class="panel">
   <div class="panel-head">

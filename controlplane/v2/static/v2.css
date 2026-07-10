@@ -363,3 +363,10 @@ table.node-list td { padding: 5px 8px; font-size: 13px; }
   display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   color: var(--sub); font-size: 12.5px; border-top: 1px solid var(--line);
 }
+
+/* Model 축 — category 레벨(3단 계층 이식, 2026-07-10) */
+tr.cat-row td { background: var(--bg); }
+tr.cat-row .cat-name { font-weight: 700; font-size: 14.5px; }
+tr.cat-row:hover td { background: #eef1f5; }
+tr.svc-row td:nth-child(2) { padding-left: 18px; }
+tr.cat-detail > td { background: var(--card); }

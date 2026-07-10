@@ -31,40 +31,112 @@
   {% endif %}
 </section>
 
-{# ── Plan — 선택만, 발사는 기존 콘솔로 GET 핸드오프 (v1은 발사 없음) ────── #}
+{# ── Plan — test-planning 경험 console2 패리티: 선택 트리 ▸ 조합 DAG ▸ 견적 ▸
+     pre-flight (오너 판정 2026-07-10: "선택하고 DAG 확인하는 게 이 플랫폼의
+     핵심"). 발사(POST /api/run)는 하지 않는다 — [Review & run] 은 pre-flight
+     모달까지만 열고, 그 안의 [Run live]는 항상 disabled (검수 후 활성화 예정).
+     모든 동적 렌더링은 controlplane/v2/static/runs_plan.js — 이 섹션은 그
+     스크립트가 채우는 정적 골격 + 게이트 데이터 아일랜드뿐이다. #}
+<style>
+/* Plan(⑥ test-planning) 전용 스코프 CSS — v2.css는 다른 에이전트 작업 충돌
+   방지를 위해 여기서 건드리지 않는다(최종 보고에 v2.css 이관용 스니펫 별도
+   제공). 클래스는 전부 rp- 접두사로 이 섹션에 한정 — 단, resource_graph.js가
+   생성하는 rg-*/nrect 마크업은 하드코딩된 이름이라 #rp-stage-wrap로 스코프. */
+.rp-cols { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1080px) { .rp-cols { grid-template-columns: 1fr; } }
+.rp-tree-panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; max-height: 620px; }
+.rp-tree-controls { display: flex; gap: 8px; align-items: center; padding: 10px 10px 8px; flex-wrap: wrap; }
+.rp-tree-controls input[type="text"] { flex: 1; min-width: 110px; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 12.5px; font-family: inherit; }
+.rp-allbtn { font-size: 11px; background: #fff; border: 1px solid var(--line); color: var(--ink); border-radius: 6px; padding: 5px 9px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.rp-allbtn.on { background: var(--ink); color: #fff; }
+.rp-tree { overflow: auto; border-top: 1px solid var(--line); flex: 1; min-height: 220px; }
+.rp-row { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px; cursor: pointer; user-select: none; border-bottom: 1px solid var(--bg); font-size: 12.5px; white-space: nowrap; }
+.rp-row .rp-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.rp-chk { width: 15px; height: 15px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border: 1.4px solid var(--sub); border-radius: 4px; background: #fff; font-size: 11px; font-weight: 800; color: #fff; line-height: 1; }
+.rp-row.on .rp-chk, .rp-row.partial .rp-chk { border-color: var(--link); }
+.rp-row.on .rp-chk { background: var(--link); }
+.rp-row.partial .rp-chk { color: var(--link); background: #eff6ff; }
+.rp-cat-row { background: var(--bg); font-weight: 700; }
+.rp-cat-row .rp-car { width: 13px; color: var(--sub); font-size: 11px; }
+.rp-cat-row .rp-meta { font-size: 11px; font-weight: 700; color: var(--sub); }
+.rp-cat-row.on { background: #eff6ff; }
+.rp-cat-row.partial { background: #f3f8ff; }
+.rp-svcs { background: #fff; }
+.rp-svc-row { padding-left: 26px; }
+.rp-svc-row.on { background: #eff6ff; }
+.rp-svc-row.on .rp-name { color: #1d4ed8; font-weight: 700; }
+.rp-svc-row.partial { background: #f3f8ff; }
+.rp-svc-row.nolc { opacity: .55; cursor: default; }
+.rp-svc-row .rp-count { font-size: 11px; color: var(--sub); min-width: 30px; text-align: right; }
+.rp-glyph { font-size: 10px; }
+.rp-dep { font-size: 9.5px; font-weight: 700; color: #7c3aed; border: 1px solid #ddd6fe; border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+.rp-empty { color: var(--sub); font-size: 12.5px; padding: 14px 10px; margin: 0; }
+.rp-sel-readout { font-size: 12.5px; color: var(--sub); padding: 8px 10px; border-top: 1px solid var(--line); }
+.rp-sel-readout b { color: var(--ink); }
+.rp-dag-panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.rp-toolbar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 8px; }
+.rp-tgroup { display: flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.rp-tgroup button { background: #fff; border: none; border-left: 1px solid var(--line); color: var(--sub); padding: 5px 11px; cursor: pointer; font-size: 11.5px; font-weight: 700; font-family: inherit; }
+.rp-tgroup button:first-child { border-left: none; }
+.rp-tgroup button.on { background: var(--bg); color: var(--ink); }
+.rp-gran-note { font-size: 11px; color: var(--sub); }
+.rp-statchip { margin-left: auto; font-size: 11px; color: var(--sub); background: var(--bg); border: 1px solid var(--line); border-radius: 13px; padding: 3px 11px; }
+.rp-stage-wrap { position: relative; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+.rp-stage { position: relative; width: 100%; height: min(60vh, 480px); min-height: 340px; overflow: hidden; cursor: grab; background: radial-gradient(circle, var(--bg) 1px, transparent 1px); background-size: 26px 26px; }
+.rp-stage.grabbing { cursor: grabbing; }
+.rp-stage svg { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.rp-zoomctl { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 5; }
+.rp-zoomctl button { width: 28px; height: 28px; border: 1px solid var(--line); background: #fff; border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 700; color: var(--ink); display: flex; align-items: center; justify-content: center; }
+.rp-zoomctl button.fit { font-size: 9.5px; font-weight: 700; }
+.rp-hint-pill { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255, 255, 255, .94); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 11px; color: var(--sub); max-width: 60%; }
+.rp-hint-pill:empty { display: none; }
+.rp-hint-pill b { color: var(--ink); }
+.rp-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--sub); margin: 7px 0 0; }
+.rp-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); }
+#rp-stage-wrap g.rg-unit { cursor: pointer; }
+#rp-stage-wrap g.rg-unit .nrect { transition: opacity .12s; }
+#rp-stage-wrap g.rg-unit.dimmed { opacity: .13; }
+#rp-stage-wrap g.rg-selbox { cursor: pointer; }
+#rp-stage-wrap .rg-edge { stroke: #8a93a0; stroke-width: 1.3; fill: none; }
+#rp-stage-wrap .rg-edge.hot { stroke: var(--link); stroke-width: 2.2; }
+#rp-stage-wrap .rg-edge.dim { opacity: .08; }
+#rp-stage-wrap .rg-active { filter: drop-shadow(0 0 3px rgba(37, 99, 235, .45)); }
+.rp-estimate { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin-top: 14px; font-size: 13px; }
+.rp-estimate b { font-variant-numeric: tabular-nums; }
+.rp-amber { color: #ca8a04; font-weight: 700; }
+.rp-warn { color: var(--bad-ink); font-weight: 700; }
+.rp-review-row { margin-top: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rp-review-btn { background: var(--ink); color: #fff; border: none; border-radius: 8px; padding: 9px 18px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
+.rp-review-btn:disabled { opacity: .5; cursor: not-allowed; }
+.rp-scrim { position: fixed; inset: 0; background: rgba(15, 23, 42, .4); z-index: 60; display: none; }
+.rp-scrim.open { display: block; }
+.rp-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 760px; max-width: 94vw; max-height: 86vh; background: #fff; border: 1px solid var(--line); border-radius: 10px; z-index: 61; box-shadow: 0 12px 40px rgba(15, 23, 42, .22); display: none; flex-direction: column; }
+.rp-modal.open { display: flex; }
+.rp-modal .rp-mh { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+.rp-modal .rp-mh h3 { margin: 0; font-size: 15px; }
+.rp-modal .rp-mbody { overflow: auto; padding: 10px 16px; }
+.rp-modal .rp-mfoot { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.rp-gatechip { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px; border: 1px solid var(--line); margin: 0 6px 6px 0; display: inline-block; }
+.rp-gatechip.on { background: var(--bad-bg); color: var(--bad-ink); border-color: var(--bad-line); }
+.rp-gatechip.off { background: var(--good-bg); color: var(--good-ink); border-color: var(--good-line); }
+.rp-heavy-note { border: 1px solid var(--bad-line); background: var(--bad-bg); border-radius: 8px; padding: 9px 12px; font-size: 13px; margin-top: 8px; }
+</style>
 <section class="panel">
   <div class="panel-head">
     <h2>Plan</h2>
-    <span class="panel-note">스위트·프로파일·서비스를 고르면 아래 링크가 그 값으로 갱신됩니다 (자동 발사 아님 — 프리필만)</span>
+    <span class="panel-note">리소스를 선택하면 오른쪽 조합 DAG와 아래 견적이 실시간으로 갱신됩니다 — 여기서는 발사되지 않습니다</span>
   </div>
-  <div class="plan-form">
-    <label>Suite
-      <select id="planSuite">
-        <option value="">(repo default)</option>
-        {% for s in suites %}<option value="{{ s }}" {% if prefill.suite == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>Profile
-      <select id="planProfile">
-        <option value="">(repo vars 기본)</option>
-        {% for p in profiles %}<option value="{{ p }}" {% if prefill.profile == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>Service
-      <input type="text" id="planService" placeholder="service 이름 (예: loadbalancer)" title="category/service 형식을 붙여넣어도 service 이름만 전달됩니다" value="{{ prefill.service }}">
-    </label>
+  <div id="rp-root" data-prefill-service="{{ prefill.service }}">
+    <p class="empty-state">Model 로딩 중…</p>
   </div>
-  <p class="plan-cta-wrap">
-    <a id="planLegacyLink" class="run-cta{{ ' disabled' if not gate.mutations }}" href="/testing"
-       {% if not gate.mutations %}
-       aria-disabled="true" tabindex="-1"
-       title="이 서버는 열람용(read-only)으로 기동되어 실행이 비활성화되어 있습니다"
-       {% else %}
-       title="기존 실행 콘솔로 이동 — 선택이 미리 채워지며, 실행은 사전 확인 후 수동으로 시작됩니다"
-       {% endif %}>Continue in legacy console ↗</a>
-  </p>
-  <p class="panel-note">v2에서의 직접 실행(사전 확인 포함)은 검수 후 제공 예정입니다.</p>
 </section>
+{# 실효 게이트 — Gate status 패널과 같은 출처(runs_data.get_gate_status())를
+   그대로 재사용한다(재계산 금지, 위 계약 안전 원칙 1과 동일 이유). #}
+<script type="application/json" id="rp-gate-data">{{ gate | tojson }}</script>
+{# DAG 렌더러는 console2 소유 원본을 그대로 로드한다(복붙 금지) — 같은 앱에서
+   서빙되는 same-origin 자산이라 "외부 CDN 금지" 원칙과 무관하다. #}
+<script src="/testing/console/assets/resource_graph.js"></script>
+<script src="/v2/static/runs_plan.js"></script>
 
 {# ── Live runs — This server 배지, console2 엔진 조회 직접 호출 ─────────── #}
 <section class="panel">
@@ -152,32 +224,5 @@
   <p class="empty-state">런 기록이 없습니다 — 공식 실행 이력은 발행 대시보드에서 볼 수 있습니다. <a href="/reporting">발행 수치 보기 →</a></p>
   {% endif %}
 </section>
-
-<script>
-(function () {
-  var suite = document.getElementById('planSuite');
-  var profile = document.getElementById('planProfile');
-  var service = document.getElementById('planService');
-  var link = document.getElementById('planLegacyLink');
-  if (!link) { return; }
-  var readOnly = link.classList.contains('disabled');
-  if (readOnly) {
-    link.addEventListener('click', function (e) { e.preventDefault(); });
-    return;
-  }
-  function update() {
-    var params = new URLSearchParams();
-    if (suite.value) { params.set('suite', suite.value); }
-    if (profile.value) { params.set('profile', profile.value); }
-    var svc = service.value.trim().split('/').pop(); if (svc) { params.set('service', svc); }
-    var qs = params.toString();
-    link.setAttribute('href', '/testing' + (qs ? ('?' + qs) : ''));
-  }
-  suite.addEventListener('change', update);
-  profile.addEventListener('change', update);
-  service.addEventListener('input', update);
-  update();
-})();
-</script>
 
 {% endblock %}

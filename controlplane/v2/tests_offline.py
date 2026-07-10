@@ -4,7 +4,9 @@
 """
 from __future__ import annotations
 
+import json
 import os
+import re
 import sys
 import tempfile
 
@@ -82,6 +84,58 @@ def test_service_detail_unknown_slug_is_404():
     assert r.status_code == 404, r.status_code
     assert "찾을 수 없" in r.text
     assert "/v2/services" in r.text
+
+
+def test_service_detail_filter_bar_and_resource_groups():
+    """발행 페이지 패리티 리디자인(2026-07-10) — 필터 바(Resource groups/Defects
+    only/Slow/HTTP status) + 히어로 + 액션 배너 + JS가 소비하는 행 JSON(그룹·
+    slow·근거 run id 필드)이 실제로 응답에 실려 있는지 확인한다."""
+    from controlplane.v2 import services_data
+    data = services_data.get_services_data()
+    if not data or not data.get("services"):
+        print("  (skip: 발행본 접근 불가 - empty-state는 위 테스트에서 검증됨)")
+        return
+    svc = next((s for s in data["services"] if s.get("endpoint_rows")), None)
+    if not svc:
+        print("  (skip: rows가 있는 서비스 없음)")
+        return
+    r = client.get(f"/v2/services/{svc['slug']}")
+    assert r.status_code == 200, r.status_code
+    body = r.text
+    for label in ("Resource groups", "Defects only", "Slow (", "All HTTP status", "Reset"):
+        assert label in body, label
+    assert "Verified (2xx) coverage" in body
+    assert "action-banner" in body
+
+    m = re.search(r'<script type="application/json" id="ep-rows-data">(.*?)</script>', body, re.S)
+    assert m, "행 JSON 스크립트가 없음"
+    rows = json.loads(m.group(1))
+    assert rows, "행이 비어 있음"
+    for row in rows:
+        for key in ("group", "slow", "ev", "cov", "status", "elapsed_s"):
+            assert key in row, key
+        parts = row["path"].split("/")
+        expected_group = parts[2] if len(parts) > 2 and parts[2] else "other"
+        assert row["group"] == expected_group, (row["path"], row["group"])
+
+
+def test_service_detail_group_counts_match_endpoints():
+    """리소스 그룹으로 나눠도 엔드포인트 총합이 그대로여야 한다(행 누락 없음)."""
+    from controlplane.v2 import services_data
+    data = services_data.get_services_data()
+    if not data or not data.get("services"):
+        print("  (skip: 발행본 접근 불가 - empty-state는 위 테스트에서 검증됨)")
+        return
+    svc = next((s for s in data["services"] if len(s.get("endpoint_rows") or []) >= 2), None)
+    if not svc:
+        print("  (skip: rows가 2개 이상인 서비스 없음)")
+        return
+    rows = svc["endpoint_rows"]
+    groups: dict[str, list] = {}
+    for row in rows:
+        groups.setdefault(row["group"], []).append(row)
+    assert sum(len(v) for v in groups.values()) == len(rows)
+    assert len(groups) >= 1
 
 
 def test_local_run_shows_in_isolated_section():
@@ -192,9 +246,11 @@ def test_run_axis_renders_with_gate_panel():
     assert "Plan" in body
     assert "Live runs" in body
     assert "History" in body
-    assert "Continue in legacy console" in body
-    # v2 자체 발사는 아직 없음 (계약 §2.6 각주)
-    assert "검수 후 제공 예정" in body
+    # 계획 경험(선택 트리→DAG→견적→pre-flight) 골격 + 렌더러/JS 로드 (계약 §2.6 개정)
+    assert 'id="rp-root"' in body
+    assert "resource_graph.js" in body and "runs_plan.js" in body
+    # v2 자체 발사는 여전히 없음 — [Run live]는 disabled (검수 후 활성화)
+    assert "POST /api/run" not in body or "발사(POST /api/run)는 하지 않는다" in body
 
 
 def test_run_axis_gate_values_match_settings_no_hardcoding():
@@ -228,19 +284,18 @@ def test_run_axis_readonly_mode_banner_and_disabled_cta():
         body = r.text
         assert "Mutations OFF" in body
         assert "이 서버는 열람용(read-only)으로 기동되어 실행이 비활성화되어 있습니다" in body
-        assert "run-cta disabled" in body
-        assert "aria-disabled=\"true\"" in body
+        # 게이트 데이터 아일랜드가 mutations=false를 실어 JS가 Review 버튼을 잠근다
+        assert '"mutations": false' in body or '"mutations":false' in body
     finally:
         object.__setattr__(settings, "allow_mutations", original)
 
 
 def test_run_axis_prefill_query_reflected():
-    r = client.get("/v2/run?suite=smoke&profile=stage-kr-west1&service=vpc%2Fsubnet")
+    r = client.get("/v2/run?service=networking%2Floadbalancer")
     assert r.status_code == 200
     body = r.text
-    assert 'value="smoke" selected' in body
-    assert 'value="stage-kr-west1" selected' in body
-    assert 'value="vpc/subnet"' in body
+    # 프리필은 선택 트리 초기화용 data 속성으로 승계 (runs_plan.js가 소비)
+    assert 'data-prefill-service="networking/loadbalancer"' in body
 
 
 def test_run_axis_no_post_route():
