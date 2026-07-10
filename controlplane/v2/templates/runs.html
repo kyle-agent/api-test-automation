@@ -38,10 +38,10 @@
      모든 동적 렌더링은 controlplane/v2/static/runs_plan.js — 이 섹션은 그
      스크립트가 채우는 정적 골격 + 게이트 데이터 아일랜드뿐이다. #}
 <style>
-/* Plan(⑥ test-planning) 전용 스코프 CSS — v2.css는 다른 에이전트 작업 충돌
-   방지를 위해 여기서 건드리지 않는다(최종 보고에 v2.css 이관용 스니펫 별도
-   제공). 클래스는 전부 rp- 접두사로 이 섹션에 한정 — 단, resource_graph.js가
-   생성하는 rg-*/nrect 마크업은 하드코딩된 이름이라 #rp-stage-wrap로 스코프. */
+/* Plan(test-planning) 전용 스코프 CSS. 클래스는 전부 rp- 접두사 — 단,
+   resource_graph.js가 생성하는 rg- 계열·nrect 마크업은 하드코딩된 이름이라
+   #rp-stage-wrap로 스코프. (주의: CSS 주석 안에 별표+슬래시 시퀀스를 쓰면
+   주석이 조기 종료되어 다음 룰을 삼킨다 — 2026-07-10 실제 발생했던 버그.) */
 .rp-cols { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: start; }
 @media (max-width: 1080px) { .rp-cols { grid-template-columns: 1fr; } }
 .rp-tree-panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; max-height: 620px; }
