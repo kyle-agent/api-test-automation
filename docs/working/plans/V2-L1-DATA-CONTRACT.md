@@ -118,6 +118,29 @@ basis: V2-DECISIONS.md(D2 확정) + 정찰 실측 4건 (2026-07-09, 발행물/�
 | 정합성(축2) 변화 | S1 | `conformance_new.json` new/regressed/fixed + `conformance.json` summary | 회귀(축1)와 별도 섹션 — 축 혼동 금지 |
 | 트리아지 분류 | 후속 | `controlplane.triage` 스키마(환경/스펙변경/테스트버그/실회귀) 재사용 가치 있음. 단 발행 1건 ↔ GH run 1..N 매핑 계약이 선행 — 후속 결정 지점 | v1 범위 제외 |
 
+### 2.6 실행 축 — 계획·모니터링·기록 (2026-07-10 보강)
+
+**안전 원칙 (pre-flight 오너 확정과 Hard Rule 1의 v2 구현)**
+- **실효 게이트 표시 의무**: mutations/heavy/destructive 게이트는 실제 설정
+  (core.config / env)에서 읽어 표시 — 하드코딩 금지 (기존 콘솔의 오표시가
+  이 규칙의 반면교사). LIVE 기동 시 mutations 토글 없음(항상 ON 표기).
+- **read-only 기동 = 열람 모드**: 실행 CTA 비활성 + "이 서버는 열람용
+  (read-only)으로 기동됨 — 실행하려면 관리자 설정 필요" 표기.
+- **v1은 발사 없음**: 계획(선택) 화면은 v2에, 발사는 "Run in legacy console ↗"
+  핸드오프(선택값을 기존 `/testing?…` prefill 쿼리로 전달). **v2 자체 발사**
+  (누름 → pre-flight 컨펌 모달 → 기존 발사 API 재사용: CI=`POST /runs/trigger`,
+  이 서버=`POST /api/local-run`)는 **오너 검수 게이트 통과 후에만 활성화** —
+  실제 클라우드에 작용하는 기능은 검수 없이 켜지 않는다.
+
+| 요소 | 출처 | 비고 |
+|---|---|---|
+| 실효 게이트 패널 | 서버 설정 실측 | mutations ON/OFF · heavy · destructive · 프로파일. 배지: This server |
+| 계획(선택 폼) | 카탈로그/스위트 목록 (기존 로더) | `?service=` 등 prefill 쿼리 수용 — 서비스 상세 딥링크의 v2 종착지(후속 전환) |
+| 실행 위치 | UI 선택지: This server / CI | D5 권고 A의 v2 구현 — v1은 표시+핸드오프만 |
+| 라이브 모니터링 | `console_api.api_runs()`·`api_run(rid)` | This server 배지. 이벤트 스트림 상세는 후속 |
+| 용량/큐 | `console_api.api_capacity()` | VPC 큐·용량 요약 |
+| 기록 | Overview 병합 타임라인과 동일 원천 (limit 100) | 행별 출처 배지 |
+
 ## 3. empty-state 표준 문구
 
 | 상황 | 문구 |
