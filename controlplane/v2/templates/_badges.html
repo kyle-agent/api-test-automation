@@ -1,17 +1,17 @@
 {# 출처 배지 — v2 전체에서 유일한 배지 구현 (L1 계약 §4).
    source ∈ published|local|run. stale=True 면 노랑(노후) — 원칙 1-4. #}
 {% macro badge(source, ts=None, ident=None, stale=False) -%}
-{%- set names = {'published': '발행', 'local': '지금 이 서버', 'run': '이 런'} -%}
+{%- set names = {'published': 'Published', 'local': 'This server', 'run': 'This run'} -%}
 {%- set tips = {'published': '발행된 공식 집계 — 어느 서버에서 열어도 같은 값',
                 'local': '이 서버에서만 관측된 값 — 공식 집계와 다를 수 있음',
                 'run': '특정 실행 1건에 고정된 값 (과거형)'} -%}
 <span class="badge badge-{{ source }}{% if stale %} badge-stale{% endif %}"
       title="{{ tips[source] }}{% if stale %} · 24시간 이상 지난 발행본{% endif %}">
-  <i class="dot"></i>{{ names[source] }}{% if ts %} @{{ ts }}{% endif %}{% if ident %} · {{ ident }}{% endif %}{% if stale %} · 노후{% endif %}
+  <i class="dot"></i>{{ names[source] }}{% if ts %} @{{ ts }}{% endif %}{% if ident %} · {{ ident }}{% endif %}{% if stale %} · stale{% endif %}
 </span>
 {%- endmacro %}
 
-{# 용어 — 한국어 1급 + 코드 괄호 보조 + 정의 툴팁 (D7). terms.py 값만 사용. #}
+{# 용어 — 이름은 영어(D7 개정) + 정의 툴팁은 한국어. terms.py 값만 사용. #}
 {% macro term(key, terms) -%}
 <span class="term" title="{{ terms[key].tip }}">{{ terms[key].label }}{% if terms[key].code %}<span class="term-code">({{ terms[key].code }})</span>{% endif %}<sup class="term-i">ⓘ</sup></span>
 {%- endmacro %}

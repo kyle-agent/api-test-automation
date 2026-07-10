@@ -3,14 +3,14 @@
 {% block title %}{{ svc.service }}{% endblock %}
 {% block content %}
 
-<p class="crumb"><a href="/v2/services">서비스 목록</a> / {{ svc.category }}</p>
+<p class="crumb"><a href="/v2/services">Service list</a> / {{ svc.category }}</p>
 <h1 class="page-q">{{ svc.service }}
-  {% if svc.untestable %}<span class="badge badge-none" title="{{ svc.untestable }}">기능 테스트 제외</span>{% endif %}
+  {% if svc.untestable %}<span class="badge badge-none" title="{{ svc.untestable }}">{{ terms['untestable'].label }}</span>{% endif %}
 </h1>
 
 <section class="panel overview">
   <div class="panel-head">
-    <h2>개요</h2>
+    <h2>Overview</h2>
     {{ badge('published', ts=pub.updated_label, ident=('dd:' ~ pub.sha if pub.sha else None), stale=pub.stale) }}
   </div>
   {% if svc.untestable %}
@@ -23,12 +23,12 @@
       <div class="kpi-sub">{{ svc.covered }}/{{ svc.total }}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">읽기(GET)</div>
+      <div class="kpi-label">Read (GET)</div>
       <div class="kpi-value">{{ svc.get_pct_label }}</div>
       <div class="kpi-sub">{{ svc.gcov }}/{{ svc.gtot }}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">쓰기(POST/PUT/DELETE)</div>
+      <div class="kpi-label">Write (POST/PUT/DELETE)</div>
       <div class="kpi-value">{{ svc.write_pct_label }}</div>
       <div class="kpi-sub">{{ svc.wcov }}/{{ svc.wtot }}</div>
     </div>
@@ -40,19 +40,19 @@
   </div>
   <p class="run-cta-wrap">
     <a class="run-cta" href="/testing?service={{ svc.category }}/{{ svc.service }}"
-       title="기존 실행 콘솔로 이동 — 선택이 미리 채워지며, 실행은 사전 확인 후 수동으로 시작됩니다">이 서비스 실행 (기존 콘솔) ↗</a>
+       title="기존 실행 콘솔로 이동 — 선택이 미리 채워지며, 실행은 사전 확인 후 수동으로 시작됩니다">Run this service (legacy console) ↗</a>
   </p>
 </section>
 
 <section class="panel">
   <div class="panel-head">
-    <h2>엔드포인트 목록</h2>
+    <h2>Endpoints</h2>
     <span class="panel-note">{{ rows|length }}개</span>
   </div>
 
   <div class="svc-toolbar ep-toolbar">
     <div class="seg" id="m-seg">
-      <button type="button" data-m="" aria-pressed="true">전체</button>
+      <button type="button" data-m="" aria-pressed="true">All</button>
       <button type="button" data-m="GET" aria-pressed="false">GET</button>
       <button type="button" data-m="POST" aria-pressed="false">POST</button>
       <button type="button" data-m="PUT" aria-pressed="false">PUT</button>
@@ -60,21 +60,21 @@
       <button type="button" data-m="PATCH" aria-pressed="false">PATCH</button>
     </div>
     <select id="cov-filter">
-      <option value="">전체 커버</option>
+      <option value="">All coverage</option>
       <option value="verified">{{ terms['cov_verified'].label }}</option>
       <option value="reached">{{ terms['cov_reached'].label }}</option>
       <option value="failed">{{ terms['cov_failed'].label }}</option>
       <option value="none">{{ terms['cov_none'].label }}</option>
     </select>
-    <div class="search"><input id="ep-search" type="text" placeholder="경로 · API명 검색" autocomplete="off"></div>
+    <div class="search"><input id="ep-search" type="text" placeholder="Search path · API" autocomplete="off"></div>
   </div>
 
   <div class="tbl-scroll">
   <table class="tbl ep-tbl" id="ep-table">
     <thead>
       <tr>
-        <th class="cbar-h"></th><th>메서드</th><th>경로</th><th>API명</th>
-        <th>커버</th><th>최근 status · 응답</th><th>{{ term('defect_red', terms) }}</th>
+        <th class="cbar-h"></th><th>Method</th><th>Path</th><th>API</th>
+        <th>Coverage</th><th>Last status · latency</th><th>{{ term('defect_red', terms) }}</th>
       </tr>
     </thead>
     <tbody>
@@ -98,7 +98,7 @@
         <td>
           {% if r.defects %}
           <details>
-            <summary class="defbtn {{ 'crit' if r.defect_status=='red' else '' }}">{{ '결함' if r.defect_status=='red' else '개선' }} {{ r.defects|length }}</summary>
+            <summary class="defbtn {{ 'crit' if r.defect_status=='red' else '' }}">{{ terms['defect_red'].label if r.defect_status=='red' else terms['defect_yellow'].label }} {{ r.defects|length }}</summary>
             <ul class="defitems">
               {% for it in r.defects %}
               <li class="defitem {{ 'crit' if r.defect_status=='red' else '' }}">

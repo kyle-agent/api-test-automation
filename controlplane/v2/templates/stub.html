@@ -3,15 +3,15 @@
 {% block content %}
 <h1 class="page-q">{{ stub_title }}</h1>
 {% if notice %}
-{% from "_badges.html" import badge %}
+{% from "_badges.html" import badge, term %}
 <section class="headline bad">
   <div class="headline-main">
-    <strong>새 회귀 {{ notice.fail_new }}건</strong>
-    <span class="headline-sub">이미 알던 실패 {{ notice.fail_known }}건 (추적 중)</span>
+    <strong>{{ term('regression_new', terms) }}: {{ notice.fail_new }}</strong>
+    <span class="headline-sub">{{ term('regression_known', terms) }}: {{ notice.fail_known }} (tracked)</span>
   </div>
   <div class="headline-meta">
     {{ badge('published', ts=pub.updated_label, stale=pub.stale) }}
-    <a class="headline-link" href="/reporting" title="회귀·트리아지 화면 구축 전까지 기존 Reporting의 트리아지에서 상세 확인">기존 Reporting에서 상세 확인 ↗</a>
+    <a class="headline-link" href="/reporting" title="회귀·트리아지 화면 구축 전까지 기존 Reporting의 트리아지에서 상세 확인">Open legacy Reporting ↗</a>
   </div>
 </section>
 {% endif %}

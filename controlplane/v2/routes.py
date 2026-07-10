@@ -28,6 +28,7 @@ def _ctx(request: Request, active: str) -> dict:
         "active": active,
         "nav": terms.NAV,
         "terms": terms.TERMS,
+        "terms_run_status": terms.RUN_STATUS,
         "sources": terms.SOURCES,
         "product": terms.PRODUCT_NAME,
         "pub": published.meta(),
@@ -106,13 +107,13 @@ def situation(request: Request):
 # ── 나머지 축 (골격 — 화면 단위로 채워진다) ─────────────────────────────────
 
 _STUBS = {
-    "model": ("모델", "테스트 정의 · 리소스 모델 — 모델 표·작업 큐·노드 에디터·인벤토리가 이 축에 들어옵니다.",
-              [("기존 Modeling 화면", "/planning")]),
-    "run": ("실행", "테스트 실행 · 모니터링 — 계획(선택→구성 확인)→실행 모니터링→기록이 이 축에 들어옵니다.",
-            [("기존 Testing 콘솔", "/testing")]),
-    "tools": ("도구", "부가 도구 — AI 초안·지식 문서·발행 대시보드 링크 모음.",
-              [("발행 대시보드 (읽기 전용 공유용) ↗", "/reporting"),
-               ("AI 도구", "/ai"), ("기존 홈", "/")]),
+    "model": ("Model", "테스트 정의 · 리소스 모델 — 모델 표·작업 큐·노드 에디터·인벤토리가 이 축에 들어옵니다.",
+              [("Legacy Modeling screen", "/planning")]),
+    "run": ("Runs", "테스트 실행 · 모니터링 — 계획(선택→구성 확인)→실행 모니터링→기록이 이 축에 들어옵니다.",
+            [("Legacy Testing console", "/testing")]),
+    "tools": ("Tools", "부가 도구 — AI 초안·지식 문서·발행 대시보드 링크 모음.",
+              [("Published dashboard (read-only sharing) ↗", "/reporting"),
+               ("AI tools", "/ai"), ("Legacy Home", "/")]),
 }
 
 

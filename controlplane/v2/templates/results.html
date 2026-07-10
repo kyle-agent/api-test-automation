@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% from "_badges.html" import badge, term %}
-{% block title %}결과{% endblock %}
+{% block title %}Results{% endblock %}
 {% block content %}
 
-<h1 class="page-q">실행 결과 · 회귀 분석</h1>
+<h1 class="page-q">Results</h1>
 
 {# ── 판정 헤드라인 — 현황과 동일 원천(S1, history.jsonl 마지막 줄) ─────── #}
 {% if head %}
@@ -11,18 +11,18 @@
   <section class="headline {{ 'bad' if fail_new and fail_new > 0 else 'good' }} {{ 'is-stale' if pub.stale }}">
     <div class="headline-main">
       {% if fail_new and fail_new > 0 %}
-        <strong>{{ term('regression_new', terms) }} {{ fail_new }}건</strong> — 확인이 필요합니다
+        <strong>{{ term('regression_new', terms) }}: {{ fail_new }}</strong> — 확인이 필요합니다
       {% else %}
-        <strong>{{ term('regression_new', terms) }} 0</strong> — 배포 안전
+        <strong>{{ term('regression_new', terms) }}: 0</strong> — 배포 안전
       {% endif %}
       {% if head.get('fail_known') %}
-        <span class="headline-sub">{{ term('regression_known', terms) }} {{ head.fail_known }}건</span>
+        <span class="headline-sub">{{ term('regression_known', terms) }}: {{ head.fail_known }}</span>
       {% endif %}
     </div>
     <div class="headline-meta">
       {{ badge('published', ts=(verdict_ts or pub.updated_label), stale=pub.stale) }}
       {% if verdict_ts and pub.updated_label and verdict_ts != pub.updated_label %}
-      <span class="panel-note" title="판정은 마지막 결과 런 기준이며, 발행 저장소 갱신(@{{ pub.updated_label }})과 시각이 다를 수 있습니다">판정 기준 런 @{{ verdict_ts }}</span>
+      <span class="panel-note" title="판정은 마지막 결과 런 기준이며, 발행 저장소 갱신(@{{ pub.updated_label }})과 시각이 다를 수 있습니다">Verdict run @{{ verdict_ts }}</span>
       {% endif %}
     </div>
   </section>
@@ -46,7 +46,7 @@
       <div class="tbl-scroll">
       <table class="tbl">
         <thead>
-          <tr><th>항목</th><th>당시 status</th><th>현재 상태</th><th>서비스</th></tr>
+          <tr><th>Endpoint</th><th>Status then</th><th>Current</th><th>Service</th></tr>
         </thead>
         <tbody>
           {% for r in new_regressions %}
@@ -82,7 +82,7 @@
       </table>
       </div>
     {% else %}
-      <p class="empty-state">새 회귀 상세 목록을 가져올 수 없습니다 — 발행 대시보드 참조 → <a href="/reporting">발행 대시보드 열기 ↗</a></p>
+      <p class="empty-state">새 회귀 상세 목록을 가져올 수 없습니다 — 발행 대시보드 참조 → <a href="/reporting">Open published dashboard ↗</a></p>
     {% endif %}
   {% elif head %}
     <p class="empty-state">{{ term('regression_new', terms) }} 없음 — 배포 안전</p>
@@ -94,9 +94,10 @@
 {# ── 섹션 2: 정합성(축2) 변화 — 회귀(축1)와 별도 ────────────────────────── #}
 <section class="panel">
   <div class="panel-head">
-    <h2>정합성 변화 (설계·문서 축)</h2>
+    <h2>Conformance changes</h2>
     {{ badge('published', ts=pub.updated_label, stale=pub.stale) }}
   </div>
+  <p class="panel-note">설계·문서 축 — 회귀(축1)와는 별도 판정입니다.</p>
   {% if conf_summary %}
   <p class="panel-note">
     현재 발행 기준 결함 등급 분포 —
@@ -126,22 +127,22 @@
     {% if changed %}
     <div class="tbl-scroll">
     <table class="tbl">
-      <thead><tr><th>구분</th><th>항목</th><th>이전 → 이후</th><th>서비스</th></tr></thead>
+      <thead><tr><th>Change</th><th>Endpoint</th><th>From → To</th><th>Service</th></tr></thead>
       <tbody>
         {% for e in conf_changes.new %}
         <tr><td>{{ term('conformance_new', terms) }}</td><td class="mono">{{ e.endpoint }}</td>
             <td class="mono">{{ e['from'] }} → {{ e['to'] }}</td>
-            <td>{% if e.link %}<a href="{{ e.link }}">보기 →</a>{% else %}<span class="mut">—</span>{% endif %}</td></tr>
+            <td>{% if e.link %}<a href="{{ e.link }}">View →</a>{% else %}<span class="mut">—</span>{% endif %}</td></tr>
         {% endfor %}
         {% for e in conf_changes.regressed %}
         <tr><td>{{ term('conformance_regressed', terms) }}</td><td class="mono">{{ e.endpoint }}</td>
             <td class="mono">{{ e['from'] }} → {{ e['to'] }}</td>
-            <td>{% if e.link %}<a href="{{ e.link }}">보기 →</a>{% else %}<span class="mut">—</span>{% endif %}</td></tr>
+            <td>{% if e.link %}<a href="{{ e.link }}">View →</a>{% else %}<span class="mut">—</span>{% endif %}</td></tr>
         {% endfor %}
         {% for e in conf_changes.fixed %}
         <tr><td>{{ term('conformance_fixed', terms) }}</td><td class="mono">{{ e.endpoint }}</td>
             <td class="mono">{{ e['from'] }} → {{ e['to'] }}</td>
-            <td>{% if e.link %}<a href="{{ e.link }}">보기 →</a>{% else %}<span class="mut">—</span>{% endif %}</td></tr>
+            <td>{% if e.link %}<a href="{{ e.link }}">View →</a>{% else %}<span class="mut">—</span>{% endif %}</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -155,7 +156,7 @@
 {# ── 섹션 3: 기지 실패 (추적 중) — 목록이 길어 맨 아래 + 기본 접힘 ──────── #}
 <section class="panel">
   <div class="panel-head">
-    <h2>{{ term('regression_known', terms) }} (추적 중)</h2>
+    <h2>{{ term('regression_known', terms) }} (tracked)</h2>
     <span class="panel-note">저장소 baseline{% if known_issues %} · {{ known_issues|length }}건{% endif %}</span>
   </div>
   {% if known_issues is none %}
@@ -164,11 +165,11 @@
     <p class="empty-state">등록된 기지 실패가 없습니다.</p>
   {% else %}
   <details class="known-fold">
-    <summary>목록 펼치기 ({{ known_issues|length }}건)</summary>
+    <summary>Show all ({{ known_issues|length }})</summary>
     <div class="tbl-scroll">
     <table class="tbl">
       <thead>
-        <tr><th>항목</th><th>status</th><th>유형</th><th>등록</th><th>비고</th></tr>
+        <tr><th>Endpoint</th><th>status</th><th>Type</th><th>Since</th><th>Notes</th></tr>
       </thead>
       <tbody>
         {% for it in known_issues %}

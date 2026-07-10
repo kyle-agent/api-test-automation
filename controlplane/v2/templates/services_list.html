@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% from "_badges.html" import badge, term %}
-{% block title %}서비스{% endblock %}
+{% block title %}Services{% endblock %}
 {% block content %}
 
-<h1 class="page-q">서비스별 테스트 현황</h1>
+<h1 class="page-q">Services</h1>
 
 {% if data is none %}
 <section class="panel">
@@ -16,18 +16,18 @@
 {% else %}
 <section class="panel">
   <div class="panel-head">
-    <h2>서비스 목록</h2>
+    <h2>Service list</h2>
     {{ badge('published', ts=pub.updated_label, ident=('dd:' ~ pub.sha if pub.sha else None), stale=pub.stale) }}
   </div>
   <div class="svc-toolbar">
-    <div class="search"><input id="svc-search" type="text" placeholder="이름 · 카테고리 검색" oninput="svcFilter()" autocomplete="off"></div>
+    <div class="search"><input id="svc-search" type="text" placeholder="Search name · category" oninput="svcFilter()" autocomplete="off"></div>
     <span class="panel-note">{{ services|length }}개 서비스 · 기본 정렬: {{ term('cov_c3', terms) }} 오름차순(백로그 우선)</span>
   </div>
   <div class="tbl-scroll">
   <table class="tbl" id="svc-table">
     <thead>
       <tr>
-        <th>서비스</th><th>카테고리</th><th>{{ term('cov_c3', terms) }}</th>
+        <th>Service</th><th>Category</th><th>{{ term('cov_c3', terms) }}</th>
         <th>{{ term('defect_red', terms) }}/{{ term('defect_yellow', terms) }}</th><th></th>
       </tr>
     </thead>
@@ -37,16 +37,16 @@
           data-name="{{ s.service|lower }}" data-cat="{{ s.category|lower }}">
         <td>
           <a href="/v2/services/{{ s.slug }}">{{ s.service }}</a>
-          {% if s.untestable %}<span class="badge badge-none" title="{{ s.untestable }}">기능 테스트 제외</span>{% endif %}
+          {% if s.untestable %}<span class="badge badge-none" title="{{ s.untestable }}">{{ terms['untestable'].label }}</span>{% endif %}
         </td>
         <td>{{ s.category }}</td>
         <td class="mono">{{ s.covered }}/{{ s.total }} · {{ s.pct_label }}</td>
         <td>
-          {% if s.defect_red %}<span class="defc red">결함 {{ s.defect_red }}</span>{% endif %}
-          {% if s.defect_yellow %}<span class="defc yellow">개선 {{ s.defect_yellow }}</span>{% endif %}
+          {% if s.defect_red %}<span class="defc red">{{ terms['defect_red'].label }} {{ s.defect_red }}</span>{% endif %}
+          {% if s.defect_yellow %}<span class="defc yellow">{{ terms['defect_yellow'].label }} {{ s.defect_yellow }}</span>{% endif %}
           {% if not s.defect_red and not s.defect_yellow %}<span class="mut">—</span>{% endif %}
         </td>
-        <td><a href="/v2/services/{{ s.slug }}">상세 보기 →</a></td>
+        <td><a href="/v2/services/{{ s.slug }}">Details →</a></td>
       </tr>
       {% endfor %}
     </tbody>

@@ -20,6 +20,7 @@ import time
 from pathlib import Path
 
 from controlplane import dashdata
+from controlplane.v2 import terms
 from dashboard.build import load_catalog, per_service, slug  # noqa: F401  (slug re-exported)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -112,7 +113,12 @@ def _merge_known_issues(conf_by_endpoint: dict) -> dict:
     return conf_by_endpoint
 
 
-_COV_LABEL = {"verified": "검증(C3)", "reached": "도달", "failed": "실패", "none": "미관측"}
+_COV_LABEL = {
+    "verified": terms.TERMS["cov_verified"]["label"],
+    "reached": terms.TERMS["cov_reached"]["label"],
+    "failed": terms.TERMS["cov_failed"]["label"],
+    "none": terms.TERMS["cov_none"]["label"],
+}
 _COV_ICON = {"verified": "✓", "reached": "◑", "failed": "⛔", "none": "·"}
 
 

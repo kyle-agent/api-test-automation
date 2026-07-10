@@ -36,12 +36,12 @@ def test_situation_renders():
     r = client.get("/v2")
     assert r.status_code == 200, r.status_code
     body = r.text
-    assert "플랫폼 현황" in body  # 격식 명사형 — 구어체·질문형 금지 (D7 추가, 2026-07-10)
+    assert "Overview" in body  # 페이지 h1 — D7 개정(2026-07-10): 이름은 영어
     assert "SCP API Regression" in body
     # 판정 헤드라인 또는 empty-state 중 하나는 반드시 존재 (L1 §2.1/§3)
-    assert ("새 회귀" in body) or ("발행된 공식 수치가 아직 없습니다" in body)
+    assert ("New regressions" in body) or ("발행된 공식 수치가 아직 없습니다" in body)
     # 로컬 관측 empty-state는 0이 아니라 안내문 (원칙 1-3)
-    assert ("이 서버에서 실행된 런이 없습니다" in body) or ("이 서버의 런" in body)
+    assert ("이 서버에서 실행된 런이 없습니다" in body) or ("Runs on this server" in body)
 
 
 def test_axes_render():
@@ -55,9 +55,9 @@ def test_services_list_renders():
     r = client.get("/v2/services")
     assert r.status_code == 200, r.status_code
     body = r.text
-    assert "서비스별 테스트 현황" in body
+    assert "Services" in body
     # 서비스 1개 이상 렌더되거나 empty-state 중 하나는 반드시 존재 (L1 §2.2/§3)
-    assert ("상세 보기" in body) or ("발행된 공식 수치를 가져올 수 없습니다" in body) \
+    assert ("Details" in body) or ("발행된 공식 수치를 가져올 수 없습니다" in body) \
         or ("표시할 서비스가 없습니다" in body)
 
 
@@ -71,8 +71,8 @@ def test_service_detail_renders_or_skips_offline():
     r = client.get(f"/v2/services/{svc_slug}")
     assert r.status_code == 200, r.status_code
     body = r.text
-    assert "엔드포인트 목록" in body
-    assert "이 서비스 실행" in body
+    assert "Endpoints" in body
+    assert "Run this service" in body
     assert "/testing?service=" in body  # 기존 prefill 계약 딥링크
 
 
@@ -108,13 +108,13 @@ def test_results_axis_renders():
     r = client.get("/v2/results")
     assert r.status_code == 200, r.status_code
     body = r.text
-    assert "실행 결과 · 회귀 분석" in body
+    assert "Results" in body
     # 회귀 섹션은 실제 목록 또는 empty-state 중 하나로 반드시 성립 (L1 §2.5/§3)
-    assert ("당시 status" in body) or ("새 회귀 없음" in body) \
+    assert ("Status then" in body) or ("없음 — 배포 안전" in body) \
         or ("상세 목록을 가져올 수 없습니다" in body) \
         or ("발행된 공식 수치를 가져올 수 없습니다" in body)
-    assert "정합성 변화" in body
-    assert ("기지 실패" in body)
+    assert "Conformance changes" in body
+    assert ("Known issues" in body)
 
 
 def test_results_new_regressions_detail_when_available():

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% from "_badges.html" import badge, term %}
-{% block title %}현황{% endblock %}
+{% block title %}Overview{% endblock %}
 {% block content %}
 
-<h1 class="page-q">플랫폼 현황</h1>
+<h1 class="page-q">Overview</h1>
 
 {# ── 판정 헤드라인 — 최신 발행본 단일 (D2) ─────────────────────────── #}
 {% if head %}
@@ -11,19 +11,19 @@
   <section class="headline {{ 'bad' if fail_new and fail_new > 0 else 'good' }} {{ 'is-stale' if pub.stale }}">
     <div class="headline-main">
       {% if fail_new and fail_new > 0 %}
-        <strong>새 회귀 {{ fail_new }}건</strong> — 확인이 필요합니다
-        <a class="headline-link" href="/v2/results" title="결과 축에서 회귀 상세 확인">상세 보기 →</a>
+        <strong>{{ term('regression_new', terms) }}: {{ fail_new }}</strong> — 확인이 필요합니다
+        <a class="headline-link" href="/v2/results" title="결과 축에서 회귀 상세 확인">Details →</a>
       {% else %}
-        <strong>새 회귀 0</strong> — 배포 안전
+        <strong>{{ term('regression_new', terms) }}: 0</strong> — 배포 안전
       {% endif %}
       {% if head.get('fail_known') %}
-        <span class="headline-sub" title="{{ terms['regression_known'].tip }}">기지 실패 {{ head.fail_known }}건 (추적 중)</span>
+        <span class="headline-sub">{{ term('regression_known', terms) }}: {{ head.fail_known }} (tracked)</span>
       {% endif %}
     </div>
     <div class="headline-meta">
       {{ badge('published', ts=(verdict_ts or pub.updated_label), stale=pub.stale) }}
       {% if chip_n > 0 %}
-        <a class="chip" href="#local-runs" title="발행 이후 이 서버에서 완료된 런 — 판정에는 반영되지 않음">발행 이후 이 서버 런 {{ chip_n }}건 →</a>
+        <a class="chip" href="#local-runs" title="발행 이후 이 서버에서 완료된 런 — 판정에는 반영되지 않음">Local runs since publish: {{ chip_n }} →</a>
       {% endif %}
     </div>
   </section>
@@ -49,13 +49,13 @@
   <div class="kpi {{ 'is-stale' if pub.stale }}">
     <div class="kpi-label">{{ term('regression_new', terms) }}</div>
     <div class="kpi-value">{% if head %}{{ head.get('fail_new', '—') }}{% else %}—{% endif %}</div>
-    {% if head and head.get('fail_known') is not none %}<div class="kpi-sub" title="{{ terms['regression_known'].tip }}">이미 알던 실패 {{ head.fail_known }}건</div>{% endif %}
+    {% if head and head.get('fail_known') is not none %}<div class="kpi-sub">{{ term('regression_known', terms) }}: {{ head.fail_known }}</div>{% endif %}
     {{ badge('published', stale=pub.stale) }}
   </div>
   <div class="kpi">
     <div class="kpi-label">{{ term('residual', terms) }}</div>
     <div class="kpi-value">—</div>
-    <div class="kpi-sub empty-note">이 서버에서 수집한 이력이 없습니다 — <a href="/planning/resources" title="기존 자원 뷰에서 수집 (30~90초)">수집하기 →</a></div>
+    <div class="kpi-sub empty-note">이 서버에서 수집한 이력이 없습니다 — <a href="/planning/resources" title="기존 자원 뷰에서 수집 (30~90초)">Collect →</a></div>
     {{ badge('local') }}
   </div>
 </section>
@@ -63,19 +63,19 @@
 {# ── 병합 런 타임라인 — 행별 출처 배지 (M2 원칙) ─────────────────────── #}
 <section class="panel">
   <div class="panel-head">
-    <h2>런 타임라인</h2>
+    <h2>Run timeline</h2>
     <span class="panel-note">CI와 이 서버의 런을 시간순으로 병합 — 행별 출처 표시</span>
   </div>
   {% if runs %}
   <table class="tbl">
-    <thead><tr><th>출처</th><th title="실행 1회의 식별자">런</th><th title="실행한 테스트 묶음">스위트</th><th title="실행의 진행 단계 — 성공/실패 판정(런 결과)은 런 상세에서 제공 예정">진행 상태</th><th>시각</th></tr></thead>
+    <thead><tr><th>Source</th><th title="실행 1회의 식별자">Run</th><th title="실행한 테스트 묶음">Suite</th><th title="실행의 진행 단계 — 성공/실패 판정(런 결과)은 런 상세에서 제공 예정">Status</th><th>Time</th></tr></thead>
     <tbody>
       {% for r in runs %}
       <tr>
         <td>{{ badge('local') if r.is_local else badge('published') }}</td>
         <td class="mono">{{ r.gh_run_id or '(대기)' }}</td>
         <td>{{ r.suite }}{% if r.profile %} · {{ r.profile }}{% endif %}</td>
-        <td><span class="st st-{{ r.status }}">{{ {'done':'완료','failed':'실패','running':'실행 중','dispatched':'요청됨','archived':'보관됨'}.get(r.status, r.status) }}</span></td>
+        <td><span class="st st-{{ r.status }}">{{ terms_run_status.get(r.status, r.status) }}</span></td>
         <td class="mono">{{ r.when or '' }}</td>
       </tr>
       {% endfor %}
@@ -92,18 +92,18 @@
 {# ── 이 서버의 런 — 로컬 관측의 격리 섹션 (D2) ──────────────────────── #}
 <section class="panel" id="local-runs">
   <div class="panel-head">
-    <h2>이 서버의 런</h2>
+    <h2>Runs on this server</h2>
     {{ badge('local') }}
   </div>
   {% if local_runs %}
   <table class="tbl">
-    <thead><tr><th title="실행 1회의 식별자">런</th><th title="실행한 테스트 묶음">스위트</th><th title="실행의 진행 단계">진행 상태</th><th>시각</th></tr></thead>
+    <thead><tr><th title="실행 1회의 식별자">Run</th><th title="실행한 테스트 묶음">Suite</th><th title="실행의 진행 단계">Status</th><th>Time</th></tr></thead>
     <tbody>
       {% for r in local_runs %}
       <tr>
         <td class="mono">{{ r.gh_run_id }}</td>
         <td>{{ r.suite }}</td>
-        <td><span class="st st-{{ r.status }}">{{ {'done':'완료','failed':'실패','running':'실행 중'}.get(r.status, r.status) }}</span></td>
+        <td><span class="st st-{{ r.status }}">{{ terms_run_status.get(r.status, r.status) }}</span></td>
         <td class="mono">{{ r.finished_at or r.requested_at or '' }}</td>
       </tr>
       {% endfor %}
