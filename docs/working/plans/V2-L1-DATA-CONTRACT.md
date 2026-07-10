@@ -166,6 +166,30 @@ basis: V2-DECISIONS.md(D2 확정) + 정찰 실측 4건 (2026-07-09, 발행물/�
 - 결과 행의 출처 배지: Services/Endpoints = 발행/저장소 기준 표기,
   Runs = This server.
 
+### 2.9 실행 뷰 (런 상세의 live/queued/done 3상태) — 오너 승인 목업 기준 (2026-07-10)
+
+> 목업: scratchpad v2-exec-mockup.html (아티팩트 발행됨). 골격은 legacy 실행
+> 화면(체크리스트+now-playing) 패리티, 그 위에 3층: A(이상 감지)·B(계획↔실행
+> 연속성)·C(종료 후 다음 행동). **런타임 DAG 없음** (기존 결정 존중 — 🕸
+> 온디맨드 버튼만).
+
+| 요소 | 출처 | 비고 |
+|---|---|---|
+| PLAN 스트립 | `POST /api/plan {lifecycle_ids: rec.lifecycle_ids}` 재계산 + durations | 생성/삭제 예상·peak VPC·ETA p50 |
+| ACTUAL 스트립 | 이벤트 집계(생성 수·경과) + `/api/capacity` | 편차 칩 = ETA 대비 경과·생성 진척의 가중 판정 |
+| VPC 슬롯 미터 | `/api/capacity` (cap·baseline·reserved·headroom·queued) | 기존/이 런/다른 런/여유 구분, cap-bar 흡수 |
+| now-playing | 이벤트 tail (열린 step-start) | 진행률·잔여 ETA·⏹ Abort(기존 API) |
+| A. 지연 의심 | 이벤트 경과 vs durations 실측 평균 ×3 | ⚠️ **세마포어 대기와 구분 필수**: 대기 이벤트가 없으면 VPC-생성 스텝은 지연 판정에서 제외(오탐 방지) — 엔진 요청 #5 처리 후 정식 구분 |
+| A. 실패 군집 | 같은 서비스 연속 fail ≥2 | 인라인 ⏸ 제안 |
+| 슬롯 대기 칩 (파랑) | 엔진 요청 #5의 대기 이벤트 (그 전엔 미표시) | "정상 조율, 실패 아님" 문구 고정 |
+| queued 상태 | rec.status queued + capacity + 선행 런 잔여 ETA | WHY QUEUED(여유<peak) + 예상 시작 + 대기 취소 |
+| 체크리스트/필터 | groupEventsByLifecycle 로직 이식 | ⊘ 쿼터 스킵 글리프(skip≠fail, Hard Rule 6), hover ⏸ + 확인 팝오버 |
+| 호출 티커 | step-end 이벤트 최근 5건 | 500은 즉시 눈에 띔 |
+| 4탭 | 이벤트(자원/API/로그) 네이티브, Runtime은 새 창 ↗ | iframe 금지(M6) |
+| C. 종료 카드 | 이벤트 요약 + fold evidence(기존 run_detail_data) + 잔존 대조 + 쿼터 스킵 목록 | fail→Results, +검증→Fold, 잔존→Leftover 딥링크. 계획 대비 회고 1줄 |
+| 폴링 규율 | 이벤트 2s 증분(?offset=) · capacity 30s · 숨은 탭 정지 | P2C-24 다이어트 준수, 렌더는 변경분만 |
+| 잔존 | 실행 중 UI 없음(의도) — 종료 카드 1급 + Runs 축 Leftover 패널(후속) | D8 단일 표면 |
+
 ## 3. empty-state 표준 문구
 
 | 상황 | 문구 |
