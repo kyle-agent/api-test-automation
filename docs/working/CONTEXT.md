@@ -113,7 +113,28 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-07-09 밤, 오너 실시간 협업 세션 마감 — main=`f8b44f62`, branch 동기):**
+- **LATEST (2026-07-10 밤 — main=`672de85c`, branch 동기, 오너 실시간 협업 2일차 마감):**
+  검증 **2,424** (+13 오늘: private-nat 4 · LB member 2 · fs replication 2 ·
+  iam createrole/deleterole/createiamuser/getiamuser · apigw setprivatelinkendpoint).
+  **오늘의 확정**: ① IAM 트러스트 정책 = Principal(root SRN 리스트형)+Resource
+  둘 다 필수 → create-role 202 (PF-20/31 입력정형 확정) ② apigw-privatelink
+  **완전 그린** — scf PLE 생성이 함수를 DEPLOYING으로 되돌리는 게 뿌리, settle
+  체인으로 delete-function까지 204 ③ private-nat DX 경로 완전 그린 (남은 1건:
+  gone-폴 403 수리 반영됨 — 삭제된 vpc-connection GET은 403 반환, until_status
+  [403,404]) ④ iam-user-full 신설(오너 승인) — create 201/get 200, PF-36
+  (password base64 필수) 엔진 json_b64_fields로 해결; update의 password_reuse_count
+  최소 1 수리 반영 — **다음 런이 유저-의존 나머지 7키 판정** ⑤ P2C-26: 리소스
+  개별선택 조용한 탈락 수리 (stale 매핑 19곳 + pre-flight dropped 경고 + 게이트)
+  ⑥ adopt:vpc 선택은 non-heavy여도 공유 VPC 프로비저닝 (IB-049 스킵 뿌리)
+  ⑦ run-end 리퍼 게이트 강제 (콘솔 서버 env 무관) ⑧ cloudcontrol 서비스
+  untestable 등록. **SCR 미결**: PF-37 (public 토큰 서버가 유효 인증키 401 거부
+  — 소거 완전, SDS 문의감) + PF-38 (endpoint disable→enable 후 데이터플레인
+  4h+ 미복구, API는 Running 표시 — 콘솔 재토글 또는 SDS 문의). SCR push 유저
+  `regrscr856f95`(정책 3종+인증키)와 sample/test 커버리지 배선은 무퇴행 대기 —
+  이미지만 들어오면 image/tags ~19키 자동 활성. **다음 런 판정 대기**: iam-user
+  나머지 7키 + private-nat 403-폴 (오너: pull+콘솔 재시작 필요 — run-ea6d가
+  구코드로 IB-049 스킵 재현했음). auto-repair Routine(hourly :30) 가동 중.
+- **PRIOR (2026-07-09 밤, 오너 실시간 협업 세션 마감 — main=`f8b44f62`, branch 동기):**
   하루 종일 오너와 실시간으로 런 3회(run-2b 90/96 → run-2c 16/2 표적 → run-85b2
   91/96 풀런 → 진행 중 4번째) 트리아지·수리·화면개편을 반복. **내일 아침 리뷰
   포인트: `docs/working/plans/CX-IA-DESIGN-2026-07-09.md`** (제3자 실사용 리뷰 —
