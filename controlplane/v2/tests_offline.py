@@ -76,7 +76,7 @@ def test_service_detail_renders_or_skips_offline():
     body = r.text
     assert "Endpoints" in body
     assert "Run this service" in body
-    assert "/testing?service=" in body  # 기존 prefill 계약 딥링크
+    assert "/v2/run?service=" in body  # v2 Runs 계획 프리필 (GHA 디스패치 배제 — D5 개정)
 
 
 def test_service_detail_unknown_slug_is_404():
