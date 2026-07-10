@@ -37,13 +37,12 @@
   <div class="kpi {{ 'is-stale' if pub.stale }}">
     <div class="kpi-label">{{ term('cov_c3', terms) }}</div>
     <div class="kpi-value">{% if head and head.get('cov_c3') is not none %}{{ head.cov_c3 }}%{% else %}—{% endif %}</div>
-    {% if head and head.get('tested') is not none %}<div class="kpi-sub">{{ head.tested }}/{{ head.total }}</div>{% endif %}
     {{ badge('published', stale=pub.stale) }}
   </div>
   <div class="kpi {{ 'is-stale' if pub.stale }}">
     <div class="kpi-label">{{ term('cov_op', terms) }}</div>
     <div class="kpi-value">{% if head and head.get('cov_op') is not none %}{{ head.cov_op }}%{% else %}—{% endif %}</div>
-    {% if head and head.get('cov_get') is not none %}<div class="kpi-sub" title="읽기(GET) 커버리지">GET {{ head.cov_get }}%</div>{% endif %}
+    {% if head and head.get('tested') is not none %}<div class="kpi-sub" title="호출이 관측된 엔드포인트 / 전체">{{ head.tested }}/{{ head.total }}{% if head.get('cov_get') is not none %} · GET {{ head.cov_get }}%{% endif %}</div>{% endif %}
     {{ badge('published', stale=pub.stale) }}
   </div>
   <div class="kpi {{ 'is-stale' if pub.stale }}">
