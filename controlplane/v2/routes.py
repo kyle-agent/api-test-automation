@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from controlplane import db, snapshots
-from controlplane.v2 import published, services_data, terms
+from controlplane.v2 import published, results_data, services_data, terms
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -98,7 +98,8 @@ def situation(request: Request):
         called_pct = round(head["tested"] / head["total"] * 100, 1)
 
     ctx.update(head=head, runs=runs, local_runs=local_runs[:10], chip_n=chip_n,
-               called_pct=called_pct)
+               called_pct=called_pct,
+               verdict_ts=published.headline_ts_label(head))
     return templates.TemplateResponse(request, "situation.html", ctx)
 
 
@@ -109,8 +110,6 @@ _STUBS = {
               [("기존 Modeling 화면", "/planning")]),
     "run": ("실행", "테스트 실행 · 모니터링 — 계획(선택→구성 확인)→실행 모니터링→기록이 이 축에 들어옵니다.",
             [("기존 Testing 콘솔", "/testing")]),
-    "results": ("결과", "실행 결과 · 회귀 분석 — 요약·회귀/트리아지·런 타임라인·비교가 이 축에 들어옵니다.",
-                [("기존 Reporting 화면", "/reporting")]),
     "tools": ("도구", "부가 도구 — AI 초안·지식 문서·발행 대시보드 링크 모음.",
               [("발행 대시보드 (읽기 전용 공유용) ↗", "/reporting"),
                ("AI 도구", "/ai"), ("기존 홈", "/")]),
@@ -156,19 +155,13 @@ def run(request: Request):
 
 @router.get("/results", response_class=HTMLResponse)
 def results(request: Request):
-    # 회귀·트리아지 화면이 지어지기 전에도 "새 회귀 → 상세" 동선이 끊기지 않게
-    # 발행 헤드라인의 회귀 요약 + 기존 화면으로의 연결을 예고로 제공한다.
-    title, desc, links = _STUBS["results"]
+    """결과 축(⑤) — 회귀·트리아지 (L1 계약 §2.5)."""
     ctx = _ctx(request, "results")
-    head = published.headline()
-    notice = None
-    if head and head.get("fail_new"):
-        notice = {
-            "fail_new": head["fail_new"],
-            "fail_known": head.get("fail_known", 0),
-        }
-    ctx.update(stub_title=title, stub_desc=desc, stub_links=links, notice=notice)
-    return templates.TemplateResponse(request, "stub.html", ctx)
+    data = results_data.get_results_data()
+    ctx.update(data)
+    ctx.setdefault("verdict_ts",
+                   published.headline_ts_label(data.get("head")))
+    return templates.TemplateResponse(request, "results.html", ctx)
 
 
 @router.get("/tools", response_class=HTMLResponse)

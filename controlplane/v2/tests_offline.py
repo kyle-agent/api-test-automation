@@ -104,6 +104,85 @@ def test_published_meta_shape():
     # ok=False여도 화면은 성립해야 함 — situation이 200을 주는지는 위에서 검증됨
 
 
+def test_results_axis_renders():
+    r = client.get("/v2/results")
+    assert r.status_code == 200, r.status_code
+    body = r.text
+    assert "실행 결과 · 회귀 분석" in body
+    # 회귀 섹션은 실제 목록 또는 empty-state 중 하나로 반드시 성립 (L1 §2.5/§3)
+    assert ("당시 status" in body) or ("새 회귀 없음" in body) \
+        or ("상세 목록을 가져올 수 없습니다" in body) \
+        or ("발행된 공식 수치를 가져올 수 없습니다" in body)
+    assert "정합성 변화" in body
+    assert ("기지 실패" in body)
+
+
+def test_results_new_regressions_detail_when_available():
+    # 실측(계약 §2.5 작성 시점)에는 발행 배너에 이 두 항목이 있었다. 발행본이
+    # 그 사이 바뀌었을 수 있어(오늘 재확인: 최신 발행은 healthy — Hard Rule 5,
+    # 기억보다 현재 관측이 우선) 존재를 강제하지 않고 있으면 렌더까지 검증한다.
+    from controlplane.v2 import results_data
+    rows = results_data.get_new_regressions()
+    if not rows:
+        print("  (skip: 발행 배너에 새 회귀 상세 없음 - empty-state는 위 테스트에서 검증됨)")
+        return
+    r = client.get("/v2/results")
+    body = r.text
+    for row in rows:
+        assert row["key"] in body
+    keys = {row["key"] for row in rows}
+    if ("networking-loadbalancer-members-nat:static-nat-create" in keys
+            and "networking/loadbalancer/createloadbalancerpublicnatip" in keys):
+        assert "이중 기록 추정" in body
+
+
+def test_new_regressions_enrichment_is_deterministic():
+    # 라이브 발행본 상태와 무관하게(임시 우회 파서의 견고성) 이중 기록 감지 +
+    # 카탈로그/합성 키 분기 + 딥링크를 직접 검증한다.
+    from controlplane.v2 import results_data
+    parsed = [
+        ("networking-loadbalancer-members-nat:static-nat-create", 500),
+        ("networking/loadbalancer/createloadbalancerpublicnatip", 500),
+    ]
+    rows = results_data._enrich_new_regressions(parsed)
+    by_key = {row["key"]: row for row in rows}
+    synth = by_key["networking-loadbalancer-members-nat:static-nat-create"]
+    cat = by_key["networking/loadbalancer/createloadbalancerpublicnatip"]
+    assert synth["kind"] == "synthetic"
+    assert cat["kind"] == "catalog"
+    assert cat["link"] == "/v2/services/networking__loadbalancer"
+    assert synth["dup_of"] and cat["dup_of"]
+
+
+def test_banner_regex_parses_synthetic_html_fixture():
+    # dashboard/build.py:1150-1154이 실제로 내는 마크업 구조를 흉내낸 고정
+    # fixture로 정규식 파서 자체를 라이브 상태와 독립적으로 검증한다.
+    from controlplane.v2 import results_data
+    snippet = (
+        '<div class="action bad"><div><b>새 회귀 2건 — 조치 필요.</b>'
+        '<div><code>networking-loadbalancer-members-nat:static-nat-create</code> → 500</div>'
+        '<div><code>networking/loadbalancer/createloadbalancerpublicnatip</code> → 500</div>'
+        '</div></div>')
+    m = results_data._BANNER_RE.search(snippet)
+    assert m
+    items = results_data._ITEM_RE.findall(m.group(1))
+    assert len(items) == 2
+
+
+def test_known_issues_shape_or_none():
+    from controlplane.v2 import results_data
+    issues = results_data.get_known_issues()
+    assert issues is None or isinstance(issues, list)
+    if issues:
+        assert all("key" in it and "status" in it for it in issues)
+
+
+def test_conformance_changes_shape_or_none():
+    from controlplane.v2 import results_data
+    changes = results_data.get_conformance_changes()
+    assert changes is None or all(k in changes for k in ("new", "regressed", "fixed"))
+
+
 def test_existing_home_untouched():
     # 스트랭글러 불변식: v2 마운트가 기존 화면을 깨지 않는다
     r = client.get("/")

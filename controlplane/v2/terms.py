@@ -47,6 +47,13 @@ TERMS: dict[str, dict] = {
                    "tip": "결함 = 계약 위반 등 실제 구현 버그"},
     "defect_yellow": {"label": "개선", "code": None,
                       "tip": "개선 = 설계·문서상 아쉬운 점(구현 버그는 아님)"},
+    # 결과 축(⑤) — 정합성(축2) 변화 (L1 계약 §2.5)
+    "conformance_new": {"label": "신규 결함", "code": None,
+                        "tip": "직전 발행 기준선(초록)에서 이번 발행에 새로 결함(빨강/노랑)으로 바뀐 엔드포인트"},
+    "conformance_regressed": {"label": "악화", "code": None,
+                              "tip": "이미 결함이던 항목이 더 심각한 등급으로 나빠짐(노랑→빨강)"},
+    "conformance_fixed": {"label": "해소", "code": None,
+                          "tip": "이전에 결함이던 항목이 이번 발행에서 개선되어 등급이 좋아짐"},
 }
 
 # 출처 배지 3종 (L1 계약 §1) — 라벨과 뜻. 배지 마크업은 _badges.html 매크로가 유일한 구현.

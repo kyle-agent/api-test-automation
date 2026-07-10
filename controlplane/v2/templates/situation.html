@@ -21,7 +21,7 @@
       {% endif %}
     </div>
     <div class="headline-meta">
-      {{ badge('published', ts=pub.updated_label, stale=pub.stale) }}
+      {{ badge('published', ts=(verdict_ts or pub.updated_label), stale=pub.stale) }}
       {% if chip_n > 0 %}
         <a class="chip" href="#local-runs" title="발행 이후 이 서버에서 완료된 런 — 판정에는 반영되지 않음">발행 이후 이 서버 런 {{ chip_n }}건 →</a>
       {% endif %}
