@@ -2089,7 +2089,12 @@ def _run_worker(rec: dict) -> None:
                     f"# gates: mutations={rec['mutations']} destructive={rec['destructive']} "
                     f"heavy={rec['heavy']}  parallel={n}\n")
             f.flush()
-            shared = _provision_shared(env, f) if rec["heavy"] else {}
+            from regression.scenarios import local_run as _lr
+            # adopt:vpc 선택은 non-heavy여도 공유 VPC가 필요하다 (2026-07-10
+            # run-adfd: heavy-게이트 탓에 private-nat/apigw-privatelink IB-049 스킵)
+            shared = (_provision_shared(env, f)
+                      if rec["heavy"] or _lr.selection_needs_shared_vpc(
+                          rec["lifecycle_ids"]) else {})
             if shared.get("SCP_SHARED_VPC_ID"):
                 # run-keyed shared-VPC ownership: the capacity view uses this to
                 # keep the shared VPC under '내 실행' (신규10), never '기존'.

@@ -199,6 +199,22 @@ def _stream_cmd(cmd: Sequence[str], env: Mapping, f) -> tuple[int, list[str]]:
     return proc.wait(), lines
 
 
+def selection_needs_shared_vpc(lifecycle_ids: Sequence[str]) -> bool:
+    """선택에 adopt:vpc 라이프사이클이 하나라도 있으면 True — 공유 VPC 프로비저닝
+    필요 판정. 종전에는 heavy 선택에서만 프로비저닝해서, non-heavy 선택에 섞인
+    adopt형(gen-private-nat 등)이 전부 IB-049 스킵됐다 (오너 실측 2026-07-10
+    run-adfd: 'no shared VPC and running under xdist worker')."""
+    from regression.scenarios.loader import load_lifecycles
+    lcs, _ = load_lifecycles(with_sources=True)
+    want = set(lifecycle_ids)
+    for lc in lcs:
+        if lc["id"] in want:
+            for s in lc.get("steps", []):
+                if s.get("adopt") == "vpc":
+                    return True
+    return False
+
+
 def provision_shared(env: dict, f) -> dict:
     """Provision ONE session-shared VPC+subnet so adopter lifecycles don't skip under
     ``-n``. Best-effort: on failure adopters self-skip and self-creators still run.
@@ -275,7 +291,8 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
         f.write(f"# local live run  lifecycle_ids={ids}\n"
                 f"# gates: mutations={mutations} destructive={destructive} heavy={heavy}  parallel={n}\n")
         f.flush()
-        shared = provision_shared(env, f) if heavy else {}
+        shared = (provision_shared(env, f)
+                  if heavy or selection_needs_shared_vpc(ids) else {})
         f.write("\n=== pytest === (수집 → xdist 워커 기동 — 첫 step 로그까지 보통 수십 초)\n")
         f.flush()
         pos = f.tell()
