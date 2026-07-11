@@ -1596,8 +1596,11 @@ def run_sweep(client) -> int:
         "eventstreams", "searchengine", "sqlserver", "vertica"))
         for pair in res]
     deleted += len(dbaas_deleted)
-    _wait_all_gone(c, [(svc, f"/v1/clusters/{cid}") for svc, cid in
-                       dbaas_deleted], 900, 20)
+    # NOTE: the dbaas barrier does NOT sit here any more (owner feedback
+    # 2026-07-11, live run: "SUBNET 3개 중 연관 리소스 없는 것들은 바로
+    # 지워도 되었을텐데"). It moved BELOW the first subnet attempt so a
+    # subnet with no dbaas/VM tenant is reaped immediately instead of
+    # stalling up to 900s behind cluster teardown it doesn't depend on.
 
     # 2z. VPC endpoints (regrvpce) — VPC children that 409-block their VPC.
     # COVERAGE GAP found 2026-07-09 (run-2b): the sweep had NO vpc-endpoints
@@ -1613,13 +1616,36 @@ def run_sweep(client) -> int:
             vpce_ids.append(it["id"])
     _wait_all_gone(c, [("vpc", f"/v1/vpc-endpoints/{e}") for e in vpce_ids])
 
-    # 3. subnets — delete all, then one barrier until all are gone.
-    subnet_ids = []
+    # 3. subnets — OPTIMISTIC first attempt BEFORE the dbaas barrier: a subnet
+    # with no tenant deletes right away; one whose port is still held by a
+    # draining dbaas cluster 409s (cheap, harmless) and is retried once below,
+    # after the cluster barrier frees it. Only a REAL 2xx/404 joins the wait
+    # list / progress tally — the old `if _delete(...)` also treated a truthy
+    # 409 as deleted and would have parked the barrier on a subnet that was
+    # never accepted for deletion.
+    subnet_ids, subnet_retry = [], []
     for it in _select(c, "vpc", "/v1/subnets",
                       name_prefixes=("regrsub", "zznetsub")):
-        if _delete(c, "vpc", f"/v1/subnets/{it['id']}"):
+        st = _delete(c, "vpc", f"/v1/subnets/{it['id']}")
+        if _is_2xx_or_gone(st):
+            _note_progress(st)
             deleted += 1
             subnet_ids.append(it["id"])
+        elif st:
+            print(f"  subnet {_name_of(it)} ({it['id']}) delete -> {st} "
+                  f"(tenant still draining — retried after the dbaas barrier)")
+            subnet_retry.append(it["id"])
+    # dbaas barrier (moved from 2d): clusters release their subnet ports here.
+    _wait_all_gone(c, [(svc, f"/v1/clusters/{cid}") for svc, cid in
+                       dbaas_deleted], 900, 20)
+    for sid in subnet_retry:
+        st = _delete(c, "vpc", f"/v1/subnets/{sid}")
+        if _is_2xx_or_gone(st):
+            _note_progress(st)
+            deleted += 1
+            subnet_ids.append(sid)
+        else:
+            print(f"  subnet {sid} delete -> {st} (still held — next round)")
     _wait_all_gone(c, [("vpc", f"/v1/subnets/{s}") for s in subnet_ids])
 
     # 3b. internet gateways + public IPs (regr*) — children that would
