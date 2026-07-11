@@ -136,16 +136,11 @@ def _split_stale_running(runs) -> tuple[list, list]:
     return active, stale
 
 
-@app.get("/", include_in_schema=False)
-def root_to_v2():
-    # G3 전환(오너 승인 2026-07-10): 루트 랜딩을 v2 셸로. 기존 홈은
-    # /legacy/home 로 보존(v2의 legacy 핸드오프가 아직 참조하므로 삭제 안 함).
-    # 되돌리기: 이 라우트 제거 + 아래 home()의 경로를 "/" 로 복귀.
-    return RedirectResponse("/v2", status_code=302)
-
-
-@app.get("/legacy/home", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
+@app.get("/legacy/home", response_class=HTMLResponse, include_in_schema=False)
 def home(request: Request):
+    # 방향 선회(오너 2026-07-10): v1을 본체로 유지 — G3 루트 전환 되돌림.
+    # v2는 /v2 에 참고용(접목 도너)으로 존치. /legacy/home 별칭도 유지.
     runs = db.list_runs(limit=50)
     running, stale_running = _split_stale_running(runs)
     today = db.now()[:10]
