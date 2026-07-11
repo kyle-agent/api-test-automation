@@ -49,10 +49,23 @@ Changed vs legacy:
 from __future__ import annotations
 
 import os
+import threading
 import time
 
 import core
 from core.registry import is_owned, is_expired
+
+# Guards the module-level per-campaign counters/caches now that independent
+# passes can run on worker threads (sweep parallelization). The boxed-int
+# ``+= 1`` counters and the check-then-add dedup in ``_delete`` go through
+# this lock. The remaining compound mutations (_STUCK two-step writes,
+# _CONVERGED check-then-add in _select) stay unlocked because of a KEYSPACE
+# INVARIANT the parallel design relies on: concurrently-running passes touch
+# DISJOINT collections — every _TAIL_PASSES entry and every dbaas engine owns
+# its own (service, path) and id namespace, so no two threads ever race on
+# the same key. If you add a pass that shares a collection/id family with
+# another concurrent pass, route its shared-state writes through this lock.
+_STATE_LOCK = threading.Lock()
 
 # ---------------------------------------------------------------------------
 # Ownership / expiry helpers
@@ -136,10 +149,24 @@ def _is_deletable(item: dict, *, name_prefixes: tuple[str, ...] = ()) -> bool:
 # ---------------------------------------------------------------------------
 
 def _items(body):
+    """Items list of a collection response. The FIRST non-empty list-of-dicts
+    wins; an empty list is only a FALLBACK. The old \"first list that is empty
+    or dict-list\" rule broke on bodies whose pagination ``links: []`` precedes
+    the real items key — live PF 2026-07-11: SKE ``GET /clusters/{id}/nodepools``
+    returns ``{"count":1, "links":[], "nodepools":[…]}``, so the sweep saw 0
+    nodepools, skipped nodepool teardown, and the cluster delete 409-looped
+    (owner: "노드풀은 왜 삭제안해?"). ``links`` never carries collection items,
+    so it is excluded from the fallback too."""
     if isinstance(body, dict):
-        for v in body.values():
-            if isinstance(v, list) and (not v or isinstance(v[0], dict)):
+        fallback = None
+        for k, v in body.items():
+            if not isinstance(v, list):
+                continue
+            if v and isinstance(v[0], dict):
                 return v
+            if not v and fallback is None and k != "links":
+                fallback = v
+        return fallback if fallback is not None else []
     return body if isinstance(body, list) else []
 
 
@@ -284,7 +311,7 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
     # another bounded round instead of declaring convergence.
     inprog = [it for it in picked if _is_async_deleting(it)]
     if inprog:
-        _INPROGRESS_THIS_ROUND[0] += len(inprog)
+        _bump_inprog(len(inprog))
         print(f"  {path}: {len(inprog)} item(s) mid-async-deletion "
               f"(transitional state) — waiting, not converging")
     # Convergence (Task C, change 1): this pass yields no further progress when
@@ -340,6 +367,12 @@ _INPROGRESS_THIS_ROUND = [0]  # owned items observed mid-async-deletion (state
                               # 409-blocked its VPC — regrtgw*/regrvpcsh* leak.)
 
 
+def _bump_inprog(n: int = 1) -> None:
+    """Locked increment of the async-in-flight counter (threaded passes)."""
+    with _STATE_LOCK:
+        _INPROGRESS_THIS_ROUND[0] += n
+
+
 def _item_id(it: dict):
     """Stable id for stuck-tracking — covers the id-field variants the API uses
     across collections (id / volume_id / image_id / replication_id / name)."""
@@ -383,7 +416,8 @@ def _note_progress(st, it: dict | None = None) -> bool:
     deletes cleanly next round). Recording a 409 as stuck would strand a resource
     that is merely waiting on an in-flight dependency."""
     if _is_2xx_or_gone(st):
-        _PROGRESS_THIS_ROUND[0] += 1
+        with _STATE_LOCK:
+            _PROGRESS_THIS_ROUND[0] += 1
         return True
     if it is not None and st != 409:
         _mark_issued(it)
@@ -513,11 +547,12 @@ def _delete(client, service, path, json=None):
     try:
         r = client.delete(path, service=service, json=json)
         if r.status and 200 <= r.status < 300:
-            if key in _DELETED_THIS_SWEEP:
-                # already 2xx-deleted this sweep — pending-deletion listing,
-                # not progress (falsy return so no caller counts it)
-                return None
-            _DELETED_THIS_SWEEP.add(key)
+            with _STATE_LOCK:   # atomic check-then-add (threaded passes)
+                if key in _DELETED_THIS_SWEEP:
+                    # already 2xx-deleted this sweep — pending-deletion listing,
+                    # not progress (falsy return so no caller counts it)
+                    return None
+                _DELETED_THIS_SWEEP.add(key)
         return r.status
     except core.MutationBlocked as exc:
         print(f"  blocked: {exc}")
@@ -545,6 +580,45 @@ def _wait_gone(client, service, path, timeout=150, interval=10):
             return True
         time.sleep(interval)
     return False
+
+
+def _wait_all_gone(client, pairs, timeout=150, interval=10):
+    """Pass-level BARRIER for async deletes: poll every ``(service, path)`` in
+    ``pairs`` until ALL 404 or one SHARED deadline passes.
+
+    Replaces the per-item ``_wait_gone`` chains where blocking waits added up
+    serially — a pass with N slow items cost up to N×timeout wall time (e.g.
+    dbaas: 900s PER cluster) — with one shared window: the deletes were all
+    issued before the barrier, so they drain concurrently server-side and the
+    wall cost is ≈ the slowest single item. Dependency semantics are unchanged:
+    every caller sits between "issue this pass's deletes" and "start the pass
+    that needs them gone", exactly where the old per-item waits sat.
+
+    Mirrors ``_wait_gone``'s contract per item: a GET error counts as gone, and
+    ``SCP_SWEEP_NOWAIT=true`` skips the barrier entirely (the round loop
+    resolves dependencies by retrying)."""
+    if not pairs:
+        return True
+    if os.environ.get("SCP_SWEEP_NOWAIT", "").lower() == "true":
+        return True
+    remaining = list(pairs)
+    deadline = time.monotonic() + timeout
+    while remaining:
+        still = []
+        for service, path in remaining:
+            try:
+                if client.get(path, service=service).status != 404:
+                    still.append((service, path))
+            except Exception:
+                pass  # like _wait_gone: an unreadable item counts as gone
+        remaining = still
+        if not remaining or time.monotonic() >= deadline:
+            break
+        time.sleep(interval)
+    if remaining:
+        print(f"  wait-all: {len(remaining)} item(s) still present at the "
+              f"{timeout}s barrier — left to the next round")
+    return not remaining
 
 
 def _reap_lb_static_nat(client, lb_id: str) -> bool:
@@ -618,6 +692,7 @@ def _purge_vpc_children(client, vid):
     # (not REJECT-able), so DISCONNECT each connected endpoint (provider side) then
     # delete the service; its customer port is reaped with it. (Learned reaping the
     # leaked wave5 privatelink VPC, 2026-06-18.)
+    _pls_wait = []
     try:
         pls_items = _items(client.get("/v1/privatelink-services", service="vpc").body)
     except Exception:
@@ -642,7 +717,12 @@ def _purge_vpc_children(client, vid):
                 print(f"  privatelink disconnect {eid} -> {exc}")
         if _delete(client, "vpc", f"/v1/privatelink-services/{psid}"):
             n += 1
-            _wait_gone(client, "vpc", f"/v1/privatelink-services/{psid}", 180, 10)
+            _pls_wait.append(("vpc", f"/v1/privatelink-services/{psid}"))
+    _wait_all_gone(client, _pls_wait, 180, 10)
+    # LB/NAT/IGW own ports, so barrier PER COLLECTION: all of one collection's
+    # deletes are issued together, then awaited together, before the next
+    # collection (ports) lists — the same child→parent ordering the old
+    # per-item waits enforced, minus the serial wall time.
     for svc, coll in (("loadbalancer", "/v1/loadbalancers"),
                       ("vpc", "/v1/nat-gateways"),
                       ("vpc", "/v1/internet-gateways"),
@@ -651,15 +731,18 @@ def _purge_vpc_children(client, vid):
             items = _items(client.get(coll, service=svc).body)
         except Exception:
             continue
+        _coll_wait = []
         for it in items:
             if isinstance(it, dict) and it.get("id") and str(it.get("vpc_id")) == vid:
                 if _delete(client, svc, f"{coll}/{it['id']}"):
                     n += 1
-                    _wait_gone(client, svc, f"{coll}/{it['id']}", 180, 10)
+                    _coll_wait.append((svc, f"{coll}/{it['id']}"))
+        _wait_all_gone(client, _coll_wait, 180, 10)
     try:
         subs = _items(client.get("/v1/subnets", service="vpc").body)
     except Exception:
         subs = []
+    _sub_wait = []
     for sn in subs:
         if isinstance(sn, dict) and sn.get("id") and str(sn.get("vpc_id")) == vid:
             try:
@@ -672,11 +755,16 @@ def _purge_vpc_children(client, vid):
                 pass
             if _delete(client, "vpc", f"/v1/subnets/{sn['id']}"):
                 n += 1
-                _wait_gone(client, "vpc", f"/v1/subnets/{sn['id']}", 120, 10)
+                _sub_wait.append(("vpc", f"/v1/subnets/{sn['id']}"))
+    _wait_all_gone(client, _sub_wait, 120, 10)
     return n
 
 
-def _vpc_409_holder(client, vid) -> str | None:
+_HOLDER_COLLS = (("loadbalancer", "/v1/loadbalancers", "loadbalancer"),
+                 ("vpc", "/v1/nat-gateways", "nat-gateway"))
+
+
+def _vpc_409_holder(client, vid, cache: dict | None = None) -> str | None:
     """Best-effort: NAME the still-present resource that 409-blocks a VPC delete
     (all read-only GETs). When a holder is detectable the VPC pass burns ONE
     attempt + prints "blocked by <holder>" and defers to the next round, instead
@@ -692,30 +780,63 @@ def _vpc_409_holder(client, vid) -> str | None:
       * a loadbalancer / NAT gateway whose ``vpc_id`` matches (they are reaped by
         the pre-pass, but a mid-drain one still holds the VPC).
     Returns a human-readable description, or None (caller falls back to the
-    blind purge-children + retry loop)."""
-    for t in _list_all(client, "vpc", "/v1/transit-gateways"):
-        if not (t.get("id") and _is_candidate(
-                t, name_prefixes=("regrtgw", "zznettgw"))):
-            continue
-        try:
-            conns = _items(client.get(
-                f"/v1/transit-gateways/{t['id']}/vpc-connections",
-                service="vpc").body)
-        except Exception:
-            conns = []
-        for cn in conns:
-            if isinstance(cn, dict) and str(cn.get("vpc_id")) == str(vid):
-                return (f"transit-gateway {_name_of(t) or t['id']} "
-                        f"vpc-connection {cn.get('id')} "
-                        f"(state={cn.get('state')})")
-    for svc, coll, label in (("loadbalancer", "/v1/loadbalancers",
-                              "loadbalancer"),
-                             ("vpc", "/v1/nat-gateways", "nat-gateway")):
-        for x in _list_all(client, svc, coll):
-            if isinstance(x, dict) and x.get("id") \
-                    and str(x.get("vpc_id")) == str(vid):
-                return f"{label} {_name_of(x) or x['id']} (state={x.get('state')})"
-    return None
+    blind purge-children + retry loop).
+
+    ``cache`` (optional dict, scoped by the caller to ONE VPC pass of ONE
+    round) memoises the TGW/connection/LB/NAT listings: with several blocked
+    VPCs the old code re-listed all four collections PER VPC. Staleness is
+    handled in BOTH directions: a cache HIT (holder named) may be a holder
+    that has since drained — worst case the VPC defers to the next round,
+    which re-lists fresh (never deletes anything extra). A cache MISS
+    re-lists ONCE and rescans before answering None, so a holder that
+    APPEARED after the cache was populated is never masked — the blind
+    purge-children fallback only runs on listings exactly as fresh as the
+    pre-cache behavior."""
+    if cache is None:
+        cache = {}
+
+    def _populate():
+        pairs = []
+        for t in _list_all(client, "vpc", "/v1/transit-gateways"):
+            if not (t.get("id") and _is_candidate(
+                    t, name_prefixes=("regrtgw", "zznettgw"))):
+                continue
+            try:
+                conns = _items(client.get(
+                    f"/v1/transit-gateways/{t['id']}/vpc-connections",
+                    service="vpc").body)
+            except Exception:
+                conns = []
+            pairs.append((t, conns))
+        cache["tgw_conns"] = pairs
+        for svc, coll, _label in _HOLDER_COLLS:
+            cache[coll] = _list_all(client, svc, coll)
+
+    def _scan():
+        for t, conns in cache["tgw_conns"]:
+            for cn in conns:
+                if isinstance(cn, dict) and str(cn.get("vpc_id")) == str(vid):
+                    return (f"transit-gateway {_name_of(t) or t['id']} "
+                            f"vpc-connection {cn.get('id')} "
+                            f"(state={cn.get('state')})")
+        for _svc, coll, label in _HOLDER_COLLS:
+            for x in cache.get(coll, []):
+                if isinstance(x, dict) and x.get("id") \
+                        and str(x.get("vpc_id")) == str(vid):
+                    return (f"{label} {_name_of(x) or x['id']} "
+                            f"(state={x.get('state')})")
+        return None
+
+    fresh = "tgw_conns" not in cache
+    if fresh:
+        _populate()
+    holder = _scan()
+    if holder or fresh:
+        return holder
+    # MISS against possibly-stale listings — refresh once and rescan so a
+    # holder that appeared mid-round is reported instead of silently missed.
+    _populate()
+    return _scan()
 
 
 # ---------------------------------------------------------------------------
@@ -936,342 +1057,81 @@ def _extra_region_clients(primary) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Main sweep
+# Parallel execution of INDEPENDENT passes
+# ---------------------------------------------------------------------------
+# The sweep's wall time was dominated by strictly-serial listing + deleting of
+# ~30 collections even though most of the tail (steps 5-12: resource-groups,
+# SCR, filestorage, SKE, certs/queues, secrets→KMS, SCF, apigateway, CDN, IAM,
+# servicewatch) has NO cross-collection dependency — only the networking chain
+# (servers → … → VPCs) must stay ordered. Independent passes now run on a
+# small thread pool; each pass keeps its INTERNAL ordering (repos before
+# registries, secrets before KMS, nodepools before clusters, …) untouched.
+#
+# SAFETY: parallelism changes only WHEN a pass runs, never WHAT it selects —
+# ownership gating (_select / _is_deletable) is per-pass and unchanged. The
+# shared ApiClient is thread-safe (requests.Session + stateless per-request
+# signing; the pool is sized for ~60 hosts), and the module-level campaign
+# counters take _STATE_LOCK. A pass that raises is reported and costs only its
+# own pass (the others complete) — same round-retry recovery as before.
+
+def _sweep_workers() -> int:
+    """SCP_SWEEP_PARALLEL — thread-pool size for independent sweep passes.
+    Default 6 (modest vs. the API gateway; xdist test runs push it harder).
+    Set 1 to force the legacy fully-serial sweep."""
+    try:
+        return max(1, int(os.environ.get("SCP_SWEEP_PARALLEL", "6")))
+    except ValueError:
+        return 6
+
+
+def _map_parallel(fn, items):
+    """Map ``fn`` over ``items`` on the sweep pool (ordered results). Falls back
+    to a plain loop when the pool is disabled or pointless (≤1 item)."""
+    items = list(items)
+    workers = min(_sweep_workers(), len(items))
+    if workers <= 1:
+        return [fn(x) for x in items]
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=workers,
+                            thread_name_prefix="sweep") as ex:
+        return list(ex.map(fn, items))
+
+
+def _run_passes(passes, client) -> int:
+    """Run ``(name, fn)`` passes — concurrently when the pool allows — and
+    return the summed deletion count. A pass's exception is contained (printed,
+    counted 0) so one broken service can't abort the rest of the sweep."""
+    def _one(named):
+        name, fn = named
+        try:
+            return fn(client) or 0
+        except Exception as exc:  # noqa: BLE001 — isolate pass failures
+            print(f"  pass {name} error: {exc}")
+            return 0
+    return sum(_map_parallel(_one, passes))
+
+
+# ---------------------------------------------------------------------------
+# Independent tail passes (steps 5-12) — one function per dependency island.
+# Bodies are moved verbatim from the old inline run_sweep tail; each returns
+# its own deletion count.
 # ---------------------------------------------------------------------------
 
-def run_sweep(client) -> int:
-    """Execute the full dependency-ordered sweep. Returns count of deletions."""
-    deleted = 0
-    c = client
-
-    # 1. servers (virtualserver) — delete then wait gone (frees subnet/sg)
-    for it in _select(c, "virtualserver", "/v1/servers",
-                      name_prefixes=("regrsrv",)):
-        if _delete(c, "virtualserver", f"/v1/servers/{it['id']}"):
-            deleted += 1
-            _wait_gone(c, "virtualserver", f"/v1/servers/{it['id']}", 300, 15)
-
-    # 2. launch-configurations, then keypairs + security-groups.
-    # 2-lc. launch-configurations (regrlc*/regrasglc*) — full-inventory sweep
-    # 2026-07-02 found a leaked ``regrlc371da604`` (compute__virtualserver /
-    # wave4 lifecycles create them; the collection was never in this map).
-    # Delete BEFORE keypairs: an LC pins a platform-derived keypair named
-    # ``regrlckp{run}-{lc_id}`` that is only freed with the LC.
-    for it in _select(c, "virtualserver", "/v1/launch-configurations",
-                      name_prefixes=("regrlc", "regrasglc")):
-        if it.get("id") and _note_progress(
-                _delete(c, "virtualserver",
-                        f"/v1/launch-configurations/{it['id']}"), it):
-            deleted += 1
-
-    # 2-sg. server groups (regrsgrp*, wave1 lifecycle) — same 2026-07-02 sweep
-    # found 4 leaked; the collection was never in this map. No dependencies
-    # once the servers (step 1) are gone.
-    for it in _select(c, "virtualserver", "/v1/server-groups",
-                      name_prefixes=("regrsgrp",)):
-        if it.get("id") and _note_progress(
-                _delete(c, "virtualserver",
-                        f"/v1/server-groups/{it['id']}"), it):
-            deleted += 1
-
-    # 2. keypairs + security-groups (independent). Keypair name families:
-    # regrkey* (canonical), regrlckp* (launch-config lifecycle + its
-    # platform-derived ``regrlckp{run}-{lc_id}``), regraskp*/regraskpc*
-    # (auto-scaling lifecycles) — the narrow ("regrkey",) list left a
-    # regrlckp* keypair behind (full-inventory sweep 2026-07-02).
-    for it in _select(c, "virtualserver", "/v1/keypairs",
-                      name_prefixes=("regrkey", "regrlckp", "regraskp")):
-        if _delete(c, "virtualserver",
-                   f"/v1/keypairs/{it.get('name')}"):
-            deleted += 1
-    for it in _select(c, "security-group", "/v1/security-groups",
-                      name_prefixes=("regrsg",)):
-        if _delete(c, "security-group",
-                   f"/v1/security-groups/{it['id']}"):
-            deleted += 1
-
-    # 2b. ports (regrport) — subnet children; must go before the subnet pass.
-    for it in _select(c, "vpc", "/v1/ports",
-                      name_prefixes=("regrport", "zznetport")):
-        if it.get("id") and _delete(c, "vpc", f"/v1/ports/{it['id']}"):
-            deleted += 1
-
-    # 2c-0. virtualserver CUSTOM IMAGES (regrimg*) — MUST go before the volume
-    # pass. A custom image created from a VM volume PINS its source volume:
-    #   DELETE /v1/volumes/{id} -> 400 Snapshot.InvalidSnapshotDeleteRequest
-    #     "Volume linked to the Server Custom Image cannot be deleted."
-    # so a leaked regrimg* image makes its source volume un-reapable forever
-    # (8-round loop, field 2026-06-22). Dependency order is image -> snapshot ->
-    # volume, so reap the image first; DELETE /v1/images/{id} -> 204 clears it.
-    # Owned-only (regrimg prefix / owner tag) — never touches platform base
-    # images (those carry no regr* name and no owner tag).
-    for it in _select(c, "virtualserver", "/v1/images",
-                      name_prefixes=("regrimg",), match_token=True):
-        iid = it.get("id") or it.get("image_id")
-        if not iid:
-            continue
-        st = _delete(c, "virtualserver", f"/v1/images/{iid}")
-        if _note_progress(st, it):
-            deleted += 1
-            _wait_gone(c, "virtualserver", f"/v1/images/{iid}", 300, 15)
-        else:
-            print(f"  image {_name_of(it)} ({iid}) delete -> {st}")
-
-    # 2c. volume snapshots (regrsnap) then their block volumes (regrvol) —
-    # snapshot first so the volume delete isn't blocked.
-    for it in _select(c, "virtualserver", "/v1/snapshots",
-                      name_prefixes=("regr",), match_token=True):
-        if it.get("id") and _note_progress(
-                _delete(c, "virtualserver", f"/v1/snapshots/{it['id']}"), it):
-            deleted += 1
-            _wait_gone(c, "virtualserver",
-                       f"/v1/snapshots/{it['id']}", 300, 15)
-    # Broad "regr" prefix on purpose: a VM create's INLINE boot volume is
-    # auto-created by the platform — it carries NO registry tag (we only tag
-    # what we create directly) and is named after the server (regrsrv*), not
-    # regrvol*. delete_on_termination should reap it, but failed runs leave
-    # tag-less regr* volumes behind (user-reported: 6 orphans).
-    for it in _select(c, "virtualserver", "/v1/volumes",
-                      name_prefixes=("regr", "zznet"),
-                      match_token=True, force_unnamed=True):
-        vid = it.get("id")
-        if not vid:
-            continue
-        st = _delete(c, "virtualserver", f"/v1/volumes/{vid}")
-        if _note_progress(st, it):
-            deleted += 1
-        else:
-            print(f"  volume {_name_of(it)} ({vid}) delete -> {st}")
-
-    # 2d. dbaas clusters (regr* per engine service) — MUST go before
-    # subnets/vpcs. Issue all deletes, then wait each is gone.
-    dbaas_deleted = []
-    for svc in ("mysql", "postgresql", "mariadb", "epas", "cachestore",
-                "eventstreams", "searchengine", "sqlserver", "vertica"):
-        for it in _select(c, svc, "/v1/clusters", name_prefixes=("regr",)):
-            cid = it.get("id")
-            if cid and _delete(c, svc, f"/v1/clusters/{cid}"):
-                deleted += 1
-                dbaas_deleted.append((svc, cid))
-    for svc, cid in dbaas_deleted:
-        _wait_gone(c, svc, f"/v1/clusters/{cid}", 900, 20)
-
-    # 2z. VPC endpoints (regrvpce) — VPC children that 409-block their VPC.
-    # COVERAGE GAP found 2026-07-09 (run-2b): the sweep had NO vpc-endpoints
-    # pass at all, so an endpoint whose lifecycle delete 400'd (CREATING —
-    # gen-vpc-endpoint) pinned the session-shared VPC (`regrvpcsh…` 8cdd0e0c)
-    # ACTIVE for hours while every scan reported the collection converged.
-    # Must run BEFORE the subnet/vpc passes.
-    vpce_ids = []
-    for it in _select(c, "vpc", "/v1/vpc-endpoints",
-                      name_prefixes=("regrvpce",)):
-        if it.get("id") and _delete(c, "vpc", f"/v1/vpc-endpoints/{it['id']}"):
-            deleted += 1
-            vpce_ids.append(it["id"])
-    for eid in vpce_ids:
-        _wait_gone(c, "vpc", f"/v1/vpc-endpoints/{eid}")
-
-    # 3. subnets — delete all, then wait each is gone.
-    subnet_ids = []
-    for it in _select(c, "vpc", "/v1/subnets",
-                      name_prefixes=("regrsub", "zznetsub")):
-        if _delete(c, "vpc", f"/v1/subnets/{it['id']}"):
-            deleted += 1
-            subnet_ids.append(it["id"])
-    for sid in subnet_ids:
-        _wait_gone(c, "vpc", f"/v1/subnets/{sid}")
-
-    # 3b. internet gateways + public IPs (regr*) — children that would
-    # 409-block their VPC; delete them (and wait) before the vpc pass.
-    for it in _select(c, "vpc", "/v1/internet-gateways",
-                      name_prefixes=("regr", "zznet")):
-        if it.get("id") and _delete(
-                c, "vpc", f"/v1/internet-gateways/{it['id']}"):
-            deleted += 1
-            _wait_gone(c, "vpc",
-                       f"/v1/internet-gateways/{it['id']}", 300, 15)
-    for it in _select(c, "vpc", "/v1/publicips",
-                      name_prefixes=("regr",), force_unnamed=True):
-        if it.get("id") and _delete(c, "vpc", f"/v1/publicips/{it['id']}"):
-            deleted += 1
-
-    # 3b-2. VPC PEERINGS — must go before the VPCs they lock (run #5 evidence:
-    # a peering stuck in CREATING blocks BOTH its VPCs with 409
-    # related-resource, and a peering only becomes deletable after approval:
-    # PUT .../approval {"type": "CREATE_APPROVE"} — the proven body). Approve
-    # best-effort, then delete with a short 400/409 retry.
-    for it in _select(c, "vpc", "/v1/vpc-peerings",
-                      name_prefixes=("regrpeer",)):
-        pid = it.get("id")
-        if not pid:
-            continue
-        try:  # approval is a no-op 4xx if already ACTIVE/REJECTED — best-effort
-            c.put(f"/v1/vpc-peerings/{pid}/approval", service="vpc",
-                  json={"type": "CREATE_APPROVE"})
-        except Exception:
-            pass
-        st = None
-        for _ in range(6):
-            st = _delete(c, "vpc", f"/v1/vpc-peerings/{pid}")
-            if st and (200 <= st < 300 or st == 404):
-                deleted += 1
-                break
-            time.sleep(15)
-        if not (st and (200 <= st < 300 or st == 404)):
-            print(f"  vpc-peering {pid} delete -> {st}")
-
-    # 3c. shared-networking lifecycle children. private-dns holds quota;
-    # transit-gateways and load-balancers would 409-block the vpc.
-    for it in _select(c, "dns", "/v1/private-dns",
-                      name_prefixes=("regrpdns", "zznetpdns")):
-        if it.get("id") and _delete(c, "dns", f"/v1/private-dns/{it['id']}"):
-            deleted += 1
-            _wait_gone(c, "dns", f"/v1/private-dns/{it['id']}", 300, 15)
-    for it in _select(c, "dns", "/v1/hosted-zones",
-                      name_prefixes=("regr",)):
-        if it.get("id") and _delete(c, "dns", f"/v1/hosted-zones/{it['id']}"):
-            deleted += 1
-    # transit-gateways + their vpc-connections. Live evidence (2026-07-03/04
-    # incident, run 28648339307 + console2 FORCE log): a TGW with a
-    # vpc-connection does NOT reliably cascade on DELETE — the connection sits
-    # DELETING (hours observed) while the TGW reports EDITING, and the pair
-    # 409-blocks the shared VPC. The FLAT /v1/transit-gateway-vpc-connections
-    # list is 403 for this account, but the NESTED per-TGW list is 200
-    # (live-verified 2026-07-04) — so enumerate + delete each owned TGW's
-    # connections FIRST, then the TGW. Transitional (DELETING) items count as
-    # in-progress (main() grants another bounded round) instead of converging;
-    # a rejected TGW delete is transitional (its connection is draining) and is
-    # retried next round, never stuck-marked.
-    for it in _select(c, "vpc", "/v1/transit-gateways",
-                      name_prefixes=("regrtgw", "zznettgw")):
-        tid = it.get("id")
-        if not tid:
-            continue
-        # 1) reap this owned TGW's vpc-connections (children; they block both
-        #    the TGW delete and the connected VPC's delete). Owned-safe: only
-        #    children of a TGW that already passed _select's ownership gate.
-        try:
-            conns = _items(c.get(
-                f"/v1/transit-gateways/{tid}/vpc-connections",
-                service="vpc").body)
-        except Exception:
-            conns = []
-        for cn in conns:
-            cnid = cn.get("id") if isinstance(cn, dict) else None
-            if not cnid:
-                continue
-            if _is_async_deleting(cn):
-                _INPROGRESS_THIS_ROUND[0] += 1
-                print(f"  tgw-vpc-connection {cnid} (tgw {tid}) already "
-                      f"{cn.get('state')} — waiting, not re-deleting")
-                continue
-            cst = _delete(
-                c, "vpc", f"/v1/transit-gateways/{tid}/vpc-connections/{cnid}")
-            if _note_progress(cst):
-                deleted += 1
-            print(f"  tgw-vpc-connection {cnid} (tgw {tid}) delete -> {cst}")
-        # 2) the TGW itself. Mid-deletion → skip the no-op re-DELETE (already
-        #    counted in-progress by _select's async check). A first 202 IS
-        #    genuine progress (_note_progress) — the old bare `if _delete(...)`
-        #    also counted a truthy 409 as a deletion, which inflated `reported`
-        #    and helped the premature "converged" stop.
-        if _is_async_deleting(it):
-            continue
-        # REPAIR 2026-07-07 (HB4b-2, offline, see CAMPAIGN-C3-100-repair-log.md
-        # #HB4b-2 item 5): a TGW still CREATING/EDITING (settling after its own
-        # create or after a vpc-connection create/delete) 400s "not deletable
-        # state(Active, Error)" on DELETE — that failure was never counted
-        # in-progress, so a sweep whose only remaining item was such a TGW
-        # converged one round early instead of granting the settle time. Skip
-        # the doomed DELETE and count it as in-progress instead, same as
-        # _is_async_deleting.
-        if _is_tgw_settling(it):
-            _INPROGRESS_THIS_ROUND[0] += 1
-            print(f"  transit-gateway {_name_of(it) or tid} ({tid}) state="
-                  f"{it.get('state')} — not yet settled (CREATING/EDITING), "
-                  f"deferring delete to next round")
-            continue
-        st = _delete(c, "vpc", f"/v1/transit-gateways/{tid}")
-        if _is_2xx_or_gone(st):
-            _note_progress(st)
-            deleted += 1
-            _wait_gone(c, "vpc", f"/v1/transit-gateways/{tid}", 300, 15)
-        elif st is not None:
-            print(f"  transit-gateway {_name_of(it)} ({tid}) delete -> {st} "
-                  f"(transitional while its vpc-connection drains — "
-                  f"retried next round)")
-
-    # Load balancers + nat gateways have no regr name; delete any whose
-    # vpc_id matches a regr* vpc. These would otherwise 409-block the vpc.
-    regr_vpc_ids = {
-        v["id"]
-        for v in _select(c, "vpc", "/v1/vpcs",
-                         name_prefixes=_VPC_NAME_PREFIXES)
-        if v.get("id")
-    }
-    if regr_vpc_ids:
-        for svc, coll in (("loadbalancer", "/v1/loadbalancers"),
-                          ("vpc", "/v1/nat-gateways")):
-            try:
-                items = _items(c.get(coll, service=svc).body)
-            except Exception:
-                items = []
-            for it in items:
-                if (isinstance(it, dict) and it.get("id")
-                        and str(it.get("vpc_id")) in regr_vpc_ids):
-                    lb_id = it["id"]
-                    if svc == "loadbalancer":
-                        _reap_lb_static_nat(c, lb_id)
-                    if _delete(c, svc, f"{coll}/{it['id']}"):
-                        deleted += 1
-                        _wait_gone(c, svc, f"{coll}/{it['id']}", 300, 15)
-
-    # 4. vpcs — 409 handling is HOLDER-AWARE (2026-07-03 incident): when the
-    # blocker is detectable (an owned TGW's vpc-connection into this VPC, or a
-    # mid-drain LB/NAT gateway — _vpc_409_holder), burn ONE attempt, print
-    # "blocked by <holder>", count the VPC as deferred-in-progress (grants the
-    # next round) and move on — the old loop burned 6 identical noisy 409s per
-    # round against a dependency only time clears. Only when NO holder is
-    # detectable fall back to the blind purge-children + retry loop
-    # (un-prefixed child leaks).
-    deleted_vpc_ids = []
-    for it in _select(c, "vpc", "/v1/vpcs",
-                      name_prefixes=_VPC_NAME_PREFIXES):
-        vid = it["id"]
-        for attempt in range(6):
-            st = _delete(c, "vpc", f"/v1/vpcs/{vid}")
-            print(f"  delete vpc {it.get('name', vid)} ({vid}) -> {st}")
-            if st in (200, 202, 204):
-                deleted += 1
-                deleted_vpc_ids.append(vid)
-                break
-            if st == 409:
-                holder = _vpc_409_holder(c, vid)
-                if holder:
-                    _INPROGRESS_THIS_ROUND[0] += 1
-                    print(f"    blocked by {holder} — deferring to next round")
-                    break
-                # No detectable holder — purge ALL of this vpc's children
-                # (name-agnostic, by vpc_id) to catch un-prefixed leaks,
-                # then retry.
-                deleted += _purge_vpc_children(c, vid)
-                time.sleep(10)
-                continue
-            break
-    # VPC deletion is async (202); wait for each to actually disappear so the
-    # account's VPC quota is freed before a subsequent CRUD run creates a VPC.
-    for vid in deleted_vpc_ids:
-        _wait_gone(c, "vpc", f"/v1/vpcs/{vid}", 300, 15)
-
+def _pass_resource_groups(c) -> int:
     # 5. resource-groups
+    deleted = 0
     for it in _select(c, "resourcemanager", "/v1/resource-groups",
                       name_prefixes=("regr-rg",)):
         if _delete(c, "resourcemanager",
                    f"/v1/resource-groups/{it['id']}"):
             deleted += 1
+    return deleted
 
+
+def _pass_scr(c) -> int:
     # 6. container registries (scr) — delete may flaky-500, so retry.
     # repositories (regrrepo) — registry children; delete before the registry.
+    deleted = 0
     for it in _select(c, "scr", "/v1/repositories",
                       name_prefixes=("regrrepo",)):
         if it.get("id") and _delete(c, "scr",
@@ -1291,15 +1151,22 @@ def run_sweep(client) -> int:
                 time.sleep(15)
                 continue
             break
+    return deleted
 
+
+def _pass_filestorage(c) -> int:
     # 7. filestorage volumes (replication-aware; primary region + any extra
     # SCP_SWEEP_REGIONS). Tears down a volume's replication from the replica side
     # before deleting it, and NEVER counts a 4xx delete as success (Bug 2).
-    deleted += _sweep_filestorage_volumes(c)
+    deleted = _sweep_filestorage_volumes(c)
     for extra in _extra_region_clients(c):
         deleted += _sweep_filestorage_volumes(extra)
+    return deleted
 
+
+def _pass_ske(c) -> int:
     # 8. ske clusters (regrske) — delete their nodepools first, then cluster
+    deleted = 0
     for it in _select(c, "ske", "/v1/clusters",
                       name_prefixes=("regrske",)):
         cid = it.get("id")
@@ -1308,11 +1175,13 @@ def run_sweep(client) -> int:
                                service="ske").body)
         except Exception:
             nps = []
+        _np_wait = []
         for np in nps:
             npid = np.get("id") if isinstance(np, dict) else None
             if npid:
                 _delete(c, "ske", f"/v1/nodepools/{npid}")
-                _wait_gone(c, "ske", f"/v1/nodepools/{npid}", 600, 30)
+                _np_wait.append(("ske", f"/v1/nodepools/{npid}"))
+        _wait_all_gone(c, _np_wait, 600, 30)
         for _ in range(8):
             st = _delete(c, "ske", f"/v1/clusters/{cid}")
             print(f"  delete cluster {_name_of(it)} ({cid}) -> {st}")
@@ -1323,8 +1192,12 @@ def run_sweep(client) -> int:
                 time.sleep(30)
                 continue
             break
+    return deleted
 
+
+def _pass_certs_queues_sgs(c) -> int:
     # 9. light, self-contained resources (no dependencies): certs, queues
+    deleted = 0
     for it in _select(c, "certificatemanager", "/v1/certificatemanager",
                       name_prefixes=("regrcert",)):
         if it.get("id") and _delete(
@@ -1343,9 +1216,13 @@ def run_sweep(client) -> int:
                 c, "security-group",
                 f"/v1/security-groups/{it['id']}"):
             deleted += 1
+    return deleted
 
+
+def _pass_secrets_kms(c) -> int:
     # 10. secrets (regrsec) — delete needs a waiting_time_ndays body. Sweep
     # these before their KMS keys, since a secret references a kms_id.
+    deleted = 0
     _sec_pending = 0
     for it in _select(c, "secretsmanager", "/v1/secrets",
                       name_prefixes=("regrsec",)):
@@ -1376,12 +1253,16 @@ def run_sweep(client) -> int:
     if _kms_pending:
         print(f"  /v1/kms/transit: {_kms_pending} already scheduled-for-deletion "
               f"(To_Be_Terminated, PF-09) — 재삭제 안 함")
+    return deleted
 
+
+def _pass_scf(c) -> int:
     # 12. light create->read lifecycle types (scf, apigateway, iam, servicewatch).
     # scf cloud functions (regrscf + wave5의 regrw5scf/regrw5trg — 2026-07-10
     # 오너 실측: regrw5* 4건이 name-mismatch로 영구 스킵되던 커버리지 갭):
     # delete each function's triggers first,
     # then the function itself.
+    deleted = 0
     for it in _select(c, "scf", "/v1/cloud-functions",
                       name_prefixes=("regrscf", "regrw5scf", "regrw5trg")):
         fid = it.get("id")
@@ -1399,16 +1280,45 @@ def run_sweep(client) -> int:
                         json={"cloud_function_id": fid,
                               "trigger_type": (tr.get("trigger_type")
                                                or "cronjob")})
-        if _delete(c, "scf", f"/v1/cloud-functions/{fid}"):
+        # PF-46 (2026-07-11 live): a function whose PrivateLink SERVICE is
+        # enabled rejects DELETE (scp-cloud-function.function-not-deletable-
+        # error) — disable it first via PUT …/configurations/privatelink-
+        # services {"privatelink_service_enabled": false}. A service stuck in
+        # CREATING rejects the deactivation too ("not allowed when Creating
+        # state", observed stuck 3 weeks on regrw5trg*) — that function is
+        # un-deletable until the backend settles; the 400 below feeds the
+        # stuck-tracker so the sweep converges instead of retrying forever.
+        plink = f"/v1/cloud-functions/{fid}/configurations/privatelink-services"
+        try:
+            pl = c.get(plink, service="scf").body or {}
+            if isinstance(pl, dict) and pl.get("privatelink_service_enabled"):
+                pr = c.put(plink, service="scf",
+                           json={"privatelink_service_enabled": False})
+                print(f"  scf {fid} privatelink-service disable -> {pr.status}")
+        except core.MutationBlocked as exc:
+            print(f"  blocked: {exc}")
+        except Exception as exc:
+            print(f"  scf {fid} privatelink-service check -> {exc}")
+        st = _delete(c, "scf", f"/v1/cloud-functions/{fid}")
+        if _note_progress(st, it):   # a 400 is NOT a deletion (Bug-2a class)
             deleted += 1
+        else:
+            print(f"  cloud-function {_name_of(it)} ({fid}) delete -> {st}")
+    return deleted
 
+
+def _pass_apigateway(c) -> int:
     # apigateway apis (regrapi) — deleting the api removes its child resources.
+    deleted = 0
     for it in _select(c, "apigateway", "/v1/apis",
                       name_prefixes=("regrapi",)):
         if it.get("id") and _delete(
                 c, "apigateway", f"/v1/apis/{it['id']}"):
             deleted += 1
+    return deleted
 
+
+def _pass_cdn(c) -> int:
     # cdn distributions (regr{ualpha}, networking__cdn lifecycle) — VPC-free
     # control-plane resources; the collection was never in this map, so 7 leaked
     # ACTIVE distributions accumulated (full-inventory sweep 2026-07-02). The
@@ -1430,6 +1340,7 @@ def run_sweep(client) -> int:
     # completes); STOPPING -> wait (skip); anything else -> attempt DELETE and
     # count ONLY a 2xx (the 404 trap). A 400 invalid-state is transitional and
     # deliberately NOT fed to the stuck-tracker.
+    deleted = 0
     for it in _select(c, "cdn", "/v1/cdns", name_prefixes=("regr", "zznet")):
         cid = it.get("id")
         if not cid:
@@ -1452,14 +1363,22 @@ def run_sweep(client) -> int:
         if st and 200 <= st < 300:
             _note_progress(st)      # genuine teardown (no stuck-marking arg)
             deleted += 1
+            # Deliberately per-item _wait_gone (NOT the _wait_all_gone
+            # barrier): CDN teardown is a per-item state machine (stop →
+            # deactivation settles → delete) and the pass runs on its own
+            # worker thread, so this wait blocks nobody else.
             _wait_gone(c, "cdn", f"/v1/cdns/{cid}", 300, 15)
         else:
             # 404 here is the masked state error (resource persists) and 400
             # is the transitional invalid-state — both resolve with time, so
             # report and let a later round / the next sweep retry.
             print(f"  cdn {_name_of(it)} ({cid}) state={state} delete -> {st}")
+    return deleted
 
+
+def _pass_iam(c) -> int:
     # iam groups (regrgrp) + policies (regrpol)
+    deleted = 0
     for it in _select(c, "iam", "/v1/groups",
                       name_prefixes=("regrgrp",)):
         if it.get("id") and _delete(c, "iam", f"/v1/groups/{it['id']}"):
@@ -1473,10 +1392,14 @@ def run_sweep(client) -> int:
                       name_prefixes=("regrpol", "regrgrpbpol", "regrrolepol")):
         if it.get("id") and _delete(c, "iam", f"/v1/policies/{it['id']}"):
             deleted += 1
+    return deleted
 
+
+def _pass_servicewatch(c) -> int:
     # servicewatch alerts / dashboards / event-rules (regralert / regrdash /
     # regrevtrule) — same bulk-delete-by-ids shape as log groups. Their
     # lifecycles delete inline, but failed runs orphan them (user-reported).
+    deleted = 0
     for path, prefix in (("/v1/alerts", "regralert"),
                          ("/v1/dashboards", "regrdash"),
                          ("/v1/event-rules", "regrevtrule")):
@@ -1585,6 +1508,441 @@ def run_sweep(client) -> int:
             deleted += 1
         else:
             print(f"  log-group {gid} delete -> {st}")
+    return deleted
+
+
+# The independent tail groups (steps 5-12). Order within each pass is a real
+# dependency (repos→registries, secrets→KMS, nodepools→cluster); order BETWEEN
+# entries is not — they may run in any order / concurrently.
+_TAIL_PASSES = (
+    ("resource-groups", _pass_resource_groups),
+    ("scr", _pass_scr),
+    ("filestorage", _pass_filestorage),
+    ("ske", _pass_ske),
+    ("certs-queues-sgs", _pass_certs_queues_sgs),
+    ("secrets-kms", _pass_secrets_kms),
+    ("scf", _pass_scf),
+    ("apigateway", _pass_apigateway),
+    ("cdn", _pass_cdn),
+    ("iam", _pass_iam),
+    ("servicewatch", _pass_servicewatch),
+)
+
+
+# ---------------------------------------------------------------------------
+# Main sweep
+# ---------------------------------------------------------------------------
+
+def run_sweep(client) -> int:
+    """Execute the full dependency-ordered sweep. Returns count of deletions."""
+    deleted = 0
+    c = client
+
+    # 0. SKE teardown starts FIRST, on its own worker (owner feedback
+    # 2026-07-11 "노드풀은 왜 삭제안해?"): the SKE pass historically sat in
+    # the tail (step 8) — AFTER the VPC pass — yet SKE node ports PIN the
+    # shared subnet, so round 1 always left the subnet+VPC pair to round 2
+    # while nodepool teardown (≤10 min) hadn't even started. Kicking it off
+    # here overlaps SKE teardown with the entire networking chain; it is
+    # JOINED (bounded) right before the subnet retry below, so a round can
+    # reap subnet→VPC as soon as the nodes are gone. Serial mode
+    # (SCP_SWEEP_PARALLEL=1) keeps the legacy tail placement.
+    ske_future = None
+    if _sweep_workers() > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        _ske_ex = ThreadPoolExecutor(max_workers=1,
+                                     thread_name_prefix="sweep-ske")
+        ske_future = _ske_ex.submit(_run_passes, (("ske", _pass_ske),), c)
+        _ske_ex.shutdown(wait=False)
+
+    # 1. servers (virtualserver) — issue every delete, then ONE barrier until
+    # all are gone (frees subnet/sg). Server teardown drains concurrently
+    # server-side, so the old delete→wait→delete→wait chain (300s PER server)
+    # collapses to ≈ the slowest single server.
+    _srv_wait = []
+    for it in _select(c, "virtualserver", "/v1/servers",
+                      name_prefixes=("regrsrv",)):
+        if _delete(c, "virtualserver", f"/v1/servers/{it['id']}"):
+            deleted += 1
+            _srv_wait.append(("virtualserver", f"/v1/servers/{it['id']}"))
+    _wait_all_gone(c, _srv_wait, 300, 15)
+
+    # 2. launch-configurations, then keypairs + security-groups.
+    # 2-lc. launch-configurations (regrlc*/regrasglc*) — full-inventory sweep
+    # 2026-07-02 found a leaked ``regrlc371da604`` (compute__virtualserver /
+    # wave4 lifecycles create them; the collection was never in this map).
+    # Delete BEFORE keypairs: an LC pins a platform-derived keypair named
+    # ``regrlckp{run}-{lc_id}`` that is only freed with the LC.
+    for it in _select(c, "virtualserver", "/v1/launch-configurations",
+                      name_prefixes=("regrlc", "regrasglc")):
+        if it.get("id") and _note_progress(
+                _delete(c, "virtualserver",
+                        f"/v1/launch-configurations/{it['id']}"), it):
+            deleted += 1
+
+    # 2-sg. server groups (regrsgrp*, wave1 lifecycle) — same 2026-07-02 sweep
+    # found 4 leaked; the collection was never in this map. No dependencies
+    # once the servers (step 1) are gone.
+    for it in _select(c, "virtualserver", "/v1/server-groups",
+                      name_prefixes=("regrsgrp",)):
+        if it.get("id") and _note_progress(
+                _delete(c, "virtualserver",
+                        f"/v1/server-groups/{it['id']}"), it):
+            deleted += 1
+
+    # 2. keypairs + security-groups (independent). Keypair name families:
+    # regrkey* (canonical), regrlckp* (launch-config lifecycle + its
+    # platform-derived ``regrlckp{run}-{lc_id}``), regraskp*/regraskpc*
+    # (auto-scaling lifecycles) — the narrow ("regrkey",) list left a
+    # regrlckp* keypair behind (full-inventory sweep 2026-07-02).
+    for it in _select(c, "virtualserver", "/v1/keypairs",
+                      name_prefixes=("regrkey", "regrlckp", "regraskp")):
+        if _delete(c, "virtualserver",
+                   f"/v1/keypairs/{it.get('name')}"):
+            deleted += 1
+    for it in _select(c, "security-group", "/v1/security-groups",
+                      name_prefixes=("regrsg",)):
+        if _delete(c, "security-group",
+                   f"/v1/security-groups/{it['id']}"):
+            deleted += 1
+
+    # 2b. ports (regrport) — subnet children; must go before the subnet pass.
+    for it in _select(c, "vpc", "/v1/ports",
+                      name_prefixes=("regrport", "zznetport")):
+        if it.get("id") and _delete(c, "vpc", f"/v1/ports/{it['id']}"):
+            deleted += 1
+
+    # 2c-0. virtualserver CUSTOM IMAGES (regrimg*) — MUST go before the volume
+    # pass. A custom image created from a VM volume PINS its source volume:
+    #   DELETE /v1/volumes/{id} -> 400 Snapshot.InvalidSnapshotDeleteRequest
+    #     "Volume linked to the Server Custom Image cannot be deleted."
+    # so a leaked regrimg* image makes its source volume un-reapable forever
+    # (8-round loop, field 2026-06-22). Dependency order is image -> snapshot ->
+    # volume, so reap the image first; DELETE /v1/images/{id} -> 204 clears it.
+    # Owned-only (regrimg prefix / owner tag) — never touches platform base
+    # images (those carry no regr* name and no owner tag).
+    _img_wait = []
+    for it in _select(c, "virtualserver", "/v1/images",
+                      name_prefixes=("regrimg",), match_token=True):
+        iid = it.get("id") or it.get("image_id")
+        if not iid:
+            continue
+        st = _delete(c, "virtualserver", f"/v1/images/{iid}")
+        if _note_progress(st, it):
+            deleted += 1
+            _img_wait.append(("virtualserver", f"/v1/images/{iid}"))
+        else:
+            print(f"  image {_name_of(it)} ({iid}) delete -> {st}")
+    _wait_all_gone(c, _img_wait, 300, 15)
+
+    # 2c. volume snapshots (regrsnap) then their block volumes (regrvol) —
+    # snapshot first so the volume delete isn't blocked.
+    _snap_wait = []
+    for it in _select(c, "virtualserver", "/v1/snapshots",
+                      name_prefixes=("regr",), match_token=True):
+        if it.get("id") and _note_progress(
+                _delete(c, "virtualserver", f"/v1/snapshots/{it['id']}"), it):
+            deleted += 1
+            _snap_wait.append(("virtualserver", f"/v1/snapshots/{it['id']}"))
+    _wait_all_gone(c, _snap_wait, 300, 15)
+    # Broad "regr" prefix on purpose: a VM create's INLINE boot volume is
+    # auto-created by the platform — it carries NO registry tag (we only tag
+    # what we create directly) and is named after the server (regrsrv*), not
+    # regrvol*. delete_on_termination should reap it, but failed runs leave
+    # tag-less regr* volumes behind (user-reported: 6 orphans).
+    for it in _select(c, "virtualserver", "/v1/volumes",
+                      name_prefixes=("regr", "zznet"),
+                      match_token=True, force_unnamed=True):
+        vid = it.get("id")
+        if not vid:
+            continue
+        st = _delete(c, "virtualserver", f"/v1/volumes/{vid}")
+        if _note_progress(st, it):
+            deleted += 1
+        else:
+            print(f"  volume {_name_of(it)} ({vid}) delete -> {st}")
+
+    # 2d. dbaas clusters (regr* per engine service) — MUST go before
+    # subnets/vpcs. The nine engines are independent services (separate hosts,
+    # separate collections), so list+issue runs per-engine on the sweep pool,
+    # then ONE shared barrier until every issued cluster delete lands.
+    def _dbaas_engine(svc):
+        out = []
+        try:
+            for it in _select(c, svc, "/v1/clusters", name_prefixes=("regr",)):
+                cid = it.get("id")
+                if cid and _delete(c, svc, f"/v1/clusters/{cid}"):
+                    out.append((svc, cid))
+        except Exception as exc:  # isolate one engine's failure
+            print(f"  dbaas {svc} pass error: {exc}")
+        return out
+    dbaas_deleted = [pair for res in _map_parallel(_dbaas_engine, (
+        "mysql", "postgresql", "mariadb", "epas", "cachestore",
+        "eventstreams", "searchengine", "sqlserver", "vertica"))
+        for pair in res]
+    deleted += len(dbaas_deleted)
+    # NOTE: the dbaas barrier does NOT sit here any more (owner feedback
+    # 2026-07-11, live run: "SUBNET 3개 중 연관 리소스 없는 것들은 바로
+    # 지워도 되었을텐데"). It moved BELOW the first subnet attempt so a
+    # subnet with no dbaas/VM tenant is reaped immediately instead of
+    # stalling up to 900s behind cluster teardown it doesn't depend on.
+
+    # 2z. VPC endpoints (regrvpce) — VPC children that 409-block their VPC.
+    # COVERAGE GAP found 2026-07-09 (run-2b): the sweep had NO vpc-endpoints
+    # pass at all, so an endpoint whose lifecycle delete 400'd (CREATING —
+    # gen-vpc-endpoint) pinned the session-shared VPC (`regrvpcsh…` 8cdd0e0c)
+    # ACTIVE for hours while every scan reported the collection converged.
+    # Must run BEFORE the subnet/vpc passes.
+    vpce_ids = []
+    for it in _select(c, "vpc", "/v1/vpc-endpoints",
+                      name_prefixes=("regrvpce",)):
+        if it.get("id") and _delete(c, "vpc", f"/v1/vpc-endpoints/{it['id']}"):
+            deleted += 1
+            vpce_ids.append(it["id"])
+    _wait_all_gone(c, [("vpc", f"/v1/vpc-endpoints/{e}") for e in vpce_ids])
+
+    # 3. subnets — OPTIMISTIC first attempt BEFORE the dbaas barrier: a subnet
+    # with no tenant deletes right away; one whose port is still held by a
+    # draining dbaas cluster 409s (cheap, harmless) and is retried once below,
+    # after the cluster barrier frees it. Only a REAL 2xx/404 joins the wait
+    # list / progress tally — the old `if _delete(...)` also treated a truthy
+    # 409 as deleted and would have parked the barrier on a subnet that was
+    # never accepted for deletion.
+    subnet_ids, subnet_retry = [], []
+    for it in _select(c, "vpc", "/v1/subnets",
+                      name_prefixes=("regrsub", "zznetsub")):
+        st = _delete(c, "vpc", f"/v1/subnets/{it['id']}")
+        if _is_2xx_or_gone(st):
+            _note_progress(st)
+            deleted += 1
+            subnet_ids.append(it["id"])
+        elif st:
+            print(f"  subnet {_name_of(it)} ({it['id']}) delete -> {st} "
+                  f"(tenant still draining — retried after the dbaas barrier)")
+            subnet_retry.append(it["id"])
+    # dbaas barrier (moved from 2d): clusters release their subnet ports here.
+    _wait_all_gone(c, [(svc, f"/v1/clusters/{cid}") for svc, cid in
+                       dbaas_deleted], 900, 20)
+    # SKE join (bounded): node ports must be gone before the subnet retry can
+    # succeed. On timeout the teardown keeps draining in the background — the
+    # retry below 409s cheaply and the in-progress grant hands it to the next
+    # round.
+    if ske_future is not None:
+        from concurrent.futures import TimeoutError as _FTimeout
+        try:
+            deleted += ske_future.result(timeout=900)
+        except _FTimeout:
+            _bump_inprog()
+            print("  ske teardown still in flight at the subnet-retry join — "
+                  "deferring its subnets to the next round")
+    for sid in subnet_retry:
+        st = _delete(c, "vpc", f"/v1/subnets/{sid}")
+        if _is_2xx_or_gone(st):
+            _note_progress(st)
+            deleted += 1
+            subnet_ids.append(sid)
+        else:
+            print(f"  subnet {sid} delete -> {st} (still held — next round)")
+    _wait_all_gone(c, [("vpc", f"/v1/subnets/{s}") for s in subnet_ids])
+
+    # 3b. internet gateways + public IPs (regr*) — children that would
+    # 409-block their VPC; delete them (and wait) before the vpc pass.
+    _igw_wait = []
+    for it in _select(c, "vpc", "/v1/internet-gateways",
+                      name_prefixes=("regr", "zznet")):
+        if it.get("id") and _delete(
+                c, "vpc", f"/v1/internet-gateways/{it['id']}"):
+            deleted += 1
+            _igw_wait.append(("vpc", f"/v1/internet-gateways/{it['id']}"))
+    _wait_all_gone(c, _igw_wait, 300, 15)
+    for it in _select(c, "vpc", "/v1/publicips",
+                      name_prefixes=("regr",), force_unnamed=True):
+        if it.get("id") and _delete(c, "vpc", f"/v1/publicips/{it['id']}"):
+            deleted += 1
+
+    # 3b-2. VPC PEERINGS — must go before the VPCs they lock (run #5 evidence:
+    # a peering stuck in CREATING blocks BOTH its VPCs with 409
+    # related-resource, and a peering only becomes deletable after approval:
+    # PUT .../approval {"type": "CREATE_APPROVE"} — the proven body). Approve
+    # best-effort, then delete with a short 400/409 retry.
+    for it in _select(c, "vpc", "/v1/vpc-peerings",
+                      name_prefixes=("regrpeer",)):
+        pid = it.get("id")
+        if not pid:
+            continue
+        try:  # approval is a no-op 4xx if already ACTIVE/REJECTED — best-effort
+            c.put(f"/v1/vpc-peerings/{pid}/approval", service="vpc",
+                  json={"type": "CREATE_APPROVE"})
+        except Exception:
+            pass
+        st = None
+        for _ in range(6):
+            st = _delete(c, "vpc", f"/v1/vpc-peerings/{pid}")
+            if st and (200 <= st < 300 or st == 404):
+                deleted += 1
+                break
+            time.sleep(15)
+        if not (st and (200 <= st < 300 or st == 404)):
+            print(f"  vpc-peering {pid} delete -> {st}")
+
+    # 3c. shared-networking lifecycle children. private-dns holds quota;
+    # transit-gateways and load-balancers would 409-block the vpc.
+    _pdns_wait = []
+    for it in _select(c, "dns", "/v1/private-dns",
+                      name_prefixes=("regrpdns", "zznetpdns")):
+        if it.get("id") and _delete(c, "dns", f"/v1/private-dns/{it['id']}"):
+            deleted += 1
+            _pdns_wait.append(("dns", f"/v1/private-dns/{it['id']}"))
+    _wait_all_gone(c, _pdns_wait, 300, 15)
+    for it in _select(c, "dns", "/v1/hosted-zones",
+                      name_prefixes=("regr",)):
+        if it.get("id") and _delete(c, "dns", f"/v1/hosted-zones/{it['id']}"):
+            deleted += 1
+    # transit-gateways + their vpc-connections. Live evidence (2026-07-03/04
+    # incident, run 28648339307 + console2 FORCE log): a TGW with a
+    # vpc-connection does NOT reliably cascade on DELETE — the connection sits
+    # DELETING (hours observed) while the TGW reports EDITING, and the pair
+    # 409-blocks the shared VPC. The FLAT /v1/transit-gateway-vpc-connections
+    # list is 403 for this account, but the NESTED per-TGW list is 200
+    # (live-verified 2026-07-04) — so enumerate + delete each owned TGW's
+    # connections FIRST, then the TGW. Transitional (DELETING) items count as
+    # in-progress (main() grants another bounded round) instead of converging;
+    # a rejected TGW delete is transitional (its connection is draining) and is
+    # retried next round, never stuck-marked.
+    _tgw_wait = []
+    for it in _select(c, "vpc", "/v1/transit-gateways",
+                      name_prefixes=("regrtgw", "zznettgw")):
+        tid = it.get("id")
+        if not tid:
+            continue
+        # 1) reap this owned TGW's vpc-connections (children; they block both
+        #    the TGW delete and the connected VPC's delete). Owned-safe: only
+        #    children of a TGW that already passed _select's ownership gate.
+        try:
+            conns = _items(c.get(
+                f"/v1/transit-gateways/{tid}/vpc-connections",
+                service="vpc").body)
+        except Exception:
+            conns = []
+        for cn in conns:
+            cnid = cn.get("id") if isinstance(cn, dict) else None
+            if not cnid:
+                continue
+            if _is_async_deleting(cn):
+                _bump_inprog()
+                print(f"  tgw-vpc-connection {cnid} (tgw {tid}) already "
+                      f"{cn.get('state')} — waiting, not re-deleting")
+                continue
+            cst = _delete(
+                c, "vpc", f"/v1/transit-gateways/{tid}/vpc-connections/{cnid}")
+            if _note_progress(cst):
+                deleted += 1
+            print(f"  tgw-vpc-connection {cnid} (tgw {tid}) delete -> {cst}")
+        # 2) the TGW itself. Mid-deletion → skip the no-op re-DELETE (already
+        #    counted in-progress by _select's async check). A first 202 IS
+        #    genuine progress (_note_progress) — the old bare `if _delete(...)`
+        #    also counted a truthy 409 as a deletion, which inflated `reported`
+        #    and helped the premature "converged" stop.
+        if _is_async_deleting(it):
+            continue
+        # REPAIR 2026-07-07 (HB4b-2, offline, see CAMPAIGN-C3-100-repair-log.md
+        # #HB4b-2 item 5): a TGW still CREATING/EDITING (settling after its own
+        # create or after a vpc-connection create/delete) 400s "not deletable
+        # state(Active, Error)" on DELETE — that failure was never counted
+        # in-progress, so a sweep whose only remaining item was such a TGW
+        # converged one round early instead of granting the settle time. Skip
+        # the doomed DELETE and count it as in-progress instead, same as
+        # _is_async_deleting.
+        if _is_tgw_settling(it):
+            _bump_inprog()
+            print(f"  transit-gateway {_name_of(it) or tid} ({tid}) state="
+                  f"{it.get('state')} — not yet settled (CREATING/EDITING), "
+                  f"deferring delete to next round")
+            continue
+        st = _delete(c, "vpc", f"/v1/transit-gateways/{tid}")
+        if _is_2xx_or_gone(st):
+            _note_progress(st)
+            deleted += 1
+            _tgw_wait.append(("vpc", f"/v1/transit-gateways/{tid}"))
+        elif st is not None:
+            print(f"  transit-gateway {_name_of(it)} ({tid}) delete -> {st} "
+                  f"(transitional while its vpc-connection drains — "
+                  f"retried next round)")
+    _wait_all_gone(c, _tgw_wait, 300, 15)
+
+    # Load balancers + nat gateways have no regr name; delete any whose
+    # vpc_id matches a regr* vpc. These would otherwise 409-block the vpc.
+    regr_vpc_ids = {
+        v["id"]
+        for v in _select(c, "vpc", "/v1/vpcs",
+                         name_prefixes=_VPC_NAME_PREFIXES)
+        if v.get("id")
+    }
+    if regr_vpc_ids:
+        _lbnat_wait = []
+        for svc, coll in (("loadbalancer", "/v1/loadbalancers"),
+                          ("vpc", "/v1/nat-gateways")):
+            try:
+                items = _items(c.get(coll, service=svc).body)
+            except Exception:
+                items = []
+            for it in items:
+                if (isinstance(it, dict) and it.get("id")
+                        and str(it.get("vpc_id")) in regr_vpc_ids):
+                    lb_id = it["id"]
+                    if svc == "loadbalancer":
+                        _reap_lb_static_nat(c, lb_id)
+                    if _delete(c, svc, f"{coll}/{it['id']}"):
+                        deleted += 1
+                        _lbnat_wait.append((svc, f"{coll}/{it['id']}"))
+        _wait_all_gone(c, _lbnat_wait, 300, 15)
+
+    # 4. vpcs — 409 handling is HOLDER-AWARE (2026-07-03 incident): when the
+    # blocker is detectable (an owned TGW's vpc-connection into this VPC, or a
+    # mid-drain LB/NAT gateway — _vpc_409_holder), burn ONE attempt, print
+    # "blocked by <holder>", count the VPC as deferred-in-progress (grants the
+    # next round) and move on — the old loop burned 6 identical noisy 409s per
+    # round against a dependency only time clears. Only when NO holder is
+    # detectable fall back to the blind purge-children + retry loop
+    # (un-prefixed child leaks).
+    deleted_vpc_ids = []
+    holder_cache: dict = {}   # per-round TGW/LB/NAT listings for holder lookup
+    for it in _select(c, "vpc", "/v1/vpcs",
+                      name_prefixes=_VPC_NAME_PREFIXES):
+        vid = it["id"]
+        for attempt in range(6):
+            st = _delete(c, "vpc", f"/v1/vpcs/{vid}")
+            print(f"  delete vpc {it.get('name', vid)} ({vid}) -> {st}")
+            if st in (200, 202, 204):
+                deleted += 1
+                deleted_vpc_ids.append(vid)
+                break
+            if st == 409:
+                holder = _vpc_409_holder(c, vid, cache=holder_cache)
+                if holder:
+                    _bump_inprog()
+                    print(f"    blocked by {holder} — deferring to next round")
+                    break
+                # No detectable holder — purge ALL of this vpc's children
+                # (name-agnostic, by vpc_id) to catch un-prefixed leaks,
+                # then retry.
+                deleted += _purge_vpc_children(c, vid)
+                time.sleep(10)
+                continue
+            break
+    # VPC deletion is async (202); wait until all actually disappear so the
+    # account's VPC quota is freed before a subsequent CRUD run creates a VPC.
+    _wait_all_gone(c, [("vpc", f"/v1/vpcs/{v}") for v in deleted_vpc_ids],
+                   300, 15)
+
+    # 5-12. independent tail passes — see _TAIL_PASSES. Each keeps its
+    # internal child→parent ordering (repos→registries, secrets→KMS,
+    # nodepools→cluster); the groups themselves share no dependency, so they
+    # run concurrently on the sweep pool (SCP_SWEEP_PARALLEL, 1 = serial).
+    # SKE is excluded here when it already ran early (step 0).
+    tail = (_TAIL_PASSES if ske_future is None else
+            tuple(p for p in _TAIL_PASSES if p[0] != "ske"))
+    deleted += _run_passes(tail, c)
 
     print(f"sweep done: {deleted} resource(s) deleted")
     return deleted
