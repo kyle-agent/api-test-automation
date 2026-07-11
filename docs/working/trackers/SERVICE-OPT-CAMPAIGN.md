@@ -41,8 +41,8 @@
 | 16 | firewall | gen-wave5-fw | 대기 | | | | 캐리어 암묵 생성 |
 | 17 | resourcemanager | 4종 | ✅ 완료 | RG 80.4s→**19.1s** | set-rg tags:[] 400 수리 (-61s) | 19.1/25/17/45.8s | tag-rg 403은 entitlement | | | | |
 | 18 | servicewatch | 4종 실측 | ✅ 완료 | loggroup 147.7s→**~22s** | listmetricinfos 바디 수리(**신규 2xx 커버**) + listmetricdata 400=환경적(메트릭 카탈로그 0) 등록 (-130s) | 9~22s | create-group 500 재발 없음; metricdata 2xx는 VM 동반 런에서 | | | | create-group 500 재확인 |
-| 19 | cdn / dns / gslb | reads+CRUD | 대기 | | | | CDN stop 상태기계 |
-| 20 | certificatemanager | selfsign 등 | 대기 | | | | |
+| 19 | cdn / gslb | reads | ✅ 완료 | 4.5s/6.8s | 대기 없음 | 동일 | dns는 heavy — #21로 이관 |
+| 20 | certificatemanager | selfsign | ✅ 완료 | 16.5s (재검증) | 캠페인 자체 회귀({today} int화) 적발·즉수정 | ~16.5s | create 201 |
 | 21 | networking (vpc/subnet/port/publicip/peering/TGW/endpoint/NAT) | 다수 | 대기 | | | | 슬롯 소비 — 후반 |
 | 22 | loadbalancer | light + heavy | 대기 | | | | |
 | 23 | filestorage | 3종 | 대기 | | | | 교차리전 replication |
@@ -57,6 +57,8 @@
 
 ## 발견/개선 로그
 
+- **자기 회귀 적발 (#20)**: epoch 정수 코어션이 {today} 문자열 필드까지 int화 → cert 400. epoch_* 한정으로 즉시 수정 — 서비스별 즉검증 루프가 당일 회귀를 당일 적발.
+- **dns 스킵 관찰 (#19)**: heavy-스킵 확정 선택인데 공유 VPC 프로비저닝(~1분)을 하고 버림 — '선택 전원이 heavy-스킵이면 프로비저닝 생략' 개선 후보.
 - **servicewatch (#18)**: listmetricinfos의 dimensions가 JSON '문자열'로 박혀 400이던 것 수리 → **신규 2xx 커버리지 획득**. listmetricdata는 메트릭 카탈로그가 비면(구동 VM 없음) 어떤 쌍도 400 — cm과 같은 VS-의존 클래스. epoch 토큰({epoch_now}/{epoch_1h_ago}) + 정수 보존 치환 엔진 추가.
 - **resourcemanager (#17)**: set-rg tags:[] 400 → 실태그 수리 (80→19초).
 - **queueservice (#9)**: optional-4xx 재시도 사다리가 '범주적 400'(FIFO 전용 설정을 표준 큐에)에 스텝당 60초 소진 — 문서화된 범주 400은 expect_status로 등록해 사다리 차단 (153→26초). **같은 패턴 전수 점검 후보**: 사다리는 '시간이 지나면 2xx가 될 수 있는 400'에만 태워야 함.
