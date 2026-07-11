@@ -503,6 +503,46 @@ def test_quota_simulation_runs_on_dependencies_save():
     assert path.read_bytes() == orig
 
 
+def test_source_badges_and_empty_states():
+    """v2 접목 1 (2026-07-11, V2-L1-DATA-CONTRACT §1·§3·§4) — 출처 배지 3종.
+
+    v1의 최대 약점이던 "발행본 fail N vs 이 서버 run 없음" 모순을 수치별 출처
+    배지(Published/This server/This run)와 empty-state 문구("관측 없음 ≠ 0")로
+    해소한다. 배지 마크업은 _badges.html 매크로 단일 구현."""
+    from controlplane import common, dashdata
+
+    # 매크로 시각 라벨 — history ts(UTC) → KST 짧은 라벨, 파싱 실패는 빈 문자열
+    assert common.snap_ts_short({"ts": "2026-07-09T10:27:00Z"}) == "07-09 19:27"
+    assert common.snap_ts_short({"ts": "not-a-ts"}) == ""
+    assert common.snap_ts_short(None) == ""
+
+    home = client.get("/").text
+    # 셸 CSS: 배지 4종(발행/이 서버/이 런 + 노후)이 항상 정의돼 있다
+    for cls in (".badge-published", ".badge-local", ".badge-run", ".badge-stale"):
+        assert cls in home, cls
+
+    snap = dashdata.latest_coverage()
+    if snap:
+        # 판정 배너·타일 = 발행본 출처 배지 (파랑, 노후면 badge-stale 병기)
+        assert 'badge badge-published' in home
+        assert ">Published" in home
+    else:
+        # 발행본 없음 = "관측 없음"으로 렌더 (0으로 위장 금지 — 계약 §3)
+        assert "발행된 공식 수치를 가져올 수 없습니다" in home
+        assert "관측 없음" in home
+
+    # 병합 런 타임라인 — 행별 출처 배지: local- 접두 = This server, 숫자 = CI
+    db.create_run("smoke", "stage", gh_run_id="local-badge-test")
+    runs_page = client.get("/reporting?tab=runs").text
+    assert ">source</th>" in runs_page
+    assert "badge badge-local" in runs_page and ">This server" in runs_page
+    assert ">CI" in runs_page          # 9200 등 CI 런 행 (파랑 재사용)
+
+    # 런 상세 = 이 런(S3) 배지 — 과거형 고정 값임을 선언
+    detail = client.get("/runs/9200").text
+    assert "badge badge-run" in detail and ">This run" in detail
+
+
 # --- runner -----------------------------------------------------------------------
 
 TESTS = [
@@ -527,6 +567,7 @@ TESTS = [
     test_good_edit_applies_and_git_commits,
     test_quota_simulation_warns_on_peak_over_limit,
     test_quota_simulation_runs_on_dependencies_save,
+    test_source_badges_and_empty_states,
 ]
 
 

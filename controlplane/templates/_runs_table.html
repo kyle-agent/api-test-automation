@@ -1,9 +1,13 @@
+{% from "_badges.html" import badge %}
 <table>
-  <thead><tr><th>run</th><th>suite</th><th>profile</th><th>trigger</th><th>status</th>
+  {# v2 접목 1 (계약 §2.1 병합 런 타임라인): 행별 출처 배지 — gh_run_id 의
+     'local-' 접두 = 이 서버에서 실행된 런, 숫자 = CI(GitHub Actions) 런. #}
+  <thead><tr><th>source</th><th>run</th><th>suite</th><th>profile</th><th>trigger</th><th>status</th>
       <th>requested</th><th>finished</th></tr></thead>
   <tbody>
   {% for r in runs %}
   <tr>
+    <td>{{ badge('local') if (r['gh_run_id'] or '').startswith('local-') else badge('ci') }}</td>
     <td>{% if r['gh_run_id'] %}<a href="/runs/{{ r['gh_run_id'] }}"><code>{{ r['gh_run_id'] }}</code></a>
         {% else %}<span class="muted">#{{ r['id'] }} (대기)</span>{% endif %}</td>
     <td>{{ r['suite'] or '-' }}</td>
@@ -14,7 +18,11 @@
     <td class="muted">{{ r['finished_at'] or '' }}</td>
   </tr>
   {% else %}
-  <tr><td colspan="7" class="muted">아직 run이 없습니다.</td></tr>
+  {# empty-state 표준 (계약 §3): "run 없음"이 발행 수치와 모순으로 읽히지 않게
+     — 위 배너/타일의 fail·커버리지는 발행본 기준이라 이 서버의 실행 여부와 무관. #}
+  <tr><td colspan="8" class="muted">이 서버에 run 기록이 없습니다 — 공식 수치
+      (배너·타일의 Published 배지)는 발행본 기준으로, 이 서버의 실행 여부와
+      무관합니다.</td></tr>
   {% endfor %}
   </tbody>
 </table>

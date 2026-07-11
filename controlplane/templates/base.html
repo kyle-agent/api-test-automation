@@ -61,6 +61,17 @@
   .s-unobs{background:var(--grey-bg);color:var(--grey)}
   .s-regress{background:var(--red-bg);color:var(--red)}
   .s-known{background:#3a1212;color:#ffb3b3}
+  /* 출처 배지 3종 (v2 접목 1 — V2-L1-DATA-CONTRACT §4: 수치마다 출처가 보이게).
+     published=발행본(파랑) · local=이 서버(초록) · run=이 런(보라) · stale=노후(노랑,
+     뒤에 선언되어 색을 덮음). 마크업은 _badges.html 매크로 단일 구현. */
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;border-radius:999px;padding:1px 8px;border:1px solid;white-space:nowrap;cursor:default;vertical-align:middle}
+  .badge .dot{width:6px;height:6px;border-radius:50%;display:inline-block;background:currentColor}
+  .badge-published{color:var(--blue);border-color:#c7dbf7;background:var(--blue-bg)}
+  .badge-local{color:var(--green);border-color:#bfe5cd;background:var(--green-bg)}
+  .badge-run{color:var(--purple);border-color:#ddccf3;background:var(--purple-bg)}
+  .badge-stale{color:var(--amber);border-color:#f0d9a8;background:var(--amber-bg)}
+  /* 노후 발행본이면 수치 회색화 (계약 원칙 1-4) — 카드에 is-stale 부여 */
+  .is-stale .v{color:var(--muted)!important}
   .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
   .tag.heavy{background:var(--purple-bg);color:var(--purple)}
   .tag.destructive{background:var(--red-bg);color:var(--red)}

@@ -139,11 +139,23 @@ def home(request: Request):
     today = db.now()[:10]
     runs_today = sum(1 for r in runs
                      if (r["requested_at"] or "").startswith(today))
+    coverage = dashdata.latest_coverage()
+    # v2 접목 1 (D2 보조 칩): 발행 판정 이후 이 서버에서 끝난 로컬 런 수 —
+    # "fail N (발행) vs 이 서버 run 없음"이 모순으로 읽히는 문제의 해소 장치.
+    # 판정은 바꾸지 않는다. gh_run_id 'local-' 접두 = 로컬 런 (100% 구분키,
+    # v2 계약 §1-S2); ts 는 양쪽 다 "%Y-%m-%dT%H:%M:%SZ" 라 문자열 비교 안전.
+    # limit=50 창 안에서만 세므로 하한값이다 — 칩은 유도용이라 충분.
+    snap_ts = str((coverage or {}).get("ts") or "")
+    local_since_publish = sum(
+        1 for r in runs
+        if str(r["gh_run_id"] or "").startswith("local-")
+        and (r["finished_at"] or "") > snap_ts) if snap_ts else 0
     return _render(request, "home.html", "home",
                    runs=runs[:5], running=running,
                    stale_running=stale_running, runs_today=runs_today,
+                   local_since_publish=local_since_publish,
                    schedules=db.list_schedules(),
-                   coverage=dashdata.latest_coverage(),
+                   coverage=coverage,
                    scenario_stats=_scenario_stats(),
                    catalog_count=_catalog_count(),
                    model_stats=_model_stats())

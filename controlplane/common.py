@@ -45,6 +45,22 @@ def snapshot_age(snap: dict | None) -> dict:
     return {"label": label, "stale": sec >= STALE_AFTER_H * 3600}
 
 
+def snap_ts_short(snap: dict | None) -> str:
+    """발행 판정 시각의 짧은 KST 라벨 ("MM-DD HH:MM") — 출처 배지용 (v2 접목 1).
+
+    원천은 history.jsonl 행의 ``ts`` = **판정 런 시각** (v2 published.py 실측:
+    발행 저장소 갱신 시각과 다를 수 있고, 판정 배지에는 이 값이 맞다).
+    파싱 실패는 빈 문자열로 강등 — 배지는 시각 없이 렌더된다."""
+    ts = str((snap or {}).get("ts") or "")
+    try:
+        t = _dt.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=_dt.timezone.utc)
+    except ValueError:
+        return ""
+    return t.astimezone(_dt.timezone(_dt.timedelta(hours=9))).strftime(
+        "%m-%d %H:%M")
+
+
 def base_ctx(active: str) -> dict:
     """Everything base.html needs, for ANY page-rendering route."""
     snap = dashdata.latest_coverage()
@@ -68,4 +84,5 @@ def base_ctx(active: str) -> dict:
         "ctx_env": ctx_env,
         "snap_age": age["label"],
         "snap_stale": age["stale"],
+        "snap_ts_label": snap_ts_short(snap),
     }

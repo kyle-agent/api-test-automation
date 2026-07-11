@@ -1,0 +1,17 @@
+{# 출처 배지 — v1의 유일한 출처 배지 구현 (v2 접목 1, V2-L1-DATA-CONTRACT §4).
+   source ∈ published|local|run|ci. stale=True 면 노랑(노후 발행본) — 노후 기준은
+   v1 기존 결정(P2C-12, common.STALE_AFTER_H=48h)을 따른다 (계약의 24h와 다름 —
+   결정 지점, docs/working/trackers/V1-GRAFT.md).
+   'ci'는 병합 런 타임라인의 행별 출처용(계약 §2.1 "CI/이 서버") — 파랑 재사용.
+   모든 수치 카드·표의 출처 표기는 이 매크로만 사용 (별도 배지 마크업 금지). #}
+{% macro badge(source, ts=None, ident=None, stale=False) -%}
+{%- set names = {'published': 'Published', 'local': 'This server', 'run': 'This run', 'ci': 'CI'} -%}
+{%- set styles = {'published': 'published', 'local': 'local', 'run': 'run', 'ci': 'published'} -%}
+{%- set tips = {'published': '발행된 공식 집계 — 어느 서버에서 열어도 같은 값',
+                'local': '이 서버에서만 관측된 값 — 공식 집계와 다를 수 있음',
+                'run': '특정 실행 1건에 고정된 값 (과거형)',
+                'ci': 'GitHub Actions에서 실행된 공식 런 기록'} -%}
+<span class="badge badge-{{ styles[source] }}{% if stale %} badge-stale{% endif %}"
+      title="{{ tips[source] }}{% if stale %} · 노후 발행본 — 화면 수치가 현재 상태와 다를 수 있습니다{% endif %}"><i
+  class="dot"></i>{{ names[source] }}{% if ts %} @{{ ts }}{% endif %}{% if ident %} · {{ ident }}{% endif %}{% if stale %} · 노후{% endif %}</span>
+{%- endmacro %}

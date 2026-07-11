@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_badges.html" import badge %}
 {% block title %}Report — SCP API Regression{% endblock %}
 {% block content %}
 
@@ -18,11 +19,14 @@
       soft {{ coverage.get('soft','-') }} ·
       known-red {{ coverage.get('fail_known') or 0 }}
       (sha {{ coverage.get('sha','') }})
+      {{ badge('published', ts=(snap_ts_label if snap_ts_label is defined else none),
+               stale=(snap_stale is defined and snap_stale)) }}
     </div>
   </div>
 
   <h2>커버리지 사다리 <span class="hint">C1 도달 → C2 호출 → C3 검증
-    (정의: docs/COVERAGE-CRITERIA.md)</span></h2>
+    (정의: docs/COVERAGE-CRITERIA.md)</span>
+    {{ badge('published', stale=(snap_stale is defined and snap_stale)) }}</h2>
   <div class="card pad">
     <div class="lad"><span class="lv" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인 (reachability waiver 서비스는 도달충족 포함) = covered. 헤드라인 지표, 목표 100%">C3</span>
       <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--green)"></i></div>
@@ -41,20 +45,26 @@
       <span class="desc">도달가능 · static reachable / {{ total }} API</span></div>
   </div>
 
-  <h2>이번 스냅샷 <span class="hint">{{ coverage.get('ts','') }}{% if snap_age is defined and snap_age %} ({{ snap_age }}){% endif %}</span></h2>
+  <h2>이번 스냅샷 <span class="hint">{{ coverage.get('ts','') }}{% if snap_age is defined and snap_age %} ({{ snap_age }}){% endif %}</span>
+    {{ badge('published', stale=(snap_stale is defined and snap_stale)) }}</h2>
+  {# v2 접목 1: 노후 발행본이면 수치 회색화 — 출처 배지는 위 섹션 헤더에 1개
+     (이 타일 4장은 전부 같은 발행본 출처, 계약 §0-4 "한 카드 한 출처"). #}
+  {% set rep_stale = snap_stale is defined and snap_stale %}
   <div class="tiles" style="margin-top:6px">
-    <div class="card tile" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체({{ total }}). 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)"><div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
+    <div class="card tile {{ 'is-stale' if rep_stale }}" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체({{ total }}). 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)"><div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
       <div class="k">write-op (cov_op)</div></div>
-    <div class="card tile" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율"><div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
+    <div class="card tile {{ 'is-stale' if rep_stale }}" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율"><div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
       <div class="k">GET (cov_get)</div></div>
-    <div class="card tile" title="단위가 다른 두 수 (분수 아님) — 호출: 응답을 받은 고유 엔드포인트 수(C2) · ok: 2xx로 판정된 관측(호출) 건수, 같은 엔드포인트 반복 호출 포함이라 더 클 수 있음"><div class="v">{{ coverage.get('tested','-') }} <span style="font-size:14px;color:var(--muted)">호출 EP</span> · {{ coverage.get('ok','-') }} <span style="font-size:14px;color:var(--green)">ok 관측</span></div>
+    <div class="card tile {{ 'is-stale' if rep_stale }}" title="단위가 다른 두 수 (분수 아님) — 호출: 응답을 받은 고유 엔드포인트 수(C2) · ok: 2xx로 판정된 관측(호출) 건수, 같은 엔드포인트 반복 호출 포함이라 더 클 수 있음"><div class="v">{{ coverage.get('tested','-') }} <span style="font-size:14px;color:var(--muted)">호출 EP</span> · {{ coverage.get('ok','-') }} <span style="font-size:14px;color:var(--green)">ok 관측</span></div>
       <div class="k">호출 엔드포인트 → ok(2xx) 관측</div></div>
-    <div class="card tile" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보"><div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
+    <div class="card tile {{ 'is-stale' if rep_stale }}" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보"><div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
       <div class="k">신규 fail</div></div>
   </div>
   {% else %}
   <div class="verdict none"><span class="pip"></span>
-    <div><b>스냅샷 없음</b> — dashboard-data 브랜치를 읽을 수 없습니다.</div></div>
+    <div><b>발행된 공식 수치를 가져올 수 없습니다</b> — dashboard-data 브랜치를
+      읽을 수 없거나(오프라인?) 아직 발행된 run이 없습니다. 이는 "회귀 0"이
+      아니라 <b>관측 없음</b>입니다.</div></div>
   {% endif %}
 
 {# ============ Coverage & Conformance (canonical dashboard embed) ============ #}
@@ -110,7 +120,8 @@
 {# ===================== Triage ===================== #}
 {% elif tab == 'triage' %}
   <h2>실패 분류 <span class="hint">최신 발행 스냅샷 기준 — run별 AI triage는
-    run 상세에서</span></h2>
+    run 상세에서</span>
+    {{ badge('published', stale=(snap_stale is defined and snap_stale)) }}</h2>
   {% if coverage %}
   <div class="card pad" style="padding-top:4px">
     <table>
@@ -135,8 +146,8 @@
     </table>
   </div>
   {% else %}
-  <div class="card pad"><span class="muted small">스냅샷이 없어 분류를 표시할 수
-    없습니다.</span></div>
+  <div class="card pad"><span class="muted small">발행된 공식 수치를 가져올 수
+    없어 분류를 표시할 수 없습니다 — 관측 없음(0 아님).</span></div>
   {% endif %}
   <p class="small muted" style="margin-top:10px">개별 run의 AI triage(분류·원인·조치)는
     RUN 히스토리에서 run을 열어 실행/확인합니다 —

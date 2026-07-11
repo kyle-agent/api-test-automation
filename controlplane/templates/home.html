@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_badges.html" import badge %}
 {% block title %}Overview — SCP API Regression{% endblock %}
 {% block content %}
 
@@ -25,46 +26,55 @@
       {% endif %}
       <span class="muted small">— 스냅샷 {{ coverage.get('ts','') }}{% if snap_age is defined and snap_age %}
         <b>({{ snap_age }})</b>{% endif %}</span>
-      {% if snap_stale is defined and snap_stale %}<span class="chip s-reached"
-        title="발행 후 48시간 이상 경과 — 이 배너는 현재 상태가 아니라 그 시점의 결과입니다">노후 스냅샷</span>{% endif %}
+      {# v2 접목 1: 판정 헤드라인의 출처 배지 (기존 '노후 스냅샷' chip 을 흡수 —
+         stale 이면 배지가 노랑 + '노후' 표기) + D2 보조 칩(발행 이후 이 서버 런). #}
+      {{ badge('published', ts=(snap_ts_label if snap_ts_label is defined else none), stale=snap_is_stale) }}
+      {% if local_since_publish is defined and local_since_publish %}<a class="chip s-verified"
+        href="/testing/embed"
+        title="발행 판정 이후 이 서버에서 완료된 로컬 런 — 공식 판정에는 아직 반영되지 않았습니다 (판정은 발행본 기준)">발행 이후 이 서버 런 {{ local_since_publish }}건 →</a>{% endif %}
     </div>
   </div>
 
+  {# v2 접목 1: 타일 전부 발행본(S1) 출처 — 카드마다 배지 1개(계약 §0-4
+     "한 카드의 기본값은 한 출처") + 노후 시 is-stale 로 수치 회색화(원칙 1-4). #}
   <div class="tiles">
-    <div class="card tile" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체. 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)">
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체. 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)">
       <div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
       <div class="k">write-op 커버리지 (cov_op)</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_op',0) }}%;background:var(--amber)"></i></div>
-      <div class="goal">목표 100%</div>
+      <div class="goal">목표 100% · {{ badge('published', stale=snap_is_stale) }}</div>
     </div>
-    <div class="card tile" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율">
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율">
       <div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
       <div class="k">GET 커버리지 (cov_get)</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_get',0) }}%;background:var(--green)"></i></div>
-      <div class="goal">목표 100%</div>
+      <div class="goal">목표 100% · {{ badge('published', stale=snap_is_stale) }}</div>
     </div>
-    <div class="card tile" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인(누적, reachability waiver는 도달충족 포함) = covered. 헤드라인 지표">
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인(누적, reachability waiver는 도달충족 포함) = covered. 헤드라인 지표">
       <div class="v">{{ coverage.get('cov_c3','-') }}%</div>
       <div class="k">누적 C3 검증</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--blue)"></i></div>
-      <div class="goal">목표 100%</div>
+      <div class="goal">목표 100% · {{ badge('published', stale=snap_is_stale) }}</div>
     </div>
-    <div class="card tile" title="C1 도달가능(Plannable) — enabled 시나리오가 정적으로 도달 가능한 엔드포인트(라이브 호출 없음). 저작 진척 지표">
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="C1 도달가능(Plannable) — enabled 시나리오가 정적으로 도달 가능한 엔드포인트(라이브 호출 없음). 저작 진척 지표">
       <div class="v">{{ coverage.get('reachable_pct','-') }}%</div>
       <div class="k">C1 static reachable</div>
       <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
-      <div class="goal">전체 {{ coverage.get('total','-') }} API</div>
+      <div class="goal">전체 {{ coverage.get('total','-') }} API · {{ badge('published', stale=snap_is_stale) }}</div>
     </div>
-    <div class="card tile" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보">
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보">
       <div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
       <div class="k">신규 fail</div>
-      <div class="goal" style="margin-top:8px">{{ '회귀 발생 — Triage 확인' if fail_new else '회귀 없음' }}</div>
+      <div class="goal" style="margin-top:8px">{{ '회귀 발생 — Triage 확인' if fail_new else '회귀 없음' }} · {{ badge('published', stale=snap_is_stale) }}</div>
     </div>
   </div>
 {% else %}
+  {# empty-state 표준 문구 (v2 접목 1, 계약 §3): 관측없음 ≠ 0 — 값 자리에 0을
+     그리지 않고 안내문으로 렌더. #}
   <div class="verdict none"><span class="pip"></span>
-    <div><b>스냅샷 없음</b> — dashboard-data 브랜치를 읽을 수 없습니다.
-      git 원격 접근을 확인하세요.</div></div>
+    <div><b>발행된 공식 수치를 가져올 수 없습니다</b> — dashboard-data 브랜치를
+      읽을 수 없거나(오프라인?) 아직 발행된 run이 없습니다. git 원격 접근을
+      확인하세요. 이는 "회귀 0"이 아니라 <b>관측 없음</b>입니다.</div></div>
 {% endif %}
 
 {# 2026-07-07 오너 결정: Catalog 칸 제거(4→3칸) — Modeling이 카탈로그를 흡수,
@@ -75,7 +85,8 @@
     <div class="pl">Modeling</div>
     <div class="pv">{{ model_stats.validated }}<span
       style="font-size:13px;font-weight:600;color:var(--muted)">/{{ model_stats.nodes }}</span></div>
-    <div class="ps">전체 {{ catalog_count }} API의 테스트 모델 저작 — VALIDATED/전체 노드</div>
+    <div class="ps">전체 {{ catalog_count }} API의 테스트 모델 저작 — VALIDATED/전체 노드
+      · <span class="note" title="자원 모델은 저장소(main) 파일 기준 — 발행본/로컬 관측이 아님 (계약 §2.7)">저장소 기준</span></div>
     <span class="chev">→</span>
   </a>
   <a class="pstage" href="/testing/embed">
@@ -83,13 +94,15 @@
     <div class="pv">{{ running|length }}
       <span style="font-size:12px;font-weight:500;color:var(--muted)">진행 중</span></div>
     <div class="ps">스케줄 {{ schedules|length }} · 오늘 실행 {{ runs_today }}{%
-      if stale_running %} · <span title="running/dispatched 상태로 24시간 이상 방치된 기록 — 죽은 워커/미회수 run일 가능성이 높아 '진행 중' 집계에서 제외">오래된 미회수 {{ stale_running|length }}</span>{% endif %}</div>
+      if stale_running %} · <span title="running/dispatched 상태로 24시간 이상 방치된 기록 — 죽은 워커/미회수 run일 가능성이 높아 '진행 중' 집계에서 제외">오래된 미회수 {{ stale_running|length }}</span>{% endif %}
+      · {{ badge('local') }}</div>
     <span class="chev">→</span>
   </a>
   <a class="pstage" href="/reporting">
     <div class="pl">Reporting</div>
     <div class="pv">{{ coverage.get('cov_c3','-') if coverage else '-' }}%</div>
-    <div class="ps">C3 검증 · 신규 회귀 {{ (coverage.get('fail_new') or 0) if coverage else '-' }}</div>
+    <div class="ps">C3 검증 · 신규 회귀 {{ (coverage.get('fail_new') or 0) if coverage else '-' }}
+      · {{ badge('published', stale=(snap_stale if snap_stale is defined else false)) }}</div>
   </a>
 </div>
 

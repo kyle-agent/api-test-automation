@@ -1,9 +1,11 @@
 {% extends "base.html" %}
+{% from "_badges.html" import badge %}
 {% block title %}Run {{ gh_run_id }}{% endblock %}
 {% block content %}
 
 <section>
-  <h2>Run {{ gh_run_id }}</h2>
+  {# v2 접목 1 (계약 §1-S3): 이 화면의 모든 값은 이 런 1건에 고정 — 과거형. #}
+  <h2>Run {{ gh_run_id }} {{ badge('run') }}</h2>
   <table>
     {% if run %}
     <tr><th>status</th><td><span class="status {{ run['status'] }}">{{ run['status'] }}</span></td>
