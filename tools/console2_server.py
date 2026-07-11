@@ -2114,7 +2114,10 @@ def _run_worker(rec: dict) -> None:
                 # the leader — subprocess.run gave us no handle at all.
                 proc = subprocess.Popen(
                     [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
-                     "-n", n, "--maxschedchunk=1", "-o", "addopts=", "-q"],
+                     # worksteal: 런 꼬리의 "진행 N ≈ 대기 N"(워커별 선배정)
+                     # 직접 해법 — 유휴 워커가 대기 항목을 훔쳐감 (오너 실측
+                     # 2026-07-11 진행7·대기5; local_run.live_run과 동일 변경)
+                     "-n", n, "--dist=worksteal", "-o", "addopts=", "-q"],
                     cwd=str(ROOT), env={**env, **shared}, stdout=f,
                     stderr=subprocess.STDOUT, start_new_session=True)
                 with _LOCK:

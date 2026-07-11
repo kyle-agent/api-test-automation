@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 
@@ -169,7 +168,7 @@ def _load_lifecycles() -> dict[str, dict]:
     try:
         from regression.scenarios.loader import load_lifecycles
         lcs, _ = load_lifecycles(with_sources=True)
-        return {l["id"]: l for l in lcs}
+        return {lc["id"]: lc for lc in lcs}
     except Exception:
         # 폴백: lifecycles 디렉토리 직접 로드
         out = {}
@@ -179,9 +178,9 @@ def _load_lifecycles() -> dict[str, dict]:
                 doc = json.loads(f.read_text())
             except ValueError:
                 continue
-            for l in (doc if isinstance(doc, list) else doc.get("lifecycles", [])):
-                if isinstance(l, dict) and l.get("id"):
-                    out[l["id"]] = l
+            for lc in (doc if isinstance(doc, list) else doc.get("lifecycles", [])):
+                if isinstance(lc, dict) and lc.get("id"):
+                    out[lc["id"]] = lc
         return out
 
 
@@ -281,7 +280,8 @@ def main(argv=None) -> int:
     else:
         rid = a.run_id or latest_run_id()
         if not rid:
-            print("런을 찾지 못했습니다."); return 1
+            print("런을 찾지 못했습니다.")
+            return 1
         print(f"run: {rid}")
         events = load_events_from_bucket(rid)
     r = verdict(events, workers=a.workers, vpc_slots=a.vpc_slots, top=a.top)

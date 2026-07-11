@@ -29,7 +29,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 _ROOT = Path(__file__).resolve().parents[2]      # repo root (regression/scenarios/..)
 
@@ -298,7 +298,14 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
         pos = f.tell()
         rc = subprocess.run(
             [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
-             "-n", n, "--maxschedchunk=1", "-o", "addopts=", "-q"],
+             # worksteal (xdist ≥3.2): 유휴 워커가 바쁜 워커의 대기 항목을
+             # 훔쳐간다 — 런 꼬리의 "진행 N ≈ 대기 N"(워커별 선배정 큐에 묶여
+             # 유휴 워커가 있어도 못 가져가던 현상, 오너 실측 2026-07-11
+             # 진행7·대기5)의 직접 해법. maxschedchunk는 load 스케줄러
+             # 전용이라 함께 제거. 초기 분배는 수집 순서의 연속 블록이므로
+             # conftest의 LPT+인터리브 정렬과도 궁합이 맞는다(블록마다
+             # heavy+light 혼합).
+             "-n", n, "--dist=worksteal", "-o", "addopts=", "-q"],
             cwd=str(_ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT).returncode
         f.flush()
         try:
@@ -388,42 +395,42 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
         except Exception:  # noqa: BLE001 — best-effort
             continue
     lcs, _ = load_lifecycles(with_sources=True)
-    en = {l["id"]: l for l in lcs
-          if l.get("enabled") and l.get("role", "verify") == "verify"}
+    en = {lc["id"]: lc for lc in lcs
+          if lc.get("enabled") and lc.get("role", "verify") == "verify"}
     ids = list(lifecycle_ids) if lifecycle_ids else sorted(en)
     items = [en[i] for i in ids if i in en]
 
-    def _dur(l: dict) -> float:
-        v = dur.get(l["id"], 0.0)
-        return v if v > 0 else float(CLASS_DEFAULT_S[classify_lifecycle(l)])
+    def _dur(lc: dict) -> float:
+        v = dur.get(lc["id"], 0.0)
+        return v if v > 0 else float(CLASS_DEFAULT_S[classify_lifecycle(lc)])
 
-    def _self_vpc(l: dict) -> bool:
-        for s in l.get("steps", []):
+    def _self_vpc(lc: dict) -> bool:
+        for s in lc.get("steps", []):
             if (s.get("method") == "POST"
                     and (s.get("path") or "").rstrip("/").endswith("/vpcs")):
                 return s.get("adopt") != "vpc"
         return False
 
-    items.sort(key=lambda l: (_dur(l), len(l.get("steps") or [])), reverse=True)
+    items.sort(key=lambda lc: (_dur(lc), len(lc.get("steps") or [])), reverse=True)
     cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
     n_w = int(workers) if workers else max(1, min(cap, len(items) or 1))
     n_v = max(1, int(vpc_slots))
     wfree = [0.0] * n_w
     vfree = [0.0] * n_v
     bars = []
-    for l in items:
-        d = _dur(l)
+    for lc in items:
+        d = _dur(lc)
         wi = min(range(n_w), key=lambda i: wfree[i])
         start = wfree[wi]
-        v = _self_vpc(l)
+        v = _self_vpc(lc)
         if v:
             vi = min(range(n_v), key=lambda i: vfree[i])
             start = max(start, vfree[vi])
             vfree[vi] = start + d
         wfree[wi] = start + d
-        bars.append({"id": l["id"], "w": wi, "s": round(start, 1),
+        bars.append({"id": lc["id"], "w": wi, "s": round(start, 1),
                      "e": round(start + d, 1), "vpc": v,
-                     "measured": dur.get(l["id"], 0.0) > 0})
+                     "measured": dur.get(lc["id"], 0.0) > 0})
     return {"workers": n_w, "vpc_slots": n_v,
             "makespan_s": max((b["e"] for b in bars), default=0.0),
             "bars": bars}
