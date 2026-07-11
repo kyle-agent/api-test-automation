@@ -38,7 +38,8 @@
       <td class="muted">{{ s.endpoints }}</td>
       <td class="small">
         <a href="/catalog?q={{ s.service|urlencode }}">📖 카탈로그</a> ·
-        <a href="/planning/resources/map" title="테스트 모델(노드/생애주기) 저작 현황">Modeling</a> ·
+        <a href="/planning/resources/map?q={{ s.service|urlencode }}"
+           title="테스트 모델(노드/생애주기) 저작 현황 — 이 서비스로 필터 프리필">Modeling</a> ·
         <a href="/testing?service={{ (s.category ~ '/' ~ s.service)|urlencode }}"
            title="Testing 트리거 폼에 이 서비스를 프리필 (자동 발사 아님 — 안전 게이트 유지)">▶ 실행 prefill</a>
       </td>

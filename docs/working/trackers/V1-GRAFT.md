@@ -46,6 +46,26 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   지시로 v1 이름 유지).
 - 검증: tests_offline `test_v2_shell_header_and_global_search` (23/23).
 
+## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
+
+- **① 전역 의존 그래프 탭 제거 + 미니그래프 인스펙터** — P2C-25 결정 이행
+  (v2 D6와 동일 결론): 275노드 전체 지도 탭 삭제, 서비스 행 **🕸 의존 ▸**
+  클릭 시 그 서비스의 의존 폐쇄집합만 드로어로 (donor: v2 svc_graph.js —
+  `POST /api/graph` + `resource_graph.js` scene() 원본 재사용, 서비스당 1회
+  lazy 로드). 노드 클릭 = 인스펙터(id·service·**노드 편집 →**).
+  `/planning/resources/map.json` 라우트는 보존(console2 run 뷰 공유).
+- **② 출처·단위 정직화** — KPI 아래 "저장소(main) 기준" 註 + "VALIDATED는
+  모델 노드 단위 — 엔드포인트 단위 검증은 Reporting·발행 대시보드" (§2.7).
+- **③ `?q=` 딥링크** — 전역 검색/외부에서 필터 프리필 (카탈로그와 동일 관례).
+  /search 서비스 결과의 Modeling 링크가 q를 나른다.
+- **④ 서비스 행 ▶ 실행** — `/testing?service=<cat>/<svc>` prefill (자동 발사
+  아님). 수리 1건: `.epbtn` 스타일 공유 탓에 기존 엔드포인트 토글 핸들러가
+  🕸/▶에도 바인딩(▶ 내비게이션 차단·빈 드로어) — 핸들러를 `.epbtn[hx-get]`로
+  한정 (실측으로 발견).
+- **⑤ 카테고리 검증 진척 미니바** — VALIDATED/노드 비율, 카테고리 간 비교.
+- 검증: `test_modeling_improvements_batch` (24/24) + 실주행(미니그래프 로드·
+  인스펙터·▶ prefill 내비게이션·엔드포인트 드로어 회귀 무).
+
 ## 접목 1 상세 — 무엇을 어디에 얹었나
 
 - **배지 매크로** `controlplane/templates/_badges.html` (donor: v2 `_badges.html`):

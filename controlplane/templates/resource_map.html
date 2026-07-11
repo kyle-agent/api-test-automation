@@ -84,14 +84,36 @@
   .statchip{font-size:11.5px;color:var(--muted);margin-left:auto}
   .leg{display:flex;gap:15px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:2px 0 12px}
   .leg .sw{width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:5px;border:1.5px solid}
+  /* 카테고리 검증 진척 미니바 (모델링 개선 ⑤) */
+  .tally .pbar{display:inline-block;width:64px;height:5px;border-radius:3px;background:#dfe5ec;
+      overflow:hidden;vertical-align:1px;margin-right:7px}
+  .tally .pbar i{display:block;height:100%;background:var(--green);border-radius:3px}
+  /* 의존 미니그래프 드로어 (모델링 개선 ① — v2 D6 인스펙터 이식, donor: svc_graph.js).
+     전체 275노드 지도 대신 그 서비스의 의존 폐쇄집합만, 노드 클릭=인스펙터. */
+  tr.depdrawer td{background:#fbfcfd;padding:8px 10px 10px 34px;border-bottom:1px solid var(--border)}
+  .dep-stage-wrap{position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .dep-stage{position:relative;width:100%;height:min(42vh,320px);min-height:180px;overflow:hidden;cursor:grab;
+      background:radial-gradient(circle,var(--surface2) 1px,transparent 1px);background-size:26px 26px}
+  .dep-stage.grabbing{cursor:grabbing}
+  .dep-stage svg{position:absolute;top:0;left:0;transform-origin:0 0}
+  .dep-stage-wrap g.rg-unit{cursor:pointer}
+  .dep-stage-wrap g.rg-unit.dimmed{opacity:.13}
+  .dep-stage-wrap .rg-edge{stroke:#8a93a0;stroke-width:1.3;fill:none}
+  .dep-stage-wrap .rg-edge.hot{stroke:var(--blue);stroke-width:2.2}
+  .dep-stage-wrap .rg-edge.dim{opacity:.08}
+  .dep-insp{margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;
+      font-size:12.5px;display:none;background:var(--surface2)}
+  .dep-insp.on{display:block}
+  .dep-insp-row{display:flex;gap:8px;padding:2px 0}
+  .dep-insp-row .k{color:var(--muted);min-width:52px}
 </style>
 
 <section>
+  {# 모델링 개선 ① (P2C-25 결정 이행 + v2 D6 확정): 전체 의존 그래프 탭 제거 —
+     "의존이 가치 있는 순간은 개별 서비스를 눌렀을 때". 의존은 서비스 행의
+     🕸 의존 미니그래프(아래 depdrawer)로 이동. map.json 라우트는 보존
+     (console2 run 뷰 공유 — 제거 불가). #}
   <h2 style="display:flex;align-items:center;gap:12px">Modeling · 테스트 모델
-    <span class="tgroup" id="view-toggle">
-      <button data-view="table" class="on">표 (모델 목록)</button>
-      <button data-view="graph">의존 그래프 (영향 파악)</button>
-    </span>
     <a href="/planning/resources/worklist" style="font-size:13px;font-weight:600;margin-left:auto">작업 큐 →</a>
     <a href="/ai/task-draft" style="font-size:13px;font-weight:600"
        title="모델 공백 서비스의 자원 task 정의를 AI가 초안 — drafts/ 검토용">AI 초안 →</a>
@@ -108,6 +130,13 @@
     <div class="card"><div class="num">{{ gated }}</div><div class="lbl" style="color:var(--grey)">게이트 (이 계정에선 불가)</div></div>
     <div class="card"><div class="num">{{ incomplete }}</div><div class="lbl" style="color:#b26a00">불완전 (endpoint/requires 결손)</div></div>
   </div>
+  {# 모델링 개선 ② (계약 §2.7 — 출처·단위 정직화): 이 화면 수치는 발행/로컬
+     관측이 아니라 저장소 파일 기준이며, VALIDATED 는 노드 단위라 발행본의
+     엔드포인트 단위 검증 수치와 숫자 체계가 다르다. #}
+  <div class="muted small" style="margin:-4px 0 12px">
+    위 수치는 <b title="knowledge/formal/resources/*.yaml — 발행본/로컬 관측이 아닌 저장소(main) 파일 기준">저장소(main) 기준</b> ·
+    VALIDATED는 <b>모델 노드 단위</b> — 엔드포인트 단위 검증 수치(발행 집계)는
+    <a href="/reporting">Reporting</a> · <a href="/dashboard/index.html">발행 대시보드</a> 참조.</div>
 
   <div class="toolrow"></div>
 
@@ -149,7 +178,9 @@
         <tr class="cat" data-cat="{{ cat.category }}">
           <td colspan="6"><div class="gh"><span class="caret">▾</span>
             <span class="catname">{{ cat.category }}</span>
-            <span class="tally">{{ cat.services|length }} 서비스 · {{ cat.n }} 노드 ·
+            <span class="tally"><span class="pbar"
+                title="검증 진척 — VALIDATED {{ cat.val }}/{{ cat.n }} 노드"><i
+                style="width:{{ ((cat.val * 100 / cat.n)|round(0))|int if cat.n else 0 }}%"></i></span>{{ cat.services|length }} 서비스 · {{ cat.n }} 노드 ·
               <span class="v">✓{{ cat.val }}</span> <span class="i">⚠{{ cat.inc }}</span> <span class="d">docs {{ cat.docs }}</span>{% if cat.gated %} <span class="g" title="계정 게이트 — 할 수 없음">🔒{{ cat.gated }}</span>{% endif %}</span></div></td>
         </tr>
         {% for svc in cat.services %}
@@ -164,6 +195,11 @@
                title="이 서비스의 카탈로그 엔드포인트 펼치기 — 모델됨=노드 편집 링크 · 미모델=참조 없음 · 미매핑=참조가 구체값이라 단정 불가(미모델로 세지 않음)">API {{ svc.ep.api }}
               (모델됨 {{ svc.ep.modeled }} · <span class="epu">미모델 {{ svc.ep.unmodeled }}</span>{% if svc.ep.unmapped %} · <span class="epq">미매핑 {{ svc.ep.unmapped }}</span>{% endif %}) ▸</a>
             {%- endif %}
+            {# 모델링 개선 ①·④: 의존 미니그래프 토글 + Testing prefill 딥링크 #}
+            <a class="epbtn depbtn" href="#"
+               title="이 서비스의 의존 미니그래프 — 실행 시 함께 생성·정리되는 의존 폐쇄집합만 표시 (전체 그래프 탭 대체, v2 D6). 노드 클릭 = 인스펙터">🕸 의존 ▸</a>
+            <a class="epbtn runbtn" href="/testing?service={{ svc.service|urlencode }}"
+               title="Testing 트리거 폼에 이 서비스를 프리필 — 자동 발사 아님 (pre-flight·안전 게이트 유지)">▶ 실행</a>
             <span class="tally">{{ svc.n }} 노드 · <span class="v">✓{{ svc.val }}</span>
               <span class="i">⚠{{ svc.inc }}</span> <span class="d">docs {{ svc.docs }}</span>{% if svc.gated %} <span class="g" title="계정 게이트 — 할 수 없음">🔒{{ svc.gated }}</span>{% endif %}</span></div></td>
         </tr>
@@ -174,6 +210,16 @@
               class="muted small">엔드포인트 목록 로딩…</div></td>
         </tr>
         {% endif %}
+        <tr class="depdrawer" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}"
+            style="display:none">
+          <td colspan="6">
+            <div class="muted small" style="margin:0 0 6px">이 서비스를 실행할 때
+              함께 생성·정리되는 <b>의존 폐쇄집합</b>입니다 — 노드 클릭 = 인스펙터
+              (의존 정의 수정은 노드 편집에서).</div>
+            <div id="depd-{{ svc.service|replace('/','--') }}"
+                 class="muted small">🕸 의존 ▸ 클릭 시 로드…</div>
+          </td>
+        </tr>
           {% for r in svc.nodes %}
           <tr class="node" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}"
               data-prov="{{ r.provenance }}" data-complete="{{ '1' if r.complete else '0' }}"
@@ -198,34 +244,9 @@
     </div>
   </div>
 
-  <!-- ========== 의존 그래프 (토글) ========== -->
-  <div id="pane-graph" hidden>
-    <div class="muted small" style="margin:0 0 6px">노드를 건드리기 전 <b>영향 범위</b>를
-      보는 뷰 — 편집은 표에서.</div>
-    <div class="leg">
-      <span><i class="sw" style="background:var(--green-bg);border-color:var(--green)"></i>VALIDATED</span>
-      <span><i class="sw" style="background:var(--amber-bg);border-color:var(--amber)"></i>docs (모델만)</span>
-      <span><i class="sw" style="background:var(--grey-bg);border-color:var(--grey)"></i>⚠ 불완전</span>
-      <span class="muted">접힌 그룹=카테고리 · 클릭=펼치기 · 자원 노드 클릭=편집(전체 화면)</span>
-    </div>
-    <div class="dag-toolbar">
-      <div class="tgroup" id="map-gran">
-        <button data-gran="category" class="on">카테고리</button>
-        <button data-gran="service">서비스</button>
-        <button data-gran="resource">전체 펼침</button>
-      </div>
-      <button class="minibtn" id="map-collapse">⊟ 전체 접기</button>
-      <span class="statchip" id="map-stat"></span>
-    </div>
-    <div class="stage" id="map-stage">
-      <svg id="map-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
-      <div class="hint-pill" id="map-hint"></div>
-      <div class="zoomctl">
-        <button id="map-zin" title="확대">+</button><button id="map-zout" title="축소">−</button>
-        <button id="map-zfit" class="fit" title="전체 보기">맞춤</button>
-      </div>
-    </div>
-  </div>
+  {# 구 "의존 그래프 (영향 파악)" 전역 탭은 제거됨 (P2C-25 오너 결정 + v2 D6) —
+     /planning/resources/map.json 라우트와 resource_graph.js 렌더러는 보존
+     (console2 run 뷰·미니그래프가 공유). #}
 </section>
 
 <script src="/static/resource_graph.js"></script>
@@ -240,9 +261,10 @@
   var catRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.cat"));
   var svcRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.svc"));
   var epRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.epdrawer"));
+  var depRows = Array.prototype.slice.call(tbody.querySelectorAll("tr.depdrawer"));
   var fSearch = document.getElementById("f-search"), fService = document.getElementById("f-service");
   var fCount = document.getElementById("f-count");
-  var status = "all", collapsedCats = {}, collapsedSvcs = {}, openDrawers = {};
+  var status = "all", collapsedCats = {}, collapsedSvcs = {}, openDrawers = {}, openDeps = {};
   // P2-7: 카테고리 기본 접힘 (17k px 방지) — 펼침 상태는 세션 동안 기억.
   // 검색/필터 중에는 apply()가 접힘을 무시하므로 매치는 항상 보인다.
   var SS = "modeling.collapsed", stored = null;
@@ -283,6 +305,13 @@
                 !collapsedCats[tr.dataset.cat] && !collapsedSvcs[key];
       tr.style.display = vis ? "" : "none";
     });
+    // 의존 미니그래프 드로어 — 엔드포인트 드로어와 같은 가시성 규칙 (개선 ①)
+    depRows.forEach(function (tr) {
+      var key = tr.dataset.cat + "/" + tr.dataset.svc;
+      var vis = openDeps[key] && !filtering && svcVis[key] &&
+                !collapsedCats[tr.dataset.cat] && !collapsedSvcs[key];
+      tr.style.display = vis ? "" : "none";
+    });
     catRows.forEach(function (tr) {
       tr.style.display = catVis[tr.dataset.cat] ? "" : "none";
       var car = tr.querySelector(".caret"); if (car) car.textContent = collapsedCats[tr.dataset.cat] ? "▸" : "▾";
@@ -304,7 +333,10 @@
     var k = tr.dataset.cat + "/" + tr.dataset.svc; collapsedSvcs[k] = !collapsedSvcs[k]; persist(); apply(); }); });
   // 엔드포인트 집계 토글 — svc 행 접기 클릭과 분리(stopPropagation). 첫 클릭은
   // htmx(hx-trigger="click once")가 파셜을 lazy 로드하고, 이후엔 열림/닫힘만.
-  document.querySelectorAll(".epbtn").forEach(function (btn) {
+  // 주의: .depbtn/.runbtn 도 .epbtn 스타일을 공유하므로 hx-get 있는 실제
+  // 엔드포인트 버튼으로 한정한다 (전체 .epbtn 바인딩이면 ▶ 실행 내비게이션이
+  // preventDefault 로 막히고 🕸 클릭이 빈 엔드포인트 드로어를 연다 — 실측).
+  document.querySelectorAll(".epbtn[hx-get]").forEach(function (btn) {
     btn.addEventListener("click", function (e) {
       e.preventDefault(); e.stopPropagation();
       var tr = btn.closest("tr");
@@ -318,55 +350,72 @@
     if (allCollapsed) catRows.forEach(function (tr) { collapsedCats[tr.dataset.cat] = true; });
     persist(); apply();
   });
+  // 개선 ③: 전역 검색(/search)·외부 딥링크의 ?q= 프리필 — 카탈로그와 동일 관례
+  var qp = new URLSearchParams(location.search).get("q") || "";
+  if (qp) fSearch.value = qp;
   apply();
 
-  // ---- 그림 (lazy) ----
-  var scene = null, booted = false, META = {};
-  var COL = { val: { fill: "#e7f6ed", stroke: "#15924f" }, docs: { fill: "#fdf3e2", stroke: "#b5740b" },
-              bad: { fill: "#eef1f4", stroke: "#7a838d" } };
-  function overlay(id) {
-    var m = META[id]; if (!m) return null;
-    if (!m.complete) return { fill: COL.bad.fill, stroke: COL.bad.stroke, badge: "⚠" };
-    if (m.provenance === "VALIDATED") return { fill: COL.val.fill, stroke: COL.val.stroke, badge: "✓" };
-    if (m.provenance === "docs") return { fill: COL.docs.fill, stroke: COL.docs.stroke };
-    return { fill: COL.bad.fill, stroke: COL.bad.stroke };
+  // ---- 의존 미니그래프 인스펙터 (개선 ① — v2 D6, donor: v2 svc_graph.js) ----
+  // 전체 275노드 지도(구 탭) 대신 그 서비스의 의존 폐쇄집합만 그린다.
+  // 데이터 = POST /api/graph {services:[cat/svc]} (console2 계약 재사용),
+  // 렌더러 = resource_graph.js scene() 원본 재사용(복붙 금지). 서비스당 1회 로드.
+  var depLoaded = {};
+  function depInspect(box, node) {
+    if (!node) { box.classList.remove("on"); box.innerHTML = ""; return; }
+    var esc = function (s) { return (s + "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+    box.classList.add("on");
+    box.innerHTML =
+      '<div class="dep-insp-row"><span class="k">id</span><span class="v mono">' + esc(node.id) + "</span></div>" +
+      '<div class="dep-insp-row"><span class="k">service</span><span class="v mono">' + esc(node.service || "") + "</span></div>" +
+      '<div class="dep-insp-row"><a class="editbtn" href="' + NODE_URL + encodeURIComponent(node.id) + '">노드 편집 →</a></div>';
   }
-  function bootGraph(data) {
-    META = data.meta || {};
-    var svg = document.getElementById("map-svg"), stage = document.getElementById("map-stage");
-    if (!window.ResourceGraph || !data.nodes || !data.nodes.length) {
-      svg.innerHTML = '<text x="14" y="26" fill="#656d76">그릴 모델 그래프가 없습니다.</text>'; return;
+  function depRender(host, g) {
+    if (!g || !g.nodes || !g.nodes.length) {
+      host.innerHTML = '<span class="muted small">이 서비스의 리소스 모델이 아직 없습니다 — 노드를 먼저 저작하세요.</span>'; return;
     }
-    scene = window.ResourceGraph.scene(svg, stage, data, {
-      overlay: overlay, hint: document.getElementById("map-hint"), stat: document.getElementById("map-stat"),
-      onFocus: function (info) { if (info && info.label && META[info.label]) go(info.label); },
+    if (!window.ResourceGraph || !window.ResourceGraph.scene) {
+      host.innerHTML = '<span class="miss">resource_graph.js 렌더러를 불러오지 못했습니다.</span>'; return;
+    }
+    var GN = {};
+    g.nodes.forEach(function (n) { GN[n.id] = n; });
+    host.innerHTML =
+      '<div class="dep-stage-wrap"><div class="dep-stage"><svg></svg></div></div><div class="dep-insp"></div>';
+    var stage = host.querySelector(".dep-stage"), svg = host.querySelector("svg"),
+        insp = host.querySelector(".dep-insp");
+    // 읽기 전용 인스펙터 — onToggleTarget/isSelectable 없음(선택 코너 미표시)
+    var scene = window.ResourceGraph.scene(svg, stage, g, {
+      onFocus: function (fi) { depInspect(insp, fi ? (GN[fi.label] || null) : null); },
     });
     scene.start();
-    var g = document.querySelectorAll("#map-gran button");
-    g.forEach(function (b) { b.onclick = function () {
-      g.forEach(function (x) { x.classList.toggle("on", x === b); });
-      if (b.dataset.gran === "resource") scene.expandAll(); else scene.setGranularity(b.dataset.gran); }; });
-    document.getElementById("map-collapse").onclick = function () {
-      g.forEach(function (x) { x.classList.toggle("on", x.dataset.gran === "category"); });
-      scene.setGranularity("category"); };
-    document.getElementById("map-zin").onclick = function () { scene.zoomIn(); };
-    document.getElementById("map-zout").onclick = function () { scene.zoomOut(); };
-    document.getElementById("map-zfit").onclick = function () { scene.zoomToFit(); };
   }
-  function ensureGraph() {
-    if (booted) return; booted = true;
-    fetch("/planning/resources/map.json").then(function (r) { return r.json(); }).then(bootGraph)
-      .catch(function (e) { document.getElementById("map-svg").innerHTML =
-        '<text x="14" y="26" fill="#cf222e">map.json 로드 실패: ' + (e && e.message || e) + "</text>"; });
+  function depLoad(key, svc) {
+    if (depLoaded[key]) return;
+    depLoaded[key] = true;
+    var host = document.getElementById("depd-" + svc.replace(/\//g, "--"));
+    if (!host) return;
+    host.textContent = "의존 그래프를 불러오는 중…";
+    fetch("/api/graph", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ services: [svc] }) })
+      .then(function (r) { return r.json(); })
+      .then(function (g) {
+        if (g && g.error) { host.innerHTML = '<span class="miss">의존 그래프 로딩 실패: ' + g.error + "</span>"; return; }
+        depRender(host, g);
+      })
+      .catch(function (e) { host.innerHTML = '<span class="miss">의존 그래프 로딩 실패: ' + (e && e.message || e) + "</span>"; });
   }
-  document.querySelectorAll("#view-toggle button").forEach(function (b) {
-    b.addEventListener("click", function () {
-      document.querySelectorAll("#view-toggle button").forEach(function (x) { x.classList.toggle("on", x === b); });
-      var graph = b.dataset.view === "graph";
-      document.getElementById("pane-table").hidden = graph;
-      document.getElementById("pane-graph").hidden = !graph;
-      if (graph) { ensureGraph(); if (scene) setTimeout(function () { scene.fit && scene.fit(); }, 40); }
+  document.querySelectorAll(".depbtn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var tr = btn.closest("tr");
+      var key = tr.dataset.cat + "/" + tr.dataset.svc;
+      openDeps[key] = !openDeps[key];
+      if (openDeps[key]) depLoad(key, tr.dataset.svc);
+      apply();
     });
+  });
+  // 개선 ④: ▶ 실행 prefill 링크 — svc 행 접기 토글과 분리 (기본 내비게이션 유지)
+  document.querySelectorAll(".runbtn").forEach(function (a) {
+    a.addEventListener("click", function (e) { e.stopPropagation(); });
   });
 })();
 </script>

@@ -249,7 +249,9 @@ def test_ia_catalog_absorbed_into_modeling():
     assert "모델됨" in page and "미모델" in page and "epdrawer" in page
     assert ">검증상태</th>" in page and ">code</th>" not in page \
         and ">opt</th>" not in page
-    assert "범례:" in page and "의존 그래프 (영향 파악)" in page
+    # 2026-07-11 모델링 개선 ①(P2C-25 결정 이행 + v2 D6): 전역 '의존 그래프
+    # (영향 파악)' 탭은 제거 — 의존은 서비스 행의 🕸 미니그래프 인스펙터로.
+    assert "범례:" in page and "의존 그래프 (영향 파악)" not in page
 
     # 엔드포인트 드로어 파셜 — 상태 칩 3종 분류 (규칙: resource_routes.py 주석)
     part = client.get("/planning/resources/map/endpoints",
@@ -590,6 +592,42 @@ def test_v2_shell_header_and_global_search():
     assert "URLSearchParams(location.search).get('q')" in cat
 
 
+def test_modeling_improvements_batch():
+    """모델링 화면 개선 ①~⑤ (2026-07-11 오너 승인 — 검토 보고의 5개 항목).
+
+    ① 전역 의존 그래프 탭 제거(P2C-25 + v2 D6) — 서비스 행 🕸 의존 미니그래프
+       인스펙터로 대체 (donor: v2 svc_graph.js · /api/graph + resource_graph.js
+       scene() 재사용). map.json 라우트는 보존(console2 공유).
+    ② 출처·단위 정직화 — '저장소(main) 기준' + VALIDATED는 노드 단위 註.
+    ③ ?q= 딥링크 (전역 검색 → Modeling 필터 프리필).
+    ④ 서비스 행 ▶ 실행 prefill (/testing?service= — 자동 발사 아님).
+    ⑤ 카테고리 행 검증 진척 미니바."""
+    page = client.get("/planning/resources/map").text
+    # ① 탭 제거 + 미니그래프 인스펙터 골격
+    assert 'data-view="graph"' not in page and 'id="pane-graph"' not in page
+    assert 'class="epbtn depbtn"' in page and "🕸 의존" in page
+    assert '<tr class="depdrawer"' in page
+    assert '"/api/graph"' in page                       # console2 계약 재사용
+    assert "window.ResourceGraph.scene" in page         # 렌더러 원본 재사용
+    assert "resource_graph.js" in page
+    assert "노드 편집 →" in page                        # 인스펙터의 다음 행동
+    # 라우트 보존 — console2 run 뷰가 공유
+    assert client.get("/planning/resources/map.json").status_code == 200
+    # ② 출처·단위 註
+    assert "저장소(main) 기준" in page and "모델 노드 단위" in page
+    # ③ ?q= 프리필
+    assert "URLSearchParams(location.search)" in page
+    # ④ ▶ 실행 prefill
+    assert 'class="epbtn runbtn"' in page and "/testing?service=" in page
+    # ⑤ 진척 미니바 (카테고리 행마다 1개) — 주의: bare '<tr class="cat"' 는
+    # base.html 의 P2C-23 CSS 주석 본문에도 등장하므로 data-cat 행만 센다
+    assert page.count('class="pbar"') >= page.count('<tr class="cat" data-cat=')
+    assert page.count('<tr class="cat" data-cat=') >= 10
+    # /search 서비스 결과의 Modeling 링크가 ?q= 를 나른다
+    sr = client.get("/search", params={"q": "vpc"}).text
+    assert "/planning/resources/map?q=" in sr
+
+
 # --- runner -----------------------------------------------------------------------
 
 TESTS = [
@@ -616,6 +654,7 @@ TESTS = [
     test_quota_simulation_runs_on_dependencies_save,
     test_source_badges_and_empty_states,
     test_v2_shell_header_and_global_search,
+    test_modeling_improvements_batch,
 ]
 
 
