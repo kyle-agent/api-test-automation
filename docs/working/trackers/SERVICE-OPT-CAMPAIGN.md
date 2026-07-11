@@ -44,7 +44,7 @@
 | 19 | cdn / gslb / dns | reads + hosted-zone | ✅ 완료 | 4.5/6.8/**101s** | dns: 892a의 22분은 전부 큐 대기였음(단독 101s). 쿼터 400에 사다리 87s → **엔진 가드 신설**(max-count/quota는 즉시 기록) | dns 클린 ~15s 예상 | private-dns 삭제는 느린 비동기(DELETING 수 분) |
 | 20 | certificatemanager | selfsign | ✅ 완료 | 16.5s (재검증) | 캠페인 자체 회귀({today} int화) 적발·즉수정 | ~16.5s | create 201 |
 | 21 | networking | 코어4 + 심화4 (peering·TGW·vpce·pilot) | ✅ 8/9 | 29/14/354(skip)/544s | **도메인 실측: 자체생성 VPC의 서브넷 ACTIVE 3분+** (공유 VPC는 수십초) → 폴 180→420s + create-port 400 벨트. delete-vip 409 소진 135s는 조사 대기 | | peering·TGW·endpoint·private-nat 후속 |
-| 22 | loadbalancer | light + heavy | ◑ | 8.6s / 153.5s(fail) | **암묵 의존 발견: lb-members는 살아있는 VM 필요** (단독 런에서 find-member-vm-ip 404 → member 400). VM 짝지음 재실행으로 member_state 수리 검증 중 | | 전체 런에선 타 라이프사이클 VM을 빌리는 구조 — 스케줄 의존 힌트 |
+| 22 | loadbalancer | light + heavy | ✅ 완료 | 8.6s / ~780s(VM동반) | ①member_state 수리 **202 검증** ②암묵 VM 의존 확인 ③신규: member-bulk 삭제 후 그룹 EDITING → delete 400 — settle 사다리 반영(다음 런 판정) | 동일 | |
 | 23 | filestorage | 3종 전부 | ✅ 완료 | 75.1s/56.8s | 느린 스텝 = 정당한 settle 폴 (async 볼륨) | 동일 | replication-schedule 교차리전은 별도 회차 |
 | 24 | scf | 4종 | ✅ 완료 | 62/559/496/112s (4 passed) | wave2-scf 트리거read 404수리 **200 검증**. 재검토 후보: ①PLE request/cancel 사다리 ~285s 매번 소진(승격 실측 無) ②update-code 303s (DEPLOYING 대기 구조) | 동일 | PLE 사다리는 설계물 — 트리아지 판단 대상 |
 | 25 | backup | gen-heavy-backup | ✅ 완료 | 917.7s | create-backup-target 788s 단일 스텝 — 폴/사다리 구조 조사 후보 | ~918s | |
