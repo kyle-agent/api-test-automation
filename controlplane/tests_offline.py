@@ -612,6 +612,9 @@ def test_modeling_improvements_batch():
     assert "window.ResourceGraph.scene" in page         # 렌더러 원본 재사용
     assert "resource_graph.js" in page
     assert "노드 편집 →" in page                        # 인스펙터의 다음 행동
+    # 드로어는 검색/필터 중에도 보인다 (오너 실측 2026-07-11: ?q= 진입 상태에서
+    # 🕸 클릭 시 그림이 안 떠 보였음 — 명시적으로 연 드로어를 필터가 숨기지 않게)
+    assert "(filtering || !collapsedSvcs[key])" in page
     # 라우트 보존 — console2 run 뷰가 공유
     assert client.get("/planning/resources/map.json").status_code == 200
     # ② 출처·단위 註

@@ -305,11 +305,14 @@
                 !collapsedCats[tr.dataset.cat] && !collapsedSvcs[key];
       tr.style.display = vis ? "" : "none";
     });
-    // 의존 미니그래프 드로어 — 엔드포인트 드로어와 같은 가시성 규칙 (개선 ①)
+    // 의존 미니그래프 드로어 (개선 ①) — 엔드포인트 드로어와 달리 **검색/필터
+    // 중에도 보인다** (오너 실측 2026-07-11: 전역 검색 ?q= 로 진입한 상태에서
+    // 🕸 를 눌러도 그림이 안 떠 보였음 — 명시적으로 연 드로어를 필터가 숨길
+    // 이유가 없다). 규칙: 열려 있고 + 소속 svc 행이 보이면 표시.
     depRows.forEach(function (tr) {
       var key = tr.dataset.cat + "/" + tr.dataset.svc;
-      var vis = openDeps[key] && !filtering && svcVis[key] &&
-                !collapsedCats[tr.dataset.cat] && !collapsedSvcs[key];
+      var svcRowVisible = svcVis[key] && !(!filtering && collapsedCats[tr.dataset.cat]);
+      var vis = openDeps[key] && svcRowVisible && (filtering || !collapsedSvcs[key]);
       tr.style.display = vis ? "" : "none";
     });
     catRows.forEach(function (tr) {
