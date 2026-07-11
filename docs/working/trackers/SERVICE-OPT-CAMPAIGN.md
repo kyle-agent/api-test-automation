@@ -34,13 +34,13 @@
 | 9 | queueservice | gen-wave3-qfifo, application-queueservice-queue | ✅ 완료 | 17.5s / **153.3s** | **-127s**: 표준 큐 dedup PUT 400은 범주적(FIFO 전용)인데 optional-4xx 사다리가 스텝당 60s 소진 → expect_status에 400 등록 | 17.5s / **26.3s** | 첫 대형 개선 — 사다리는 '승격 가능한 400'에만 | | | | |
 | 10 | iam-identity-center | idc-read-coverage | ✅ 완료 | 17.2s | 대기 없음 (404 관용 reads) | ~17s | | | | | |
 | 11 | direct-connect | gen-direct-connect (+ routing) | 대기 | | | | DC 1:1-per-VPC 규약 |
-| 12 | iam | iam-group, gen-wave5-iam-bindings (+ user/role) | 대기 | | | | |
-| 13 | kms | gen-wave2-sec, security-kms-transit-crypto | 대기 | | | | PF-09 예약삭제 |
-| 14 | secretsmanager | security-secretsmanager-writes | 대기 | | | | |
-| 15 | apigateway | gen-wave-apigw, gen-wave5-apigw-policy | 대기 | | | | |
+| 12 | iam | iam-group, gen-wave5-iam-bindings | ✅ 완료 | 18.2s/39.7s | 대기 없음 (스텝 최대 4.8s) | 동일 | | | | | |
+| 13 | kms | gen-wave2-sec, security-kms-transit-crypto | ✅ 완료 | 22.8s/45.7s | 대기 없음 | 동일 | 예약삭제(PF-09)로 잔존은 자동소멸 | | | | PF-09 예약삭제 |
+| 14 | secretsmanager | security-secretsmanager-writes | ✅ 완료 | 54.8s | 대기 없음 (create 18.6s는 서버 실소요) | ~55s | | | | | |
+| 15 | apigateway | gen-wave-apigw, gen-wave5-apigw-policy | ▶ 진행 | | | | |
 | 16 | firewall | gen-wave5-fw | 대기 | | | | 캐리어 암묵 생성 |
-| 17 | resourcemanager | 4종 | 대기 | | | | |
-| 18 | servicewatch | 8종 | 대기 | | | | create-group 500 재확인 |
+| 17 | resourcemanager | 4종 | ▶ 진행 | | | | |
+| 18 | servicewatch | 8종 | ▶ 진행 | | | | create-group 500 재확인 |
 | 19 | cdn / dns / gslb | reads+CRUD | 대기 | | | | CDN stop 상태기계 |
 | 20 | certificatemanager | selfsign 등 | 대기 | | | | |
 | 21 | networking (vpc/subnet/port/publicip/peering/TGW/endpoint/NAT) | 다수 | 대기 | | | | 슬롯 소비 — 후반 |
