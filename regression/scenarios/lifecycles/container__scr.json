@@ -214,7 +214,12 @@
           ],
           "optional": true,
           "group": "scr-registry-public-acl",
-          "_note": "updatepublicacl: requires public endpoint enabled first; using public_acl_enabled:false (no-op/safe)"
+          "_note": "updatepublicacl: requires public endpoint enabled first; using public_acl_enabled:false (no-op/safe) || auto-repair R1-settle-409 (run-end 자동수리): 409 settle 서명 ({\"errors\":[{\"code\":\"scp-container-registry.common.edit-conflict\",\"detail\":\"Resou…) — retry_on_status에 409 없음",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15
         },
         {
           "name": "registry-disable-public-endpoint",

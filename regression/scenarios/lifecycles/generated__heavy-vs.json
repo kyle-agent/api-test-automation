@@ -412,7 +412,16 @@
           "expect_status": [
             200
           ],
-          "poll": {"until_status": [200], "give_up_status": [404], "timeout": 300, "interval": 15},
+          "poll": {
+            "until_status": [
+              200
+            ],
+            "give_up_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          },
           "optional": true,
           "group": "custom-image",
           "_note": "공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)"
@@ -424,9 +433,21 @@
           "optional": true,
           "method": "POST",
           "path": "/v1/images/{custom_image_id}/members",
-          "json": {"member": "ec11538abf8f46d2953539521f745366"},
-          "capture_soft": {"member_id": "$.member_id"},
-          "expect_status": [200, 201, 202, 400, 403, 409, 422],
+          "json": {
+            "member": "ec11538abf8f46d2953539521f745366"
+          },
+          "capture_soft": {
+            "member_id": "$.member_id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            409,
+            422
+          ],
           "_note": "2026-07-08 25-편입(owner GO): createimagemember — 자기 계정으로 share (asg notification user_ids 선례의 계정 고정값). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
@@ -436,7 +457,11 @@
           "optional": true,
           "method": "GET",
           "path": "/v1/images/{custom_image_id}/members/{member_id}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "_note": "2026-07-08 25-편입(owner GO): showimagemember."
         },
         {
@@ -446,8 +471,15 @@
           "optional": true,
           "method": "PUT",
           "path": "/v1/images/{custom_image_id}/members/{member_id}",
-          "json": {"status": "accepted"},
-          "expect_status": [200, 202, 400, 404],
+          "json": {
+            "status": "accepted"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            404
+          ],
           "_note": "2026-07-08 25-편입(owner GO): updateimagemember — status 값 추정(glance 계열). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
@@ -458,7 +490,13 @@
           "destructive": true,
           "method": "DELETE",
           "path": "/v1/images/{custom_image_id}/members/{member_id}",
-          "expect_status": [200, 202, 204, 400, 404],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
           "_note": "2026-07-08 25-편입(owner GO): deleteimagemember."
         },
         {
@@ -468,8 +506,18 @@
           "optional": true,
           "method": "POST",
           "path": "/v1/images/{custom_image_id}/share",
-          "json": {"account_id": "ec11538abf8f46d2953539521f745366"},
-          "expect_status": [200, 201, 202, 400, 403, 409, 422],
+          "json": {
+            "account_id": "ec11538abf8f46d2953539521f745366"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            409,
+            422
+          ],
           "_note": "2026-07-08 25-편입(owner GO): createsharingimage — body 스키마 추정. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
@@ -479,10 +527,31 @@
           "optional": true,
           "method": "POST",
           "path": "/v1/images",
-          "json": {"container_format": "bare", "disk_format": "qcow2", "min_disk": 100, "min_ram": 0, "name": "regrimgsh{ualpha}", "os_distro": "ubuntu", "protected": false},
-          "capture_soft": {"pending_image_id": "$.id"},
-          "expect_status": [200, 201, 202, 400, 409, 422],
-          "cleanup": {"method": "DELETE", "path": "/v1/images/{pending_image_id}", "service": "virtualserver"},
+          "json": {
+            "container_format": "bare",
+            "disk_format": "qcow2",
+            "min_disk": 100,
+            "min_ram": 0,
+            "name": "regrimgsh{ualpha}",
+            "os_distro": "ubuntu",
+            "protected": false
+          },
+          "capture_soft": {
+            "pending_image_id": "$.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            409,
+            422
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/images/{pending_image_id}",
+            "service": "virtualserver"
+          },
           "_note": "2026-07-08 25-편입(owner GO): createimage — 업로드 대기 셸 생성 (docs request_example body 그대로, os_distro 만 ubuntu). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
@@ -493,7 +562,14 @@
           "method": "POST",
           "path": "/v1/images/{pending_image_id}/import",
           "json": {},
-          "expect_status": [200, 202, 400, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            404,
+            409,
+            422
+          ],
           "_note": "2026-07-08 25-편입(owner GO): importimage — 소스 URL 스키마 미문서(빈 body 도달+정정 유도). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
@@ -504,7 +580,13 @@
           "destructive": true,
           "method": "DELETE",
           "path": "/v1/images/{pending_image_id}",
-          "expect_status": [200, 202, 204, 400, 404],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
           "_note": "2026-07-08 25-편입(owner GO): pending 셸 teardown."
         },
         {
@@ -537,8 +619,19 @@
           "service": "virtualserver",
           "method": "GET",
           "path": "/v1/volumes/{vol_id}",
-          "expect_status": [200],
-          "poll": {"field": "$.state", "until": ["in-use", "IN-USE", "in_use"], "timeout": 180, "interval": 10},
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "in-use",
+              "IN-USE",
+              "in_use"
+            ],
+            "timeout": 180,
+            "interval": 10
+          },
           "_note": "2026-07-08 (run 936s 실패 재발 방지): attach 202 는 비동기 — 대기 수정으로 빨라진 흐름에서 후속/해제 스텝이 attach 완료 전에 나가는 레이스를 명시 settle 로 차단."
         },
         {
@@ -718,9 +811,10 @@
               "RUNNING",
               "AVAILABLE"
             ],
-            "timeout": 300,
+            "timeout": 420,
             "interval": 15
-          }
+          },
+          "_note": "auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 300s의 96%를 소진 (until 미충족) — 경계 플레이키 위험"
         },
         {
           "name": "create-server-static-nat",
@@ -779,8 +873,18 @@
           "service": "virtualserver",
           "method": "GET",
           "path": "/v1/volumes/{vol_id}",
-          "expect_status": [200],
-          "poll": {"field": "$.state", "until": ["available", "AVAILABLE"], "timeout": 180, "interval": 10},
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          },
           "_note": "2026-07-08: detach 202 settle — delete-block-volume 이 detaching 상태를 때리지 않게."
         },
         {
@@ -853,10 +957,10 @@
               "CREATED",
               "RUNNING"
             ],
-            "timeout": 180,
+            "timeout": 240,
             "interval": 10
           },
-          "_note": "2026-07-08 전런 수리: delete-public-ip 400 'PublicIP state is not deletable state(ATTACHED)' — attach는 create-server-static-nat가 수행했고(카탈로그에 publicip 전용 detach endpoint 없음: create/delete/list/set/show뿐), detach = 직전 delete-server-static-nat인데 202 비동기라 ATTACHED가 남은 채 delete가 나갔다. wait-volume-detached와 동일한 settle 폴: ATTACHED 이탈(라이브 2026-07-08: attached 상태 문자열은 'ATTACHED'; until은 DETACHED/AVAILABLE + create쪽 wait의 검증 어휘)까지 대기, 미도달 시 180s 후 200 통과 → delete의 400 retry가 보험."
+          "_note": "2026-07-08 전런 수리: delete-public-ip 400 'PublicIP state is not deletable state(ATTACHED)' — attach는 create-server-static-nat가 수행했고(카탈로그에 publicip 전용 detach endpoint 없음: create/delete/list/set/show뿐), detach = 직전 delete-server-static-nat인데 202 비동기라 ATTACHED가 남은 채 delete가 나갔다. wait-volume-detached와 동일한 settle 폴: ATTACHED 이탈(라이브 2026-07-08: attached 상태 문자열은 'ATTACHED'; until은 DETACHED/AVAILABLE + create쪽 wait의 검증 어휘)까지 대기, 미도달 시 180s 후 200 통과 → delete의 400 retry가 보험. || auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 180s의 96%를 소진 (until 미충족) — 경계 플레이키 위험"
         },
         {
           "name": "delete-public-ip",

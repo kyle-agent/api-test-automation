@@ -1335,7 +1335,7 @@
           "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
           "json": {
             "member": {
-              "member_port": 80,
+              "member_port": 8080,
               "member_state": "ENABLE"
             }
           },
@@ -1349,7 +1349,7 @@
           ],
           "retries": 8,
           "retry_interval": 15,
-          "_note": "2026-07-10 오너 실측(run 라이브): member 반영 중 서버그룹이 잠시 Not-Active → 후속 member op가 409 NotUpdatableState. settle 409 재시도 사다리(8x15s) — batch-2 'ExistInprogress pacing' 규약과 동형. 참고: 이 409의 존재 자체가 member create 성공 증거 (PF-35 해결: WEIGHTED_ROUND_ROBIN+weight 10)."
+          "_note": "2026-07-10 오너 실측(run 라이브): member 반영 중 서버그룹이 잠시 Not-Active → 후속 member op가 409 NotUpdatableState. settle 409 재시도 사다리(8x15s) — batch-2 'ExistInprogress pacing' 규약과 동형. 참고: 이 409의 존재 자체가 member create 성공 증거 (PF-35 해결: WEIGHTED_ROUND_ROBIN+weight 10). || run-923a: 같은 포트(80) 재설정 → 400 ExistRequestMemberPort — set은 실제 '변경'이어야 함, 8080으로."
         },
         {
           "name": "create-lb-member-bulk",

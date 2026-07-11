@@ -245,7 +245,7 @@
           "service": "backup",
           "method": "GET",
           "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}",
-          "_note": "HB3b (2026-07-05, run 28723287734 job-log diagnosis): CONFIRMED 2026-06-20 that policy_type=VM_IMAGE 500s (ContactAdminForAssistance) for VIRTUAL_SERVER/GPU_SERVER, so FILESYSTEM is the only usable policy_type here (covers getbackuptargetlist). HB3 (2026-07-05) showed the query itself returns 200 but `contents` can still be EMPTY right after wait-server-active flips ACTIVE -- inventory-registration lag, not a hard rejection. Turned into a settle-poll on `$.count` (NOT the uuid itself -- the engine's poll only supports exact-value equality via field+until, and server_uuid is an arbitrary value we cannot predict, so we poll the one field whose target value IS predictable: `count` must reach exactly 1, per the documented BackupTargetListResponse example `{\"contents\":[{...}],\"count\":1}` -- data/api_docs.json storage/backup/getbackuptargetlist). give_up_status short-circuits on any status that means 'this query itself is broken' rather than 'not registered yet', so we don't burn the full timeout on a structural error. server_name=regrsrv{unique} in the query already scopes the result server-side to exactly OUR server (unique per run) -- so once count=1, contents[0] IS our own server and no client-side name filter is needed; if the account ever had a stale duplicate the query's own server_name match would still return only one row, so [0] stays safe (documented as the load-bearing premise, not re-verified live this session since this session is offline-only).",
+          "_note": "HB3b (2026-07-05, run 28723287734 job-log diagnosis): CONFIRMED 2026-06-20 that policy_type=VM_IMAGE 500s (ContactAdminForAssistance) for VIRTUAL_SERVER/GPU_SERVER, so FILESYSTEM is the only usable policy_type here (covers getbackuptargetlist). HB3 (2026-07-05) showed the query itself returns 200 but `contents` can still be EMPTY right after wait-server-active flips ACTIVE -- inventory-registration lag, not a hard rejection. Turned into a settle-poll on `$.count` (NOT the uuid itself -- the engine's poll only supports exact-value equality via field+until, and server_uuid is an arbitrary value we cannot predict, so we poll the one field whose target value IS predictable: `count` must reach exactly 1, per the documented BackupTargetListResponse example `{\"contents\":[{...}],\"count\":1}` -- data/api_docs.json storage/backup/getbackuptargetlist). give_up_status short-circuits on any status that means 'this query itself is broken' rather than 'not registered yet', so we don't burn the full timeout on a structural error. server_name=regrsrv{unique} in the query already scopes the result server-side to exactly OUR server (unique per run) -- so once count=1, contents[0] IS our own server and no client-side name filter is needed; if the account ever had a stale duplicate the query's own server_name match would still return only one row, so [0] stays safe (documented as the load-bearing premise, not re-verified live this session since this session is offline-only). || auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 600s의 98%를 소진 (until 미충족) — 경계 플레이키 위험",
           "expect_status": [
             200,
             201,
@@ -256,7 +256,7 @@
             "until": [
               1
             ],
-            "timeout": 600,
+            "timeout": 780,
             "interval": 15,
             "give_up_status": [
               400,

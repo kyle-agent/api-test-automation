@@ -74,7 +74,16 @@
           "json": {
             "description": "updated by API regression suite"
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): vpc-cidr-secondary 은퇴분 (setvpc). optional+관용 — VPC 상태에 따른 4xx 도 기록은 남긴다 (원 스텝 노트 승계)."
         },
         {
@@ -208,7 +217,16 @@
             "description": "updated by API regression suite",
             "security_groups": []
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): vpc-port 은퇴분 (setport)."
         },
         {
@@ -371,9 +389,10 @@
               "RUNNING",
               "AVAILABLE"
             ],
-            "timeout": 300,
+            "timeout": 420,
             "interval": 15
-          }
+          },
+          "_note": "auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 300s의 97%를 소진 (until 미충족) — 경계 플레이키 위험"
         },
         {
           "name": "verify-public-ip",

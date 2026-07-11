@@ -892,7 +892,7 @@
           "path": "/v1/vpc-peerings/{vpc_peering_id}",
           "group": "peering",
           "optional": true,
-          "_note": "Settle-poll moved to run IMMEDIATELY after create-vpc-peering (was previously after list/approve) so it gets the full fresh timeout budget instead of starting ~120s late behind approve-vpc-peering's now-removed retry loop -- HB5 (reports/results/hb5/observations-gw0.jsonl) showed this poll ending right at its (then) 300s timeout with state still not ACTIVE, and every subsequent write (routing-rule create, set, delete) then 400'd 'not Active/changeable/deletable state(CREATING)'. REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 5): the HB5 placement fix did NOT resolve it — this SAME run shows wait-peering-active (right after create, no approve/list ahead of it) STILL returning at ts create+~309s (i.e. it burned its full then-300s budget) with the cascade repeating identically (set/delete/create-routing-rule all 400 CREATING). Ruled out the 'wrong response-wrapper-key' hypothesis (the TGW capture-key class of bug): `data/api_docs.json` networking/vpc/showvpcpeering response_example confirms the wrapper IS `$.vpc_peering.state` — the field is correct, this is a genuine timeout-too-short-for-the-real-async-settle, same 'poll returns the LAST response on timeout regardless of field match' engine behaviour (engine.py _run_step) as the TGW/VPN cases, just with a longer real backend delay. Bumped timeout 300->900s (peering evidently needs several minutes) as the next evidence-based step; give_up_status unchanged (still bails fast on a failed create). UNVERIFIED LIVE — if a 900s window STILL never reaches ACTIVE, reclassify as a genuine product-side stuck-CREATING defect (baseline-worthy) rather than a settle-timing issue. || 2026-07-10 타임아웃 900→1200s: run-85b2/377e 실측이 한도의 98~99%를 소진(경계 플레이키 방지, 완화가 아니라 여유 확보).",
+          "_note": "Settle-poll moved to run IMMEDIATELY after create-vpc-peering (was previously after list/approve) so it gets the full fresh timeout budget instead of starting ~120s late behind approve-vpc-peering's now-removed retry loop -- HB5 (reports/results/hb5/observations-gw0.jsonl) showed this poll ending right at its (then) 300s timeout with state still not ACTIVE, and every subsequent write (routing-rule create, set, delete) then 400'd 'not Active/changeable/deletable state(CREATING)'. REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 5): the HB5 placement fix did NOT resolve it — this SAME run shows wait-peering-active (right after create, no approve/list ahead of it) STILL returning at ts create+~309s (i.e. it burned its full then-300s budget) with the cascade repeating identically (set/delete/create-routing-rule all 400 CREATING). Ruled out the 'wrong response-wrapper-key' hypothesis (the TGW capture-key class of bug): `data/api_docs.json` networking/vpc/showvpcpeering response_example confirms the wrapper IS `$.vpc_peering.state` — the field is correct, this is a genuine timeout-too-short-for-the-real-async-settle, same 'poll returns the LAST response on timeout regardless of field match' engine behaviour (engine.py _run_step) as the TGW/VPN cases, just with a longer real backend delay. Bumped timeout 300->900s (peering evidently needs several minutes) as the next evidence-based step; give_up_status unchanged (still bails fast on a failed create). UNVERIFIED LIVE — if a 900s window STILL never reaches ACTIVE, reclassify as a genuine product-side stuck-CREATING defect (baseline-worthy) rather than a settle-timing issue. || 2026-07-10 타임아웃 900→1200s: run-85b2/377e 실측이 한도의 98~99%를 소진(경계 플레이키 방지, 완화가 아니라 여유 확보). || auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 1200s의 99%를 소진 (until 미충족) — 경계 플레이키 위험",
           "expect_status": [
             200,
             400,
@@ -903,7 +903,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 1200,
+            "timeout": 1500,
             "interval": 15,
             "give_up_status": [
               400,
@@ -1320,7 +1320,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 300,
+            "timeout": 420,
             "interval": 15,
             "give_up_status": [
               400,
@@ -1328,7 +1328,7 @@
               404
             ]
           },
-          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): observation timestamps CONFIRM create-tgw-vpc-connection (202 at wait-tgw-active+~3s, itself already past a successful wait-tgw-active 200) is immediately followed (~7s later, after only 3 read-only GETs) by create-tgw-firewall 400 `transit-gateway.not-active-state:(EDITING)` — i.e. the vpc-connection create ASYNC-transitions the TGW from ACTIVE back to EDITING, exactly like create-transit-gateway itself does (same wait-tgw-active precedent), and every child write issued in that window 400s. Fix: re-settle to ACTIVE right after create-tgw-vpc-connection (same field/until/give_up_status as wait-tgw-active) before any subsequent child create touches the TGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm the firewall/routing-rule/uplink-routing-rule cascade clears."
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): observation timestamps CONFIRM create-tgw-vpc-connection (202 at wait-tgw-active+~3s, itself already past a successful wait-tgw-active 200) is immediately followed (~7s later, after only 3 read-only GETs) by create-tgw-firewall 400 `transit-gateway.not-active-state:(EDITING)` — i.e. the vpc-connection create ASYNC-transitions the TGW from ACTIVE back to EDITING, exactly like create-transit-gateway itself does (same wait-tgw-active precedent), and every child write issued in that window 400s. Fix: re-settle to ACTIVE right after create-tgw-vpc-connection (same field/until/give_up_status as wait-tgw-active) before any subsequent child create touches the TGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm the firewall/routing-rule/uplink-routing-rule cascade clears. || auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 300s의 97%를 소진 (until 미충족) — 경계 플레이키 위험"
         },
         {
           "name": "get-tgw-routing-rules",
@@ -1407,7 +1407,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 300,
+            "timeout": 420,
             "interval": 15,
             "give_up_status": [
               400,
@@ -1415,7 +1415,7 @@
               404
             ]
           },
-          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 3): observation timestamps CONFIRM wait-tgw-active-after-connection returned 200 at ts …771.05 — ~306s after create-tgw-vpc-connection (ts …465.07), i.e. essentially its own full 300s timeout budget, so it very likely never actually observed state==ACTIVE and just returned the last polled response (the engine's poll loop returns the last response on timeout, regardless of the field's value — see engine.py's poll() implementation). EVERY subsequent child create/delete (firewall @+4s, firewall-connection @+5s, routing-rule @+6s, uplink-routing-rule @+7s, delete-firewall-connection @+8s, delete-vpc-connection @+13s, set @+14s, all measured from wait-tgw-active-after-connection's own return) then 400'd `not-active-state:(EDITING)` in lockstep — one settle-poll right after the vpc-connection create was not enough headroom for the TGW to reach a stable ACTIVE state before the whole child-op cascade began. Fix (same tedious-but-proven pattern as wait-tgw-active-before-delete, HB4b): re-settle to ACTIVE immediately before EACH remaining child op (this one + the siblings below), so every op gets its own up-to-300s settle window instead of all sharing the one budget already spent right after the vpc-connection create. REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): this settle-poll (and create-tgw-firewall-connection right after it) MOVED to run BEFORE create-tgw-firewall — see create-tgw-firewall-connection's own note for why the old order was backwards. UNVERIFIED LIVE (offline repair)."
+          "_note": "REPAIR 2026-07-07 (HB4c, run 28833316852, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4c item 3): observation timestamps CONFIRM wait-tgw-active-after-connection returned 200 at ts …771.05 — ~306s after create-tgw-vpc-connection (ts …465.07), i.e. essentially its own full 300s timeout budget, so it very likely never actually observed state==ACTIVE and just returned the last polled response (the engine's poll loop returns the last response on timeout, regardless of the field's value — see engine.py's poll() implementation). EVERY subsequent child create/delete (firewall @+4s, firewall-connection @+5s, routing-rule @+6s, uplink-routing-rule @+7s, delete-firewall-connection @+8s, delete-vpc-connection @+13s, set @+14s, all measured from wait-tgw-active-after-connection's own return) then 400'd `not-active-state:(EDITING)` in lockstep — one settle-poll right after the vpc-connection create was not enough headroom for the TGW to reach a stable ACTIVE state before the whole child-op cascade began. Fix (same tedious-but-proven pattern as wait-tgw-active-before-delete, HB4b): re-settle to ACTIVE immediately before EACH remaining child op (this one + the siblings below), so every op gets its own up-to-300s settle window instead of all sharing the one budget already spent right after the vpc-connection create. REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): this settle-poll (and create-tgw-firewall-connection right after it) MOVED to run BEFORE create-tgw-firewall — see create-tgw-firewall-connection's own note for why the old order was backwards. UNVERIFIED LIVE (offline repair). || auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 300s의 97%를 소진 (until 미충족) — 경계 플레이키 위험"
         },
         {
           "name": "create-tgw-firewall-connection",
@@ -1454,7 +1454,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 300,
+            "timeout": 420,
             "interval": 15,
             "give_up_status": [
               400,
@@ -1462,7 +1462,7 @@
               404
             ]
           },
-          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): NEW step — settle-poll the TGW's `firewall_connection_state` (field CONFIRMED from `data/api_docs.json` networking/vpc/createtransitgatewayfirewallconnection response_example, same show-shaped object as showtransitgateway) to ACTIVE before create-tgw-firewall fires, per that create's own required-precondition error (see create-tgw-firewall-connection's note). Same GET (`show-transit-gateway`) as every other wait-tgw-active-* step, just polling a different field on the identical response body. UNVERIFIED LIVE (offline repair)."
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 3): NEW step — settle-poll the TGW's `firewall_connection_state` (field CONFIRMED from `data/api_docs.json` networking/vpc/createtransitgatewayfirewallconnection response_example, same show-shaped object as showtransitgateway) to ACTIVE before create-tgw-firewall fires, per that create's own required-precondition error (see create-tgw-firewall-connection's note). Same GET (`show-transit-gateway`) as every other wait-tgw-active-* step, just polling a different field on the identical response body. UNVERIFIED LIVE (offline repair). || auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 300s의 97%를 소진 (until 미충족) — 경계 플레이키 위험"
         },
         {
           "name": "wait-tgw-active-before-firewall",
@@ -2111,9 +2111,10 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 180,
+            "timeout": 240,
             "interval": 10
-          }
+          },
+          "_note": "auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 180s의 99%를 소진 (until 미충족) — 경계 플레이키 위험"
         },
         {
           "name": "show-subnet",
