@@ -338,6 +338,52 @@
           "group": "param"
         },
         {
+          "name": "settle-cluster-after-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param",
+          "_note": "2026-07-11 run-923a 수리: epas/pg는 set-parameters 202 수락 후 비동기 Parameter Modify가 실패하며 service_state=UNKNOWN으로 추락 — 이후 mutating subop 전부 400 InvalidState 연쇄(각 12op). 같은 런에서 후반의 sync-cluster-state 202가 RUNNING을 복구해 upgrade-kernel/resize가 성공한 것을 실측 — 그 복구를 param 그룹 직후로 전진 배치."
+        },
+        {
+          "name": "wait-cluster-running-after-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "param",
+          "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -392,8 +438,8 @@
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "alert",
-            "schedule_day_of_month": "28",
-            "schedule_day_of_week": "MON",
+            "schedule_day_of_month": "-1",
+            "schedule_day_of_week": null,
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
             "secret_key": ""
@@ -465,8 +511,8 @@
           "json": {
             "access_key": "",
             "delete_on_export": true,
-            "schedule_day_of_month": "28",
-            "schedule_day_of_week": "MON",
+            "schedule_day_of_month": "-1",
+            "schedule_day_of_week": null,
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
             "secret_key": ""
@@ -615,16 +661,10 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "security_group_rules": [
-              {
-                "direction": "INBOUND",
-                "protocol": "TCP",
-                "port_min": 2866,
-                "port_max": 2866,
-                "remote_ip_prefix": "10.0.0.0/8",
-                "description": "regr coverage probe"
-              }
-            ]
+            "add_ip_addresses": [
+              "10.124.0.10"
+            ],
+            "del_ip_addresses": []
           },
           "expect_status": [
             200,
@@ -985,7 +1025,7 @@
           "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
           "json": {
             "role_type": "DATA",
-            "size_gb": 10,
+            "size_gb": 104,
             "volume_type": "SSD"
           },
           "expect_status": [
@@ -1744,6 +1784,52 @@
           "group": "param"
         },
         {
+          "name": "settle-cluster-after-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param",
+          "_note": "2026-07-11 run-923a 수리: epas/pg는 set-parameters 202 수락 후 비동기 Parameter Modify가 실패하며 service_state=UNKNOWN으로 추락 — 이후 mutating subop 전부 400 InvalidState 연쇄(각 12op). 같은 런에서 후반의 sync-cluster-state 202가 RUNNING을 복구해 upgrade-kernel/resize가 성공한 것을 실측 — 그 복구를 param 그룹 직후로 전진 배치."
+        },
+        {
+          "name": "wait-cluster-running-after-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "param",
+          "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -2001,8 +2087,8 @@
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "alert",
-            "schedule_day_of_month": "28",
-            "schedule_day_of_week": "MON",
+            "schedule_day_of_month": "-1",
+            "schedule_day_of_week": null,
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
             "secret_key": ""
@@ -2074,8 +2160,8 @@
           "json": {
             "access_key": "",
             "delete_on_export": true,
-            "schedule_day_of_month": "28",
-            "schedule_day_of_week": "MON",
+            "schedule_day_of_month": "-1",
+            "schedule_day_of_week": null,
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
             "secret_key": ""
@@ -2220,7 +2306,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.124.0.10"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
@@ -2650,9 +2738,25 @@
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
+          "name": "capture-bsg-data-id",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "bsg_data_id": "$.instance_groups[0].block_storage_groups[1].id"
+          },
+          "group": "resize",
+          "_note": "2026-07-11 run-923a 수리: resize를 OS 롤 그룹(bsg_id=[0])에 쏴서 Dbaas.ValidationError.InvalidBlockStorageRoleType — add-block-storages가 만든 DATA 그룹([1])을 재조회 캡처해 그것을 리사이즈. 캡처 실패(add 미성공) 시 soft라 {bsg_data_id} 리터럴 404 도달로 강등."
+        },
+        {
           "name": "resize-block-storage",
           "method": "POST",
-          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
           "json": {
             "size_gb": 112
           },
@@ -2974,6 +3078,12 @@
             201,
             202
           ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
           "capture": {
             "cluster_id": "$.resource.id"
           },
@@ -3396,6 +3506,52 @@
           "group": "param"
         },
         {
+          "name": "settle-cluster-after-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param",
+          "_note": "2026-07-11 run-923a 수리: epas/pg는 set-parameters 202 수락 후 비동기 Parameter Modify가 실패하며 service_state=UNKNOWN으로 추락 — 이후 mutating subop 전부 400 InvalidState 연쇄(각 12op). 같은 런에서 후반의 sync-cluster-state 202가 RUNNING을 복구해 upgrade-kernel/resize가 성공한 것을 실측 — 그 복구를 param 그룹 직후로 전진 배치."
+        },
+        {
+          "name": "wait-cluster-running-after-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "param",
+          "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -3606,8 +3762,8 @@
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "alert",
-            "schedule_day_of_month": "28",
-            "schedule_day_of_week": "MON",
+            "schedule_day_of_month": "-1",
+            "schedule_day_of_week": null,
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
             "secret_key": ""
@@ -3679,8 +3835,8 @@
           "json": {
             "access_key": "",
             "delete_on_export": true,
-            "schedule_day_of_month": "28",
-            "schedule_day_of_week": "MON",
+            "schedule_day_of_month": "-1",
+            "schedule_day_of_week": null,
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
             "secret_key": ""
@@ -3825,7 +3981,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.124.0.10"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
@@ -4256,9 +4414,25 @@
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
+          "name": "capture-bsg-data-id",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "bsg_data_id": "$.instance_groups[0].block_storage_groups[1].id"
+          },
+          "group": "resize",
+          "_note": "2026-07-11 run-923a 수리: resize를 OS 롤 그룹(bsg_id=[0])에 쏴서 Dbaas.ValidationError.InvalidBlockStorageRoleType — add-block-storages가 만든 DATA 그룹([1])을 재조회 캡처해 그것을 리사이즈. 캡처 실패(add 미성공) 시 soft라 {bsg_data_id} 리터럴 404 도달로 강등."
+        },
+        {
           "name": "resize-block-storage",
           "method": "POST",
-          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
           "json": {
             "size_gb": 112
           },
@@ -4981,6 +5155,52 @@
           "group": "param"
         },
         {
+          "name": "settle-cluster-after-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param",
+          "_note": "2026-07-11 run-923a 수리: epas/pg는 set-parameters 202 수락 후 비동기 Parameter Modify가 실패하며 service_state=UNKNOWN으로 추락 — 이후 mutating subop 전부 400 InvalidState 연쇄(각 12op). 같은 런에서 후반의 sync-cluster-state 202가 RUNNING을 복구해 upgrade-kernel/resize가 성공한 것을 실측 — 그 복구를 param 그룹 직후로 전진 배치."
+        },
+        {
+          "name": "wait-cluster-running-after-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "param",
+          "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -5132,7 +5352,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.124.0.10"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
@@ -5510,9 +5732,25 @@
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
+          "name": "capture-bsg-data-id",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "bsg_data_id": "$.instance_groups[0].block_storage_groups[1].id"
+          },
+          "group": "resize",
+          "_note": "2026-07-11 run-923a 수리: resize를 OS 롤 그룹(bsg_id=[0])에 쏴서 Dbaas.ValidationError.InvalidBlockStorageRoleType — add-block-storages가 만든 DATA 그룹([1])을 재조회 캡처해 그것을 리사이즈. 캡처 실패(add 미성공) 시 soft라 {bsg_data_id} 리터럴 404 도달로 강등."
+        },
+        {
           "name": "resize-block-storage",
           "method": "POST",
-          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
           "json": {
             "size_gb": 112
           },
@@ -6231,6 +6469,52 @@
           "group": "param"
         },
         {
+          "name": "settle-cluster-after-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param",
+          "_note": "2026-07-11 run-923a 수리: epas/pg는 set-parameters 202 수락 후 비동기 Parameter Modify가 실패하며 service_state=UNKNOWN으로 추락 — 이후 mutating subop 전부 400 InvalidState 연쇄(각 12op). 같은 런에서 후반의 sync-cluster-state 202가 RUNNING을 복구해 upgrade-kernel/resize가 성공한 것을 실측 — 그 복구를 param 그룹 직후로 전진 배치."
+        },
+        {
+          "name": "wait-cluster-running-after-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "group": "param",
+          "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -6477,8 +6761,8 @@
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "alert",
-            "schedule_day_of_month": "28",
-            "schedule_day_of_week": "MON",
+            "schedule_day_of_month": "-1",
+            "schedule_day_of_week": null,
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
             "secret_key": ""
@@ -6550,8 +6834,8 @@
           "json": {
             "access_key": "",
             "delete_on_export": true,
-            "schedule_day_of_month": "28",
-            "schedule_day_of_week": "MON",
+            "schedule_day_of_month": "-1",
+            "schedule_day_of_week": null,
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
             "secret_key": ""
@@ -6696,7 +6980,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.124.0.10"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
@@ -7173,9 +7459,25 @@
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
         },
         {
+          "name": "capture-bsg-data-id",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "bsg_data_id": "$.instance_groups[0].block_storage_groups[1].id"
+          },
+          "group": "resize",
+          "_note": "2026-07-11 run-923a 수리: resize를 OS 롤 그룹(bsg_id=[0])에 쏴서 Dbaas.ValidationError.InvalidBlockStorageRoleType — add-block-storages가 만든 DATA 그룹([1])을 재조회 캡처해 그것을 리사이즈. 캡처 실패(add 미성공) 시 soft라 {bsg_data_id} 리터럴 404 도달로 강등."
+        },
+        {
           "name": "resize-block-storage",
           "method": "POST",
-          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
           "json": {
             "size_gb": 112
           },

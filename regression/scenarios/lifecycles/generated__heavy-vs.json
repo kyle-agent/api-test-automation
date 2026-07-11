@@ -405,122 +405,6 @@
           }
         },
         {
-          "name": "verify-custom-image-read-members",
-          "service": "virtualserver",
-          "method": "GET",
-          "path": "/v1/images/{custom_image_id}/members",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "until_status": [
-              200
-            ],
-            "give_up_status": [
-              404
-            ],
-            "timeout": 300,
-            "interval": 15
-          },
-          "optional": true,
-          "group": "custom-image",
-          "_note": "공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)"
-        },
-        {
-          "name": "create-image-member",
-          "service": "virtualserver",
-          "group": "image-extras",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/images/{custom_image_id}/members",
-          "json": {
-            "member": "ec11538abf8f46d2953539521f745366"
-          },
-          "capture_soft": {
-            "member_id": "$.member_id"
-          },
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            409,
-            422
-          ],
-          "_note": "2026-07-08 25-편입(owner GO): createimagemember — 자기 계정으로 share (asg notification user_ids 선례의 계정 고정값). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
-        },
-        {
-          "name": "show-image-member",
-          "service": "virtualserver",
-          "group": "image-extras",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/images/{custom_image_id}/members/{member_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "_note": "2026-07-08 25-편입(owner GO): showimagemember."
-        },
-        {
-          "name": "update-image-member",
-          "service": "virtualserver",
-          "group": "image-extras",
-          "optional": true,
-          "method": "PUT",
-          "path": "/v1/images/{custom_image_id}/members/{member_id}",
-          "json": {
-            "status": "accepted"
-          },
-          "expect_status": [
-            200,
-            202,
-            400,
-            404
-          ],
-          "_note": "2026-07-08 25-편입(owner GO): updateimagemember — status 값 추정(glance 계열). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
-        },
-        {
-          "name": "delete-image-member",
-          "service": "virtualserver",
-          "group": "image-extras",
-          "optional": true,
-          "destructive": true,
-          "method": "DELETE",
-          "path": "/v1/images/{custom_image_id}/members/{member_id}",
-          "expect_status": [
-            200,
-            202,
-            204,
-            400,
-            404
-          ],
-          "_note": "2026-07-08 25-편입(owner GO): deleteimagemember."
-        },
-        {
-          "name": "create-sharing-image",
-          "service": "virtualserver",
-          "group": "image-extras",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/images/{custom_image_id}/share",
-          "json": {
-            "account_id": "ec11538abf8f46d2953539521f745366"
-          },
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            409,
-            422
-          ],
-          "_note": "2026-07-08 25-편입(owner GO): createsharingimage — body 스키마 추정. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
-        },
-        {
           "name": "create-image-shell",
           "service": "virtualserver",
           "group": "image-shell",
@@ -534,7 +418,8 @@
             "min_ram": 0,
             "name": "regrimgsh{ualpha}",
             "os_distro": "ubuntu",
-            "protected": false
+            "protected": false,
+            "url": "https://object-store.kr-west1.e.samsungsdscloud.com/ec11538abf8f46d2953539521f745366:apitest-oplog-permanent/assets/regr-minimal.qcow2"
           },
           "capture_soft": {
             "pending_image_id": "$.id"
@@ -552,7 +437,135 @@
             "path": "/v1/images/{pending_image_id}",
             "service": "virtualserver"
           },
-          "_note": "2026-07-08 25-편입(owner GO): createimage — 업로드 대기 셸 생성 (docs request_example body 그대로, os_distro 만 ubuntu). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+          "_note": "2026-07-08 25-편입(owner GO): createimage. 2026-07-11 run-923a 수리: url 필수 (400 'Field url is invalid … 255자 이하, .qcow2') — oplog 버킷 assets/regr-minimal.qcow2 (수제 qcow2 v3 262144B, public-read, anon GET 200 실측 2026-07-11)를 소스로 주입. RGW tenant path(<account>:<bucket>)는 ops.html DEFAULT_BASE와 동일 형식. 멤버/visibility ops는 볼륨 없는 이 셸에서만 가능(custom image는 Image.InvalidVolumeOnVisibilityUpdate/SharedVisibilityRequired로 categorical 거부 — run-923a 실측)이라 이 그룹으로 이전."
+        },
+        {
+          "name": "set-image-shell-visibility-shared",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/images/{pending_image_id}",
+          "json": {
+            "min_ram": 0,
+            "protected": false,
+            "visibility": "shared"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            404
+          ],
+          "_note": "2026-07-11 신설: updateimage 2xx 검증 경로 — 볼륨 있는 custom image는 visibility 변경이 categorical 거부(run-923a)라 볼륨 없는 셸에서 shared로 전환. 멤버 API(SharedVisibilityRequired) 선행조건 겸용."
+        },
+        {
+          "name": "verify-image-shell-read-members",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/images/{pending_image_id}/members",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "image-shell",
+          "_note": "listimagemembers — shared visibility 셸에서 빈 목록 200 기대 (run-923a: private 이미지는 400 SharedVisibilityRequired; 구 custom-image 폴 스텝의 300s 공회전 제거)."
+        },
+        {
+          "name": "create-image-member",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images/{pending_image_id}/members",
+          "json": {
+            "member_id": "ec11538abf8f46d2953539521f745366"
+          },
+          "capture_soft": {
+            "member_id": "$.member_id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            409,
+            422
+          ],
+          "_note": "2026-07-08 25-편입(owner GO): createimagemember — 자기 계정으로 share (asg notification user_ids 선례의 계정 고정값). 2026-07-11 run-923a 수리: 필드명 member→member_id ('Extra inputs are not permitted' + member_id 형식 에러 실측) + shared 셸로 이전. member_id 캡처는 soft — 실패해도 후속 스텝이 템플릿 경로로 도달(관측은 템플릿 기록이라 카탈로그 조인 유지)."
+        },
+        {
+          "name": "show-image-member",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/images/{pending_image_id}/members/{member_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "_note": "2026-07-08 25-편입(owner GO): showimagemember. 2026-07-11: shared 셸로 이전 ({member_id} 템플릿 유지 — 카탈로그 조인/커버리지 귀속용)."
+        },
+        {
+          "name": "update-image-member",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/images/{pending_image_id}/members/{member_id}",
+          "json": {
+            "status": "accepted"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            404
+          ],
+          "_note": "2026-07-08 25-편입(owner GO): updateimagemember — status 값 추정(glance 계열). 2026-07-11: shared 셸 + {member_id} 템플릿으로 이전."
+        },
+        {
+          "name": "delete-image-member",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "destructive": true,
+          "method": "DELETE",
+          "path": "/v1/images/{pending_image_id}/members/{member_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
+          "_note": "2026-07-08 25-편입(owner GO): deleteimagemember. 2026-07-11: shared 셸 + {member_id} 템플릿으로 이전."
+        },
+        {
+          "name": "create-sharing-image",
+          "service": "virtualserver",
+          "group": "image-shell",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/images/{pending_image_id}/share",
+          "json": {
+            "account_id": "ec11538abf8f46d2953539521f745366"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            409,
+            422
+          ],
+          "_note": "2026-07-08 25-편입(owner GO): createsharingimage — body 스키마 추정. 2026-07-11: shared visibility 선행조건 충족을 위해 셸로 이전 (run-923a: private custom image에서 404 ImageNotFound)."
         },
         {
           "name": "import-image",
@@ -561,7 +574,9 @@
           "optional": true,
           "method": "POST",
           "path": "/v1/images/{pending_image_id}/import",
-          "json": {},
+          "json": {
+            "url": "https://object-store.kr-west1.e.samsungsdscloud.com/ec11538abf8f46d2953539521f745366:apitest-oplog-permanent/assets/regr-minimal.qcow2"
+          },
           "expect_status": [
             200,
             202,
@@ -570,7 +585,7 @@
             409,
             422
           ],
-          "_note": "2026-07-08 25-편입(owner GO): importimage — 소스 URL 스키마 미문서(빈 body 도달+정정 유도). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+          "_note": "2026-07-08 25-편입(owner GO): importimage. 2026-07-11 run-923a 수리: url 필수 (400 'Field url is invalid … .qcow2$') — create와 같은 실존 public qcow2 주입; 202 수리 후 비동기 fetch 결과는 별개(수용). 멤버 ops 뒤에 배치 — import가 이미지 상태를 saving으로 전이시키면 멤버 변경이 409될 수 있어."
         },
         {
           "name": "delete-image-shell",
@@ -580,14 +595,20 @@
           "destructive": true,
           "method": "DELETE",
           "path": "/v1/images/{pending_image_id}",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15,
           "expect_status": [
             200,
             202,
             204,
             400,
-            404
+            404,
+            409
           ],
-          "_note": "2026-07-08 25-편입(owner GO): pending 셸 teardown."
+          "_note": "2026-07-08 25-편입(owner GO): pending 셸 teardown. 2026-07-11: import 직후 saving 상태 삭제 409 대비 사다리."
         },
         {
           "name": "create-volume-attachment",

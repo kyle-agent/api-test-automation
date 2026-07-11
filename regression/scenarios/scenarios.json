@@ -1641,13 +1641,26 @@
           "_note": "strict 단건 조회 — '이번 런에서 지금도 200인가'를 이 레시피가 자급자족으로 증명 (2026-07-08 owner: dup_store/CI read-chain 의존 제거). 뒤의 wait-snapshot-gone(삭제확인 404)과는 목적이 다르다."
         },
         {
+          "name": "wait-snapshot-available",
+          "method": "GET",
+          "path": "/v1/snapshots/{snap_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.status",
+            "until": ["available", "AVAILABLE"],
+            "timeout": 300,
+            "interval": 10
+          },
+          "_note": "2026-07-11 run-923a 수리: create 직후 status=creating 실측 — revert 400 'Check whether the latest snapshot is available'의 뿌리. update/revert 전에 available settle."
+        },
+        {
           "name": "update-snapshot",
           "optional": true,
           "method": "PUT",
           "path": "/v1/snapshots/{snap_id}",
-          "json": {"description": "updated by API regression suite"},
+          "json": {"name": "regrsnap{unique}u", "description": "updated by API regression suite"},
           "expect_status": [200, 202, 400, 404],
-          "_note": "2026-07-08 25-편입(owner GO): updatesnapshot — body 필드 추정(description). 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+          "_note": "2026-07-08 25-편입(owner GO): updatesnapshot. 2026-07-11 run-923a 수리: name 필수(ValidationError 'Field name is invalid' — description만으로 400), 정규식 ^[a-zA-Z0-9-_ ]+$ · regrsnap prefix 유지(스윕 매처)."
         },
         {
           "name": "revert-volume-to-snapshot",
@@ -1656,7 +1669,21 @@
           "path": "/v1/volumes/{vol_id}/revert",
           "json": {"snapshot_id": "{snap_id}"},
           "expect_status": [200, 202, 400, 404, 409],
-          "_note": "2026-07-08 25-편입(owner GO): revertvolumetosnapshot — 독립 볼륨(available)이라 되돌리기 안전; body 추정. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
+          "_note": "2026-07-08 25-편입(owner GO): revertvolumetosnapshot — 독립 볼륨(available)이라 되돌리기 안전; body 추정. 2026-07-11 run-923a: 400 뿌리는 스냅샷 creating 상태 — 앞의 wait-snapshot-available이 수리."
+        },
+        {
+          "name": "wait-volume-available-after-revert",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.state",
+            "until": ["available", "AVAILABLE", "error", "ERROR"],
+            "timeout": 300,
+            "interval": 10
+          },
+          "_note": "2026-07-11: revert 202 비동기 — 볼륨이 reverting 동안 후속 transfer/delete가 409를 맞지 않도록 settle (error 종착도 수용해 공회전 방지)."
         },
         {
           "name": "probe-reads",
@@ -4055,14 +4082,13 @@
           "path": "/v1/images/{custom_image_id}",
           "json": {
             "min_ram": 0,
-            "protected": false,
-            "visibility": "private"
+            "protected": false
           },
           "expect_status": [
             200,
             202
           ],
-          "_note": "HB3b-2 (2026-07-06, run 28766151214): the min_disk:104 fix from HB3b (run 28723287734) still 400s, but with a DIFFERENT/categorical message this time: `Image with volumes cannot update min disk` — not a value-mismatch, an outright rejection of the min_disk field whenever the image was created from a server with attached volumes (this lifecycle's image IS such a snapshot). No min_disk value can satisfy it, so the field is dropped entirely rather than re-tuned. `data/api_docs.json` `compute/virtualserver/imagesetrequest` (ImageSetRequest, PUT /v1/images/{id}) has exactly 4 fields: min_disk, min_ram, protected, visibility — there is NO `description` field on this model (unlike some other services' update bodies), so the safe substitute is `visibility` (kept at its default `private` — a genuine no-op-safe value, pattern `private|shared`) alongside the pre-existing min_ram/protected. Not re-verified live this session (offline-only); next dispatch should confirm 2xx with this body shape."
+          "_note": "HB3b-2 (2026-07-06, run 28766151214): min_disk는 volume-backed 이미지에서 categorical 거부('Image with volumes cannot update min disk') → 드랍. 2026-07-11 run-923a: visibility도 동일 계열 거부('Image with volumes cannot update visibility', Image.InvalidVolumeOnVisibilityUpdate) → 드랍. ImageSetRequest 4필드 중 volume-backed에서 안전한 것은 min_ram+protected 뿐. visibility 변경 경로(updateimage 2xx)는 gen-heavy-vs-netops의 볼륨 없는 image-shell에서 별도 검증."
         },
         {
           "name": "image-delete",
