@@ -110,14 +110,18 @@ def pytest_collection_modifyitems(config, items) -> None:
     if len(slots) < 2:
         return
 
-    def _key(it) -> float:
+    def _key(it) -> tuple:
         lid = _lifecycle_id(it)
+        lc = getattr(it, "callspec", None)
+        lc = lc.params.get("lifecycle") if lc else None
+        lc = lc if isinstance(lc, dict) else {}
         v = dur.get(lid, 0.0)
         if v <= 0.0:
-            lc = getattr(it, "callspec", None)
-            lc = lc.params.get("lifecycle") if lc else None
-            v = _class_default_s(lc if isinstance(lc, dict) else {})
-        return v
+            v = _class_default_s(lc)
+        # 2차 키 = 스텝 수: 클래스 추정 동률(cluster-grade 2400s ×20+)로 LPT가
+        # 퇴화하던 문제의 타이브레이크 (2026-07-11 run-923a 재구성 — ske/vs-full이
+        # 동률 무리에 섞여 뒤로 밀렸음). 실측이 쌓이면 1차 키가 지배한다.
+        return (v, len(lc.get("steps") or []))
 
     ordered = sorted((items[i] for i in slots), key=_key, reverse=True)
     ordered = _interleave_for_workers(ordered, _worker_count(config))
