@@ -29,10 +29,10 @@
 | 4 | quick-query | gen-quick-query-* ×2 | ✅ 완료 | 4.7s+3.9s | 대기 없음 | ~5s/개 | read | | | | |
 | 5 | configinspection | configinspection-read-coverage | ✅ 완료 | 5.9s | 대기 없음 | ~6s | read | | | | |
 | 6 | support / quota / pricing / costexplorer | 각 1 (reads) | ✅ 완료 | 8.1/9.6/9.2/6.8s | 대기 없음 | ~7-10s/개 | read 묶음, 4 passed |
-| 7 | network-logging | gen-wave4-nlog | ▶ 진행 | | | | |
-| 8 | multinodegpucluster | gen-gpu-node-image | ▶ 진행 | | | | |
-| 9 | queueservice | gen-wave3-qfifo, application-queueservice-queue | ▶ 진행 | | | | |
-| 10 | iam-identity-center | idc-read-coverage | ▶ 진행 | | | | |
+| 7 | network-logging | gen-wave4-nlog | ✅ 완료 | 11.4s | 대기 없음 | ~11s | CRUD-light | | | | |
+| 8 | multinodegpucluster | gen-gpu-node-image | ✅ 완료 | 11.3s | 대기 없음 | ~11s | | | | | |
+| 9 | queueservice | gen-wave3-qfifo, application-queueservice-queue | ✅ 완료 | 17.5s / **153.3s** | **-127s**: 표준 큐 dedup PUT 400은 범주적(FIFO 전용)인데 optional-4xx 사다리가 스텝당 60s 소진 → expect_status에 400 등록 | 17.5s / **26.3s** | 첫 대형 개선 — 사다리는 '승격 가능한 400'에만 | | | | |
+| 10 | iam-identity-center | idc-read-coverage | ✅ 완료 | 17.2s | 대기 없음 (404 관용 reads) | ~17s | | | | | |
 | 11 | direct-connect | gen-direct-connect (+ routing) | 대기 | | | | DC 1:1-per-VPC 규약 |
 | 12 | iam | iam-group, gen-wave5-iam-bindings (+ user/role) | 대기 | | | | |
 | 13 | kms | gen-wave2-sec, security-kms-transit-crypto | 대기 | | | | PF-09 예약삭제 |
@@ -57,5 +57,6 @@
 
 ## 발견/개선 로그
 
+- **queueservice (#9)**: optional-4xx 재시도 사다리가 '범주적 400'(FIFO 전용 설정을 표준 큐에)에 스텝당 60초 소진 — 문서화된 범주 400은 expect_status로 등록해 사다리 차단 (153→26초). **같은 패턴 전수 점검 후보**: 사다리는 '시간이 지나면 2xx가 될 수 있는 400'에만 태워야 함.
 - **엔진 개선 (svc-opt 파생)**: 런 종료 자동 스윕에 자원-생성 게이트 — read-only 런(3~9초)에 계정 전체 스윕(수 분)이 통째로 돌던 낭비 제거 (events 원장 resource-tracked=0이면 스킵; local_run+console2 동일 적용). 캠페인 회전 속도와 오너 콘솔 read 런 종료 시간 모두 단축.
 - **cloudmonitoring (#1)**: 대기 낭비 0. getaccountproductlist는 Running VM 의존 — 전체 런에서 VS 뒤로 배치하면 관용404→2xx 승격 가능 (스케줄 의존 힌트).
