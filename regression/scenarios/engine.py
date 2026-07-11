@@ -484,11 +484,12 @@ def _fill_obj(obj, ctx: dict):
     """Recursively substitute {placeholders} inside a request body."""
     if isinstance(obj, str):
         out = _fill(obj, ctx)
-        # 정수 보존 치환 (svc-opt 2026-07-11): 문자열 전체가 단일 {token}이고
-        # 결과가 순수 정수면 int로 — epoch 초 같은 숫자 필드({epoch_now})가
-        # 문자열로 남아 스키마 400을 유발하지 않게.
-        if (out != obj and isinstance(out, str) and out.isdigit()
-                and obj.startswith("{") and obj.endswith("}")
+        # 정수 보존 치환 (svc-opt 2026-07-11): epoch_* 토큰 단독 값만 int로
+        # — 숫자형 스키마 필드(listmetricdata start/end)용. 토큰 이름 한정인
+        # 이유: 범용 '숫자면 int' 규칙은 {today}("20260711") 같은 문자열
+        # 스키마 필드를 int로 바꿔 400을 유발했다 (cert selfsign 실측 회귀).
+        if (isinstance(out, str) and out.isdigit()
+                and obj.startswith("{epoch_") and obj.endswith("}")
                 and obj.count("{") == 1):
             return int(out)
         return out
