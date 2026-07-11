@@ -41,8 +41,8 @@
 | 16 | firewall | gen-wave5-fw | 대기 | | | | 캐리어 암묵 생성 |
 | 17 | resourcemanager | 4종 | ✅ 완료 | RG 80.4s→**19.1s** | set-rg tags:[] 400 수리 (-61s) | 19.1/25/17/45.8s | tag-rg 403은 entitlement | | | | |
 | 18 | servicewatch | 4종 실측 | ✅ 완료 | loggroup 147.7s→**~22s** | listmetricinfos 바디 수리(**신규 2xx 커버**) + listmetricdata 400=환경적(메트릭 카탈로그 0) 등록 (-130s) | 9~22s | create-group 500 재발 없음; metricdata 2xx는 VM 동반 런에서 | | | | create-group 500 재확인 |
-| 19 | cdn / dns / gslb | reads+CRUD | 대기 | | | | CDN stop 상태기계 |
-| 20 | certificatemanager | selfsign 등 | 대기 | | | | |
+| 19 | cdn / gslb / dns | reads + hosted-zone | ✅ 완료 | 4.5/6.8/**101s** | dns: 892a의 22분은 전부 큐 대기였음(단독 101s). 쿼터 400에 사다리 87s → **엔진 가드 신설**(max-count/quota는 즉시 기록) | dns 클린 ~15s 예상 | private-dns 삭제는 느린 비동기(DELETING 수 분) |
+| 20 | certificatemanager | selfsign | ✅ 완료 | 16.5s (재검증) | 캠페인 자체 회귀({today} int화) 적발·즉수정 | ~16.5s | create 201 |
 | 21 | networking (vpc/subnet/port/publicip/peering/TGW/endpoint/NAT) | 다수 | 대기 | | | | 슬롯 소비 — 후반 |
 | 22 | loadbalancer | light + heavy | 대기 | | | | |
 | 23 | filestorage | 3종 | 대기 | | | | 교차리전 replication |
@@ -57,6 +57,10 @@
 
 ## 발견/개선 로그
 
+- **프로비저닝 실측 (dns 단독런)**: 공유 VPC+서브넷 준비에 **147초** — 오너 지적('시작이 너무 오래 걸림')의 실측치. 개선 후보 2건 유효: ①프로비저닝 ∥ pytest 기동 겹침(VPC-불요 항목 즉시 출발) ②VPC CREATING 중 subnet POST 수락 여부 실측 후 겹침. 단독런 배치에는 '선행 프로비저닝 재사용'(연속 배치가 같은 공유 VPC 공유)도 유효.
+- **운영 규약**: 장기 라이프사이클(dns 22분 등) 배치는 내부 timeout 금지 — 부모만 죽고 정리 미수행 (이번 dns-v2 사고; 스윕으로 회수).
+- **자기 회귀 적발 (#20)**: epoch 정수 코어션이 {today} 문자열 필드까지 int화 → cert 400. epoch_* 한정으로 즉시 수정 — 서비스별 즉검증 루프가 당일 회귀를 당일 적발.
+- **dns 스킵 관찰 (#19)**: heavy-스킵 확정 선택인데 공유 VPC 프로비저닝(~1분)을 하고 버림 — '선택 전원이 heavy-스킵이면 프로비저닝 생략' 개선 후보.
 - **servicewatch (#18)**: listmetricinfos의 dimensions가 JSON '문자열'로 박혀 400이던 것 수리 → **신규 2xx 커버리지 획득**. listmetricdata는 메트릭 카탈로그가 비면(구동 VM 없음) 어떤 쌍도 400 — cm과 같은 VS-의존 클래스. epoch 토큰({epoch_now}/{epoch_1h_ago}) + 정수 보존 치환 엔진 추가.
 - **resourcemanager (#17)**: set-rg tags:[] 400 → 실태그 수리 (80→19초).
 - **queueservice (#9)**: optional-4xx 재시도 사다리가 '범주적 400'(FIFO 전용 설정을 표준 큐에)에 스텝당 60초 소진 — 문서화된 범주 400은 expect_status로 등록해 사다리 차단 (153→26초). **같은 패턴 전수 점검 후보**: 사다리는 '시간이 지나면 2xx가 될 수 있는 400'에만 태워야 함.
