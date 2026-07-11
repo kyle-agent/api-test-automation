@@ -2211,3 +2211,27 @@ wait-direct-connect-gone(404 폴)로 반영.
   즉시 중단+teardown — 신규 hard-create 규약 실증). 뿌리는 백엔드/바디 — PF 후보.
 - **gen-wave2-scf cronjob-trigger 404**: 타 lifecycle 자원 dup-read가 삭제 후
   도착하는 레이스 — 트리아지 후속.
+
+## 라이브 재검증 2건 완주 — DC 완전 그린 + peering 시맨틱 확정 (2026-07-11 오후)
+
+- **networking-direct-connect-routing 단건 재실행 (pytest, 7:43) = 1 passed,
+  전 스텝 2xx**: create 202 → wait-ACTIVE → show 200 → **set 200** → dup-4xx
+  400(negative 실증) → rule create 202 → wait → list 200 → **rule delete 202 →
+  DC delete 202**. ACTIVE settle 2곳이 not-editable/not-deletable 400의 정답.
+  → **direct-connect 8/8 (100%)**, verified store +17 (2,431→2,448,
+  run local-dc-reverify-20260711).
+- **teardown 누수 재발견·수리**: delete-dc 202 비동기 수렴 전에 teardown 스택이
+  돌아 FIREWALL 스토리지+VPC 잔존 → `wait-direct-connect-gone`(404 폴) 신설.
+  잔존 3건(스토리지·VPC·pytest 공유 VPC)은 수동 회수 완료 (204 확인).
+- **vpc-peering rule 시맨틱 (ACTIVE 피어링 4조합 프로브)**:
+  `REQUESTER_VPC + requester-cidr 진부분집합` **만** 202 (교차/반전 조합은 전부
+  'must be included in the destination VPC IP cidr' 400; 비ACTIVE 상태에선
+  vpc-peering-not-active-state 400 — 별도 에러로 구분됨). 892a의 400 뿌리 =
+  create-vpc **adopt로 requester cidr이 공유 VPC(10.124/20)로 치환**되는데 rule
+  cidr은 10.130.x 하드코딩 — adopt-cidr 불일치 클래스(DC vpc-already-connected와
+  형제). vpc-peering create-vpc adopt 제거.
+- **adopt-cidr/자원 충돌 클래스 (신규 일반화)**: 공유 VPC를 adopt하는 lifecycle이
+  ① VPC-단위 배타 자원(DC는 VPC당 1)을 만들거나 ② 자기 cidr 하드코딩 파라미터를
+  쓰면 충돌/불일치를 만든다 — adopt 채택 전 이 두 조건을 점검할 것.
+- 프로브 관측: same-account 피어링도 CREATING이 35분까지 걸릴 수 있음 (892a는
+  ~수십 초 — 플랫폼 편차 큼; wait-peering-active timeout 여유 필요).

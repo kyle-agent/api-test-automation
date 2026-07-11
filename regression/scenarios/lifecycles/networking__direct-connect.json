@@ -188,6 +188,20 @@
           "retry_interval": 15
         },
         {
+          "name": "wait-direct-connect-gone",
+          "method": "GET",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "group": "dc",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "until_status": [404],
+            "timeout": 600,
+            "interval": 15
+          },
+          "_note": "2026-07-11 재실행 실측: delete-dc 202 비동기 수렴 전에 teardown 스택(로깅 스토리지·VPC 삭제)이 돌아 스토리지 1 + VPC 1이 잔존 — DC 404 확인 후 내려간다."
+        },
+        {
           "name": "delete-vpc",
           "service": "vpc",
           "method": "DELETE",
@@ -196,8 +210,7 @@
           "destructive": true,
           "retry_on_status": [409],
           "retries": 40,
-          "retry_interval": 30,
-          "adopt": "vpc"
+          "retry_interval": 30
         }
       ]
     }

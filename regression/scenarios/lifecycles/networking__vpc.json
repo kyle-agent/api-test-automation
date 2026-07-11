@@ -787,7 +787,7 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "_note": "2026-07-11 라이브 프로브 확정: adopt 제거 — 공유 VPC(10.124/20)를 adopt하면 requester cidr이 바뀌는데 rule의 destination_cidr(10.130.1.0/24 하드코딩)은 그대로라 'must be included in the destination VPC IP cidr' 400 (DC와 동일한 adopt-cidr 불일치 클래스). 프로브: 자체 VPC 10.150/20 + ACTIVE 피어링에서 REQUESTER_VPC+requester-cidr 부분집합 = 202 실증."
         },
         {
           "name": "wait-vpc",
@@ -957,7 +957,7 @@
             "destination_vpc_type": "REQUESTER_VPC",
             "tags": []
           },
-          "_note": "2026-07-11 run-923a 수리: requester CIDR 전체(10.130.0.0/20)와 동일값을 보냈더니 400 scp-network.vpc-peering.rule.not-available 'It must be included in the destination VPC IP cidr' — 진부분집합 /24로 축소. 여전히 실패하면 destination_vpc_type 의미가 반대(approver 측 10.141.x 요구)일 가능성 — 다음 런 에러가 판정.",
+          "_note": "2026-07-11 라이브 프로브 확정: REQUESTER_VPC + requester-cidr 진부분집합(/24)이 정답 — ACTIVE 피어링에서 202 실증 (교차 조합 4종 중 유일 성공; not-Active 상태에선 별도 에러 vpc-peering-not-active-state). 892a의 400은 create-vpc adopt로 requester cidr이 공유 VPC(10.124/20)로 바뀐 불일치가 뿌리 — adopt 제거로 해소.",
           "expect_status": [
             200,
             201,
