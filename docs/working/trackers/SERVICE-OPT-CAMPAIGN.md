@@ -49,9 +49,9 @@
 | 24 | scf | 4종 | ✅ 완료 | 62/559/496/112s (4 passed) | wave2-scf 트리거read 404수리 **200 검증**. 재검토 후보: ①PLE request/cancel 사다리 ~285s 매번 소진(승격 실측 無) ②update-code 303s (DEPLOYING 대기 구조) | 동일 | PLE 사다리는 설계물 — 트리아지 판단 대상 |
 | 25 | backup | gen-heavy-backup | ✅ 완료 | 917.7s | create-backup-target 788s 단일 스텝 — 폴/사다리 구조 조사 후보 | ~918s | |
 | 26 | cloud-ml | 2종 | ✅ 완료 | 3.2s / skip | chain은 기지 SCR 게이트(PF-37) 스킵 | ~3s | |
-| 27 | virtualserver | 5종 | ▶ 진행 | | | | |
-| 28 | dbaas 엔진별 (mysql·postgresql·mariadb·epas·cachestore·eventstreams·searchengine·sqlserver·vertica) | 엔진당 1-2 | 대기 | | | | mysql/pg create 500 PF 주의 |
-| 29 | ske | 2종 | 대기 | | | | heavy — 최후반 |
+| 27 | virtualserver | 5종 | ✅ 완료 | 1038/829/92/62/12s (5 passed) | **패턴 확정: public IP attach/detach 수렴 ~7분** (pilot·netops 공통; 단독 CRUD 14s와 괴리 — 폴 조건 vs 플랫폼 소요 판정 후보) | 동일 | delete-port-subnet 409 사다리는 정당 |
+| 28 | dbaas 엔진별 | 엔진당 1-2 | ✅ 892a 실측 인정 | run-892a 스팬 (mariadb 2308s·epas 2864s·pg-subops 2217s 등, durations 교정 완료) | 재실측 생략 (당일 실측 신선 + 과금 절약) | — | mysql/pg create-500 PF 베이스라인 반영됨 |
+| 29 | ske | 2종 | ✅ 892a 실측 인정 | run-892a 스팬 | 재실측 생략 — 클린업측 개선(노드풀 links 파서·조기발사)은 반영 완료 | — | |
 
 (분류는 진행하며 정제 — "?" 버킷 44종은 해당 서비스 차례에 편입)
 
