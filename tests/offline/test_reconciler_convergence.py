@@ -35,6 +35,7 @@ def _hermetic(monkeypatch):
     how cleanup/verify_clean.py neutralises waits for its read-only sweep."""
     monkeypatch.setattr(recon.time, "sleep", lambda *a, **k: None)
     monkeypatch.setattr(recon, "_wait_gone", lambda *a, **k: True)
+    monkeypatch.setattr(recon, "_wait_all_gone", lambda *a, **k: True)
     yield
 
 

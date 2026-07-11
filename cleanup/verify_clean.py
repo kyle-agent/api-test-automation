@@ -37,7 +37,7 @@ def _snapshot_campaign_state() -> tuple:
 def _restore_campaign_state(snap: tuple) -> None:
     conv, deleted, issued, stuck, prog, inprog = snap
     r._CONVERGED.clear();          r._CONVERGED.update(conv)            # noqa: E702
-    r._DELETED_THIS_SWEEP.clear(); r._DELETED_THIS_SWEEP.update(deleted)
+    r._DELETED_THIS_SWEEP.clear(); r._DELETED_THIS_SWEEP.update(deleted)  # noqa: E702
     r._DELETE_ISSUED.clear();      r._DELETE_ISSUED.update(issued)      # noqa: E702
     r._STUCK.clear();              r._STUCK.update(stuck)               # noqa: E702
     r._PROGRESS_THIS_ROUND[0] = prog
@@ -78,6 +78,9 @@ def scan_owned(client=None, list_errors=None) -> list[dict]:
     def fake_wait(*a, **k):
         return True
 
+    def fake_wait_all(*a, **k):
+        return True
+
     def counting_list_all(cl, service, path):
         # mirror r._list_all but RECORD failures instead of silently returning []
         try:
@@ -98,10 +101,12 @@ def scan_owned(client=None, list_errors=None) -> list[dict]:
 
     with _SCAN_LOCK:
         orig_delete, orig_wait, orig_sleep = r._delete, r._wait_gone, _t.sleep
+        orig_wait_all = r._wait_all_gone
         orig_list_all = r._list_all
         state = _snapshot_campaign_state()
         r._reset_campaign_state()        # clean slate — never inherit convergence
         r._delete, r._wait_gone = fake_delete, fake_wait
+        r._wait_all_gone = fake_wait_all  # pass-level barrier — no waits in a dry scan
         r._list_all = counting_list_all
         _t.sleep = lambda *a, **k: None  # no internal waits/backoff DURING the scan only
         try:
@@ -114,6 +119,7 @@ def scan_owned(client=None, list_errors=None) -> list[dict]:
             print("=== DRY SCAN end — nothing was deleted ===")
         finally:
             r._delete, r._wait_gone, _t.sleep = orig_delete, orig_wait, orig_sleep
+            r._wait_all_gone = orig_wait_all
             r._list_all = orig_list_all
             _restore_campaign_state(state)   # scan leaves ZERO footprint
     # 'json' rides along when the sweep's delete carried a body (bulk ids /
