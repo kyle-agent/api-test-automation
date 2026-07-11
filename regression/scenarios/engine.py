@@ -483,7 +483,15 @@ def _self_signed_pem() -> dict | None:
 def _fill_obj(obj, ctx: dict):
     """Recursively substitute {placeholders} inside a request body."""
     if isinstance(obj, str):
-        return _fill(obj, ctx)
+        out = _fill(obj, ctx)
+        # 정수 보존 치환 (svc-opt 2026-07-11): 문자열 전체가 단일 {token}이고
+        # 결과가 순수 정수면 int로 — epoch 초 같은 숫자 필드({epoch_now})가
+        # 문자열로 남아 스키마 400을 유발하지 않게.
+        if (out != obj and isinstance(out, str) and out.isdigit()
+                and obj.startswith("{") and obj.endswith("}")
+                and obj.count("{") == 1):
+            return int(out)
+        return out
     if isinstance(obj, dict):
         # keys can be templated too (e.g. resourcemanager bulk-tag bodies are
         # {"{rg_srn}": [...]} maps keyed by SRN)
@@ -577,9 +585,14 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         # One retry on a transport timeout (field case: iam PUT hit the 20s
         # read timeout once and failed the whole lifecycle). Slow-but-alive
         # gateways are environmental; a single retry absorbs the blip.
-        if "timeout" not in type(exc).__name__.lower() and "timed out" not in str(exc).lower():
+        _exc_name = type(exc).__name__.lower()
+        # ConnectionError/ProxyError도 1회 재시도 대상 (svc-opt 2026-07-11:
+        # gen-wave-apigw가 일시 ConnectionError 한 방에 라이프사이클째 실패 —
+        # timeout과 같은 '느리지만 살아있는 게이트웨이' 환경 클래스).
+        if ("timeout" not in _exc_name and "timed out" not in str(exc).lower()
+                and "connection" not in _exc_name and "proxy" not in _exc_name):
             raise
-        print(f"  step '{step.get('name')}' transport timeout — retrying once ({exc})")
+        print(f"  step '{step.get('name')}' transport blip — retrying once ({exc})")
         time.sleep(5)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
@@ -840,6 +853,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # rolling 29-day window ending today — always in-bounds on both rules.
         "iso_today": time.strftime("%Y-%m-%d", _now),
         "iso_29d_ago": time.strftime("%Y-%m-%d", time.gmtime(time.time() - 29 * 86400)),
+        # epoch 초 토큰 (servicewatch metric 창 등) — _fill_obj의 정수 보존
+        # 치환과 함께 사용: "{epoch_now}" 단독 값은 int로 들어간다.
+        "epoch_now": str(int(time.time())),
+        "epoch_1h_ago": str(int(time.time()) - 3600),
     }
     # Seed shared resources (e.g. a session-shared VPC) so {"adopt": ...} steps
     # reuse them instead of creating their own.

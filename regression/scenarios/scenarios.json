@@ -44,6 +44,7 @@
         },
         {
           "name": "set-rg",
+          "_note": "svc-opt 2026-07-11: tags:[]는 400 'The tags field must not be empty' — 실태그로 수리 (optional-4xx 사다리 60s 낭비 제거)",
           "method": "PUT",
           "path": "/v1/resource-groups/{rg_id}",
           "json": {
@@ -52,7 +53,9 @@
             "resource_types": [
               "resourcemanager:resource-group"
             ],
-            "tags": []
+            "tags": [
+              {"key": "owner", "value": "apitest"}
+            ]
           },
           "expect_status": [
             200,
@@ -9531,16 +9534,10 @@
           "group": "xcov-listmetricdata",
           "optional": true,
           "json": {
-            "end": 1640995440,
+            "end": "{epoch_now}",
             "metrics": [
               {
-                "dimensions": [
-                  {
-                    "key": "VolumeID",
-                    "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
-                  }
-                ],
-                "display_name": "Virtual Server | VirtualServer001 | CPU Usage/Core[Basic]",
+                "display_name": "Virtual Server | CPU Usage/Core[Basic]",
                 "name": "CPU Usage/Core[Basic]",
                 "namespace_name": "Virtual Server",
                 "period": 300,
@@ -9548,7 +9545,7 @@
               }
             ],
             "period": 300,
-            "start": 1640995200,
+            "start": "{epoch_1h_ago}",
             "statistic_type": "AVG"
           },
           "_note": "Body = exact data/api_bodies.json listmetricdata doc body (real namespace 'Virtual Server' + metric 'CPU Usage/Core[Basic]'); previous regr{unique} namespace was rejected. Docs-derived, pending live validation.",
@@ -9569,7 +9566,9 @@
             "metric_name": "CPU Usage/Core[Basic]",
             "namespaces": [
               {
-                "dimensions": "[[\"resource_id\"]]",
+                "dimensions": [
+                  ["resource_id"]
+                ],
                 "name": "Virtual Server"
               }
             ]
