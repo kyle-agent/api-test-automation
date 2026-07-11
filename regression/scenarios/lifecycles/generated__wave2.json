@@ -345,9 +345,11 @@
         },
         {
           "name": "verify-scf-cronjob-trigger-read",
+          "_note": "run-892a: create 200 직후 1.1s GET이 404 (트리거 인덱스 read-after-write 전파 지연) — 404 재시도로 settle",
           "service": "scf",
           "method": "GET",
           "path": "/v1/triggers/{trigger_id}",
+          "retry_on_status": [404],
           "expect_status": [
             200
           ],

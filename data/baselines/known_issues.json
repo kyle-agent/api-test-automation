@@ -197,6 +197,13 @@
       "note": "SCP backend 500 ContactAdminForAssistance on POST /v1/clusters for postgresql engine (live heavy-dbaas recovery run, fired twice). mysql/mariadb/epas/cachestore create OK with identical shared-VPC body shape -> postgresql-backend create fault, not a body/linking bug. Tracked upstream, not a regression in our suite."
     },
     {
+      "key": "database/mysql/mysqlcreatecluster",
+      "status": 500,
+      "type": "Product Bug",
+      "since": "2026-07-11",
+      "note": "SCP backend 500 ContactAdminForAssistance on POST /v1/clusters for mysql engine (run-892a; validated-facts 2026-07-11 재확인 — postgresql create-500과 동일 클래스). mariadb/epas/cachestore create OK with identical shared-VPC body shape -> mysql-backend create fault, not a body bug. 기존 mysql sub-op 베이스라인(upgradekernel 등)만 있고 create 항목이 누락되어 있었음."
+    },
+    {
       "key": "storage/backup/getbackuptargetlist",
       "status": 500,
       "type": "Product Bug",

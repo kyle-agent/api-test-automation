@@ -9425,6 +9425,7 @@
       "steps": [
         {
           "name": "create-group",
+          "_note": "run-892a: 500 ContactAdminForAssistance 1회 관측 (신규 — 과거 규칙적 2xx). 일시 플레이크 판별용 1단 재시도; 재발 시 로그그룹 총량(자동생성 15+ 잔존) 쿼터 가설 조사 후 PF 베이스라인 검토",
           "method": "POST",
           "path": "/v1/log-groups",
           "json": {
@@ -9432,6 +9433,7 @@
             "retention_period": 365,
             "tags": []
           },
+          "retry_on_status": [500],
           "expect_status": [
             200,
             201
