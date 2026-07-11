@@ -89,7 +89,12 @@ def reap_run_leftovers(events_path: str | Path, log=print) -> int:
         by_col.setdefault(_collection(it["path"] or ""), []).append(it)
     issued = 0
     for col in _ORDER + sorted(set(by_col) - set(_ORDER)):
-        for it in by_col.get(col, []):
+        # 같은 컬렉션 안에서는 더 깊은 경로(자식)를 먼저 — run-892a 실증:
+        # direct-connects 버킷에서 DC 본체가 자식 routing-rule보다 먼저
+        # 시도돼 409로 남았고, 그 DC가 공유 VPC를 스윕 내내 409로 잡았다.
+        for it in sorted(by_col.get(col, []),
+                         key=lambda x: (x.get("path") or "").count("/"),
+                         reverse=True):
             svc, path = it["service"], it["path"]
             cli = _client_for(svc, path, west, east)
             bare = path.split("?")[0]

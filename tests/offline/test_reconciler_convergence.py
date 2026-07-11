@@ -664,6 +664,59 @@ def test_endpoint_type_subnet_swept_via_type_query():
         "a subnet visible in both collections is deleted exactly once"
 
 
+def test_vpc_409_srn_holder_purged_directly():
+    """run-892a: VPC DELETE 409 본문의 related_resources SRN이 direct-connect
+    홀더를 명시 — 목록/탐지에 안 잡히는 홀더라도 SRN을 파싱해 (routing-rules
+    자식 먼저) 직접 삭제하고 VPC를 즉시 재시도해야 한다."""
+    vpc = _owned("regrvpcsh-dc", id="vpc-dc")
+    srn = ("srn:e::acct1:kr-west1::direct-connect:direct-connect/"
+           "0784758f4c96419e93df2650aba592b0")
+
+    class DC409Client(FakeClient):
+        def delete(self, path, service=None, json=None, **kw):
+            self.calls.append(("DELETE", path))
+            if path == "/v1/vpcs/vpc-dc":
+                # DC가 살아 있는 동안 409 + SRN, 지워진 뒤 204
+                if any(p.startswith("/v1/direct-connects/0784758f") and "/routing-rules/" not in p
+                       for (m, p) in self.calls if m == "DELETE"):
+                    return _Resp(204)
+                return _Resp(409, {"errors": [{
+                    "code": "scp-network.vpc.related-resource",
+                    "related_resources": [srn]}]})
+            return _Resp(204)
+
+    client = DC409Client(lists={
+        "/v1/vpcs": [vpc],
+        "/v1/direct-connects/0784758f4c96419e93df2650aba592b0/routing-rules":
+            [{"id": "rule-1"}],
+    })
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    rule_i = _ordered_index(seq, "/routing-rules/rule-1")
+    dc_i = next((i for i, p in enumerate(seq)
+                 if p == "/v1/direct-connects/0784758f4c96419e93df2650aba592b0"), -1)
+    assert rule_i >= 0 and dc_i >= 0 and rule_i < dc_i, \
+        f"routing-rule이 DC보다 먼저: rule@{rule_i} dc@{dc_i}"
+    assert seq.count("/v1/vpcs/vpc-dc") >= 2, "홀더 회수 후 VPC 즉시 재시도"
+    assert any(p == "/v1/vpcs/vpc-dc" for p in seq[dc_i:]), \
+        "DC 소멸 후 VPC 삭제가 이어져야 함"
+
+
+def test_direct_connect_pass_rules_before_dc():
+    """신설 DC 패스: 소유 regrdc*의 routing-rules를 먼저 비우고 DC를 삭제."""
+    dc = _owned("regrdcmhjehckc", id="dc-1")
+    client = FakeClient(lists={
+        "/v1/direct-connects": [dc],
+        "/v1/direct-connects/dc-1/routing-rules": [{"id": "rr-9"}],
+    })
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    rr_i = _ordered_index(seq, "/v1/direct-connects/dc-1/routing-rules/rr-9")
+    dc_i = next((i for i, p in enumerate(seq)
+                 if p == "/v1/direct-connects/dc-1"), -1)
+    assert rr_i >= 0 and dc_i >= 0 and rr_i < dc_i
+
+
 def test_unowned_items_never_selected():
     """Items with neither owner tag nor a regr* name must never be selected for
     deletion by any of the new passes."""

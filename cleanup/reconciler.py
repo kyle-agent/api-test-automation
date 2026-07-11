@@ -49,6 +49,7 @@ Changed vs legacy:
 from __future__ import annotations
 
 import os
+import re
 import threading
 import time
 
@@ -542,6 +543,22 @@ def _is_tgw_settling(item: dict) -> bool:
     return norm not in _TGW_DELETABLE_STATES
 
 
+def _delete_resp(client, service, path, json=None):
+    """``_delete``와 같은 가드/예외 처리로 DELETE를 발행하되 ``(status, body)``
+    를 반환한다 — VPC 409 본문의 ``related_resources``(SRN 홀더 목록)를 읽어야
+    하는 홀더 자동회수 경로용. 2xx dedup 캐시는 안 태운다 (VPC/홀더 삭제는
+    pending-deletion 재나열 클래스가 아니다)."""
+    try:
+        r = client.delete(path, service=service, json=json)
+        return r.status, (r.body if isinstance(r.body, dict) else {})
+    except core.MutationBlocked as exc:
+        print(f"  blocked: {exc}")
+        return None, {}
+    except Exception as exc:
+        print(f"  delete {path} error: {exc}")
+        return None, {}
+
+
 def _delete(client, service, path, json=None):
     key = (service, path, str(sorted((json or {}).items())))
     try:
@@ -762,6 +779,64 @@ def _purge_vpc_children(client, vid):
                 n += 1
                 _sub_wait.append(("vpc", f"/v1/subnets/{sn['id']}"))
     _wait_all_gone(client, _sub_wait, 120, 10)
+    return n
+
+
+# VPC DELETE 409 본문이 명시하는 홀더 SRN — 형식 실측(run-892a):
+#   srn:e::<acct>:<region>::<service>:<type>/<id>
+# 플랫폼이 홀더를 직접 알려주므로 목록 스캔/추정 없이 그 id를 삭제한다.
+# (run_scoped의 서브넷 전용 SRN 폴백을 일반화한 것 — 2026-07-11, DC 홀더가
+# 어떤 목록 패스/holder 탐지에도 안 잡힌 채 VPC를 12회 409로 잡은 실증.)
+_SRN_HOLDER = re.compile(
+    r"srn:[^\s\"']*?::([a-z0-9-]+):([a-z0-9-]+)/([0-9a-f-]{8,})")
+# type -> (service, collection). 매핑에 없는 타입은 보고만 하고 건너뛴다
+# (소유 판단이 불가한 미지 타입을 지우지 않는다 — Hard Rule 3의 정신).
+_SRN_DELETE_MAP = {
+    "direct-connect": ("direct-connect", "/v1/direct-connects"),
+    "subnet": ("vpc", "/v1/subnets"),
+    "port": ("vpc", "/v1/ports"),
+    "internet-gateway": ("vpc", "/v1/internet-gateways"),
+    "nat-gateway": ("vpc", "/v1/nat-gateways"),
+    "transit-gateway": ("vpc", "/v1/transit-gateways"),
+    "loadbalancer": ("loadbalancer", "/v1/loadbalancers"),
+    "load-balancer": ("loadbalancer", "/v1/loadbalancers"),
+    "vpc-endpoint": ("vpc", "/v1/vpc-endpoints"),
+    "vpc-peering": ("vpc", "/v1/vpc-peerings"),
+    "privatelink-service": ("vpc", "/v1/privatelink-services"),
+}
+
+
+def _purge_409_holders(client, body: dict) -> int:
+    """소유 VPC의 DELETE 409 본문 ``related_resources``(SRN)가 명시한 홀더를
+    직접 삭제하고 삭제 발행 수를 반환한다. 안전 근거는 ``_purge_vpc_children``
+    과 동일 — 이미 소유가 확인된 VPC의 삭제를 막는 자식만 대상이고, id는
+    플랫폼이 명시한 것이다. direct-connect는 자식 routing-rules를 먼저 비운다
+    (run-892a: rule이 남은 DC는 DELETE 409)."""
+    srns = " ".join(
+        str(x) for err in (body.get("errors") or [])
+        for x in (err.get("related_resources") or []))
+    n = 0
+    for m in _SRN_HOLDER.finditer(srns):
+        rtype, rid = m.group(2), m.group(3)
+        svc_coll = _SRN_DELETE_MAP.get(rtype)
+        if not svc_coll:
+            print(f"  vpc-409 holder {rtype}/{rid}: 삭제 매핑 없는 타입 — 보고만")
+            continue
+        svc, coll = svc_coll
+        if rtype == "direct-connect":
+            try:
+                for rr in _items(client.get(f"{coll}/{rid}/routing-rules",
+                                            service=svc).body):
+                    if isinstance(rr, dict) and rr.get("id"):
+                        _delete(client, svc,
+                                f"{coll}/{rid}/routing-rules/{rr['id']}")
+            except Exception:
+                pass
+        st = _delete(client, svc, f"{coll}/{rid}")
+        print(f"  vpc-409 holder {rtype} {rid} delete -> {st}")
+        if _note_progress(st):   # 홀더 소멸 = genuine 진행 (라운드 유지 근거)
+            n += 1
+            _wait_all_gone(client, [(svc, f"{coll}/{rid}")], 180, 10)
     return n
 
 
@@ -1803,6 +1878,32 @@ def run_sweep(client) -> int:
         if not (st and (200 <= st < 300 or st == 404)):
             print(f"  vpc-peering {pid} delete -> {st}")
 
+    # 3c-0. direct-connects (regrdc*) — run-892a 실증: 어떤 목록 패스에도,
+    # holder 탐지(TGW/LB/NAT)에도 없던 DC가 공유 VPC를 12회 409로 잡았다
+    # (run-scoped reap은 자식 routing-rule보다 DC를 먼저 시도해 409로 남김).
+    # 자식 routing-rules를 먼저 비우고 DC 삭제 → 배리어, VPC 패스 전에.
+    _dc_wait = []
+    for it in _select(c, "direct-connect", "/v1/direct-connects",
+                      name_prefixes=("regrdc",)):
+        did = it.get("id")
+        if not did:
+            continue
+        try:
+            for rr in _items(c.get(f"/v1/direct-connects/{did}/routing-rules",
+                                   service="direct-connect").body):
+                if isinstance(rr, dict) and rr.get("id"):
+                    _delete(c, "direct-connect",
+                            f"/v1/direct-connects/{did}/routing-rules/{rr['id']}")
+        except Exception:
+            pass
+        st = _delete(c, "direct-connect", f"/v1/direct-connects/{did}")
+        if _note_progress(st, it):
+            deleted += 1
+            _dc_wait.append(("direct-connect", f"/v1/direct-connects/{did}"))
+        else:
+            print(f"  direct-connect {_name_of(it)} ({did}) delete -> {st}")
+    _wait_all_gone(c, _dc_wait, 300, 15)
+
     # 3c. shared-networking lifecycle children. private-dns holds quota;
     # transit-gateways and load-balancers would 409-block the vpc.
     _pdns_wait = []
@@ -1929,21 +2030,25 @@ def run_sweep(client) -> int:
                       name_prefixes=_VPC_NAME_PREFIXES):
         vid = it["id"]
         for attempt in range(6):
-            st = _delete(c, "vpc", f"/v1/vpcs/{vid}")
+            st, _body409 = _delete_resp(c, "vpc", f"/v1/vpcs/{vid}")
             print(f"  delete vpc {it.get('name', vid)} ({vid}) -> {st}")
             if st in (200, 202, 204):
                 deleted += 1
                 deleted_vpc_ids.append(vid)
                 break
             if st == 409:
+                # 1) 플랫폼이 409 본문에 홀더 SRN을 명시했으면 그것부터 직접
+                #    회수 후 즉시 재시도 — run-892a의 direct-connect처럼 어떤
+                #    목록/탐지에도 없는 홀더에 6회 헛시도하는 낭비 제거.
+                if _purge_409_holders(c, _body409):
+                    continue
+                # 2) 나열 기반 탐지(드레인 중 TGW/LB/NAT) → 다음 라운드 유예
                 holder = _vpc_409_holder(c, vid, cache=holder_cache)
                 if holder:
                     _bump_inprog()
                     print(f"    blocked by {holder} — deferring to next round")
                     break
-                # No detectable holder — purge ALL of this vpc's children
-                # (name-agnostic, by vpc_id) to catch un-prefixed leaks,
-                # then retry.
+                # 3) 폴백: 자식 일괄 정리(이름 무관, by vpc_id) 후 재시도.
                 deleted += _purge_vpc_children(c, vid)
                 time.sleep(10)
                 continue
