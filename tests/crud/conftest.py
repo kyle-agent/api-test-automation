@@ -79,6 +79,20 @@ def _interleave_for_workers(ordered: list, n: int) -> list:
 
 
 def _worker_count(config) -> int:
+    """워커 수 — run-892a 딥다이브(2026-07-11)로 잡은 무효화 버그: `-n` 실행에서
+    수집·정렬은 xdist WORKER 프로세스가 하는데, xdist remote.setup_config가
+    워커의 `numprocesses` 옵션을 None으로 비워 이 함수가 항상 0을 반환했다 →
+    인터리브가 배포 이후 실전에서 한 번도 작동하지 않았고, 순수 내림차순 +
+    load의 워커당 연속 2개 선배정으로 '몬스터 뒤 몬스터'가 매 런 재현
+    (74.6분 런의 롱폴 6건 전부가 이 페어링의 피해자). 워커에서도 항상 채워지는
+    PYTEST_XDIST_WORKER_COUNT env를 1차 소스로 쓴다 (컨트롤러/단일 프로세스는
+    옵션 폴백)."""
+    try:
+        env_n = int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "") or 0)
+        if env_n:
+            return env_n
+    except ValueError:
+        pass
     try:
         return int(config.getoption("numprocesses") or 0)
     except Exception:  # noqa: BLE001
@@ -135,6 +149,11 @@ _MEASURED: dict[str, float] = {}
 
 def pytest_runtest_logreport(report) -> None:
     if getattr(report, "when", "") != "call":
+        return
+    # PASS만 학습 (run-892a 딥다이브): fast-fail(생성 500이 10초 만에 종료)이
+    # 실측으로 fold되면 LPT 랭크가 오염된다 — database-mysql-cluster avg 10.8s,
+    # mariadb-subops 45.8s(실제 2308s)로 학습돼 몬스터가 경량으로 분류됐었다.
+    if not getattr(report, "passed", False):
         return
     nodeid = getattr(report, "nodeid", "") or ""
     if "test_crud_lifecycle[" not in nodeid:
