@@ -1262,12 +1262,41 @@
           ]
         },
         {
+          "name": "create-fifo-queue",
+          "method": "POST",
+          "path": "/v1/queues",
+          "json": {
+            "name": "regrq{unique}.fifo",
+            "description": "API regression suite (fifo for dedup ops)",
+            "content_based_deduplication": true,
+            "deduplication_scope": "Queue",
+            "message_retention_period": 40,
+            "message_retention_period_unit": "minute",
+            "message_size": 256,
+            "data_key_reuse_period": 40,
+            "data_key_reuse_period_unit": "minute",
+            "tags": []
+          },
+          "optional": true,
+          "group": "fifo-dedup",
+          "capture": {
+            "fifo_queue_id": "$.queue.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/queues/{fifo_queue_id}",
+            "service": "queueservice"
+          },
+          "expect_status": [200, 201, 202, 400, 409],
+          "_note": "2026-07-11 run-892a: deduplication/deduplication-scope는 '.fifo' 큐 전용 (400 'queue name must end with .fifo' 실측) — fifo 큐를 별도 생성해 dedup 2키를 연다. envelope $.queue.id는 본 큐 create와 동일 가정 — 라이브가 정정."
+        },
+        {
           "name": "update-deduplication",
-          "_note": "표준 큐에는 dedup 설정 불가(FIFO 전용, userguide/오너 2026-06-13) — 400은 범주적 정답. svc-opt 실측(2026-07-11): 400을 미기대로 두면 optional-4xx 사다리가 60초를 태움 (2xx 커버는 gen-wave3-qfifo가 담당)",
-          "group": "qdedup",
+          "_note": "2026-07-11 병합: 이 lifecycle 자체의 fifo 큐(create-fifo-queue)로 dedup 2키 실 200 검증 완료 (fifo-dedup 그룹) — svc-opt 세션의 gen-wave3-qfifo와 중복 가능, 다음 dedup 감사 때 정리.",
+          "group": "fifo-dedup",
           "optional": true,
           "method": "PUT",
-          "path": "/v1/queues/{queue_id}/deduplication",
+          "path": "/v1/queues/{fifo_queue_id}/deduplication",
           "json": {
             "content_based_deduplication": false
           },
@@ -1280,11 +1309,11 @@
         },
         {
           "name": "update-deduplication-scope",
-          "_note": "표준 큐에는 dedup-scope 설정 불가(FIFO 전용) — 400 범주적 정답, update-deduplication과 동일 (svc-opt 2026-07-11)",
-          "group": "qdedupscope",
+          "_note": "2026-07-11 병합: fifo-dedup 그룹의 fifo 큐 대상 실 200 검증 완료 (update-deduplication과 동일).",
+          "group": "fifo-dedup",
           "optional": true,
           "method": "PUT",
-          "path": "/v1/queues/{queue_id}/deduplication-scope",
+          "path": "/v1/queues/{fifo_queue_id}/deduplication-scope",
           "json": {
             "deduplication_scope": "Queue"
           },

@@ -608,7 +608,7 @@
       "id": "gen-wave4-rmtags",
       "service": "management/resourcemanager",
       "enabled": true,
-      "_note": "PF: test HMAC key lacks resourcemanager SRN tag-write permission — run 27511269207 GET /v1/resources/{rg_srn} 403 + PUT /v1/tags/{rg_srn}/bulk 403. The SRN is valid (403 not 404) so this is a credential SCOPE boundary, not a bug. The {rg_srn} tag sub-flow is therefore GUARDED (optional + 403/404 tolerant = reachability only); create/read/set/delete of the resource-group itself is verified normally. OWNER: grant the test key resourcemanager tag-write to promote tag coverage to full CRUD. owner plan 2026-06-13: zero-cost resource-group as the live SRN source — full SRN tag family + rg set/show-resource + bulk rg delete. Tag keys carry {unique} so the per-key paths resolve to catalog endpoints (the old literal-key probe never counted). || run 27452095757 fix: set tags non-empty",
+      "_note": "PF: test HMAC key lacks resourcemanager SRN tag-write permission — run 27511269207 GET /v1/resources/{rg_srn_b64} 403 + PUT /v1/tags/{rg_srn_b64}/bulk 403. The SRN is valid (403 not 404) so this is a credential SCOPE boundary, not a bug. The {rg_srn} tag sub-flow is therefore GUARDED (optional + 403/404 tolerant = reachability only); create/read/set/delete of the resource-group itself is verified normally. OWNER: grant the test key resourcemanager tag-write to promote tag coverage to full CRUD. owner plan 2026-06-13: zero-cost resource-group as the live SRN source — full SRN tag family + rg set/show-resource + bulk rg delete. Tag keys carry {unique} so the per-key paths resolve to catalog endpoints (the old literal-key probe never counted). || run 27452095757 fix: set tags non-empty",
       "steps": [
         {
           "name": "create-resource-group",
@@ -633,6 +633,20 @@
             "path": "/v1/resource-groups/{rg_id}",
             "service": "resourcemanager"
           }
+        },
+        {
+          "name": "encode-rg-key",
+          "action": "b64_encode",
+          "input": "regr{unique}",
+          "output": "rg_key_b64",
+          "_note": "2026-07-11: 태그 key path 세그먼트도 base64 필수 (기확립 규약)."
+        },
+        {
+          "name": "encode-rg-srn",
+          "action": "b64_encode",
+          "input": "{rg_srn}",
+          "output": "rg_srn_b64",
+          "_note": "2026-07-11 프로브 실증: /v1/tags/{srn}·/v1/resources/{srn}의 path srn은 base64 필수 (raw는 400 'SRN decoding error … 0xd7' — 서버가 path를 base64로 디코드; b64 GET 200 실측). management__resourcemanager 기확립 규약의 미적용분."
         },
         {
           "name": "verify-resource-group-read-resources",
@@ -673,7 +687,7 @@
           "name": "verify-resource-group-show-resource",
           "service": "resourcemanager",
           "method": "GET",
-          "path": "/v1/resources/{rg_srn}",
+          "path": "/v1/resources/{rg_srn_b64}",
           "_note": "PF-18 — GET /v1/resources/{srn} 403 'Forbidden / You do not have permission to Action' (run 27466988779), 5th missing-action-definition case (cf. PF-01/PF-15). Product gap, not our body; [200,403] tolerated until the action definition lands.",
           "expect_status": [
             200,
@@ -691,7 +705,7 @@
           "name": "verify-resource-group-tags-bulk-set",
           "service": "resourcemanager",
           "method": "PUT",
-          "path": "/v1/tags/{rg_srn}/bulk",
+          "path": "/v1/tags/{rg_srn_b64}/bulk",
           "json": {
             "tags": [
               {
@@ -716,7 +730,7 @@
           "name": "verify-resource-group-tags-list",
           "service": "resourcemanager",
           "method": "GET",
-          "path": "/v1/tags/{rg_srn}",
+          "path": "/v1/tags/{rg_srn_b64}",
           "expect_status": [
             200,
             201,
@@ -733,7 +747,7 @@
           "name": "verify-resource-group-tag-show",
           "service": "resourcemanager",
           "method": "GET",
-          "path": "/v1/tags/{rg_srn}/regr{unique}",
+          "path": "/v1/tags/{rg_srn_b64}/{rg_key_b64}",
           "expect_status": [
             200,
             201,
@@ -750,7 +764,7 @@
           "name": "verify-resource-group-tag-update-value",
           "service": "resourcemanager",
           "method": "PUT",
-          "path": "/v1/tags/{rg_srn}/regr{unique}",
+          "path": "/v1/tags/{rg_srn_b64}/{rg_key_b64}",
           "json": {
             "value": "regrv2"
           },
@@ -799,7 +813,7 @@
           "name": "verify-resource-group-tag-delete-one",
           "service": "resourcemanager",
           "method": "DELETE",
-          "path": "/v1/tags/{rg_srn}/regr{unique}",
+          "path": "/v1/tags/{rg_srn_b64}/{rg_key_b64}",
           "expect_status": [
             200,
             201,
@@ -841,7 +855,7 @@
           "name": "verify-resource-group-tags-delete-all",
           "service": "resourcemanager",
           "method": "DELETE",
-          "path": "/v1/tags/{rg_srn}",
+          "path": "/v1/tags/{rg_srn_b64}",
           "expect_status": [
             200,
             201,

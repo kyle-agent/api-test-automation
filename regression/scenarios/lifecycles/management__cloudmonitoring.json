@@ -10,9 +10,19 @@
           "name": "list-event-policies",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies",
-          "headers": {"X-ResourceType": "Object Storage"},
-          "params": {"productResourceId": "apitest-logsink", "size": 1},
-          "expect_status": [200, 400, 403, 404],
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
+          "params": {
+            "productResourceId": "apitest-logsink",
+            "size": 1
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "cm-read",
           "capture_soft": {
@@ -24,7 +34,9 @@
           "name": "create-event-policy",
           "method": "POST",
           "path": "/v1/cloudmonitorings/event/v2/event-policies",
-          "headers": {"X-ResourceType": "Object Storage"},
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
           "json": {
             "eventPolicyRequest": {
               "eventPolicyName": "regrcmep{unique}",
@@ -38,7 +50,16 @@
               "ftCount": 1
             }
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "cm-policy",
           "capture": {
@@ -55,7 +76,12 @@
           "name": "show-event-policy",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "cm-policy"
         },
@@ -63,7 +89,9 @@
           "name": "modify-event-policy",
           "method": "PUT",
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
-          "headers": {"X-ResourceType": "Object Storage"},
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
           "json": {
             "eventPolicyRequest": {
               "eventPolicyName": "regrcmep{unique}",
@@ -77,7 +105,15 @@
               "ftCount": 3
             }
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "cm-policy",
           "_note": "modifyeventpolicy (PUT). Body uses same confirmed shape as create-event-policy (eventPolicyRequest wrapper, isLogMetric as string 'N'). Only runs if create-event-policy succeeds and captures eventPolicyId. Account-prereq blocker applies."
@@ -86,7 +122,15 @@
           "name": "delete-event-policy",
           "method": "DELETE",
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409
+          ],
           "optional": true,
           "group": "cm-policy",
           "destructive": true,
@@ -109,7 +153,15 @@
               "ftCount": 3
             }
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "cm-probe-modify",
           "_note": "modifyeventpolicy coverage probe. Uses {eventPolicyId} placeholder (maps to '*' via _norm_path, resolving to catalog key management/cloudmonitoring/modifyeventpolicy). Runs in its own group (cm-probe-modify) so it is never skipped by cm-policy group failure. If ctx has a real eventPolicyId (from create), sends a real PUT request. If not, sends literal {eventPolicyId} in path -> 400 InvalidInputValue (endpoint still reached and recorded under catalog key). CONFIRMED 2026-06-24: PUT /event-policies/999 -> 400 InvalidRequest (NE-state product), DELETE /event-policies/999 -> 404 (no such policy). Body uses confirmed shape (isLogMetric as string 'N', confirmed 2026-06-24)."
@@ -118,7 +170,15 @@
           "name": "probe-delete-event-policy",
           "method": "DELETE",
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409
+          ],
           "optional": true,
           "group": "cm-probe-delete",
           "destructive": true,
@@ -128,7 +188,9 @@
           "name": "get-metric-perf-data",
           "method": "POST",
           "path": "/v1/cloudmonitorings/product/v2/metric-data",
-          "headers": {"X-ResourceType": "Object Storage"},
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
           "json": {
             "productTypeCode": "Object Storage",
             "productResourceId": "apitest-logsink",
@@ -142,7 +204,16 @@
               }
             ]
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "cm-metric",
           "_note": "Coverage-only read-shaped POST (metric query). Body CONFIRMED via cascade probing 2026-06-19: requires X-ResourceType header; body wraps metric conditions in metricDataConditions array; queryStartDt/queryEndDt must use ISO 8601 T-suffix format (YYYY-MM-DDTHH:MM:SSZ); without T-suffix returns 400 backend date-parsing bug. Currently 404 productResourceInfos = products not enrolled in monitoring backend. Blocker: account-prereq. Isolated group so 4xx never affects the event-policy group."
@@ -156,15 +227,76 @@
       "_note": "Light, READ-ONLY (no writes, no cleanup). Covers all non-mutating cloudmonitoring endpoints (14 original + 3 strict-200 completeness steps 2026-07-08: getaccountmembers/getmetriclist/getproducttypelist — COMPLETENESS-AUDIT-2026-07-08). CONFIRMED FACTS 2026-06-20: (1) X-ResourceType header IS required for getaccountproductlist (VM/Object Storage both 200) and getproducteventpolicylist (needs header + productResourceId param). (2) BACKEND BUG: getproducteventlist, getaccounteventlist, geteventpolicyhistories ALL 400 with params[name=resourceType, value=<date>] for ANY date format tried — YYYY-MM-DD, ISO-T-Z, YYYYMMDD, epoch-int. The server-side router reads date param values as 'resourceType' field. X-ResourceType header IS forwarded correctly (debug-traced). No workaround. (3) Event policy IDs are NUMERIC (not UUID) — confirmed via 404 ResourceNotFound probes. (4) addrbook list endpoint is /v1/cloudmonitorings/product/v2/USERS/addrbooks (with 'users/' prefix) — the read_chains auto-derive incorrectly uses /v2/addrbooks (404 path not found) and therefore skips, explaining the smoke test SKIPPED message. (5) CRUD lifecycle engine skip: run_lifecycle() skips ALL lifecycles (including read-only ones) when SCP_ALLOW_MUTATIONS=false — so these steps only run in the CRUD pass. Account: 0 events, 0 event-policies, 0 addrbooks (all products state=NE not enrolled in monitoring backend). Every step is optional with tolerant expect_status including 400.",
       "steps": [
         {
+          "name": "list-account-products-vm",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "headers": {
+            "X-ResourceType": "VM"
+          },
+          "params": {
+            "size": 1
+          },
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "group": "cm-ro-products",
+          "capture_soft": {
+            "productResourceId": "$.contents[0].productResourceId"
+          },
+          "_note": "getaccountproductlist. Requires X-ResourceType header (verified live: 'VM' gives 200). Dual-recorded under catalog key because it has params. Soft-captures productResourceId for use in event-policy and event list steps. Empty if account has no VMs (still 200)."
+        },
+        {
+          "name": "list-account-products-object-storage",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
+          "params": {
+            "size": 5
+          },
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "group": "cm-ro-products",
+          "capture_soft": {
+            "productResourceId": "$.contents[0].productResourceId"
+          },
+          "_note": "getaccountproductlist alternate product type. Object Storage products exist in test account (productResourceId='apitest-logsink' confirmed). Overwrites productResourceId capture if Object Storage has more. Tolerant [200,400,403,404]."
+        },
+        {
           "name": "list-events",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/events",
-          "headers": {"X-ResourceType": "Object Storage"},
-          "params": {"productResourceId": "apitest-logsink", "eventState": "ALL", "queryStartDt": "{iso_29d_ago}", "queryEndDt": "{iso_today}", "size": 1},
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
+          "params": {
+            "productResourceId": "{productResourceId}",
+            "eventState": "ALL",
+            "queryStartDt": "{iso_dt_29d_ago}",
+            "queryEndDt": "{iso_dt_1h_ago}",
+            "size": 1
+          },
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-event",
-          "capture_soft": {"eventId": "$.contents[0].eventId"},
+          "capture_soft": {
+            "eventId": "$.contents[0].eventId"
+          },
           "_note": "getproducteventlist. CONFIRMED BACKEND BUG 2026-06-20: ANY date value in queryStartDt/queryEndDt (YYYY-MM-DD, ISO-T-Z, compact YYYYMMDD, int-epoch) triggers 400 InvalidInputValue with params[name=resourceType, value=<date>]. This happens regardless of X-ResourceType header presence. The API incorrectly reads date param values as the 'resourceType' field during validation routing. Result is always 400 - this endpoint is unreachable with correct params. Tolerant [200,400,403,404] so group continues. Event ID format is NUMERIC (not UUID - confirmed: 404 ResourceNotFound with numeric id). Without productResourceId: 400 'value: queryStartDt' (missing). Without dates: 400 'Validation failure'. All combinations 400."
         },
         {
@@ -172,7 +304,12 @@
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/events/{eventId}",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-event",
           "_note": "id-bound read (geteventdetail). Closes GAP-get-id for GET /v1/cloudmonitorings/event/v2/events/{eventId}. Keys off the soft-captured eventId; if list-events found none the {eventId} segment stays literal and normalizes to the catalog '*' key (still records coverage, 4xx's harmlessly). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
         },
@@ -181,7 +318,12 @@
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/events/{eventId}/notification-states",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-event",
           "_note": "id-bound read (geteventnotificationstates). Closes GAP-get-id for GET /v1/cloudmonitorings/event/v2/events/{eventId}/notification-states. Reuses the soft-captured eventId from list-events; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
         },
@@ -189,21 +331,42 @@
           "name": "list-event-policies-ro",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies",
-          "headers": {"X-ResourceType": "Object Storage"},
-          "params": {"productResourceId": "apitest-logsink", "size": 1},
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
+          "params": {
+            "productResourceId": "{productResourceId}",
+            "size": 1
+          },
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-policy",
-          "capture_soft": {"eventPolicyId": "$.contents[0].eventPolicyId"},
+          "capture_soft": {
+            "eventPolicyId": "$.contents[0].eventPolicyId"
+          },
           "_note": "getproducteventpolicylist. CONFIRMED 200 2026-06-20 with X-ResourceType: Object Storage header + productResourceId query param. eventPolicyId is NUMERIC (not UUID) per 404-probe. Soft-captures eventPolicyId to drive the two id-bound policy reads below. Account has 0 event policies (state NE, not enrolled in monitoring backend) so capture is empty and placeholder normalizes to catalog '*'. Tolerant [200,400,403,404]."
         },
         {
           "name": "show-event-policy-histories",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories",
-          "params": {"queryStartDt": "{iso_today}", "queryEndDt": "{iso_today}", "size": 1},
+          "params": {
+            "queryStartDt": "{iso_dt_29d_ago}",
+            "queryEndDt": "{iso_dt_1h_ago}",
+            "size": 1
+          },
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-policy",
           "_note": "id-bound read (geteventpolicyhistories). CONFIRMED BACKEND BUG 2026-06-20: ALL date formats for queryStartDt/queryEndDt trigger 400 InvalidInputValue params[name=resourceType, value=<date>] — same misparse bug as getproducteventlist/getaccounteventlist. Without dates: 400 Validation failure. So this endpoint is ALWAYS 400 regardless of input. Keys off soft-captured eventPolicyId from list-event-policies-ro (or placeholder '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
         },
@@ -212,7 +375,12 @@
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-policy",
           "_note": "id-bound read (geteventpolicynotification). Closes GAP-get-id for GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications. Reuses the soft-captured eventPolicyId; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
         },
@@ -220,76 +388,96 @@
           "name": "list-addrbooks",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/users/addrbooks",
-          "params": {"size": 1},
+          "params": {
+            "size": 1
+          },
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-addrbook",
-          "capture_soft": {"addrbookId": "$.contents[0].addrbookId"},
+          "capture_soft": {
+            "addrbookId": "$.contents[0].addrbookId"
+          },
           "_note": "getadressbooklist. Zero-required-param list (page/size/sort all optional) so this should 200 when the caller has any addrbook. Soft-captures a REAL addrbookId ($.contents[0].addrbookId, AlarmAddrBookDto.addrbookId) to drive show-addrbook-members. If the caller has no addrbook the segment stays a placeholder (normalizes to catalog '*'). Tolerant [200,400,403,404]."
         },
         {
           "name": "show-addrbook-members",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members",
-          "params": {"size": 1},
+          "params": {
+            "size": 1
+          },
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-addrbook",
           "_note": "id-bound read (getadressbookmemberlist). Closes GAP-get-id for GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members. Keys off the soft-captured addrbookId from list-addrbooks; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
-        },
-        {
-          "name": "list-account-products-vm",
-          "method": "GET",
-          "path": "/v1/cloudmonitorings/product/v2/accounts/products",
-          "headers": {"X-ResourceType": "VM"},
-          "params": {"size": 1},
-          "optional": true,
-          "expect_status": [200, 400, 403, 404],
-          "group": "cm-ro-products",
-          "capture_soft": {"productResourceId": "$.contents[0].productResourceId"},
-          "_note": "getaccountproductlist. Requires X-ResourceType header (verified live: 'VM' gives 200). Dual-recorded under catalog key because it has params. Soft-captures productResourceId for use in event-policy and event list steps. Empty if account has no VMs (still 200)."
-        },
-        {
-          "name": "list-account-products-object-storage",
-          "method": "GET",
-          "path": "/v1/cloudmonitorings/product/v2/accounts/products",
-          "headers": {"X-ResourceType": "Object Storage"},
-          "params": {"size": 5},
-          "optional": true,
-          "expect_status": [200, 400, 403, 404],
-          "group": "cm-ro-products",
-          "capture_soft": {"productResourceId": "$.contents[0].productResourceId"},
-          "_note": "getaccountproductlist alternate product type. Object Storage products exist in test account (productResourceId='apitest-logsink' confirmed). Overwrites productResourceId capture if Object Storage has more. Tolerant [200,400,403,404]."
         },
         {
           "name": "list-event-policies-with-resource",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies",
-          "headers": {"X-ResourceType": "Object Storage"},
-          "params": {"productResourceId": "{productResourceId}", "size": 1},
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
+          "params": {
+            "productResourceId": "{productResourceId}",
+            "size": 1
+          },
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-products",
-          "capture_soft": {"eventPolicyId": "$.contents[0].eventPolicyId"},
+          "capture_soft": {
+            "eventPolicyId": "$.contents[0].eventPolicyId"
+          },
           "_note": "getproducteventpolicylist with real productResourceId from soft-capture. Requires X-ResourceType header AND productResourceId query param (verified live: 200 confirmed). When productResourceId placeholder is un-filled this 400s harmlessly. Dual-recorded under catalog key because it has params. Tolerant [200,400,403,404]."
         },
         {
           "name": "list-account-events",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/accounts/events",
-          "headers": {"X-ResourceType": "Object Storage"},
-          "params": {"eventState": "ALL", "queryStartDt": "{iso_29d_ago}", "queryEndDt": "{iso_today}", "size": 1},
+          "headers": {
+            "X-ResourceType": "Object Storage"
+          },
+          "params": {
+            "eventState": "ALL",
+            "queryStartDt": "{iso_dt_29d_ago}",
+            "queryEndDt": "{iso_dt_1h_ago}",
+            "size": 1
+          },
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "group": "cm-ro-products",
-          "capture_soft": {"eventId": "$.contents[0].eventId"},
+          "capture_soft": {
+            "eventId": "$.contents[0].eventId"
+          },
           "_note": "getaccounteventlist. CONFIRMED BACKEND BUG 2026-06-20: ALL date values for queryStartDt/queryEndDt (YYYY-MM-DD, ISO-T-Z, YYYYMMDD, int-epoch) trigger 400 InvalidInputValue params[name=resourceType, value=<date>]. Header X-ResourceType IS properly forwarded (confirmed by request debug trace). The bug is server-side: the middleware routing reads the queryEndDt value as 'resourceType' validation field. Affects getproducteventlist, getaccounteventlist, and geteventpolicyhistories equally. No client-side workaround exists. Tolerant — 400 counts as reachable endpoint."
         },
         {
           "name": "get-account-members",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v1/accounts/members",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "cm-ro-completeness",
           "_note": "getaccountmembers — GET /v1/cloudmonitorings/product/v1/accounts/members. NOTE the product/v1 (not v2) prefix — cloudmonitoring is a dual-version path family (PF-26); path taken verbatim from data/api_catalog.json. Zero-required-param global read (page/size/sort optional). LIVE-CONFIRMED 200 2026-07-08 bare (totalCount 0, empty member list — empty 200 is the steady state). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08). Fresh group so the tolerant-4xx groups above never skip it."
         },
@@ -297,7 +485,9 @@
           "name": "get-metric-list",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/metrics",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "cm-ro-completeness",
           "_note": "getmetriclist — GET /v1/cloudmonitorings/product/v2/metrics (product/v2 prefix per catalog, PF-26 dual-version family). NO required query params (productTypeCode/objectType/page/size/sort all optional — docs-checked AND live-confirmed): bare call returns 200 with totalCount 3510 metric definitions, default page size 10. LIVE-CONFIRMED 200 2026-07-08. strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         },
@@ -305,7 +495,9 @@
           "name": "get-product-type-list",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v1/product-types",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "cm-ro-completeness",
           "_note": "getproducttypelist — GET /v1/cloudmonitorings/product/v1/product-types (product/v1 prefix per catalog, PF-26). Zero-required-param global read (productCategoryCode optional). LIVE-CONFIRMED 200 2026-07-08 bare (totalCount 37 product types). strict [200]. Completeness-audit 편입 (COMPLETENESS-AUDIT-2026-07-08)."
         }

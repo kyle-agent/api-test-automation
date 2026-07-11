@@ -858,6 +858,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # 치환과 함께 사용: "{epoch_now}" 단독 값은 int로 들어간다.
         "epoch_now": str(int(time.time())),
         "epoch_1h_ago": str(int(time.time()) - 3600),
+        # cloudmonitoring event/v2 계열은 (a) datetime 형식(…T00:00:00.000Z)만
+        # 받고 (b) queryEndDt가 미래면 400 InvalidInputValue — 라이브 이분탐색
+        # 실증 2026-07-11 (date-only도, 오늘 23:59Z 끝도 400; 1시간 전 끝은 200).
+        # 끝을 1시간 전으로 두면 항상 과거라 rot 없음.
+        "iso_dt_29d_ago": time.strftime("%Y-%m-%dT00:00:00.000Z",
+                                        time.gmtime(time.time() - 29 * 86400)),
+        "iso_dt_1h_ago": time.strftime("%Y-%m-%dT%H:00:00.000Z",
+                                       time.gmtime(time.time() - 3600)),
     }
     # Seed shared resources (e.g. a session-shared VPC) so {"adopt": ...} steps
     # reuse them instead of creating their own.
