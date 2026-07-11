@@ -158,7 +158,12 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   30-49스텝 유령 연쇄 (es는 프로비저닝 ERROR→그룹 cleanup이 클러스터 삭제 후
   체인이 죽은 id로 계속; mariadb·eventstreams 적용) ④ **DC**: firewall_loggable
   =true가 FIREWALL network-logging 스토리지 요구(400 not-exist-log-storage) →
-  선행 생성 그룹 신설 ⑤ peering rule CIDR 진부분집합 /24. **다음 런 판정 대기**:
+  선행 생성 그룹 신설 ⑤ peering rule CIDR 진부분집합 /24. **오너 신규 지시
+  (2026-07-11): C4 파라미터 커버리지** — "개별 API 동작을 넘어 특정 파라미터에
+  대한 동작 검증" (예: VM을 여러 이미지로 생성·수정·삭제하는 배포판 매트릭스).
+  계획 문서 `docs/working/plans/C4-PARAM-COVERAGE.md` 신설 (variants 엔진 스키마
+  제안 + 우선순위 P1=VS 이미지축·볼륨축, P2=DBaaS 버전축 — patch-minor 2xx 전략
+  겸용; 구현 착수 전 오너 컨펌 대기). **다음 런 판정 대기**:
   VS image-shell ~9키 · DB 엔진당 3-12키 · DC 4키 · peering · es 재생성.
   **구조적 차단 확인**: data-flow/data-ops/quick-query는 계정 리소스 0 → 실
   클러스터 전제 create 설계 필요(오너 결정·과금), switchover는 ha:false
