@@ -2020,3 +2020,15 @@ addgroupmember·removegroupmember·adduserpolicybinding·removeuserpolicybinding
   재토글 또는 SDS 문의.
 - SCR push 유저 regrscr856f95 (fd0328e2…) + 정책 3종(regrscrall/regrscrlogin/
   regrscrselfkey) + 인증키는 유지 중 — 해소 후 재사용, 불필요 시 삭제.
+
+## SKE nodepools 목록 응답 형태 — `links`가 items보다 먼저 온다 (2026-07-11, 라이브 실측)
+
+`GET /v1/clusters/{id}/nodepools` (service=ske)는 `{"count":1, "links":[],
+"nodepools":[…]}` 형태 — **빈 `links` 리스트가 items 키보다 앞**에 온다.
+"첫 번째 (빈 또는 dict) 리스트"를 items로 집는 파서는 links를 돌려줘 노드풀을
+0개로 오판한다 (역대 스윕이 SKE 노드풀 teardown을 건너뛰고 클러스터 delete가
+409-루프하던 근본 원인 — `cleanup.reconciler._items` 수정으로 해소: 비어있지
+않은 dict-리스트 우선, `links`는 fallback에서도 제외). dbaas 계열(postgresql/
+mysql/mariadb/epas)의 `/v1/clusters`는 `{"contents":[…], "count", "page",
+"size", "sort"}` 형태로 contents가 먼저라 무해. flat `/v1/nodepools`(+쿼리
+변형)는 이 계정에서 403 — 노드풀 접근은 **네스티드 경로만** 유효.

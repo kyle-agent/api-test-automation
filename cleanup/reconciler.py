@@ -149,10 +149,24 @@ def _is_deletable(item: dict, *, name_prefixes: tuple[str, ...] = ()) -> bool:
 # ---------------------------------------------------------------------------
 
 def _items(body):
+    """Items list of a collection response. The FIRST non-empty list-of-dicts
+    wins; an empty list is only a FALLBACK. The old \"first list that is empty
+    or dict-list\" rule broke on bodies whose pagination ``links: []`` precedes
+    the real items key — live PF 2026-07-11: SKE ``GET /clusters/{id}/nodepools``
+    returns ``{"count":1, "links":[], "nodepools":[…]}``, so the sweep saw 0
+    nodepools, skipped nodepool teardown, and the cluster delete 409-looped
+    (owner: "노드풀은 왜 삭제안해?"). ``links`` never carries collection items,
+    so it is excluded from the fallback too."""
     if isinstance(body, dict):
-        for v in body.values():
-            if isinstance(v, list) and (not v or isinstance(v[0], dict)):
+        fallback = None
+        for k, v in body.items():
+            if not isinstance(v, list):
+                continue
+            if v and isinstance(v[0], dict):
                 return v
+            if not v and fallback is None and k != "links":
+                fallback = v
+        return fallback if fallback is not None else []
     return body if isinstance(body, list) else []
 
 
@@ -1502,6 +1516,23 @@ def run_sweep(client) -> int:
     deleted = 0
     c = client
 
+    # 0. SKE teardown starts FIRST, on its own worker (owner feedback
+    # 2026-07-11 "노드풀은 왜 삭제안해?"): the SKE pass historically sat in
+    # the tail (step 8) — AFTER the VPC pass — yet SKE node ports PIN the
+    # shared subnet, so round 1 always left the subnet+VPC pair to round 2
+    # while nodepool teardown (≤10 min) hadn't even started. Kicking it off
+    # here overlaps SKE teardown with the entire networking chain; it is
+    # JOINED (bounded) right before the subnet retry below, so a round can
+    # reap subnet→VPC as soon as the nodes are gone. Serial mode
+    # (SCP_SWEEP_PARALLEL=1) keeps the legacy tail placement.
+    ske_future = None
+    if _sweep_workers() > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        _ske_ex = ThreadPoolExecutor(max_workers=1,
+                                     thread_name_prefix="sweep-ske")
+        ske_future = _ske_ex.submit(_run_passes, (("ske", _pass_ske),), c)
+        _ske_ex.shutdown(wait=False)
+
     # 1. servers (virtualserver) — issue every delete, then ONE barrier until
     # all are gone (frees subnet/sg). Server teardown drains concurrently
     # server-side, so the old delete→wait→delete→wait chain (300s PER server)
@@ -1670,6 +1701,18 @@ def run_sweep(client) -> int:
     # dbaas barrier (moved from 2d): clusters release their subnet ports here.
     _wait_all_gone(c, [(svc, f"/v1/clusters/{cid}") for svc, cid in
                        dbaas_deleted], 900, 20)
+    # SKE join (bounded): node ports must be gone before the subnet retry can
+    # succeed. On timeout the teardown keeps draining in the background — the
+    # retry below 409s cheaply and the in-progress grant hands it to the next
+    # round.
+    if ske_future is not None:
+        from concurrent.futures import TimeoutError as _FTimeout
+        try:
+            deleted += ske_future.result(timeout=900)
+        except _FTimeout:
+            _bump_inprog()
+            print("  ske teardown still in flight at the subnet-retry join — "
+                  "deferring its subnets to the next round")
     for sid in subnet_retry:
         st = _delete(c, "vpc", f"/v1/subnets/{sid}")
         if _is_2xx_or_gone(st):
@@ -1874,7 +1917,10 @@ def run_sweep(client) -> int:
     # internal child→parent ordering (repos→registries, secrets→KMS,
     # nodepools→cluster); the groups themselves share no dependency, so they
     # run concurrently on the sweep pool (SCP_SWEEP_PARALLEL, 1 = serial).
-    deleted += _run_passes(_TAIL_PASSES, c)
+    # SKE is excluded here when it already ran early (step 0).
+    tail = (_TAIL_PASSES if ske_future is None else
+            tuple(p for p in _TAIL_PASSES if p[0] != "ske"))
+    deleted += _run_passes(tail, c)
 
     print(f"sweep done: {deleted} resource(s) deleted")
     return deleted

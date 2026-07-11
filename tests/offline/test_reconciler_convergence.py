@@ -615,6 +615,28 @@ def test_lb_static_nat_retries_on_400_then_gives_up():
     assert len(dels) == 6, f"expected the bounded retry budget, got {dels}"
 
 
+def test_items_skips_pagination_links_before_items_key():
+    """PF 2026-07-11: SKE nodepools returns {"count":1,"links":[],"nodepools":
+    [...]}; the old first-list rule returned the empty links list, the sweep saw
+    0 nodepools, skipped nodepool teardown, and the cluster delete 409-looped."""
+    body = {"count": 1, "links": [],
+            "nodepools": [{"id": "np-1", "name": "regrnp1"}]}
+    assert recon._items(body) == [{"id": "np-1", "name": "regrnp1"}]
+
+
+def test_items_empty_collection_still_returns_empty():
+    assert recon._items({"count": 0, "links": [], "contents": []}) == []
+    assert recon._items({"items": []}) == []
+    assert recon._items({"links": []}) == []          # links alone ≠ items
+    assert recon._items({"count": 0}) == []
+    assert recon._items(None) == []
+
+
+def test_items_prefers_first_nonempty_dict_list():
+    body = {"sort": [], "contents": [{"id": "a"}], "extra": [{"id": "b"}]}
+    assert recon._items(body) == [{"id": "a"}]
+
+
 def test_unowned_items_never_selected():
     """Items with neither owner tag nor a regr* name must never be selected for
     deletion by any of the new passes."""
