@@ -9548,11 +9548,12 @@
             "start": "{epoch_1h_ago}",
             "statistic_type": "AVG"
           },
-          "_note": "Body = exact data/api_bodies.json listmetricdata doc body (real namespace 'Virtual Server' + metric 'CPU Usage/Core[Basic]'); previous regr{unique} namespace was rejected. Docs-derived, pending live validation.",
+          "_note": "svc-opt 2026-07-11: 롤링 1시간 창 + 차원 제거로 개정. 400 'Invalid metrics requests'는 환경적 범주 응답 — 메트릭 카탈로그(listmetricinfos 200)가 count:0 (구동 VM 없음 → 등록된 쌍이 없어 어떤 요청도 무효). 400 기대 등록으로 optional-4xx 사다리 65s 차단; Running VM이 있는 런(compute-virtualserver 뒤)에서 2xx 재승격 대상 — cm getaccountproductlist와 동일 클래스.",
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ]
         },
         {
