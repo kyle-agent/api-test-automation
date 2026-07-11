@@ -113,6 +113,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+<<<<<<< HEAD
 - **LATEST (2026-07-11 낮 — branch `claude/service-coverage-improvement-gwewio`,
   run-923a 4xx 트리아지 → 서비스 커버리지 수리 배치):** 오너 아침 풀런
   `20260711-082618-923a`(119 lifecycle) 실패 전문을 oplog artifact로 폴딩 —
@@ -137,6 +138,34 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   클러스터 전제 create 설계 필요(오너 결정·과금), switchover는 ha:false
   categorical(waiver 후보), patch-minor-version 2xx는 구버전 create 전략
   필요(백로그), scr은 PF-37 대기.
+=======
+- **LATEST (2026-07-11 밤 — main=`cf8792b3`+, 세션 인수인계. 오너: "다른 세션에서 이어서"):**
+  검증 **2,431** (run-923a fold까지). **③일차 확정**: run-923a(119종·112pass·56.7분)에서
+  iam-user 가족 7키 완전 검증(404-soft 클래스 종결) · private-nat 403 gone-폴 적중
+  (라이프사이클 종결) · apigw-privatelink 완전 그린. **스케줄링 개선 3종 반영**:
+  durations.json을 run-923a 실측 스팬 119건으로 재구축(a669fc0e) + 스텝수 타이브레이크
+  + 학습을 git-비추적 durations.local.json 오버레이로(시딩 금지 — 옛 시드가 재구축을
+  가리는 결함 6d8f804b 수리) + xdist --maxschedchunk=1. **콘솔 신기능**: ① 구성
+  [📊 예상 타임라인] 모달(/api/schedule-sim, 워커/VPC슬롯 조정) ② 실행 "예측 vs 실제"
+  실시간 패널(cf8792b3 — UI 에이전트가 지시 위반 직접 커밋했으나 코드 검증됨, ⏹ 무손상).
+  ⏹ 실효화: 재시도 사다리 탈출 + peek_interrupt(비소비) + command-applied 이벤트(69ac9c8b).
+  **미결 1순위 — 스케줄 판정**: 진행 중이던 117종 런(ai 제외)에서 예측(고스트)과 달리
+  **DB 계열+VPC 자체생성군이 늦게/못 투입** — events 도착 시 lifecycle-start 실제 순서
+  vs simulate_schedule 예측을 재구성해 "정렬 미적용 vs DB/VPC 레인 대기" 판정할 것.
+  진행≈대기 현상은 xdist 워커당 1개 선배정(잔여) — 완전 해결은 꼬리 동적 디스패처(백로그).
+  **미결 2**: 엔진 명령 채널 "Connection refused"(오너 콘솔 로그 실측) — ⏹이 안 먹는
+  앞단 원인; 오너 콘솔 기동 방식/포트 확인 필요(질문 pending). **미결 3**: 강제중지 런
+  잔재 scf 함수 2개(regrw5trg57f68be7/d7ff680d) 삭제 400 반복 — PL 서비스/엔드포인트
+  잔재, 네트워킹 쪽 privatelink-services 추적 필요. 강제중지 런은 events 미업로드
+  (로컬 콘솔 로그에서 회수 경로 백로그). **SCR**: PF-37(토큰 서버가 유효 인증키 401,
+  소거 완전)+PF-38(public endpoint disable→enable 후 데이터플레인 미복구) — SDS 문의감;
+  push 유저 regrscr856f95(fd0328e2…)+키+정책 3종 유지, sample/test 커버리지 배선 무퇴행
+  대기. **auto-repair Routine**(trig_017cGfns85afYX3D3FM9aA2E, hourly :30)은 이 세션
+  self-bind — 새 세션이 run 처리를 인수하면 중복 커밋 방지 위해 이 트리거 삭제 검토
+  (list_triggers→delete_trigger). 오너 계정 로컬에 durations.local.json 잔존 시
+  `rm -f data/optimizer/durations.local.json` 1회 필요(옛 오염값이 재구축을 가림).
+  CX-IA 디자인(D1~D8) 오너 리뷰 대기, v2는 별도 세션(V2-KICKOFF.md).
+>>>>>>> 7e3f95b7 (CONTEXT.md 인수인계 (2026-07-11 밤): 스케줄 판정 미결 · ⏹ 명령채널 refused · scf 잔재 · SCR PF-37/38 · Routine 이관 노트)
 - **PRIOR (2026-07-10 밤 — main=`672de85c`, branch 동기, 오너 실시간 협업 2일차 마감):**
   검증 **2,424** (+13 오늘: private-nat 4 · LB member 2 · fs replication 2 ·
   iam createrole/deleterole/createiamuser/getiamuser · apigw setprivatelinkendpoint).
