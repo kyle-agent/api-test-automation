@@ -46,7 +46,7 @@
 | 21 | networking (vpc/subnet/port/publicip/peering/TGW/endpoint/NAT) | 다수 | 대기 | | | | 슬롯 소비 — 후반 |
 | 22 | loadbalancer | light (heavy는 892a 수리 재검증 대기) | ✅ light 완료 | 8.6s | 대기 없음 | ~9s | heavy(members)는 member_state 수리 검증 겸 후속 |
 | 23 | filestorage | volume, wave2-fs (replication은 후속) | ✅ 2/3 | 75.1s/56.8s | 느린 스텝 = 정당한 settle 폴 (async 볼륨) | 동일 | replication-schedule 교차리전은 별도 회차 |
-| 24 | scf | 4종 | ▶ 진행 |  | | | PLE 연쇄 규약 |
+| 24 | scf | 4종 | ✅ 완료 | 62/559/496/112s (4 passed) | wave2-scf 트리거read 404수리 **200 검증**. 재검토 후보: ①PLE request/cancel 사다리 ~285s 매번 소진(승격 실측 無) ②update-code 303s (DEPLOYING 대기 구조) | 동일 | PLE 사다리는 설계물 — 트리아지 판단 대상 |
 | 25 | backup | gen-heavy-backup | 대기 | | | | heavy |
 | 26 | cloud-ml | 2종 | 대기 | | | | SCR 게이트 부분 |
 | 27 | virtualserver | 5종 | 대기 | | | | heavy 2 |
