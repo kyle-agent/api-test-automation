@@ -973,6 +973,19 @@
           }
         },
         {
+          "name": "capture-peering-rule-id",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
+          "group": "peering",
+          "optional": true,
+          "expect_status": [200, 400, 404],
+          "capture_soft": {
+            "routing_rule_id": "$.vpc_peering_rules[0].id"
+          },
+          "_note": "2026-07-11 라이브 프로브: 목록 envelope는 vpc_peering_rules — create 응답의 $.routing_rule.id 캡처는 항상 실패(892a delete 404 리터럴 뿌리). 목록 재조회로 실 id 캡처."
+        },
+        {
           "name": "get-peering-routing-rules",
           "service": "vpc",
           "method": "GET",
@@ -1058,6 +1071,22 @@
           ],
           "retries": 4,
           "retry_interval": 15
+        },
+        {
+          "name": "wait-peering-rule-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
+          "group": "peering",
+          "optional": true,
+          "expect_status": [200, 400, 404],
+          "poll": {
+            "field": "$.count",
+            "until": [0],
+            "timeout": 300,
+            "interval": 10
+          },
+          "_note": "2026-07-11 라이브 프로브: rule DELETE 202 수렴 전 peering DELETE는 400 related-resource(~60s 실측) — count 0 확인 후 삭제."
         },
         {
           "name": "wait-peering-active-before-delete",
@@ -1164,8 +1193,7 @@
             409
           ],
           "retries": 8,
-          "retry_interval": 20,
-          "adopt": "vpc"
+          "retry_interval": 20
         }
       ]
     },

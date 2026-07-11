@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 64 docs · 22 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 66 docs · 24 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -31,6 +31,7 @@
 ## Working — plans
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
+| [`working/plans/C4-PARAM-COVERAGE.md`](working/plans/C4-PARAM-COVERAGE.md) | all | C4 파라미터 커버리지 계획 (owner directive 2026-07-11) | 🟢 active |
 | [`working/plans/CAMPAIGN-C3-100-docs-research.md`](working/plans/CAMPAIGN-C3-100-docs-research.md) | 워크스트림 A 후속 에이전트 (HB2/HB6/HB7 실행자) — body 초안 입력 | CAMPAIGN-C3-100 — body 미상 7건 docs-research |  DONE (docs-research, read-only) — 2026-07-04 |
 | [`working/plans/CAMPAIGN-C3-100-repair-log.md`](working/plans/CAMPAIGN-C3-100-repair-log.md) | 워크스트림 A 오케스트레이터 — HB1b/HB2b crud_ids 구성 입력 | CAMPAIGN-C3-100 — 결정적 재실패 갭 수리 로그 (2026-07-04) |  DONE (repair pass, OFFLINE — no live SCP calls this session) — 2026-07-04 |
 | [`working/plans/CAMPAIGN-C3-100-waivers.md`](working/plans/CAMPAIGN-C3-100-waivers.md) | 오너 — CAMPAIGN-C3-100 waiver 일괄 심사용 단일 문서 | CAMPAIGN-C3-100 — Waiver 제안 통합 (오너 결정용) |  PROPOSED (오너 결정 대기) — 2026-07-07, OFFLINE 세션 (라이브 호출 없음) |
@@ -79,6 +80,7 @@
 | [`working/trackers/SERVICE-GAP-REPORTS.md`](working/trackers/SERVICE-GAP-REPORTS.md) | coverage | 서비스별 커버리지 갭 리포트 (병렬 agent 분석, 2026-06-13) |  superseded (2026-06-13 분석 스냅샷 — 커버리지 캠페인 정본으로 대체) |
 | [`working/trackers/SPEC-DIFF-2026-07-09.md`](working/trackers/SPEC-DIFF-2026-07-09.md) | orchestrator | SPEC-DIFF — 카탈로그 리프레시 + diff (2026-07-09) | 🟢 active |
 | [`working/trackers/UIUX-AUDIT-2026-07-03.md`](working/trackers/UIUX-AUDIT-2026-07-03.md) | all | SCP 컨트롤플레인 UI — IA/UX 감사 보고서 (2026-07-03) | 🟢 active |
+| [`working/trackers/V1-GRAFT.md`](working/trackers/V1-GRAFT.md) | design-improvements-v1 세션 (v2 → v1 접목) | V1 접목 트래커 — v2에서 검증된 것만 v1에 얹는다 | 🟢 active |
 | [`working/trackers/VALIDATION-QUEUE.md`](working/trackers/VALIDATION-QUEUE.md) | validation | prioritized order for the coverage-validator | 🟢 active |
 | [`working/trackers/harness-tests.md`](working/trackers/harness-tests.md) | all | Harness adversarial safety-rail tests (Tier-0) | 🟢 active |
 | [`working/trackers/run-parallelism-optimization.md`](working/trackers/run-parallelism-optimization.md) | all | Heavy-run wall-clock optimization (2026-06-19) |  superseded (2026-06-19 run 최적화 스냅샷 — DAG 스케줄러 정본으로 흡수) |

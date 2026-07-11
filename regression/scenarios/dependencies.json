@@ -153,9 +153,6 @@
       "subnet#db",
       "vpc"
     ],
-    "networking-direct-connect-routing": [
-      "vpc"
-    ],
     "networking-dns-hosted-zone-private": [
       "vpc"
     ],
@@ -168,9 +165,6 @@
     ],
     "vpc-endpoint": [
       "subnet",
-      "vpc"
-    ],
-    "vpc-peering": [
       "vpc"
     ],
     "vpc-privatelink-endpoint": [
@@ -214,7 +208,8 @@
       "vpc-transit-gateway-children",
       "heavy-shared-networking",
       "vpc-subnet-vip-nat",
-      "gen-wave5-fw"
+      "gen-wave5-fw",
+      "networking-direct-connect-routing"
     ],
     "shared_subnet_cidr": "10.124.0.0/24",
     "fixed_ip_map": {
