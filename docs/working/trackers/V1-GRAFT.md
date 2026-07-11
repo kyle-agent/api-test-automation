@@ -17,7 +17,7 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 | # | 후보 | 상태 | 비고 |
 |---|---|---|---|
 | 1 | 출처 배지 3종 + empty-state 규율 | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
-| 2 | 계획↔실행 연속성 (PLAN vs ACTUAL 스트립) | 진행 예정 | v1 실행 화면(console2) 상단 |
+| 2 | 계획↔실행 연속성 (PLAN vs ACTUAL 스트립) | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
 | 3 | 종료 후 다음 행동 카드 | 대기 | 토스트 대신 3줄 카드 |
 | 4 | 실행 중 이상 감지 (지연 의심·실패 군집) | 대기 | **엔진 요청 #5(세마포어 대기 이벤트) 선행** |
 | 5 | 판정 시각 분리 표기 (발행 시각 ≠ 판정 런 시각) | 부분 | 배지 ts는 판정 런 시각(history ts) 사용 — 분리 병기는 후속 |
@@ -44,6 +44,25 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   published.py 실측 교훈: 발행 저장소 갱신 시각과 구분)를 KST 짧은 라벨로.
 - 테스트: `tests_offline.py::test_source_badges_and_empty_states` (24/24 통과).
 
+## 접목 2 상세 — PLAN vs ACTUAL 스트립 (console2 실행 화면)
+
+- **위치**: `console2/index.html` `#planactual` — now-playing 바로 위, run이
+  in-flight(running/queued)일 때만 표시 (donor: v2 `run_exec.js` B층 +
+  `run_detail.html` plan-strip, 오너 승인 목업 §2.9).
+- **PLAN**: `POST /api/plan {lifecycle_ids: rec.lifecycle_ids}` 서버 재계산
+  (run별 1회 캐시) — 생성 ~n · 삭제 ~n · peak VPC · ETA. **ETA는 donor의
+  순차합산이 아니라 v1 now-playing 잔여와 같은 병렬 6 가정**으로 통일 (같은
+  화면에서 두 ETA의 가정이 다르면 비교 불능 — 결정 지점 4).
+- **ACTUAL**: 이벤트 실측(resource-tracked/-deleted 집계) + 경과 + VPC 슬롯
+  미터(`/api/capacity` — 기존/이 런 peak/다른 런/여유 구분). queued면
+  **WHY QUEUED**(여유 < 필요 peak 수치).
+- **편차는 보수적으로**: "ETA 초과" 칩만. 지연 의심(실측 평균 ×3) 판정은
+  접목 4로 미룸 — 엔진 요청 #5(세마포어 대기 이벤트) 전에는 VPC 대기가
+  지연으로 오탐된다 (§2.9 명시). 테스트가 `avg * 3` 부재를 고정.
+- 검증: 오프라인 계약 테스트(`test_plan_actual_strip_frontend_contract`, 33/33)
+  + simulate 런 실주행(Playwright headless — PLAN 고정·ACTUAL 폴링 갱신·종료 시
+  숨김 확인).
+
 ## 결정 지점 (오너가 뒤집을 수 있게 기록)
 
 1. **노후 기준 48h 유지** — v2 계약은 24h, v1은 기존 P2C-12 결정(공용
@@ -53,6 +72,8 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
    섹션 헤더 배지 1개 + 회색화만(같은 출처 반복 노이즈 절충). 오너 검수 시 조정.
 3. 배지 라벨은 donor 그대로 영어(Published/This server/This run/CI), 툴팁
    한국어 — D7 개정과 정합. v1 전반의 용어 정비는 접목 6에서 별도.
+4. **PLAN ETA 가정 = 병렬 6** (donor v2는 p50 순차합산) — v1 now-playing 잔여
+   ETA와 가정 통일이 우선이라 판단. durations 근사의 한계는 툴팁에 명시.
 
 ## 경계 메모
 

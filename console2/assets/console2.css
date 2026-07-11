@@ -650,6 +650,19 @@ g.rg-selbox{cursor:pointer}
 .nowplaying .np-dot.que{background:var(--amber)}
 .nowplaying .np-abort{flex:none;margin-left:6px}
 @keyframes nppulse{50%{opacity:.35}}
+/* PLAN vs ACTUAL 스트립 (v2 접목 2 — 계획↔실행 연속성, §2.9 B층): now-playing 위. */
+.planactual{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 -4px;padding:6px 12px;
+  background:var(--panel);border:1px solid var(--line2);border-radius:8px;font-size:12px;color:var(--ink)}
+.planactual .pa-col{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.planactual .pa-k{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--muted);cursor:default}
+.planactual .pa-mid{color:var(--muted)}
+.planactual .pa-over{font-size:10.5px;font-weight:700;background:#fdf3e2;color:#b5740b;border-radius:6px;padding:1px 7px}
+.planactual .slotmeter{display:inline-flex;align-items:center;gap:2px;font-size:10.5px;font-weight:700;color:var(--muted);margin-left:4px}
+.planactual .slotmeter .sl{width:10px;height:10px;border-radius:2px;display:inline-block}
+.planactual .sl.base{background:#c7ccd4}
+.planactual .sl.mine{background:var(--accent)}
+.planactual .sl.other{background:#a78bda}
+.planactual .sl.free{background:#eef1f5;border:1px dashed #c8cdd3;width:8px;height:8px}
 /* P2C-24: 런 진행률 바 (now-playing) — rail 전체 카드 링과 같은 runProgress 소스 */
 .nowplaying .np-prog{width:110px;height:6px;border-radius:4px;background:#d9e2ef;overflow:hidden;
   flex:none;display:inline-block}

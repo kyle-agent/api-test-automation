@@ -52,6 +52,11 @@ html.bare-console #backToShell{display:inline}</style>
   <span class="seg">로딩 중…</span>
 </div>
 
+<!-- PLAN vs ACTUAL (v2 접목 2 — 계획↔실행 연속성, V2-L1-DATA-CONTRACT §2.9 B층):
+     pre-flight에서 본 견적(생성·삭제·peak VPC·ETA)과 지금 실측을 한 줄에서 대조.
+     now-playing 위에 얹는다 — run이 in-flight일 때만 보임. -->
+<div class="planactual hidden" id="planactual"></div>
+
 <!-- NOW-PLAYING (신규4): persistent strip above the tabs — 지금 실행 중인
      lifecycle:step + METHOD path + 경과/평균(durations.json). Hidden when idle. -->
 <div class="nowplaying hidden" id="nowplaying"></div>

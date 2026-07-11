@@ -2040,8 +2040,87 @@ function fmtElapsed(s) {
   if (s < 3600) return Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s";
   return Math.floor(s / 3600) + "h" + String(Math.floor((s % 3600) / 60)).padStart(2, "0") + "m";
 }
+// ---- PLAN vs ACTUAL 스트립 (v2 접목 2 — 계획↔실행 연속성, §2.9 B층) ----------
+// pre-flight가 보여준 견적과 "지금"을 한 줄에서 대조한다: 생성 n/~m · ETA 대비
+// 경과 · VPC 슬롯. PLAN은 rec.lifecycle_ids로 /api/plan 서버 재계산(스테이지
+// 스냅샷은 서버 재기동/기록 복원 시 없을 수 있어 재계산이 항상 참) — run별 1회.
+let runPlan = null, runPlanFor = null;
+function ensureRunPlan() {
+  if (!runId || runPlanFor === runId || !(runSelIds || []).length) return;
+  runPlanFor = runId; runPlan = null;
+  const reqFor = runId;
+  fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lifecycle_ids: runSelIds }) })
+    .then(r => r.json())
+    .then(p => { if (runPlanFor !== reqFor) return;
+      runPlan = p.error ? { _failed: true } : p; renderPlanActual(); })
+    .catch(() => { if (runPlanFor === reqFor) { runPlan = { _failed: true }; renderPlanActual(); } });
+}
+function planTotals(p) {
+  let creates = 0, deletes = 0, dur = 0, measured = 0, total = 0;
+  Object.values(p.preview || {}).forEach(pv => {
+    total++; creates += pv.est_creates || 0; deletes += pv.est_deletes || 0;
+    if (pv.duration_s != null) { dur += pv.duration_s; measured++; }
+  });
+  // ETA = durations 실측 합 / 병렬 가정 — runProgress()의 잔여 추정과 같은 가정
+  // (donor v2는 순차합산이었으나, v1은 now-playing 잔여가 병렬 6 가정이라
+  //  같은 화면에서 대조 축을 통일한다).
+  const eta = measured ? dur / Math.min(ETA_PARALLEL, measured) : null;
+  return { creates, deletes, eta, measured, total };
+}
+function slotMeterHtml(cap, minePeak) {
+  if (!cap || !cap.cap) return "";
+  const total = cap.cap, base = Math.max(0, cap.baseline || 0);
+  const mine = Math.min(minePeak || 0, total);
+  const other = Math.max(0, (cap.reserved || 0) - mine);
+  const kinds = [];
+  for (let i = 0; i < base; i++) kinds.push("base");
+  for (let i = 0; i < mine; i++) kinds.push("mine");
+  for (let i = 0; i < other; i++) kinds.push("other");
+  while (kinds.length < total) kinds.push("free");
+  const cells = kinds.slice(0, total).map(k => `<i class="sl ${k}"></i>`).join("");
+  return `<span class="slotmeter" title="계정 VPC ${total}슬롯 — 기존 ${base}(회색) · 이 런 peak ${mine}(파랑) · 다른 런 ${other}(보라) · 여유 ${cap.headroom != null ? cap.headroom : "?"}">VPC ${cells}</span>`;
+}
+function renderPlanActual() {
+  const host = $("planactual"); if (!host) return;
+  const inFlight = runId && (runStatus === "running" || runStatus === "queued");
+  if (!inFlight) { host.classList.add("hidden"); host._h = null; host.innerHTML = ""; return; }
+  host.classList.remove("hidden");
+  ensureRunPlan();
+  let t = null, planTxt = "견적 계산 중…";
+  if (runPlan && runPlan._failed) planTxt = "견적 계산 불가 (/api/plan 실패)";
+  else if (runPlan) {
+    t = planTotals(runPlan);
+    planTxt = `생성 ~<b>${t.creates}</b> · 삭제 ~${t.deletes} · peak VPC <b>${runPlan.peak_vpcs || 0}</b> · ETA <b>${t.eta != null ? "~" + fmtElapsed(t.eta) : "미측정"}</b>`
+      + (t.eta != null && t.measured < t.total ? ` <span class="muted small">(측정 ${t.measured}/${t.total})</span>` : "");
+  }
+  let actTxt;
+  if (runStatus === "queued") {
+    // WHY QUEUED — 여유 < 필요 peak 를 수치로 (§2.9 queued 상태)
+    const cap = lastCapacity, peak = runPlan && !runPlan._failed ? (runPlan.peak_vpcs || 0) : null;
+    actTxt = cap && peak != null
+      ? `여유 <b>${cap.headroom != null ? cap.headroom : "?"}</b> &lt; 필요 peak <b>${peak}</b> — 슬롯이 나면 자동 시작 ${slotMeterHtml(cap, 0)}`
+      : "대기 큐 — 여유가 생기면 자동 시작";
+  } else {
+    const created = runEvents.filter(e => e.kind === "resource-tracked").length;
+    const deleted = runEvents.filter(e => e.kind === "resource-deleted").length;
+    const prog = runProgress();
+    // 편차 칩 — 보수적으로 "계획 ETA 초과"만 (지연 의심의 정식 판정은 접목 4:
+    // 세마포어 대기 이벤트(엔진 요청 #5) 전에는 오탐 위험이 있어 여기 안 한다)
+    const over = t && t.eta != null && prog.elapsed != null && prog.elapsed > t.eta;
+    actTxt = `생성 <b>${created}</b>${t ? `/~${t.creates}` : ""} · 삭제 ${deleted}${t ? `/~${t.deletes}` : ""} · 경과 <b>${prog.elapsed != null ? fmtElapsed(prog.elapsed) : "—"}</b>`
+      + (over ? ` <span class="pa-over" title="경과가 계획 ETA(~${fmtElapsed(t.eta)})를 넘었습니다 — 실측 평균 기반 근사라 초과 자체가 이상은 아닙니다">ETA 초과</span>` : "")
+      + " " + slotMeterHtml(lastCapacity, runPlan && !runPlan._failed ? runPlan.peak_vpcs : 0);
+  }
+  setHtmlIfChanged(host,
+    `<span class="pa-col"><span class="pa-k" title="pre-flight 견적 — /api/plan(rec.lifecycle_ids) 서버 재계산 · durations.json 실측 평균 기반">PLAN</span> <span class="pa-v">${planTxt}</span></span>`
+    + `<span class="pa-mid">→</span>`
+    + `<span class="pa-col"><span class="pa-k" title="이 run의 이벤트 실측 (resource-tracked/-deleted 집계) + /api/capacity 슬롯">${runStatus === "queued" ? "WHY QUEUED" : "ACTUAL"}</span> <span class="pa-v">${actTxt}</span></span>`);
+}
+
 function renderNowPlaying() {
   const host = $("nowplaying"); if (!host) return;
+  renderPlanActual();          // PLAN↔ACTUAL 스트립은 now-playing과 같은 생명주기
   const inFlight = runId && (runStatus === "running" || runStatus === "queued");
   if (!inFlight) { host.classList.add("hidden"); host._h = null; host.innerHTML = ""; return; }
   host.classList.remove("hidden");
