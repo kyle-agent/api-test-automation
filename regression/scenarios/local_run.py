@@ -336,8 +336,25 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
                 f.write(f"  run-scoped reap 실패(무시): {exc}\n")
             # 런 종료 자동 클린업 (owner 2026-07-10) — CLI 경로는 단일 런이라
             # 동시성 가드 불요. 끄기: SCP_RUN_END_SWEEP=false.
+            # 자원-생성 게이트 (svc-opt #3 실측 2026-07-11): 3초짜리 read-only
+            # 런에도 계정 전체 스윕(수 분)이 통째로 돌았다 — 이 런의 events
+            # 원장에 resource-tracked가 하나도 없으면 지울 것이 없으므로 스킵
+            # (run-scoped reap이 이미 '잔존 후보 0'을 확인한 것과 같은 원장).
+            def _run_created_resources() -> bool:
+                try:
+                    for line in Path(events_path).read_text().splitlines():
+                        if '"resource-tracked"' in line:
+                            return True
+                except OSError:
+                    return True   # 원장을 못 읽으면 안전측: 스윕 수행
+                return False
             if os.environ.get("SCP_RUN_END_SWEEP", "").strip().lower() \
-                    not in ("false", "0", "no"):
+                    in ("false", "0", "no"):
+                pass
+            elif not _run_created_resources():
+                f.write("\n=== 런 종료 자동 클린업: 생략 — 이 런은 자원을 "
+                        "생성하지 않음 (resource-tracked 0) ===\n")
+            else:
                 f.write("\n=== 런 종료 자동 클린업: owner-tag 강제 스윕 (IGNORE_TTL) ===\n")
                 f.flush()
                 subprocess.run(
