@@ -26,13 +26,13 @@
 | 1 | cloudmonitoring | gen-cm-event-policy, gen-cm-account-resource | ✅ 완료 | 4.5s+5.9s (2 passed) | 불필요 대기 없음 (스텝 공백 0.01s, 폴 없음) | ~6s/개 | 404-관용은 문서화된 fail-fast (undocumented X-ResourceType 필수, Running VM 없으면 404). 개선 기회: VS 라이프사이클 뒤 배치 시 2xx 승격 가능 — 의존관계 노트 |
 | 2 | scr | container-scr-registry | ✅ 완료(스킵) | 6.5s (403→skip) | 대기 없음 | ~6.5s | PF-37 entitlement 게이트 — SDS 해소 후 재실측 | | | | PF-37 게이트 — reads만 |
 | 3 | baremetal | baremetal-catalog-reads | ✅ 완료 | 8.6s (1 passed) | 대기 없음 | ~8.6s | read-only | | | | |
-| 4 | quick-query | gen-quick-query-* ×2 | ▶ 진행 | | | | |
-| 5 | configinspection | configinspection-read-coverage | ▶ 진행 | | | | |
-| 6 | support / quota / pricing / costexplorer | 각 1 (reads) | 대기 | | | | 묶음 실행 후보 (전부 read) |
-| 7 | network-logging | gen-wave4-nlog | 대기 | | | | |
-| 8 | multinodegpucluster | gen-gpu-node-image | 대기 | | | | |
-| 9 | queueservice | gen-wave3-qfifo (+ application-queueservice-queue) | 대기 | | | | |
-| 10 | iam-identity-center | idc-read-coverage | 대기 | | | | |
+| 4 | quick-query | gen-quick-query-* ×2 | ✅ 완료 | 4.7s+3.9s | 대기 없음 | ~5s/개 | read | | | | |
+| 5 | configinspection | configinspection-read-coverage | ✅ 완료 | 5.9s | 대기 없음 | ~6s | read | | | | |
+| 6 | support / quota / pricing / costexplorer | 각 1 (reads) | ✅ 완료 | 8.1/9.6/9.2/6.8s | 대기 없음 | ~7-10s/개 | read 묶음, 4 passed |
+| 7 | network-logging | gen-wave4-nlog | ▶ 진행 | | | | |
+| 8 | multinodegpucluster | gen-gpu-node-image | ▶ 진행 | | | | |
+| 9 | queueservice | gen-wave3-qfifo, application-queueservice-queue | ▶ 진행 | | | | |
+| 10 | iam-identity-center | idc-read-coverage | ▶ 진행 | | | | |
 | 11 | direct-connect | gen-direct-connect (+ routing) | 대기 | | | | DC 1:1-per-VPC 규약 |
 | 12 | iam | iam-group, gen-wave5-iam-bindings (+ user/role) | 대기 | | | | |
 | 13 | kms | gen-wave2-sec, security-kms-transit-crypto | 대기 | | | | PF-09 예약삭제 |
