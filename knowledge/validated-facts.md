@@ -2141,3 +2141,18 @@ LOCAL·VPC_ENDPOINT; 잘못된 값은 400에 enum 명시, 미지의 쿼리키는
 — `subnet_type=`은 무시되고 기본 목록 반환). reconciler의 서브넷 패스와
 _purge_vpc_children이 두 컬렉션을 모두 훑도록 수정(PF-47). run_scoped의 409
 related_resources SRN 폴백은 이런 숨은 서브넷의 기존 완화책이었다.
+
+## VPC 409 본문의 related_resources가 홀더를 직접 알려준다 — SRN 자동회수 (2026-07-11, run-892a)
+
+`DELETE /v1/vpcs/{id}` 409(`scp-network.vpc.related-resource`) 본문의
+`related_resources`는 홀더의 SRN 목록
+(`srn:e::<acct>:<region>::<service>:<type>/<id>`)을 명시한다 — run-892a에서
+**direct-connect**(`regrdc*`)가 어떤 목록 패스에도, holder 탐지(TGW/LB/NAT)
+에도 안 잡힌 채 공유 VPC를 스윕 2라운드×6회 409로 잡았고, SRN이 유일한 단서
+였다. 스윕은 이제 409 본문 SRN을 파싱해 홀더를 직접 삭제 후 즉시 재시도
+(`_purge_409_holders`; run_scoped의 서브넷 전용 폴백을 일반화). DC 자체의
+teardown 규약: **자식 routing-rules를 먼저 비워야 DC DELETE가 수락**(rule이
+남으면 409; run_scoped도 같은 컬렉션 내 깊은 경로 우선으로 교정). 서비스
+호스트 키는 `direct-connect`(하이픈; `directconnect`는 프록시 502). 미해결:
+DC의 network-logging storage delete 400 (d5637fad… 실측, 사유 미확인 —
+network-logging 스윕 패스 부재, 재발 시 조사).
