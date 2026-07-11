@@ -268,15 +268,12 @@ def coverage_map_json():
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 def coverage_map(request: Request):
-    """Coverage color-map page (active nav = 'reporting')."""
-    payload = _coverage_payload()
-    ctx = {
-        **common.base_ctx("reporting"),
-        "summary": payload["summary"],
-        "legend": payload["legend"],
-        "has_results": payload["has_results"],
-        "has_model": payload["has_model"],
-        "history": payload["history"],
-        "node_count": len(payload["graph"].get("nodes") or []),
-    }
-    return templates.TemplateResponse(request, "reporting_coverage.html", ctx)
+    """색칠지도 페이지 — **제거됨** (오너 결정 2026-07-11, V1-GRAFT 트래커).
+
+    전체-지도 뷰의 세 번째 탈락(Modeling 의존 그래프 탭 P2C-25 · v2 D6와 같은
+    결론)이자, 로컬 관측 원천이라 새 서버에서 "회귀 0"으로 오독되던 화면
+    (페르소나 P1 막힘). 기능 대체: 서비스별 커버리지 = 발행 대시보드 서비스
+    상세, 모델 진척 = Modeling 카테고리 진척 바. 딥링크 호환을 위해 라우트는
+    요약 탭으로 리다이렉트, ``/map.json`` 데이터 API는 보존(복구 용이)."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/reporting?tab=summary", status_code=302)

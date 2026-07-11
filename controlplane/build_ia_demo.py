@@ -16,11 +16,10 @@ works off the file tree — far more robust than intercepting ``window.fetch``.
 Output (``reports/ia-demo/``):
   index.html / catalog.html   ① Catalog   (server-rendered, no fetch)
   modeling.html               ② Modeling  (fetches modeling.map.json)
-  reporting.html              ④ Reporting (fetches reporting.map.json)
+  reporting.html              ④ Reporting (요약 탭 — 색칠지도 제거 2026-07-11)
   testing/                    ③ Testing   (console2 static bundle, baked offline)
   resource_graph.js           the shared SVG DAG renderer (relative)
   modeling.map.json           baked /planning/resources/map.json
-  reporting.map.json          baked /reporting/coverage/map.json
   _verify_*.png               offline file:// render screenshots (verification)
   README.md
 
@@ -57,7 +56,7 @@ OUT = ROOT / "reports" / "ia-demo"
 # (see the module docstring of each *_routes.py for where these originate.)
 RG_SRC = "/static/resource_graph.js"          # shared renderer <script src> (modeling+reporting)
 MODELING_FETCH = "/planning/resources/map.json"  # modeling map page fetch()
-REPORTING_FETCH = "/reporting/coverage/map.json"  # reporting coverage page fetch()
+# (REPORTING_FETCH 삭제 — 색칠지도 제거로 reporting 데모는 요약 탭을 굽는다)
 HTMX_CDN = "https://unpkg.com/htmx.org@1.9.12"   # base.html <script src> (CDN; vendored offline)
 
 
@@ -146,7 +145,7 @@ def _nav_rewrite(html: str) -> str:
         # --- the 4-stage nav + brand (base.html) ---
         ('href="/planning/resources/map"', 'href="modeling.html"'),
         ('href="/testing/embed"', 'href="testing.html"'),
-        ('href="/reporting/coverage"', 'href="reporting.html"'),
+        ('href="/reporting"', 'href="reporting.html"'),  # 색칠지도 제거 후 네비 랜딩 = /reporting
         ('href="/catalog"', 'href="index.html"'),
         ('class="brand" href="/"', 'class="brand" href="index.html"'),
         # --- links with no offline target -> '#' (kept clickable, no 404) ---
@@ -245,14 +244,10 @@ def _build_node_pages(c, *, htmx: bool) -> int:
 
 
 def _build_reporting(c, *, htmx: bool) -> None:
-    """④ Reporting — same shape as modeling: bake the coverage map.json (sibling +
-    inlined island), repoint fetch() + renderer, nav-rewrite + htmx + banner."""
-    map_json = c.get(REPORTING_FETCH).text
-    (OUT / "reporting.map.json").write_text(map_json, encoding="utf-8")
-    html = c.get("/reporting/coverage").text
-    html = html.replace(RG_SRC, "resource_graph.js")
-    html = html.replace(REPORTING_FETCH, "reporting.map.json")
-    html = _inline_data(html, "reporting.map.json", map_json)
+    """④ Reporting — 색칠지도 제거(오너 결정 2026-07-11) 후 데모는 요약 탭을
+    굽는다 (/reporting/coverage 는 요약으로 리다이렉트 — 그래프/map.json 굽기
+    불필요)."""
+    html = c.get("/reporting?tab=summary").text
     html = _vendor_htmx(html, available=htmx)
     html = _nav_rewrite(html)
     html = _inject_banner(html)
@@ -318,7 +313,7 @@ def _write_readme() -> None:
         "Each page's REAL production HTML is fetched in-process via Starlette "
         "`TestClient`, then post-processed: the absolute `fetch()` / asset / nav "
         "URLs are rewritten to **relative static files written next to the HTML** "
-        "(`modeling.map.json`, `reporting.map.json`, `resource_graph.js`). On "
+        "(`modeling.map.json`, `resource_graph.js`). On "
         "Pages a relative `*.json` fetch just works off the file tree — no "
         "`window.fetch` monkeypatch.\n\n"
         "- **Catalog** (`index.html` = `catalog.html`): server-rendered, no fetch.\n"
@@ -328,8 +323,7 @@ def _write_readme() -> None:
         "- **Testing** (`testing.html`): the console2 bundle (`testing/`) embedded in "
         "the spine shell via an iframe (`?embed=1`), so the 4-stage nav stays put and "
         "the toggle reads Test Planning | Test Execution.\n"
-        "- **Reporting** (`reporting.html`): fetches `reporting.map.json`, same "
-        "shared renderer.\n\n"
+        "- **Reporting** (`reporting.html`): 발행 요약 탭 (색칠지도는 제거됨).\n\n"
         "## Publish\n"
         "Copy this directory to the Pages branch: `dashboard-data:/ia-demo/`.\n\n"
         "## Files\n" + "".join(f"- `{f}`\n" for f in files),

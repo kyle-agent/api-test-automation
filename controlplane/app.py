@@ -712,12 +712,33 @@ def reporting(request: Request, tab: str = "summary"):
         from controlplane import results_data
         triage_detail = results_data.get_new_regressions()
         triage_known = results_data.get_known_issues()
+    runs = db.list_runs(limit=100)
+    archive = snapshots.archive_index(limit=100)
+    # Reporting 개선 C (계약 §2.1 병합 런 타임라인): RUN 히스토리(control plane)
+    # ∪ 아카이브(oplog 버킷 — 구형 CI 런 포함)를 gh_run_id 로 dedupe 해 시간순
+    # 단일 목록으로. "어제 런"의 단일한 답이 없던 문제(페르소나 P2 막힘) 해소.
+    seen = {str(r["gh_run_id"]) for r in runs if r["gh_run_id"]}
+    merged = [{"gh_run_id": r["gh_run_id"], "id": r["id"], "suite": r["suite"],
+               "profile": r["profile"], "trigger": r["trigger"],
+               "status": r["status"], "requested_at": r["requested_at"],
+               "finished_at": r["finished_at"], "sha": "",
+               "archive_only": False} for r in runs]
+    for a in archive:
+        rid = str(a.get("run_id") or "")
+        if not rid or rid in seen:
+            continue
+        merged.append({"gh_run_id": rid, "id": None, "suite": "", "profile": "",
+                       "trigger": "", "status": "done",
+                       "requested_at": "", "finished_at": a.get("finished") or "",
+                       "sha": a.get("sha") or "", "archive_only": True})
+    merged.sort(key=lambda r: str(r["finished_at"] or r["requested_at"] or ""),
+                reverse=True)
     return _render(request, "reporting.html", "reporting",
                    tab=tab,
                    coverage=dashdata.latest_coverage(),
                    triage_detail=triage_detail, triage_known=triage_known,
-                   runs=db.list_runs(limit=100),
-                   archive=snapshots.archive_index(limit=100))
+                   runs=runs, merged_runs=merged,
+                   archive=archive)
 
 
 @app.get("/dashboard/{rel_path:path}")
