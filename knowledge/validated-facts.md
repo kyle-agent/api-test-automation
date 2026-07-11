@@ -2020,3 +2020,87 @@ addgroupmember·removegroupmember·adduserpolicybinding·removeuserpolicybinding
   재토글 또는 SDS 문의.
 - SCR push 유저 regrscr856f95 (fd0328e2…) + 정책 3종(regrscrall/regrscrlogin/
   regrscrselfkey) + 인증키는 유지 중 — 해소 후 재사용, 불필요 시 삭제.
+
+## run-923a (2026-07-11 아침 풀런) 4xx 트리아지 — 서비스 커버리지 수리 배치 (2026-07-11)
+
+오너 풀런 `20260711-082618-923a`(119 lifecycle · step-end 1,529 · 4xx/5xx 367)의
+실패 전문을 oplog 버킷 artifact(`runs/<id>/artifact/events.jsonl`)에서 폴딩.
+미검증 갭 270키 중 **123키가 이번 런에서 4xx 도달** — 아래는 원인 확정분.
+
+### compute/virtualserver — 이미지 계열의 categorical 제약 2건 (실측 확정)
+
+- **볼륨 있는(custom, 서버 유래) 이미지는 visibility/min_disk 변경이 categorical
+  거부**: `Image.InvalidVolumeOnVisibilityUpdate` "Image with volumes cannot
+  update visibility" (min_disk도 동일 계열 — HB3b-2 기실측). 멤버 API는
+  `Image.SharedVisibilityRequired`(members는 shared 이미지만) → **custom 이미지
+  에서는 member 4종+share가 구조적으로 불가**. 수리: 전 멤버 체인을 볼륨 없는
+  image-shell(POST /v1/images)로 이전, visibility=shared 전환 스텝 신설.
+- **createimage/importimage는 `url` 필수** (400: 255자 이하 + `.qcow2$` 규격,
+  에러가 object-store 예시 URL 제시). **실존 public qcow2 자산을 상비**:
+  `assets/regr-minimal.qcow2` (수제 qcow2 v3 헤더+refcount+L1, 262,144B) —
+  oplog 버킷에 public-read 업로드, **RGW tenant path 형식**
+  `https://object-store.kr-west1.e.samsungsdscloud.com/<account_id>:apitest-oplog-permanent/assets/regr-minimal.qcow2`
+  로 anon GET 200 실측 (path-style `/bucket/...`은 NotFoundBucketNameInPath 400,
+  ops.html DEFAULT_BASE와 동일 형식이 정답).
+- createimagemember 필드명은 **`member_id`** (`member`는 "Extra inputs are not
+  permitted"; 값 규격 `^[A-Za-z0-9-]*$` 1-64).
+- updatesnapshot은 **`name` 필수** (description만 보내면 400; `^[a-zA-Z0-9-_ ]+$`).
+- revertvolumetosnapshot 400의 뿌리 = **스냅샷 create 직후 status=creating**
+  (show 200이어도 not available) → available settle 필수. 스냅샷 상태 필드는
+  `$.status` (볼륨은 `$.state` — 필드명이 다름, cinder 계열).
+- volume-transfer create 500 = PF-21 기지 제품버그 재확인 (parameter 수리 불가).
+
+### DBaaS 5엔진 공통 (database__subops-full)
+
+- **set-parameters 오염 클래스 (epas·pg 실측)**: PUT parameters 202 수락 → 비동기
+  Parameter Modify 실패 → `service_state=UNKNOWN` 추락 → 이후 mutating subop
+  **전부 400 InvalidState** (엔진당 12op 연쇄). wait-after-*가 UNKNOWN을 until에
+  포함해 즉시 '통과'하는 설계라 오염이 가려짐. **같은 런에서 sync-cluster-state
+  202가 RUNNING을 복구**해 후속 upgrade-kernel/resize 202 성공 실측 → 복구
+  스텝(sync-state + RUNNING 대기 600s, UNKNOWN은 until 제외)을 param 그룹 직후로
+  전진 배치.
+- **set-security-group-rules 400 전 엔진 공통 뿌리**: 문서 모델
+  `UpdateSecurityGroupRulesRequest = {add_ip_addresses, del_ip_addresses}` —
+  빈 리스트 no-op도, OpenStack식 rules 배열도 "invalid security-group-rules".
+  실 IP를 add 해야 함.
+- **resize-block-storage 400 InvalidBlockStorageRoleType**: OS 롤 그룹은 리사이즈
+  불가 — add-block-storages가 만든 **DATA 그룹([1])을 재조회 캡처** 후 리사이즈.
+- **add-block-storages size_gb는 multiple_of 제약** (10 거부·104 통과 실측 —
+  8의 배수 추정).
+- **register-log-export-config InvalidScheduleData**: frequency=DAY에
+  day_of_month=28 + day_of_week=MON 동시 지정이 모순 — 미사용 필드는 센티널
+  (`-1` / null; day_of_month 패턴에 `-1` 명시).
+- patch-minor-version: 자기 자신 버전 송신은 **"Unpatchable version" 400 확정**
+  (HB1 수리의 열린 질문 종결). 2xx에는 구버전 create → 신버전 패치 전략 필요
+  (SKE upgrade [1]→[0] 선례) — 백로그.
+- switchover 404 "switch over host not found" = ha_enabled:false 단일 노드
+  categorical — waiver 후보.
+- remove-backup-histories/unset-backup 401 = 기지 백엔드 quirk 재확인 (waiver #6).
+
+### 라이프사이클 구조 규약 (신규)
+
+- **create/wait는 hard 스텝이어야 한다**: optional+group create가 실패하면 그룹
+  teardown만 하고 **나머지 30-49 스텝이 죽은/삭제된 id로 계속 실행** (mariadb
+  create 500 → 49스텝 연쇄, eventstreams 프로비저닝 ERROR → es-wait terminal-bad
+  → 그룹 cleanup이 클러스터 삭제 → 이후 전부 404). hard로 승격하면 실패 시
+  라이프사이클이 정직하게 중단+전체 teardown. mariadb/eventstreams에 적용.
+- eventstreams es-wait의 step-end 이벤트가 category=ok로 기록되고 실제로는
+  terminal-bad 실패인 관측 어긋남 존재 (이벤트 발행이 분류 앞) — 트리아지 시 주의.
+
+### networking
+
+- **direct-connect create 400 `not-exist-log-storage`**: `firewall_loggable=true`
+  는 계정에 **FIREWALL network-logging 스토리지**를 요구 — gen-wave4-nlog의 검증
+  DTO `{bucket_name: apitest-logsink, resource_type: FIREWALL}` 선행 생성으로 해결
+  (스토리지가 이미 있으면 그 그룹만 실패하고 DC는 진행).
+- vpc-peering 규칙: destination_cidr에 requester CIDR **전체 동일값**은 400
+  not-available — 진부분집합 /24로. approve는 same-account에서 "Approval is not
+  required" 400 categorical (waiver/PF 후보).
+
+### data-analytics (구조적 — 파라미터 수리 범위 밖)
+
+- data-flow/data-ops/quick-query의 id-bound GET 400은 **계정에 리소스 0개**라
+  캡처가 실패해 리터럴 토큰이 형식 검사(`DFLOW-`/`DOPS-` prefix)에 걸리는 것.
+  2xx에는 실 리소스 필요 — createdataflow는 cluster_id·ingress_controller·
+  storage_class 등 **실 클러스터 전제** (오너 설계 결정 필요, 과금).
+  quick-query validate 500 ContactAdmin은 PF 후보.

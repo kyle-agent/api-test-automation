@@ -65,7 +65,7 @@
           "json": {
             "instance_count": 1,
             "service_ip_addresses": [
-              ""
+              "10.124.0.31"
             ]
           },
           "expect_status": [
@@ -426,7 +426,6 @@
           "name": "es-create",
           "service": "eventstreams",
           "group": "es-create",
-          "optional": true,
           "method": "POST",
           "path": "/v1/clusters",
           "json": {
@@ -504,7 +503,6 @@
           "name": "es-wait",
           "service": "eventstreams",
           "group": "es-create",
-          "optional": true,
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
           "expect_status": [
@@ -576,7 +574,7 @@
           "json": {
             "instance_count": 1,
             "service_ip_addresses": [
-              ""
+              "10.124.0.30"
             ]
           },
           "expect_status": [

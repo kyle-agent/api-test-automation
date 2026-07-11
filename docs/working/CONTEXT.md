@@ -113,7 +113,31 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-07-10 밤 — main=`672de85c`, branch 동기, 오너 실시간 협업 2일차 마감):**
+- **LATEST (2026-07-11 낮 — branch `claude/service-coverage-improvement-gwewio`,
+  run-923a 4xx 트리아지 → 서비스 커버리지 수리 배치):** 오너 아침 풀런
+  `20260711-082618-923a`(119 lifecycle) 실패 전문을 oplog artifact로 폴딩 —
+  미검증 갭 270키 중 **123키 4xx 도달** 확인, 파라미터/순서 수리 가능분 일괄
+  반영 (상세: `knowledge/validated-facts.md` 2026-07-11 블록). ① **VS 이미지
+  체인 재구성**: 볼륨 있는 custom 이미지는 visibility/member categorical 거부
+  (실측) → member 4종+share+listmembers를 볼륨 없는 image-shell로 이전, url
+  필수 → 수제 qcow2 상비 자산(`assets/regr-minimal.qcow2`, oplog 버킷
+  public-read, RGW tenant URL anon 200 실측) 주입, member→member_id 필드명,
+  updatesnapshot name 필수, revert 전 스냅샷 available settle 신설 ② **DBaaS
+  5엔진**: sg-rules body를 문서 모델(add_ip_addresses)+실 IP로, resize는 DATA
+  그룹([1]) 재캡처, epas/pg set-parameters 오염(202 수락→비동기 실패→UNKNOWN→
+  12op 연쇄 400)에 sync-state+RUNNING 복구 전진 배치(런 실측 근거), log-export
+  스케줄 모순(-1/null 센티널), mysql add-bs 104(multiple_of), maria-create 500
+  retry ③ **구조 규약 신설**: create/wait는 hard 스텝 — optional create 실패가
+  30-49스텝 유령 연쇄 (es는 프로비저닝 ERROR→그룹 cleanup이 클러스터 삭제 후
+  체인이 죽은 id로 계속; mariadb·eventstreams 적용) ④ **DC**: firewall_loggable
+  =true가 FIREWALL network-logging 스토리지 요구(400 not-exist-log-storage) →
+  선행 생성 그룹 신설 ⑤ peering rule CIDR 진부분집합 /24. **다음 런 판정 대기**:
+  VS image-shell ~9키 · DB 엔진당 3-12키 · DC 4키 · peering · es 재생성.
+  **구조적 차단 확인**: data-flow/data-ops/quick-query는 계정 리소스 0 → 실
+  클러스터 전제 create 설계 필요(오너 결정·과금), switchover는 ha:false
+  categorical(waiver 후보), patch-minor-version 2xx는 구버전 create 전략
+  필요(백로그), scr은 PF-37 대기.
+- **PRIOR (2026-07-10 밤 — main=`672de85c`, branch 동기, 오너 실시간 협업 2일차 마감):**
   검증 **2,424** (+13 오늘: private-nat 4 · LB member 2 · fs replication 2 ·
   iam createrole/deleterole/createiamuser/getiamuser · apigw setprivatelinkendpoint).
   **오늘의 확정**: ① IAM 트러스트 정책 = Principal(root SRN 리스트형)+Resource

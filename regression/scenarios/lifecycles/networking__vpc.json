@@ -953,10 +953,11 @@
           "group": "peering",
           "optional": true,
           "json": {
-            "destination_cidr": "10.130.0.0/20",
+            "destination_cidr": "10.130.1.0/24",
             "destination_vpc_type": "REQUESTER_VPC",
             "tags": []
           },
+          "_note": "2026-07-11 run-923a 수리: requester CIDR 전체(10.130.0.0/20)와 동일값을 보냈더니 400 scp-network.vpc-peering.rule.not-available 'It must be included in the destination VPC IP cidr' — 진부분집합 /24로 축소. 여전히 실패하면 destination_vpc_type 의미가 반대(approver 측 10.141.x 요구)일 가능성 — 다음 런 에러가 판정.",
           "expect_status": [
             200,
             201,

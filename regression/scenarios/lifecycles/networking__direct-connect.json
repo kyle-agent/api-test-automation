@@ -47,6 +47,22 @@
           "poll": {"field": "$.vpc.state", "until": ["ACTIVE", "CREATED", "RUNNING"], "timeout": 300, "interval": 10}
         },
         {
+          "name": "create-firewall-logging-storage",
+          "service": "network-logging",
+          "method": "POST",
+          "path": "/v1/network-logging/storages",
+          "group": "dc-log-storage",
+          "optional": true,
+          "json": {
+            "bucket_name": "apitest-logsink",
+            "resource_type": "FIREWALL"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"fw_log_storage_id": "$.network_logging_storage.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/network-logging/storages/{fw_log_storage_id}", "service": "network-logging"},
+          "_note": "2026-07-11 run-923a 수리: create-direct-connect(firewall_loggable=true)가 400 scp-network.direct-connect.not-exist-log-storage 'FIREWALL Logging storage does not exist' — 계정 FIREWALL 로깅 스토리지 선행 생성 (gen-wave4-nlog의 검증된 DTO {bucket_name, resource_type}, 버킷 apitest-logsink는 워크플로가 ensure). 이미 존재해 실패하면(자기 그룹) DC 그룹은 그대로 진행 — 스토리지가 있다는 뜻이므로."
+        },
+        {
           "name": "create-direct-connect",
           "method": "POST",
           "path": "/v1/direct-connects",
