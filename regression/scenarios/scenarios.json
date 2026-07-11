@@ -327,6 +327,7 @@
         },
         {
           "name": "get-subnet-active",
+          "_note": "svc-opt 2026-07-11 실측: 자체생성 VPC의 서브넷은 ACTIVE까지 3분+ 걸릴 수 있음 (공유 VPC 서브넷은 수십초) — 180s 폴 소진 후 create-port가 not-active 400으로 환경스킵되던 것. timeout 상향.",
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
           "expect_status": [
@@ -337,7 +338,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 180,
+            "timeout": 420,
             "interval": 10
           }
         },
@@ -352,8 +353,12 @@
         },
         {
           "name": "create-port",
+          "_note": "svc-opt 2026-07-11: 서브넷 늦활성 벨트 — not-active 400은 재시도로 흡수",
           "method": "POST",
           "path": "/v1/ports",
+          "retry_on_status": [400],
+          "retries": 4,
+          "retry_interval": 15,
           "json": {
             "name": "regrport{unique}",
             "description": "API regression suite",
