@@ -2114,7 +2114,7 @@ def _run_worker(rec: dict) -> None:
                 # the leader — subprocess.run gave us no handle at all.
                 proc = subprocess.Popen(
                     [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
-                     "-n", n, "-o", "addopts=", "-q"],
+                     "-n", n, "--maxschedchunk=1", "-o", "addopts=", "-q"],
                     cwd=str(ROOT), env={**env, **shared}, stdout=f,
                     stderr=subprocess.STDOUT, start_new_session=True)
                 with _LOCK:

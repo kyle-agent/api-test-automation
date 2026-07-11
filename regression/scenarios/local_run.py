@@ -298,7 +298,7 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
         pos = f.tell()
         rc = subprocess.run(
             [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
-             "-n", n, "-o", "addopts=", "-q"],
+             "-n", n, "--maxschedchunk=1", "-o", "addopts=", "-q"],
             cwd=str(_ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT).returncode
         f.flush()
         try:

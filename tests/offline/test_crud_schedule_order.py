@@ -69,3 +69,39 @@ def test_learning_gate_requires_live_run_markers(monkeypatch):
     crud_conftest.pytest_sessionfinish(None, 0)
     assert called, "live 마커가 있으면 fold되어야 한다"
     crud_conftest._MEASURED.clear()
+
+
+def test_durations_reader_merges_local_overlay(tmp_path, monkeypatch):
+    """학습은 로컬 오버레이(durations.local.json)에 쓰고, 읽기는 커밋본+오버레이
+    병합(오버레이 우선) — 커밋본을 더럽혀 git pull과 충돌하던 결함의 회귀 방지
+    (2026-07-11)."""
+    import json
+    import tests.crud.conftest as cf
+
+    committed = tmp_path / "durations.json"
+    local = tmp_path / "durations.local.json"
+    committed.write_text(json.dumps({"a": {"avg_s": 100.0}, "b": {"avg_s": 50.0}}))
+    local.write_text(json.dumps({"b": {"avg_s": 999.0}, "c": {"avg_s": 5.0}}))
+    monkeypatch.setattr(cf, "_DUR_PATH", committed)
+    monkeypatch.setattr(cf, "_DUR_LOCAL", local)
+    d = cf._durations()
+    assert d == {"a": 100.0, "b": 999.0, "c": 5.0}
+
+
+def test_sessionfinish_folds_into_local_overlay_not_committed(tmp_path, monkeypatch):
+    import json
+    import tests.crud.conftest as cf
+
+    committed = tmp_path / "durations.json"
+    local = tmp_path / "durations.local.json"
+    committed.write_text(json.dumps({"x": {"avg_s": 10.0, "n": 1, "last_s": 10.0}}))
+    monkeypatch.setattr(cf, "_DUR_PATH", committed)
+    monkeypatch.setattr(cf, "_DUR_LOCAL", local)
+    monkeypatch.setattr(cf, "_MEASURED", {"x": 30.0}, raising=False)
+    monkeypatch.setenv("SCP_CONSOLE_EVENTS", "/tmp/x.jsonl")
+    monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+    before = committed.read_text()
+    cf.pytest_sessionfinish(None, 0)
+    assert committed.read_text() == before          # 커밋본 불변
+    folded = json.loads(local.read_text())
+    assert folded["x"]["n"] == 2 and folded["x"]["last_s"] == 30.0

@@ -30,14 +30,21 @@ import os
 from pathlib import Path
 
 _DUR_PATH = Path(__file__).resolve().parents[2] / "data" / "optimizer" / "durations.json"
+# 실측 학습은 git-추적본이 아니라 **로컬 오버레이**에 쓴다 (2026-07-11 실측 결함:
+# 커밋된 durations.json에 fold하면 오너 콘솔의 작업트리가 더러워져 다음 git pull과
+# 충돌 — 학습이 조용히 유실된다). 읽기는 커밋본+오버레이 병합, 오버레이 우선.
+_DUR_LOCAL = _DUR_PATH.with_name("durations.local.json")
 
 
 def _durations() -> dict:
-    try:
-        raw = json.loads(_DUR_PATH.read_text())
-        return {k: float(v.get("avg_s") or 0.0) for k, v in raw.items()}
-    except Exception:  # noqa: BLE001 — ordering is best-effort; never break collection
-        return {}
+    out: dict = {}
+    for p in (_DUR_PATH, _DUR_LOCAL):
+        try:
+            raw = json.loads(p.read_text())
+            out.update({k: float(v.get("avg_s") or 0.0) for k, v in raw.items()})
+        except Exception:  # noqa: BLE001 — ordering is best-effort; never break collection
+            continue
+    return out
 
 
 def _class_default_s(lc: dict) -> float:
@@ -145,8 +152,12 @@ def pytest_sessionfinish(session, exitstatus) -> None:  # noqa: ARG001
         return
     try:
         from regression.scenarios.schedule_optimizer import update_durations
-        update_durations(dict(_MEASURED))
+        # 로컬 오버레이에 fold — 커밋본을 더럽히지 않는다 (git pull 충돌 방지).
+        # 오버레이가 없으면 커밋본을 시드로 복사해 롤링 평균의 연속성 유지.
+        if not _DUR_LOCAL.exists() and _DUR_PATH.exists():
+            _DUR_LOCAL.write_text(_DUR_PATH.read_text())
+        update_durations(dict(_MEASURED), path=_DUR_LOCAL)
         print(f"[durations] {len(_MEASURED)}개 lifecycle 실측을 "
-              f"durations.json에 fold (rolling avg)")
+              f"durations.local.json에 fold (rolling avg, git-비추적)")
     except Exception as exc:  # noqa: BLE001 — learning is best-effort
         print(f"[durations] fold 실패(무시): {exc}")
