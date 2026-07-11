@@ -2180,8 +2180,8 @@ def _run_worker(rec: dict) -> None:
                 f.write("\n=== per-run cleanup: teardown-scoped ===\n"
                         "  teardown 시도 완료 — 이 실행이 만든 자원의 라이프사이클 teardown 을 "
                         "수행했습니다. 실측 재스캔 예약됨 (+0 · +5m · +15m; 비동기 생성물 감시).\n"
-                        "  계정 전체 reconciler 청소는 자동 실행하지 않음 — '강제 클린업'(POST "
-                        "/api/cleanup) 버튼으로 수동 실행하세요.\n")
+                        "  계정 전체 스윕은 아래 '런 종료 자동 클린업' 단계가 수행합니다 "
+                        "(다른 실행 진행/대기 중이면 생략 — 그때만 '강제 클린업' 버튼 수동 실행).\n")
                 f.flush()
                 # Run-scoped leftover reap (owner 2026-07-09): this run's
                 # tracked−deleted 자원을 사다리로 마저 삭제 — filestorage 교차리전
