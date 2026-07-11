@@ -1255,6 +1255,7 @@
         },
         {
           "name": "update-deduplication",
+          "_note": "표준 큐에는 dedup 설정 불가(FIFO 전용, userguide/오너 2026-06-13) — 400은 범주적 정답. svc-opt 실측(2026-07-11): 400을 미기대로 두면 optional-4xx 사다리가 60초를 태움 (2xx 커버는 gen-wave3-qfifo가 담당)",
           "group": "qdedup",
           "optional": true,
           "method": "PUT",
@@ -1265,11 +1266,13 @@
           "expect_status": [
             200,
             202,
-            204
+            204,
+            400
           ]
         },
         {
           "name": "update-deduplication-scope",
+          "_note": "표준 큐에는 dedup-scope 설정 불가(FIFO 전용) — 400 범주적 정답, update-deduplication과 동일 (svc-opt 2026-07-11)",
           "group": "qdedupscope",
           "optional": true,
           "method": "PUT",
@@ -1280,7 +1283,8 @@
           "expect_status": [
             200,
             202,
-            204
+            204,
+            400
           ]
         },
         {
