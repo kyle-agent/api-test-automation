@@ -2741,6 +2741,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, _graph(self._body()))
             except Exception as exc:  # noqa: BLE001
                 return self._json(500, {"error": f"graph failed: {exc}"})
+        if p == "/api/schedule-sim":
+            # 오프라인 스케줄 시뮬 (오너 2026-07-11): 선택(또는 전체)의 예상
+            # 동시 배치를 conftest와 동일 규칙으로 계산 — API 호출 없음.
+            b = self._body()
+            ids = b.get("lifecycle_ids") or None
+            if not ids and (b.get("node_ids") or b.get("services") or b.get("categories")):
+                ids = _resolve_lifecycle_ids(b)
+            try:
+                from regression.scenarios import local_run as _lr
+                return self._json(200, _lr.simulate_schedule(
+                    ids, workers=b.get("workers"),
+                    vpc_slots=int(b.get("vpc_slots") or 4)))
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"schedule-sim failed: {exc}"})
         if p == "/api/plan":
             sel = self._body()
             ids = sel.get("lifecycle_ids") if "lifecycle_ids" in sel and not (

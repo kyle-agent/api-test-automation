@@ -157,9 +157,9 @@ def pytest_sessionfinish(session, exitstatus) -> None:  # noqa: ARG001
     try:
         from regression.scenarios.schedule_optimizer import update_durations
         # 로컬 오버레이에 fold — 커밋본을 더럽히지 않는다 (git pull 충돌 방지).
-        # 오버레이가 없으면 커밋본을 시드로 복사해 롤링 평균의 연속성 유지.
-        if not _DUR_LOCAL.exists() and _DUR_PATH.exists():
-            _DUR_LOCAL.write_text(_DUR_PATH.read_text())
+        # 시딩 카피는 하지 않는다: 옛 커밋본을 복사해두면 커밋본이 재구축돼도
+        # 낡은 오버레이가 계속 이겨버린다 (2026-07-11 실측 — 게이트 테스트가
+        # 만든 시드 오버레이가 재구축 값을 가림). 오버레이는 이 머신의 실측만.
         update_durations(dict(_MEASURED), path=_DUR_LOCAL)
         print(f"[durations] {len(_MEASURED)}개 lifecycle 실측을 "
               f"durations.local.json에 fold (rolling avg, git-비추적)")

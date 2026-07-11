@@ -51,9 +51,10 @@ def test_class_default_replaces_zero_for_unmeasured():
     assert v >= 1000.0, f"cluster-grade default expected, got {v}"
 
 
-def test_learning_gate_requires_live_run_markers(monkeypatch):
+def test_learning_gate_requires_live_run_markers(monkeypatch, tmp_path):
     """offline/mock pytest 실행이 durations.json을 오염시키지 않는다 —
     APITEST_RUN_ID/SCP_CONSOLE_EVENTS 없으면 fold가 호출되지 않는다."""
+    monkeypatch.setattr(crud_conftest, "_DUR_LOCAL", tmp_path / "durations.local.json")
     monkeypatch.delenv("APITEST_RUN_ID", raising=False)
     monkeypatch.delenv("SCP_CONSOLE_EVENTS", raising=False)
     monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
@@ -104,4 +105,7 @@ def test_sessionfinish_folds_into_local_overlay_not_committed(tmp_path, monkeypa
     cf.pytest_sessionfinish(None, 0)
     assert committed.read_text() == before          # 커밋본 불변
     folded = json.loads(local.read_text())
-    assert folded["x"]["n"] == 2 and folded["x"]["last_s"] == 30.0
+    # 시딩 카피 없음 (2026-07-11): 오버레이는 이 머신의 실측만 담는다 —
+    # 옛 커밋본을 시드하면 커밋본 재구축을 낡은 오버레이가 가려버린다.
+    assert folded["x"]["n"] == 1 and folded["x"]["last_s"] == 30.0
+    assert list(folded) == ["x"]

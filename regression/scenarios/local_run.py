@@ -366,3 +366,64 @@ def verify_clean(log_path: str) -> dict:
         rc = subprocess.run([sys.executable, "-m", "cleanup.verify_clean"],
                             cwd=str(_ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
     return {"rc": rc}
+
+
+def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
+                      workers: int | None = None, vpc_slots: int = 4) -> dict:
+    """오프라인 스케줄 시뮬레이션 — 실제 conftest 정렬(실측 LPT + 스텝수
+    타이브레이크)과 동일 규칙으로 greedy 배치를 예측한다 (오너 2026-07-11
+    "전체 실행했을 때 시나리오가 동시에 어떻게 배치될지 시뮬레이션").
+    API 호출 없음. 미모델: 공유-VPC 내 IGW/NAT 1:1 대기, 백엔드 지연/재시도.
+    반환: {workers, vpc_slots, makespan_s, bars:[{id,w,s,e,vpc,measured}]}"""
+    import json as _json
+    from regression.scenarios.loader import load_lifecycles
+    from tools.duration_stats import CLASS_DEFAULT_S, classify_lifecycle
+
+    dur: dict[str, float] = {}
+    for name in ("durations.json", "durations.local.json"):   # 오버레이 우선
+        p = _ROOT / "data" / "optimizer" / name
+        try:
+            dur.update({k: float(v.get("avg_s") or 0.0)
+                        for k, v in _json.loads(p.read_text()).items()})
+        except Exception:  # noqa: BLE001 — best-effort
+            continue
+    lcs, _ = load_lifecycles(with_sources=True)
+    en = {l["id"]: l for l in lcs
+          if l.get("enabled") and l.get("role", "verify") == "verify"}
+    ids = list(lifecycle_ids) if lifecycle_ids else sorted(en)
+    items = [en[i] for i in ids if i in en]
+
+    def _dur(l: dict) -> float:
+        v = dur.get(l["id"], 0.0)
+        return v if v > 0 else float(CLASS_DEFAULT_S[classify_lifecycle(l)])
+
+    def _self_vpc(l: dict) -> bool:
+        for s in l.get("steps", []):
+            if (s.get("method") == "POST"
+                    and (s.get("path") or "").rstrip("/").endswith("/vpcs")):
+                return s.get("adopt") != "vpc"
+        return False
+
+    items.sort(key=lambda l: (_dur(l), len(l.get("steps") or [])), reverse=True)
+    cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
+    n_w = int(workers) if workers else max(1, min(cap, len(items) or 1))
+    n_v = max(1, int(vpc_slots))
+    wfree = [0.0] * n_w
+    vfree = [0.0] * n_v
+    bars = []
+    for l in items:
+        d = _dur(l)
+        wi = min(range(n_w), key=lambda i: wfree[i])
+        start = wfree[wi]
+        v = _self_vpc(l)
+        if v:
+            vi = min(range(n_v), key=lambda i: vfree[i])
+            start = max(start, vfree[vi])
+            vfree[vi] = start + d
+        wfree[wi] = start + d
+        bars.append({"id": l["id"], "w": wi, "s": round(start, 1),
+                     "e": round(start + d, 1), "vpc": v,
+                     "measured": dur.get(l["id"], 0.0) > 0})
+    return {"workers": n_w, "vpc_slots": n_v,
+            "makespan_s": max((b["e"] for b in bars), default=0.0),
+            "bars": bars}
