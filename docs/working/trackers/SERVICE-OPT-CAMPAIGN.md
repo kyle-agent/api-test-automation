@@ -43,7 +43,7 @@
 | 18 | servicewatch | 4종 실측 | ✅ 완료 | loggroup 147.7s→**~22s** | listmetricinfos 바디 수리(**신규 2xx 커버**) + listmetricdata 400=환경적(메트릭 카탈로그 0) 등록 (-130s) | 9~22s | create-group 500 재발 없음; metricdata 2xx는 VM 동반 런에서 | | | | create-group 500 재확인 |
 | 19 | cdn / gslb / dns | reads + hosted-zone | ✅ 완료 | 4.5/6.8/**101s** | dns: 892a의 22분은 전부 큐 대기였음(단독 101s). 쿼터 400에 사다리 87s → **엔진 가드 신설**(max-count/quota는 즉시 기록) | dns 클린 ~15s 예상 | private-dns 삭제는 느린 비동기(DELETING 수 분) |
 | 20 | certificatemanager | selfsign | ✅ 완료 | 16.5s (재검증) | 캠페인 자체 회귀({today} int화) 적발·즉수정 | ~16.5s | create 201 |
-| 21 | networking (vpc/subnet/port/publicip/peering/TGW/endpoint/NAT) | 다수 | 대기 | | | | 슬롯 소비 — 후반 |
+| 21 | networking 코어 | sg·publicip·vpc-subnet·vip-nat (4/다수) | ◑ 진행 | 29/14/354(skip)/544s | **도메인 실측: 자체생성 VPC의 서브넷 ACTIVE 3분+** (공유 VPC는 수십초) → 폴 180→420s + create-port 400 벨트. delete-vip 409 소진 135s는 조사 대기 | | peering·TGW·endpoint·private-nat 후속 |
 | 22 | loadbalancer | light (heavy는 892a 수리 재검증 대기) | ✅ light 완료 | 8.6s | 대기 없음 | ~9s | heavy(members)는 member_state 수리 검증 겸 후속 |
 | 23 | filestorage | volume, wave2-fs (replication은 후속) | ✅ 2/3 | 75.1s/56.8s | 느린 스텝 = 정당한 settle 폴 (async 볼륨) | 동일 | replication-schedule 교차리전은 별도 회차 |
 | 24 | scf | 4종 | ✅ 완료 | 62/559/496/112s (4 passed) | wave2-scf 트리거read 404수리 **200 검증**. 재검토 후보: ①PLE request/cancel 사다리 ~285s 매번 소진(승격 실측 無) ②update-code 303s (DEPLOYING 대기 구조) | 동일 | PLE 사다리는 설계물 — 트리아지 판단 대상 |
@@ -57,6 +57,7 @@
 
 ## 발견/개선 로그
 
+- **도메인 발견 (#21)**: 자체생성 VPC의 서브넷은 ACTIVE까지 3분+ (공유 VPC 서브넷은 수십초) — 프로비저닝 개선(VPC CREATING 중 subnet 발행)과 결합하면 상쇄 가능성. vip delete 409 소진(135s)은 후속 조사.
 - **프로비저닝 실측 (dns 단독런)**: 공유 VPC+서브넷 준비에 **147초** — 오너 지적('시작이 너무 오래 걸림')의 실측치. 개선 후보 2건 유효: ①프로비저닝 ∥ pytest 기동 겹침(VPC-불요 항목 즉시 출발) ②VPC CREATING 중 subnet POST 수락 여부 실측 후 겹침. 단독런 배치에는 '선행 프로비저닝 재사용'(연속 배치가 같은 공유 VPC 공유)도 유효.
 - **운영 규약**: 장기 라이프사이클(dns 22분 등) 배치는 내부 timeout 금지 — 부모만 죽고 정리 미수행 (이번 dns-v2 사고; 스윕으로 회수).
 - **자기 회귀 적발 (#20)**: epoch 정수 코어션이 {today} 문자열 필드까지 int화 → cert 400. epoch_* 한정으로 즉시 수정 — 서비스별 즉검증 루프가 당일 회귀를 당일 적발.
