@@ -2032,3 +2032,17 @@ addgroupmember·removegroupmember·adduserpolicybinding·removeuserpolicybinding
 mysql/mariadb/epas)의 `/v1/clusters`는 `{"contents":[…], "count", "page",
 "size", "sort"}` 형태로 contents가 먼저라 무해. flat `/v1/nodepools`(+쿼리
 변형)는 이 계정에서 403 — 노드풀 접근은 **네스티드 경로만** 유효.
+
+## SCF 함수 삭제 ladder — PrivateLink 서비스 먼저 비활성화 (2026-07-11, PF-46)
+
+`DELETE /v1/cloud-functions/{id}`는 함수의 **PrivateLink 서비스가 enabled면
+400** (`scp-cloud-function.function-not-deletable-error`). 선행 절차:
+`PUT /v1/cloud-functions/{id}/configurations/privatelink-services`
+body `{"privatelink_service_enabled": false}` → 그 다음 함수 DELETE.
+플랫폼 결함: wave5의 regrw5trg* 2건은 privatelink_service_state가 **6/20부터
+3주째 CREATING** (requested_endpoints=[])이고, CREATING 상태에선 비활성화도
+400 (`privatelink-service-not-allow-state-error`) → 함수가 영구 삭제불가.
+백엔드(SDS) 해소 필요 — 스윕은 stuck으로 보고하고 수렴 (reconciler
+_pass_scf에 ladder 반영). SCF 전용 privatelink 경로는 scf 서비스의
+`/configurations/privatelink-services|endpoints`이며 VPC의
+`/v1/privatelink-services`에는 나타나지 않는다.

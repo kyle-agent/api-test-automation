@@ -1280,8 +1280,30 @@ def _pass_scf(c) -> int:
                         json={"cloud_function_id": fid,
                               "trigger_type": (tr.get("trigger_type")
                                                or "cronjob")})
-        if _delete(c, "scf", f"/v1/cloud-functions/{fid}"):
+        # PF-46 (2026-07-11 live): a function whose PrivateLink SERVICE is
+        # enabled rejects DELETE (scp-cloud-function.function-not-deletable-
+        # error) — disable it first via PUT …/configurations/privatelink-
+        # services {"privatelink_service_enabled": false}. A service stuck in
+        # CREATING rejects the deactivation too ("not allowed when Creating
+        # state", observed stuck 3 weeks on regrw5trg*) — that function is
+        # un-deletable until the backend settles; the 400 below feeds the
+        # stuck-tracker so the sweep converges instead of retrying forever.
+        plink = f"/v1/cloud-functions/{fid}/configurations/privatelink-services"
+        try:
+            pl = c.get(plink, service="scf").body or {}
+            if isinstance(pl, dict) and pl.get("privatelink_service_enabled"):
+                pr = c.put(plink, service="scf",
+                           json={"privatelink_service_enabled": False})
+                print(f"  scf {fid} privatelink-service disable -> {pr.status}")
+        except core.MutationBlocked as exc:
+            print(f"  blocked: {exc}")
+        except Exception as exc:
+            print(f"  scf {fid} privatelink-service check -> {exc}")
+        st = _delete(c, "scf", f"/v1/cloud-functions/{fid}")
+        if _note_progress(st, it):   # a 400 is NOT a deletion (Bug-2a class)
             deleted += 1
+        else:
+            print(f"  cloud-function {_name_of(it)} ({fid}) delete -> {st}")
     return deleted
 
 
