@@ -34,13 +34,13 @@
 | 9 | queueservice | gen-wave3-qfifo, application-queueservice-queue | ✅ 완료 | 17.5s / **153.3s** | **-127s**: 표준 큐 dedup PUT 400은 범주적(FIFO 전용)인데 optional-4xx 사다리가 스텝당 60s 소진 → expect_status에 400 등록 | 17.5s / **26.3s** | 첫 대형 개선 — 사다리는 '승격 가능한 400'에만 | | | | |
 | 10 | iam-identity-center | idc-read-coverage | ✅ 완료 | 17.2s | 대기 없음 (404 관용 reads) | ~17s | | | | | |
 | 11 | direct-connect | gen-direct-connect (+ routing) | 대기 | | | | DC 1:1-per-VPC 규약 |
-| 12 | iam | iam-group, gen-wave5-iam-bindings (+ user/role) | 대기 | | | | |
-| 13 | kms | gen-wave2-sec, security-kms-transit-crypto | 대기 | | | | PF-09 예약삭제 |
-| 14 | secretsmanager | security-secretsmanager-writes | 대기 | | | | |
-| 15 | apigateway | gen-wave-apigw, gen-wave5-apigw-policy | 대기 | | | | |
+| 12 | iam | iam-group, gen-wave5-iam-bindings | ✅ 완료 | 18.2s/39.7s | 대기 없음 (스텝 최대 4.8s) | 동일 | | | | | |
+| 13 | kms | gen-wave2-sec, security-kms-transit-crypto | ✅ 완료 | 22.8s/45.7s | 대기 없음 | 동일 | 예약삭제(PF-09)로 잔존은 자동소멸 | | | | PF-09 예약삭제 |
+| 14 | secretsmanager | security-secretsmanager-writes | ✅ 완료 | 54.8s | 대기 없음 (create 18.6s는 서버 실소요) | ~55s | | | | | |
+| 15 | apigateway | gen-wave-apigw, gen-wave5-apigw-policy | ✅ 완료 | 13.3s/93.7s | 일시 ConnectionError 1건 → 엔진 전송 재시도 확장 | 동일 | policy쪽 93.7s는 스텝 수(20+) 실소요 | | | | |
 | 16 | firewall | gen-wave5-fw | 대기 | | | | 캐리어 암묵 생성 |
-| 17 | resourcemanager | 4종 | 대기 | | | | |
-| 18 | servicewatch | 8종 | 대기 | | | | create-group 500 재확인 |
+| 17 | resourcemanager | 4종 | ✅ 완료 | RG 80.4s→**19.1s** | set-rg tags:[] 400 수리 (-61s) | 19.1/25/17/45.8s | tag-rg 403은 entitlement | | | | |
+| 18 | servicewatch | 4종 실측 | ✅ 완료 | loggroup 147.7s→**~22s** | listmetricinfos 바디 수리(**신규 2xx 커버**) + listmetricdata 400=환경적(메트릭 카탈로그 0) 등록 (-130s) | 9~22s | create-group 500 재발 없음; metricdata 2xx는 VM 동반 런에서 | | | | create-group 500 재확인 |
 | 19 | cdn / dns / gslb | reads+CRUD | 대기 | | | | CDN stop 상태기계 |
 | 20 | certificatemanager | selfsign 등 | 대기 | | | | |
 | 21 | networking (vpc/subnet/port/publicip/peering/TGW/endpoint/NAT) | 다수 | 대기 | | | | 슬롯 소비 — 후반 |
@@ -57,6 +57,8 @@
 
 ## 발견/개선 로그
 
+- **servicewatch (#18)**: listmetricinfos의 dimensions가 JSON '문자열'로 박혀 400이던 것 수리 → **신규 2xx 커버리지 획득**. listmetricdata는 메트릭 카탈로그가 비면(구동 VM 없음) 어떤 쌍도 400 — cm과 같은 VS-의존 클래스. epoch 토큰({epoch_now}/{epoch_1h_ago}) + 정수 보존 치환 엔진 추가.
+- **resourcemanager (#17)**: set-rg tags:[] 400 → 실태그 수리 (80→19초).
 - **queueservice (#9)**: optional-4xx 재시도 사다리가 '범주적 400'(FIFO 전용 설정을 표준 큐에)에 스텝당 60초 소진 — 문서화된 범주 400은 expect_status로 등록해 사다리 차단 (153→26초). **같은 패턴 전수 점검 후보**: 사다리는 '시간이 지나면 2xx가 될 수 있는 400'에만 태워야 함.
 - **엔진 개선 (svc-opt 파생)**: 런 종료 자동 스윕에 자원-생성 게이트 — read-only 런(3~9초)에 계정 전체 스윕(수 분)이 통째로 돌던 낭비 제거 (events 원장 resource-tracked=0이면 스킵; local_run+console2 동일 적용). 캠페인 회전 속도와 오너 콘솔 read 런 종료 시간 모두 단축.
 - **cloudmonitoring (#1)**: 대기 낭비 0. getaccountproductlist는 Running VM 의존 — 전체 런에서 VS 뒤로 배치하면 관용404→2xx 승격 가능 (스케줄 의존 힌트).

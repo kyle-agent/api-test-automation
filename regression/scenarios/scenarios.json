@@ -44,6 +44,7 @@
         },
         {
           "name": "set-rg",
+          "_note": "svc-opt 2026-07-11: tags:[]는 400 'The tags field must not be empty' — 실태그로 수리 (optional-4xx 사다리 60s 낭비 제거)",
           "method": "PUT",
           "path": "/v1/resource-groups/{rg_id}",
           "json": {
@@ -52,7 +53,9 @@
             "resource_types": [
               "resourcemanager:resource-group"
             ],
-            "tags": []
+            "tags": [
+              {"key": "owner", "value": "apitest"}
+            ]
           },
           "expect_status": [
             200,
@@ -9545,16 +9548,10 @@
           "group": "xcov-listmetricdata",
           "optional": true,
           "json": {
-            "end": 1640995440,
+            "end": "{epoch_now}",
             "metrics": [
               {
-                "dimensions": [
-                  {
-                    "key": "VolumeID",
-                    "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
-                  }
-                ],
-                "display_name": "Virtual Server | VirtualServer001 | CPU Usage/Core[Basic]",
+                "display_name": "Virtual Server | CPU Usage/Core[Basic]",
                 "name": "CPU Usage/Core[Basic]",
                 "namespace_name": "Virtual Server",
                 "period": 300,
@@ -9562,14 +9559,15 @@
               }
             ],
             "period": 300,
-            "start": 1640995200,
+            "start": "{epoch_1h_ago}",
             "statistic_type": "AVG"
           },
-          "_note": "Body = exact data/api_bodies.json listmetricdata doc body (real namespace 'Virtual Server' + metric 'CPU Usage/Core[Basic]'); previous regr{unique} namespace was rejected. Docs-derived, pending live validation.",
+          "_note": "svc-opt 2026-07-11: 롤링 1시간 창 + 차원 제거로 개정. 400 'Invalid metrics requests'는 환경적 범주 응답 — 메트릭 카탈로그(listmetricinfos 200)가 count:0 (구동 VM 없음 → 등록된 쌍이 없어 어떤 요청도 무효). 400 기대 등록으로 optional-4xx 사다리 65s 차단; Running VM이 있는 런(compute-virtualserver 뒤)에서 2xx 재승격 대상 — cm getaccountproductlist와 동일 클래스.",
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ]
         },
         {
@@ -9583,7 +9581,9 @@
             "metric_name": "CPU Usage/Core[Basic]",
             "namespaces": [
               {
-                "dimensions": "[[\"resource_id\"]]",
+                "dimensions": [
+                  ["resource_id"]
+                ],
                 "name": "Virtual Server"
               }
             ]
