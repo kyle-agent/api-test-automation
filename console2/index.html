@@ -57,6 +57,10 @@ html.bare-console #backToShell{display:inline}</style>
      now-playing 위에 얹는다 — run이 in-flight일 때만 보임. -->
 <div class="planactual hidden" id="planactual"></div>
 
+<!-- 종료 후 다음 행동 카드 (v2 접목 3 — §2.9 C층): run 종료 시 토스트 대신
+     fail→상세 / +검증→fold 안내 / 잔존 확인 3줄 + 계획 대비 회고 1줄. -->
+<div class="donecard hidden" id="donecard"></div>
+
 <!-- NOW-PLAYING (신규4): persistent strip above the tabs — 지금 실행 중인
      lifecycle:step + METHOD path + 경과/평균(durations.json). Hidden when idle. -->
 <div class="nowplaying hidden" id="nowplaying"></div>

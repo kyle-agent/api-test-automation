@@ -663,6 +663,16 @@ g.rg-selbox{cursor:pointer}
 .planactual .sl.mine{background:var(--accent)}
 .planactual .sl.other{background:#a78bda}
 .planactual .sl.free{background:#eef1f5;border:1px dashed #c8cdd3;width:8px;height:8px}
+/* 종료 후 다음 행동 카드 (v2 접목 3 — §2.9 C층): 토스트 대신 fail/+검증/잔존 3줄. */
+.donecard{margin:8px 0 2px;padding:9px 12px;background:var(--panel);border:1px solid var(--line2);
+  border-left:4px solid var(--accent);border-radius:8px;font-size:12px;color:var(--ink)}
+.donecard .dc-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.donecard .dc-head b{font-size:12.5px}
+.donecard .dc-x{margin-left:auto}
+.donecard .dc-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:3px 0;border-top:1px dashed var(--line)}
+.donecard .dc-k{font-size:10px;font-weight:800;letter-spacing:.4px;color:var(--muted);width:38px;flex:none}
+.donecard .dc-row.bad .dc-k{color:var(--red)}
+.donecard .dc-row.ok .dc-k{color:var(--green)}
 /* P2C-24: 런 진행률 바 (now-playing) — rail 전체 카드 링과 같은 runProgress 소스 */
 .nowplaying .np-prog{width:110px;height:6px;border-radius:4px;background:#d9e2ef;overflow:hidden;
   flex:none;display:inline-block}

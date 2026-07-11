@@ -169,6 +169,74 @@ def api_run(rid: str) -> JSONResponse:
     return _json(c2._rec_view(rec, full=True))
 
 
+# fold(공식 반영) 안내 수치의 시간창 여유 — 서버 시계 오차·로그 반영 지연 감안
+# (v2 접목 3, donor: controlplane/v2/run_detail_data._fold_status 이식. 정밀
+# 조인이 아니라 안내용 근사 — 로컬 런은 Observation.run이 비어 시간창만 가능,
+# 그래서 UI는 반드시 "약 N건"으로 표기한다).
+_FOLD_WINDOW_MARGIN_S = 30.0
+_FOLD_PREVIEW_LIMIT = 20
+
+
+@router.get("/api/runs/{rid}/fold-evidence")
+def api_fold_evidence(rid: str) -> JSONResponse:
+    """이 런 시간창 내 2xx 관측 endpoint_key − 발행본 verified_endpoints.json
+    = "공식 집계 미반영 검증 증거" (계약 §2.4, v2 접목 3의 종료 카드 +검증 줄).
+
+    **계산만 한다** — fold를 실행하거나 evidence 파일/main에 쓰지 않는다
+    (절차는 derive_verified→promote_validated→커밋 검토, Hard Rule 7 유지).
+    available=False 는 "계산 불가"(시간창/관측 파일 없음) — count 0 과 다른 상태.
+    """
+    with c2._LOCK:
+        rec = c2._RUNS.get(rid)
+    if not rec:
+        return _json({"error": "no such run"}, 404)
+    started = rec.get("started")
+    if not started:
+        return _json({"available": False, "reason": "run 시간창을 확인할 수 없음"})
+    import time as _time
+    lo = float(started) - _FOLD_WINDOW_MARGIN_S
+    hi = float(rec.get("ended") or _time.time()) + _FOLD_WINDOW_MARGIN_S
+    try:
+        from core.results import load_observations
+        obs = load_observations()
+    except Exception:                                      # noqa: BLE001
+        obs = None
+    if not obs:
+        return _json({"available": False,
+                      "reason": "이 서버에 관측 파일(reports/results)이 없음"})
+    in_window_2xx: dict[str, dict] = {}
+    for o in obs:
+        try:
+            ts = float(o.get("ts"))
+        except (TypeError, ValueError):
+            continue
+        if not (lo <= ts <= hi):
+            continue
+        key = o.get("endpoint_key") or ""
+        try:
+            is_2xx = 200 <= int(o.get("status")) <= 299
+        except (TypeError, ValueError):
+            is_2xx = False
+        if key and is_2xx:
+            in_window_2xx[key] = {"endpoint_key": key, "status": o.get("status")}
+    if not in_window_2xx:
+        return _json({"available": True, "count": 0, "preview": [],
+                      "truncated": False})
+    try:
+        import json as _jsonlib
+
+        from controlplane import dashdata
+        got = dashdata.file("verified_endpoints.json")
+        verified_doc = _jsonlib.loads(got[0].decode(errors="replace")) if got else {}
+    except Exception:                                      # noqa: BLE001
+        verified_doc = {}
+    published = set(verified_doc.get("verified") or [])
+    missing = sorted(set(in_window_2xx) - published)
+    return _json({"available": True, "count": len(missing),
+                  "preview": [in_window_2xx[k] for k in missing[:_FOLD_PREVIEW_LIMIT]],
+                  "truncated": len(missing) > _FOLD_PREVIEW_LIMIT})
+
+
 @router.get("/api/runtime", response_class=HTMLResponse)
 @router.get("/runtime", response_class=HTMLResponse)
 def api_runtime(hours: float = 1.0, scope: str = "mine",

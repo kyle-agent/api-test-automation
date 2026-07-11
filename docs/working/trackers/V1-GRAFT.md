@@ -18,7 +18,7 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 |---|---|---|---|
 | 1 | 출처 배지 3종 + empty-state 규율 | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
 | 2 | 계획↔실행 연속성 (PLAN vs ACTUAL 스트립) | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
-| 3 | 종료 후 다음 행동 카드 | 대기 | 토스트 대신 3줄 카드 |
+| 3 | 종료 후 다음 행동 카드 | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
 | 4 | 실행 중 이상 감지 (지연 의심·실패 군집) | 대기 | **엔진 요청 #5(세마포어 대기 이벤트) 선행** |
 | 5 | 판정 시각 분리 표기 (발행 시각 ≠ 판정 런 시각) | 부분 | 배지 ts는 판정 런 시각(history ts) 사용 — 분리 병기는 후속 |
 | 6 | (검토) 용어 툴팁·정의 노출 | 대기 | 오너 확인 후 |
@@ -62,6 +62,26 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 - 검증: 오프라인 계약 테스트(`test_plan_actual_strip_frontend_contract`, 33/33)
   + simulate 런 실주행(Playwright headless — PLAN 고정·ACTUAL 폴링 갱신·종료 시
   숨김 확인).
+
+## 접목 3 상세 — 종료 후 다음 행동 카드 (console2)
+
+- **위치**: `#donecard` (PLAN/ACTUAL 스트립 아래) — run 종료 전이 시
+  `onRunEnded()`가 렌더. 토스트는 짧은 확인용으로 유지, 카드가 본체(사라지지
+  않음, ✕ 닫기 / 새 런 in-flight 시 자동 숨김).
+- **구성**: 헤더 "run 종료 — n/m passed" + **계획 대비 회고 1줄**(접목 2의
+  runPlan 재사용: 계획 생성~/ETA → 실제 생성·삭제·경과) + 3줄 —
+  ① fail: 실패 lifecycle 나열 + [→ 실패만 보기](레일 fail 필터)
+  ② +검증: `GET /api/runs/{rid}/fold-evidence`(신설, donor: v2
+    run_detail_data._fold_status 이식) — "공식 미반영 검증 증거 약 N건" +
+    [공식 반영 절차] 모달(미리보기 표 + derive_verified→promote_validated→
+    검토 커밋 3단계 **안내만** — 콘솔은 fold를 실행하지 않음, Hard Rule 7)
+  ③ 잔존: 재스캔(+5m/+15m) 감시 안내 + [🔍 지금 확인] = 기존 `scanOwned()`
+    재사용(두 번째 스캔 경로 발명 금지).
+- fold-evidence는 시간창(±30s) 근사 — 화면 표기는 반드시 "약 N건"
+  (available=False(계산 불가) ≠ count 0, empty-state 규율 준수).
+- 검증: 계약 테스트 2건 추가(카드 + fold API, test_console2 35/35 ·
+  controlplane 22/22) + simulate 실주행(Playwright — 종료 전이 시 카드 렌더,
+  스트립→카드 교대, 관측 파일 없는 환경의 '계산 불가' 정직 표기 확인).
 
 ## 결정 지점 (오너가 뒤집을 수 있게 기록)
 

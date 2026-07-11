@@ -1995,6 +1995,9 @@ function onRunEnded() {
   renderNowPlaying();
   if (!runId || endToastShown[runId]) return;
   endToastShown[runId] = true;
+  // v2 접목 3 (§2.9 C층): 토스트 대신 "다음 행동 카드" — 종료 요약은 사라지지
+  // 않고, fail/+검증(fold)/잔존 각각에 다음 행동을 단다. 토스트는 유지하되
+  // 짧은 확인용으로만 (카드가 본체).
   const st = lifecycleStates();
   const ids = Object.keys(st);
   const passed = ids.filter(l => st[l] === "done").length;
@@ -2003,13 +2006,86 @@ function onRunEnded() {
   // 만 보이면 나머지가 통과처럼 읽힌다 (리뷰 후속).
   const unfin = ids.filter(l => st[l] === "running" || st[l] === "queued").length;
   let msg = `run 종료: ${passed}/${ids.length} passed`;
-  if (failed.length) msg += ` — ${failed.length} failed: ${failed.join(", ")}`;
+  if (failed.length) msg += ` — ${failed.length} failed`;
   if (unfin) msg += ` — ${unfin} 미종료(중단)`;
-  if (!failed.length && !unfin && ids.length) msg += " — 전부 통과 ✅";
   toast(msg, (failed.length || unfin) ? "fail" : "ok");
+  renderDoneCard({ passed, total: ids.length, failed, unfin });
   if (screen === "run" && detailTab === "log" && isAggScope()) loadLog(true);
   loadRunRecords();
   startRunsWatch();   // P2C-24: 종료 후 +5m/+15m 재스캔·늦출현 감시 (30s 주기)
+}
+
+// ---- 종료 후 다음 행동 카드 (v2 접목 3 — §2.9 C층, donor: run_exec.js/목업) ---
+// 3줄: ① fail → 레일 fail 필터 ② +검증 → fold 안내(공식 미반영 증거 약 N건,
+// 절차는 안내만 — 자동 실행 없음, Hard Rule 7) ③ 잔존 → 재스캔 확인.
+// + 회고 1줄: PLAN(접목 2의 runPlan) 대비 실제 생성/경과.
+function renderDoneCard(sum) {
+  const host = $("donecard"); if (!host) return;
+  const rid = runId;
+  const created = runEvents.filter(e => e.kind === "resource-tracked").length;
+  const deleted = runEvents.filter(e => e.kind === "resource-deleted").length;
+  const prog = runProgress();
+  let retro = `생성 ${created} · 삭제 ${deleted}` +
+    (prog.elapsed != null ? ` · 경과 ${fmtElapsed(prog.elapsed)}` : "");
+  if (runPlan && !runPlan._failed && runPlanFor === rid) {
+    const t = planTotals(runPlan);
+    retro = `계획 생성 ~${t.creates}·ETA ${t.eta != null ? "~" + fmtElapsed(t.eta) : "미측정"} → 실제 ${retro}`;
+  }
+  const failRow = sum.failed.length
+    ? `<div class="dc-row bad"><span class="dc-k">fail</span> <b>${sum.failed.length}건</b> — ${sum.failed.slice(0, 4).map(esc).join(", ")}${sum.failed.length > 4 ? " …" : ""}
+       <button class="minibtn" id="dc-fails" title="레일을 fail만 보기로 전환">→ 실패만 보기</button></div>`
+    : `<div class="dc-row ok"><span class="dc-k">fail</span> 0건 — 전부 통과 ✅</div>`;
+  const unfinRow = sum.unfin
+    ? `<div class="dc-row bad"><span class="dc-k">미종료</span> ${sum.unfin}건 (중단/크래시) — 로그 tab에서 마지막 step 확인</div>` : "";
+  setHtmlIfChanged(host,
+    `<div class="dc-head"><b>run 종료 — ${sum.passed}/${sum.total} passed</b>
+       <span class="muted small">${retro}</span>
+       <button class="minibtn dc-x" id="dc-close" title="카드 닫기">✕</button></div>`
+    + failRow + unfinRow
+    + `<div class="dc-row"><span class="dc-k">+검증</span> <span id="dc-fold">공식 미반영 검증 증거 계산 중…</span></div>`
+    + `<div class="dc-row"><span class="dc-k">잔존</span> 종료 후 재스캔(+5m/+15m)이 늦출현을 감시합니다 —
+         <button class="minibtn" id="dc-owned" title="지금 바로 실측 스캔 (POST /api/owned, 30~90초)">🔍 지금 확인</button></div>`);
+  host.classList.remove("hidden");
+  $("dc-close").onclick = () => { host.classList.add("hidden"); host._h = null; };
+  const fb = $("dc-fails");
+  if (fb) fb.onclick = () => { go("run"); railFilter = "fail"; renderLcPicker(); };
+  $("dc-owned").onclick = () => { go("run"); scanOwned(); };
+  // +검증 줄 — fold evidence (서버 계산: 시간창 근사라 '약 N건', 실행은 안내만)
+  fetch("/api/runs/" + encodeURIComponent(rid) + "/fold-evidence")
+    .then(r => r.json()).then(j => {
+      const el = $("dc-fold"); if (!el || runId !== rid) return;
+      if (!j || j.error || j.available === false) {
+        el.innerHTML = `계산 불가 — ${esc((j && (j.reason || j.error)) || "?")}`;
+        return;
+      }
+      el.innerHTML = j.count === 0
+        ? "이 런의 2xx 관측은 (시간창 근사) 이미 발행 집계에 반영되어 있습니다"
+        : `<b>공식 미반영 검증 증거 약 ${j.count}건</b>
+           <button class="minibtn" id="dc-fold-how" title="fold 절차 안내 — 자동 실행 없음">공식 반영 절차</button>`;
+      const hb = $("dc-fold-how");
+      if (hb) hb.onclick = () => foldHowModal(j);
+    }).catch(() => { const el = $("dc-fold"); if (el) el.textContent = "계산 불가 (요청 실패)"; });
+}
+
+// fold 절차 모달 — v2 run_detail.html §2.4 안내의 이식. 콘솔은 fold를 실행하지
+// 않는다: 절차(derive_verified → promote_validated → 검토 커밋)만 보여준다.
+function foldHowModal(j) {
+  pfOpen("공식 반영(fold) — 절차 안내");
+  const rows = (j.preview || []).map(p =>
+    `<tr><td><code>${esc(p.endpoint_key)}</code></td><td><code>${esc(p.status)}</code></td></tr>`).join("");
+  $("pf-body").innerHTML =
+    `<p><b>공식 미반영 검증 증거 약 ${j.count}건</b> <span class="muted small">— 런 시간창(±30s) 내
+       2xx 관측 중 발행본 verified_endpoints.json에 없는 endpoint (시간창 근사라 '약')</span></p>`
+    + (rows ? `<div class="scroll" style="max-height:180px"><table class="tbl"><thead><tr><th>endpoint</th><th>status</th></tr></thead><tbody>${rows}</tbody></table></div>` : "")
+    + (j.truncated ? `<p class="muted small">미리보기 상한 — 전체 약 ${j.count}건 중 일부만 표시.</p>` : "")
+    + `<p style="margin-top:10px"><b>절차 (이 콘솔은 실행하지 않음 — 검토 커밋 경로 유지)</b></p>
+       <ol class="muted small" style="margin:4px 0 0;padding-left:18px">
+         <li><code>python -m tools.derive_verified</code> — 2xx 관측을 evidence(data/baselines/verified_endpoints.json)에 병합</li>
+         <li><code>python -m tools.promote_validated --apply</code> — evidence 근거로 모델 provenance VALIDATED 승격</li>
+         <li>변경분 검토 후 커밋·push — 다음 CI 턴에 발행 파이프라인이 공식 집계에 반영</li>
+       </ol>`;
+  $("pf-foot").innerHTML = '<button class="btn ghost" id="pf-fold-close">닫기</button>';
+  $("pf-fold-close").onclick = pfClose;
 }
 
 // ---- 완료/실패 토스트 (콘솔 내 비차단 알림) ---------------------------------
@@ -2084,6 +2160,8 @@ function slotMeterHtml(cap, minePeak) {
 function renderPlanActual() {
   const host = $("planactual"); if (!host) return;
   const inFlight = runId && (runStatus === "running" || runStatus === "queued");
+  // 새 런이 뜨면 이전 런의 종료 카드(접목 3)는 치운다 — 두 스트립이 겹치지 않게
+  if (inFlight) { const dc = $("donecard"); if (dc && !dc.classList.contains("hidden")) { dc.classList.add("hidden"); dc._h = null; } }
   if (!inFlight) { host.classList.add("hidden"); host._h = null; host.innerHTML = ""; return; }
   host.classList.remove("hidden");
   ensureRunPlan();

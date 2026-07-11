@@ -839,3 +839,81 @@ def test_plan_actual_strip_frontend_contract():
     assert "지연 의심" not in js.split("function renderPlanActual")[1].split("function renderNowPlaying")[0] \
         or True  # 주석 언급은 허용 — 판정 로직 문자열은 아래에서 금지
     assert "avg * 3" not in js, "지연 의심(×3) 판정은 접목 4 전 금지 (세마포어 오탐)"
+
+
+# --------------------------------------------------------------------------- #
+# v2 접목 3 (2026-07-11) — 종료 후 다음 행동 카드 (§2.9 C층)
+# --------------------------------------------------------------------------- #
+def test_done_card_frontend_contract():
+    """Pin the v2→v1 graft #3 (V2-WRAP-AND-PIVOT §3-3): on run end the console
+    renders a persistent next-action card (토스트 대신) with the three rows —
+    fail→상세, +검증→fold 안내, 잔존→재스캔 — plus a plan-vs-actual retro line.
+
+      1. index.html: #donecard container exists (strip area, above the screens).
+      2. onRunEnded renders the card; a new in-flight run hides it.
+      3. fold row is ADVISORY only — the console never executes fold: the modal
+         shows the derive_verified→promote_validated→커밋 procedure as text.
+      4. 잔존 row reuses the EXISTING scanOwned() (no second scan path)."""
+    html = (ROOT / "console2" / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
+    # 1) container + styles
+    assert 'id="donecard"' in html and ".donecard" in css
+    # 2) card lifecycle: rendered on end, hidden when a new run is in flight
+    assert "function renderDoneCard" in js
+    assert "renderDoneCard(" in js.split("function onRunEnded", 1)[1].split("function renderDoneCard")[0]
+    pa = js.split("function renderPlanActual", 1)[1].split("function renderNowPlaying")[0]
+    assert 'dc.classList.add("hidden")' in pa
+    # 3) fold advisory (Hard Rule: 콘솔이 fold를 실행하지 않는다)
+    assert "/fold-evidence" in js and "function foldHowModal" in js
+    assert "tools.derive_verified" in js and "tools.promote_validated" in js
+    assert "약 ${j.count}건" in js  # 시간창 근사는 반드시 '약'으로 표기
+    # 4) 잔존 row reuses the one scan path
+    assert 'id="dc-owned"' in js
+    assert "scanOwned()" in js.split('$("dc-owned").onclick', 1)[1][:80]
+
+
+def test_fold_evidence_endpoint_counts_unpublished_2xx(tmp_path, monkeypatch):
+    """/api/runs/{rid}/fold-evidence — 런 시간창 내 2xx 관측 − 발행본 verified
+    집합 (계약 §2.4). 계산 전용: 어떤 파일에도 쓰지 않는다. available=False
+    (관측 파일 없음) 는 count 0 과 구분되는 별도 상태다."""
+    import json
+    import time as _t
+
+    from fastapi.testclient import TestClient
+
+    from controlplane.app import app
+    from tools import console2_server as c2
+
+    client = TestClient(app)
+    now = _t.time()
+    rec = {"id": "t-fold-1", "kind": "lifecycle", "status": "done",
+           "started": now - 600, "ended": now - 10,
+           "log": str(tmp_path / "x.log"), "events": str(tmp_path / "x.events.jsonl")}
+    with c2._LOCK:
+        c2._RUNS["t-fold-1"] = rec
+    try:
+        # 관측 파일: 시간창 안 2xx 2건(1건은 발행본에 이미 있음) + 창 밖 1건 + 4xx 1건
+        obs = [
+            {"ts": now - 300, "endpoint_key": "net/vpc/create", "status": 201},
+            {"ts": now - 300, "endpoint_key": "net/vpc/list", "status": 200},
+            {"ts": now - 7200, "endpoint_key": "net/vpc/old", "status": 200},
+            {"ts": now - 300, "endpoint_key": "net/vpc/soft", "status": 404},
+        ]
+        monkeypatch.setattr("core.results.load_observations", lambda *a, **k: obs)
+        import controlplane.dashdata as dashdata
+        monkeypatch.setattr(dashdata, "file", lambda p: (
+            json.dumps({"verified": ["net/vpc/list"]}).encode(), "application/json")
+            if p == "verified_endpoints.json" else None)
+        r = client.get("/api/runs/t-fold-1/fold-evidence").json()
+        assert r["available"] is True and r["count"] == 1, r
+        assert r["preview"][0]["endpoint_key"] == "net/vpc/create"
+        # 관측 파일 없음 → available=False (0건과 다른 상태)
+        monkeypatch.setattr("core.results.load_observations", lambda *a, **k: [])
+        r2 = client.get("/api/runs/t-fold-1/fold-evidence").json()
+        assert r2["available"] is False
+        # 없는 run → 404
+        assert client.get("/api/runs/no-such/fold-evidence").status_code == 404
+    finally:
+        with c2._LOCK:
+            c2._RUNS.pop("t-fold-1", None)
