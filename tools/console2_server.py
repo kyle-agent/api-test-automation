@@ -2203,6 +2203,17 @@ def _run_worker(rec: dict) -> None:
                 # 가드: 다른 실행이 진행/대기 중이면 생략 (스윕은 계정 전체
                 # owner-tag 대상이라 타 런 자원을 삭제할 수 있음 — 그때는
                 # 수동 강제 클린업). 끄기: SCP_RUN_END_SWEEP=false.
+                def _run_created_resources() -> bool:
+                    # 자원-생성 게이트 (svc-opt 실측 2026-07-11): read-only 런에
+                    # 계정 전체 스윕(수 분)을 돌릴 이유가 없다 — 이 런의 events
+                    # 원장에 resource-tracked가 없으면 스킵 (local_run 동일).
+                    try:
+                        for line in Path(rec["events"]).read_text().splitlines():
+                            if '"resource-tracked"' in line:
+                                return True
+                    except OSError:
+                        return True   # 원장 못 읽으면 안전측: 스윕 수행
+                    return False
                 if os.environ.get("SCP_RUN_END_SWEEP", "").strip().lower() \
                         not in ("false", "0", "no"):
                     with _ADMIT:
@@ -2211,6 +2222,9 @@ def _run_worker(rec: dict) -> None:
                     if others:
                         f.write("\n=== 런 종료 자동 클린업: 생략 — 다른 실행 "
                                 f"진행/대기 중 {others[:3]} (수동 강제 클린업 사용) ===\n")
+                    elif not _run_created_resources():
+                        f.write("\n=== 런 종료 자동 클린업: 생략 — 이 런은 자원을 "
+                                "생성하지 않음 (resource-tracked 0) ===\n")
                     else:
                         f.write("\n=== 런 종료 자동 클린업: owner-tag 강제 스윕 "
                                 "(IGNORE_TTL) — 잔존 0 수렴 ===\n")
