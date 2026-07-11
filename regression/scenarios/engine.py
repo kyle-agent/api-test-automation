@@ -1190,9 +1190,15 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # can never turn 2xx (skip retries entirely), and the cumulative
                 # retry sleep per lifecycle is bounded by SCP_OPT_RETRY_BUDGET_S
                 # so guarded coverage lifecycles don't burn ~1 min per 4xx step.
+                _nontransient_4xx = any(tok in (resp.raw_text or "").lower()
+                                        for tok in ("max-count-exceed", "quota"))
                 if (step.get("optional") and not step.get("retry_on_status")
                         and resp.status in (400, 409, 429)
                         and resp.status not in (_as_status_list(step.get("expect_status")) or [200])
+                        # 쿼터/최대개수 초과는 시간이 풀어주지 않는 클래스 —
+                        # 사다리(3×20s) 낭비 금지 (svc-opt 2026-07-11 실측:
+                        # private-dns max-count-exceed에 87s 소진)
+                        and not _nontransient_4xx
                         and "{" not in path):
                     for _attempt in range(3):
                         if opt_retry_left < 20:
