@@ -33,12 +33,12 @@
 | 8 | multinodegpucluster | gen-gpu-node-image | ✅ 완료 | 11.3s | 대기 없음 | ~11s | | | | | |
 | 9 | queueservice | gen-wave3-qfifo, application-queueservice-queue | ✅ 완료 | 17.5s / **153.3s** | **-127s**: 표준 큐 dedup PUT 400은 범주적(FIFO 전용)인데 optional-4xx 사다리가 스텝당 60s 소진 → expect_status에 400 등록 | 17.5s / **26.3s** | 첫 대형 개선 — 사다리는 '승격 가능한 400'에만 | | | | |
 | 10 | iam-identity-center | idc-read-coverage | ✅ 완료 | 17.2s | 대기 없음 (404 관용 reads) | ~17s | | | | | |
-| 11 | direct-connect | gen-direct-connect (+ routing) | 대기 | | | | DC 1:1-per-VPC 규약 |
+| 11 | direct-connect | gen-direct-connect | ✅ 완료 | 30.7s (입양 경로) | settle 17.6s는 필요 대기. **입양 재사용으로 프로비저닝 147s 절약 실증** | ~31s | DC 1:1-per-VPC — gen-private-nat 충돌 처방 대기 |
 | 12 | iam | iam-group, gen-wave5-iam-bindings | ✅ 완료 | 18.2s/39.7s | 대기 없음 (스텝 최대 4.8s) | 동일 | | | | | |
 | 13 | kms | gen-wave2-sec, security-kms-transit-crypto | ✅ 완료 | 22.8s/45.7s | 대기 없음 | 동일 | 예약삭제(PF-09)로 잔존은 자동소멸 | | | | PF-09 예약삭제 |
 | 14 | secretsmanager | security-secretsmanager-writes | ✅ 완료 | 54.8s | 대기 없음 (create 18.6s는 서버 실소요) | ~55s | | | | | |
 | 15 | apigateway | gen-wave-apigw, gen-wave5-apigw-policy | ✅ 완료 | 13.3s/93.7s | 일시 ConnectionError 1건 → 엔진 전송 재시도 확장 | 동일 | policy쪽 93.7s는 스텝 수(20+) 실소요 | | | | |
-| 16 | firewall | gen-wave5-fw | 대기 | | | | 캐리어 암묵 생성 |
+| 16 | firewall | gen-wave5-fw | ✅ 완료 | 93.7s | 대기 없음 (IGW 캐리어 대기 포함 실소요) | ~94s | |
 | 17 | resourcemanager | 4종 | ✅ 완료 | RG 80.4s→**19.1s** | set-rg tags:[] 400 수리 (-61s) | 19.1/25/17/45.8s | tag-rg 403은 entitlement | | | | |
 | 18 | servicewatch | 4종 실측 | ✅ 완료 | loggroup 147.7s→**~22s** | listmetricinfos 바디 수리(**신규 2xx 커버**) + listmetricdata 400=환경적(메트릭 카탈로그 0) 등록 (-130s) | 9~22s | create-group 500 재발 없음; metricdata 2xx는 VM 동반 런에서 | | | | create-group 500 재확인 |
 | 19 | cdn / gslb / dns | reads + hosted-zone | ✅ 완료 | 4.5/6.8/**101s** | dns: 892a의 22분은 전부 큐 대기였음(단독 101s). 쿼터 400에 사다리 87s → **엔진 가드 신설**(max-count/quota는 즉시 기록) | dns 클린 ~15s 예상 | private-dns 삭제는 느린 비동기(DELETING 수 분) |
