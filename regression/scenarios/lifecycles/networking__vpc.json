@@ -903,8 +903,8 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 1500,
-            "interval": 15,
+            "timeout": 2700,
+            "interval": 20,
             "give_up_status": [
               400,
               403,
@@ -952,6 +952,11 @@
           "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
           "group": "peering",
           "optional": true,
+          "retry_on_status": [
+            400
+          ],
+          "retries": 8,
+          "retry_interval": 60,
           "json": {
             "destination_cidr": "10.130.1.0/24",
             "destination_vpc_type": "REQUESTER_VPC",
