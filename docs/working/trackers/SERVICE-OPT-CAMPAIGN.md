@@ -44,9 +44,9 @@
 | 19 | cdn / gslb / dns | reads + hosted-zone | ✅ 완료 | 4.5/6.8/**101s** | dns: 892a의 22분은 전부 큐 대기였음(단독 101s). 쿼터 400에 사다리 87s → **엔진 가드 신설**(max-count/quota는 즉시 기록) | dns 클린 ~15s 예상 | private-dns 삭제는 느린 비동기(DELETING 수 분) |
 | 20 | certificatemanager | selfsign | ✅ 완료 | 16.5s (재검증) | 캠페인 자체 회귀({today} int화) 적발·즉수정 | ~16.5s | create 201 |
 | 21 | networking (vpc/subnet/port/publicip/peering/TGW/endpoint/NAT) | 다수 | 대기 | | | | 슬롯 소비 — 후반 |
-| 22 | loadbalancer | light + heavy | 대기 | | | | |
-| 23 | filestorage | 3종 | 대기 | | | | 교차리전 replication |
-| 24 | scf | 4종 | 대기 | | | | PLE 연쇄 규약 |
+| 22 | loadbalancer | light (heavy는 892a 수리 재검증 대기) | ✅ light 완료 | 8.6s | 대기 없음 | ~9s | heavy(members)는 member_state 수리 검증 겸 후속 |
+| 23 | filestorage | volume, wave2-fs (replication은 후속) | ✅ 2/3 | 75.1s/56.8s | 느린 스텝 = 정당한 settle 폴 (async 볼륨) | 동일 | replication-schedule 교차리전은 별도 회차 |
+| 24 | scf | 4종 | ▶ 진행 |  | | | PLE 연쇄 규약 |
 | 25 | backup | gen-heavy-backup | 대기 | | | | heavy |
 | 26 | cloud-ml | 2종 | 대기 | | | | SCR 게이트 부분 |
 | 27 | virtualserver | 5종 | 대기 | | | | heavy 2 |
