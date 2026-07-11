@@ -56,9 +56,15 @@ import core
 from core.registry import is_owned, is_expired
 
 # Guards the module-level per-campaign counters/caches now that independent
-# passes can run on worker threads (sweep parallelization). Set/dict single-op
-# mutations are GIL-atomic, but the boxed-int ``+= 1`` counters and the
-# check-then-add dedup in ``_delete`` are not — those go through this lock.
+# passes can run on worker threads (sweep parallelization). The boxed-int
+# ``+= 1`` counters and the check-then-add dedup in ``_delete`` go through
+# this lock. The remaining compound mutations (_STUCK two-step writes,
+# _CONVERGED check-then-add in _select) stay unlocked because of a KEYSPACE
+# INVARIANT the parallel design relies on: concurrently-running passes touch
+# DISJOINT collections — every _TAIL_PASSES entry and every dbaas engine owns
+# its own (service, path) and id namespace, so no two threads ever race on
+# the same key. If you add a pass that shares a collection/id family with
+# another concurrent pass, route its shared-state writes through this lock.
 _STATE_LOCK = threading.Lock()
 
 # ---------------------------------------------------------------------------
@@ -740,6 +746,10 @@ def _purge_vpc_children(client, vid):
     return n
 
 
+_HOLDER_COLLS = (("loadbalancer", "/v1/loadbalancers", "loadbalancer"),
+                 ("vpc", "/v1/nat-gateways", "nat-gateway"))
+
+
 def _vpc_409_holder(client, vid, cache: dict | None = None) -> str | None:
     """Best-effort: NAME the still-present resource that 409-blocks a VPC delete
     (all read-only GETs). When a holder is detectable the VPC pass burns ONE
@@ -760,12 +770,18 @@ def _vpc_409_holder(client, vid, cache: dict | None = None) -> str | None:
 
     ``cache`` (optional dict, scoped by the caller to ONE VPC pass of ONE
     round) memoises the TGW/connection/LB/NAT listings: with several blocked
-    VPCs the old code re-listed all four collections PER VPC. Holders only
-    ever DRAIN mid-round, so a stale cache can at worst defer a VPC to the
-    next round (which re-lists fresh) — never delete anything extra."""
+    VPCs the old code re-listed all four collections PER VPC. Staleness is
+    handled in BOTH directions: a cache HIT (holder named) may be a holder
+    that has since drained — worst case the VPC defers to the next round,
+    which re-lists fresh (never deletes anything extra). A cache MISS
+    re-lists ONCE and rescans before answering None, so a holder that
+    APPEARED after the cache was populated is never masked — the blind
+    purge-children fallback only runs on listings exactly as fresh as the
+    pre-cache behavior."""
     if cache is None:
         cache = {}
-    if "tgw_conns" not in cache:
+
+    def _populate():
         pairs = []
         for t in _list_all(client, "vpc", "/v1/transit-gateways"):
             if not (t.get("id") and _is_candidate(
@@ -779,22 +795,34 @@ def _vpc_409_holder(client, vid, cache: dict | None = None) -> str | None:
                 conns = []
             pairs.append((t, conns))
         cache["tgw_conns"] = pairs
-    for t, conns in cache["tgw_conns"]:
-        for cn in conns:
-            if isinstance(cn, dict) and str(cn.get("vpc_id")) == str(vid):
-                return (f"transit-gateway {_name_of(t) or t['id']} "
-                        f"vpc-connection {cn.get('id')} "
-                        f"(state={cn.get('state')})")
-    for svc, coll, label in (("loadbalancer", "/v1/loadbalancers",
-                              "loadbalancer"),
-                             ("vpc", "/v1/nat-gateways", "nat-gateway")):
-        if coll not in cache:
+        for svc, coll, _label in _HOLDER_COLLS:
             cache[coll] = _list_all(client, svc, coll)
-        for x in cache[coll]:
-            if isinstance(x, dict) and x.get("id") \
-                    and str(x.get("vpc_id")) == str(vid):
-                return f"{label} {_name_of(x) or x['id']} (state={x.get('state')})"
-    return None
+
+    def _scan():
+        for t, conns in cache["tgw_conns"]:
+            for cn in conns:
+                if isinstance(cn, dict) and str(cn.get("vpc_id")) == str(vid):
+                    return (f"transit-gateway {_name_of(t) or t['id']} "
+                            f"vpc-connection {cn.get('id')} "
+                            f"(state={cn.get('state')})")
+        for _svc, coll, label in _HOLDER_COLLS:
+            for x in cache.get(coll, []):
+                if isinstance(x, dict) and x.get("id") \
+                        and str(x.get("vpc_id")) == str(vid):
+                    return (f"{label} {_name_of(x) or x['id']} "
+                            f"(state={x.get('state')})")
+        return None
+
+    fresh = "tgw_conns" not in cache
+    if fresh:
+        _populate()
+    holder = _scan()
+    if holder or fresh:
+        return holder
+    # MISS against possibly-stale listings — refresh once and rescan so a
+    # holder that appeared mid-round is reported instead of silently missed.
+    _populate()
+    return _scan()
 
 
 # ---------------------------------------------------------------------------
@@ -1299,6 +1327,10 @@ def _pass_cdn(c) -> int:
         if st and 200 <= st < 300:
             _note_progress(st)      # genuine teardown (no stuck-marking arg)
             deleted += 1
+            # Deliberately per-item _wait_gone (NOT the _wait_all_gone
+            # barrier): CDN teardown is a per-item state machine (stop →
+            # deactivation settles → delete) and the pass runs on its own
+            # worker thread, so this wait blocks nobody else.
             _wait_gone(c, "cdn", f"/v1/cdns/{cid}", 300, 15)
         else:
             # 404 here is the masked state error (resource persists) and 400
