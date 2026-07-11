@@ -69,3 +69,26 @@ def test_run_env_carries_platform_url_and_run_id():
     import inspect
     src = inspect.getsource(c2)
     assert '"APITEST_PLATFORM_URL"' in src and '"APITEST_RUN_ID"' in src
+
+
+def test_peek_interrupt_does_not_consume(monkeypatch):
+    """사다리 탈출용 peek은 명령을 소비하지 않는다 — 소비하면 스텝 경계의
+    teardown+스킵이 무산됨 (2026-07-11 오너 실측 후속)."""
+    from core import commands as cmds
+
+    monkeypatch.setattr(cmds, "_ENABLED", True)
+    monkeypatch.setattr(cmds, "_abort", False)
+    pending = [{"id": 1, "action": "skip_scenario", "target": "lc-x"},
+               {"id": 2, "action": "stop_polling", "target": "lc-x"}]
+    monkeypatch.setattr(cmds, "check", lambda: list(pending))
+    acked = []
+    monkeypatch.setattr(cmds, "ack", lambda cid: acked.append(cid))
+
+    assert cmds.peek_interrupt("lc-x") is True
+    assert cmds.peek_interrupt("lc-x") is True       # 반복 호출에도 살아있음
+    assert not acked                                  # 소비/ack 없음
+    assert cmds.peek_interrupt("lc-other") is False   # 타깃 불일치(빈 target 제외)
+    # 이후 스텝 경계의 should_skip이 정상 소비
+    monkeypatch.setattr(cmds, "_pending", list(pending))
+    assert cmds.should_skip("lc-x") is True
+    assert 1 in acked

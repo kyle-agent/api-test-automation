@@ -154,3 +154,24 @@ def should_stop_polling(lifecycle_id: str = "") -> bool:
             _consume(cmd)
             return True
     return False
+
+
+def peek_interrupt(lifecycle_id: str) -> bool:
+    """비소비 확인 — 이 lifecycle을 겨냥한 개입(skip/stop_polling/abort)이
+    걸려 있는지만 본다. 재시도 사다리처럼 '탈출만 하고 집행(teardown+스킵)은
+    스텝 경계에 맡기는' 지점용: 여기서 should_skip을 쓰면 명령이 소비돼
+    정작 경계의 집행이 무산된다 (2026-07-11)."""
+    if not _ENABLED:
+        return False
+    if _abort:
+        return True
+    for cmd in check():
+        act = cmd.get("action")
+        target = cmd.get("target") or ""
+        if act == "abort_run":
+            return True
+        if act == "skip_scenario" and target == lifecycle_id:
+            return True
+        if act == "stop_polling" and (not target or target == lifecycle_id):
+            return True
+    return False

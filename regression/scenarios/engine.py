@@ -588,6 +588,15 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         attempts = int(step.get("retries", 4))
         interval = float(step.get("retry_interval", 15))
         while resp.status in ros and attempts > 0:
+            # 플랫폼 중단 명령은 재시도 사다리 **도중에도** 듣는다 (2026-07-11
+            # 오너 실측: 40×30s 사다리에 물린 시나리오가 ⏹로 안 끊겼음 —
+            # 종전에는 폴 루프만 명령을 확인했다). 비소비 peek만 쓴다:
+            # 여기서 should_skip을 소비하면 스텝 경계의 teardown+스킵이 무산됨.
+            if _commands is not None and getattr(_commands, "peek_interrupt",
+                                                 lambda _l: False)(lifecycle_id):
+                print(f"  step '{step.get('name')}': platform command — "
+                      f"abandoning retry ladder ({attempts} attempts left)")
+                break
             time.sleep(interval)
             resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
@@ -977,6 +986,12 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                         f"[{lifecycle['id']}] platform command: run abort — "
                         f"remaining steps skipped after cleanup")
                 if _commands.should_skip(lifecycle["id"]):
+                    # UI 가시성 (오너 2026-07-11 "중단되었는지도 모르겠다"):
+                    # 집행 사실을 이벤트로 남겨 로그 탭에 바로 보이게.
+                    if _cev is not None:
+                        _cev.emit("command-applied", lifecycle=lifecycle["id"],
+                                  action="skip_scenario",
+                                  note="⏹ 중단 명령 집행 — 생성 자원 정리 후 스킵")
                     _teardown()
                     raise LifecycleSkip(
                         f"[{lifecycle['id']}] platform command: scenario "
