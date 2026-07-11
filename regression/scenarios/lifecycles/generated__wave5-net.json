@@ -1330,13 +1330,14 @@
         },
         {
           "name": "verify-lb-member-set",
+          "_note": "set은 실제 변경이어야 함(run-923a port 80→8080 수리와 동일 규칙) — run-892a: member_state ENABLE 그대로 보내 400 ExistRequestMemberState → DISABLE로 토글",
           "service": "loadbalancer",
           "method": "PUT",
           "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
           "json": {
             "member": {
               "member_port": 8080,
-              "member_state": "ENABLE"
+              "member_state": "DISABLE"
             }
           },
           "expect_status": [
