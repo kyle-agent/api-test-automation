@@ -135,7 +135,11 @@
     }
   };
   syncCollapse();
-  window.filterCatalog('');
+  // ?q= 딥링크 (v2 접목 6a): 전역 검색(/search) 결과에서 넘어올 때 필터 프리필
+  var qParam = new URLSearchParams(location.search).get('q') || '';
+  var inputEl = document.getElementById('catalog-search');
+  if (qParam && inputEl) inputEl.value = qParam;
+  window.filterCatalog(qParam);
 })();
 </script>
 

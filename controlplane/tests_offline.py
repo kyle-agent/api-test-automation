@@ -543,6 +543,53 @@ def test_source_badges_and_empty_states():
     assert "badge badge-run" in detail and ">This run" in detail
 
 
+def test_v2_shell_header_and_global_search():
+    """v2 접목 6a (오너 지시 2026-07-11) — v2 셸의 상단 디자인 이식.
+
+    1. 네비: Overview 첫 메뉴 신설(홈에서 active) + 다크 pill active 스타일.
+       메뉴명은 v1 유지 (Modeling→Testing→Reporting — 오너 지시).
+    2. 헤더 우측: 전역 검색폼(GET /search) + Published 배지(발행 시각·dd sha·
+       노후) — ctxbar 의 발행 시각·노후 칩은 헤더 배지로 흡수(중복 제거),
+       ctxbar 에는 sha·suite·env·표면 모드 유지.
+    3. GET /search — 서비스/엔드포인트(카탈로그)·런(이 서버) 3섹션,
+       2자 미만 안내. 카탈로그 ?q= 딥링크."""
+    home = client.get("/").text
+    # 1) Overview 메뉴 + 다크 pill
+    assert '>Overview</a>' in home
+    assert ".nav a.active{color:#fff;background:var(--text)}" in home
+    # 홈에서 Overview 가 active (active == 'home')
+    import re
+    m = re.search(r'<a href="/" class="active">Overview</a>', home)
+    assert m, "홈에서 Overview 메뉴가 active 여야 한다"
+    # 메뉴명 유지
+    for label in (">Modeling</a>", ">Testing</a>", ">Reporting</a>"):
+        assert label in home, label
+    # 2) 헤더 검색폼 + Published 배지(또는 접근불가 empty-state)
+    assert 'action="/search"' in home and 'class="hdr-search"' in home
+    from controlplane import dashdata
+    if dashdata.latest_coverage():
+        assert home.index('class="hdrctx"') < home.index("badge badge-published")
+    else:
+        assert "발행본 접근 불가" in home
+    # 3) 전역 검색 화면
+    short = client.get("/search", params={"q": "v"})
+    assert short.status_code == 200 and "2자 이상" in short.text
+    r = client.get("/search", params={"q": "vpc"})
+    assert r.status_code == 200
+    page = r.text
+    for sec in ("서비스", "엔드포인트", ">RUN"):
+        assert sec in page, sec
+    assert "/catalog?q=" in page                     # 카탈로그 딥링크
+    assert "/testing?service=" in page               # 실행 prefill 딥링크
+    assert "저장소(카탈로그) 기준" in page            # 출처 정직 표기
+    # 런 검색 — 이 서버 기록에서 부분일치 (이전 테스트가 만든 local- 런)
+    rr = client.get("/search", params={"q": "local-badge"}).text
+    assert "local-badge-test" in rr and "badge badge-local" in rr
+    # 카탈로그 ?q= 딥링크 스크립트
+    cat = client.get("/catalog").text
+    assert "URLSearchParams(location.search).get('q')" in cat
+
+
 # --- runner -----------------------------------------------------------------------
 
 TESTS = [
@@ -568,6 +615,7 @@ TESTS = [
     test_quota_simulation_warns_on_peak_over_limit,
     test_quota_simulation_runs_on_dependencies_save,
     test_source_badges_and_empty_states,
+    test_v2_shell_header_and_global_search,
 ]
 
 

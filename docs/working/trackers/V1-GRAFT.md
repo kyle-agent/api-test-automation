@@ -22,6 +22,29 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 | 4 | 실행 중 이상 감지 (지연 의심·실패 군집) | 대기 | **엔진 요청 #5(세마포어 대기 이벤트) 선행** |
 | 5 | 판정 시각 분리 표기 (발행 시각 ≠ 판정 런 시각) | 부분 | 배지 ts는 판정 런 시각(history ts) 사용 — 분리 병기는 후속 |
 | 6 | (검토) 용어 툴팁·정의 노출 | 대기 | 오너 확인 후 |
+| 6a | v2 셸 헤더 (네비 스타일·전역 검색·헤더 Published 배지) | **완료 (2026-07-11, 오너 지시)** | 아래 상세 |
+
+## 접목 6a 상세 — v2 셸 헤더 이식 (오너 지시 2026-07-11)
+
+- **네비**: Overview 첫 메뉴 신설(`/`) + active = 다크 pill(v2 `.axis.on`).
+  **메뉴명은 v1 유지** (Modeling→Testing→Reporting — 오너 지시). 화살표(→)는
+  파이프라인 의미가 있어 유지 (제거 원하면 마크업 2줄).
+- **헤더 우측**: 전역 검색폼(GET `/search`) + Published 배지
+  (`Published @시각 · dd:sha · 노후`) — 발행 식별자는 v2 계약대로
+  dashboard-data HEAD sha(`common.dd_sha()`, 60s 캐시). 발행본 접근 불가 시
+  `badge-none` empty-state.
+- **ctxbar 정리**: 발행 시각·노후 칩을 헤더 배지로 흡수(중복 제거).
+  ctxbar에는 v2에 없던 v1 강점 — env·suite·코드 sha·LIVE/SNAPSHOT 표면
+  모드 — 만 유지.
+- **전역 검색** `/search` (donor: v2 search_data/search.html, 계약 §2.8):
+  Services(카탈로그 그룹 집계 — v1엔 서비스 상세 화면이 없어 "저장소(카탈로그)
+  기준"으로 정직 표기 + 카탈로그/Modeling/실행 prefill 링크) ·
+  Endpoints(상한 50+총계) · Runs(이 서버, 행별 local/CI 배지, 상한 20).
+  2자 미만 안내. 카탈로그 `?q=` 딥링크 신설(기존 클라 필터 프리필).
+- **이식 안 한 것 (의견)**: v2 "v2" 브랜드 칩(제품명 단일 원칙) · v2 푸터
+  legacy 링크(불필요) · v2 축 이름(Services/Model/Runs/Results/Tools — 오너
+  지시로 v1 이름 유지).
+- 검증: tests_offline `test_v2_shell_header_and_global_search` (23/23).
 
 ## 접목 1 상세 — 무엇을 어디에 얹었나
 

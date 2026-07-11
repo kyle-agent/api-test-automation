@@ -209,6 +209,14 @@ def _model_stats() -> dict:
         return {"nodes": 0, "validated": 0, "docs": 0, "groups": 0}
 
 
+@app.get("/search", response_class=HTMLResponse)
+def global_search(request: Request, q: str = ""):
+    """전역 검색 (v2 접목 6a — 계약 §2.8): 서비스·엔드포인트(카탈로그)·런(이
+    서버)을 한 화면에서. 헤더 검색폼(base.html)의 종착지."""
+    from controlplane import search as search_mod
+    return _render(request, "search.html", "search", data=search_mod.search(q))
+
+
 @app.get("/planning", include_in_schema=False)
 def planning_legacy():
     """구 4단계 스테퍼(?step=) 은퇴 (IA 확정: Catalog·Modeling·Testing·Reporting).

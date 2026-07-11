@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "_badges.html" import badge %}
+{% block title %}Search — SCP API Regression{% endblock %}
+{% block content %}
+
+{# 전역 검색 (v2 접목 6a — donor: v2 search.html, 계약 §2.8):
+   Services·Endpoints = 저장소 카탈로그 기준 · Runs = 이 서버(S2). #}
+<h2>검색</h2>
+<div class="card pad">
+  <form action="/search" method="get" style="display:flex;gap:8px">
+    <input type="text" name="q" value="{{ data.q }}" minlength="2" class="search"
+           style="flex:1;width:auto" placeholder="서비스·엔드포인트(경로/API명/메서드)·run id·suite 검색…"
+           autocomplete="off" autofocus>
+    <button type="submit">검색</button>
+  </form>
+</div>
+
+{% if data.too_short %}
+<div class="card pad" style="margin-top:12px"><span class="muted">검색어를
+  2자 이상 입력해 주세요.</span></div>
+{% else %}
+
+<h2>서비스 <span class="hint">{{ data.services.total }}건 —
+  <span title="data/api_catalog.json (저장소 HEAD) 기준 집계 — 발행/로컬 관측이 아님">저장소(카탈로그) 기준</span></span></h2>
+<div class="card pad" style="padding-top:4px">
+  {% if not data.services.ok %}
+  <p class="muted small">카탈로그를 읽을 수 없어 서비스 검색을 수행할 수 없습니다.</p>
+  {% elif not data.services['items'] %}
+  <p class="muted small">"{{ data.q }}"와 일치하는 서비스가 없습니다.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>service</th><th>category</th><th>endpoints</th><th></th></tr></thead>
+    <tbody>
+    {% for s in data.services['items'] %}
+    <tr>
+      <td><b>{{ s.service }}</b></td>
+      <td>{{ s.category }}</td>
+      <td class="muted">{{ s.endpoints }}</td>
+      <td class="small">
+        <a href="/catalog?q={{ s.service|urlencode }}">📖 카탈로그</a> ·
+        <a href="/planning/resources/map" title="테스트 모델(노드/생애주기) 저작 현황">Modeling</a> ·
+        <a href="/testing?service={{ (s.category ~ '/' ~ s.service)|urlencode }}"
+           title="Testing 트리거 폼에 이 서비스를 프리필 (자동 발사 아님 — 안전 게이트 유지)">▶ 실행 prefill</a>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<h2>엔드포인트 <span class="hint">{{ data.endpoints.total }}건{% if data.endpoints.more %}
+  — 상위 {{ data.endpoints['items']|length }}건 표시, {{ data.endpoints.more }}건 더 있음(검색어를 좁혀 주세요){% endif %}</span></h2>
+<div class="card pad" style="padding-top:4px">
+  {% if not data.endpoints.ok %}
+  <p class="muted small">카탈로그를 읽을 수 없어 엔드포인트 검색을 수행할 수 없습니다.</p>
+  {% elif not data.endpoints['items'] %}
+  <p class="muted small">"{{ data.q }}"와 일치하는 엔드포인트가 없습니다.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>method</th><th>path</th><th>API</th><th>service</th></tr></thead>
+    <tbody>
+    {% for e in data.endpoints['items'] %}
+    <tr>
+      <td><span class="tag {{ 'read' if e.method == 'GET' else 'mutation' }}">{{ e.method }}</span></td>
+      <td><code>{{ e.path }}</code></td>
+      <td class="muted"><code>{{ e.api }}</code></td>
+      <td class="small"><a href="/catalog?q={{ e.service|urlencode }}">{{ e.category }}/{{ e.service }}</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<h2>RUN <span class="hint">{{ data.runs.total }}건{% if data.runs.more %} — 상위
+  {{ data.runs['items']|length }}건 표시{% endif %}</span> {{ badge('local') }}</h2>
+<div class="card pad" style="padding-top:4px">
+  {% if not data.runs.ok %}
+  <p class="muted small">이 서버의 런 기록을 읽을 수 없습니다.</p>
+  {% elif not data.runs['items'] %}
+  <p class="muted small">"{{ data.q }}"와 일치하는 런이 없습니다 — 이 서버 기록
+    (control plane DB) 기준입니다.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>source</th><th>run</th><th>suite</th><th>profile</th><th>status</th><th>when</th></tr></thead>
+    <tbody>
+    {% for r in data.runs['items'] %}
+    <tr>
+      <td>{{ badge('local') if r.is_local else badge('ci') }}</td>
+      <td>{% if r.gh_run_id %}<a href="/runs/{{ r.gh_run_id }}"><code>{{ r.gh_run_id }}</code></a>
+          {% else %}<span class="muted">#{{ r.id }}</span>{% endif %}</td>
+      <td>{{ r.suite or '-' }}</td>
+      <td>{{ r.profile or '-' }}</td>
+      <td><span class="status {{ r.status }}">{{ r.status }}</span></td>
+      <td class="muted small">{{ r.when }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+{% endif %}
+{% endblock %}

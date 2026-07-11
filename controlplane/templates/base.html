@@ -29,11 +29,18 @@
   .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
   .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
   .brand:hover{text-decoration:none}
-  .nav{display:flex;gap:3px;align-items:center}
-  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav{display:flex;gap:3px;align-items:center;flex-wrap:wrap}
+  .nav a{padding:6px 12px;border-radius:7px;font-size:13.5px;font-weight:600;color:var(--muted)}
   .nav a:hover{background:var(--surface2);text-decoration:none}
-  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  /* v2 접목 6a: active = 다크 pill (v2 셸 .axis.on 이식) */
+  .nav a.active{color:#fff;background:var(--text)}
   .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  /* v2 접목 6a: 헤더 우측 — 전역 검색 + Published 배지 (v2 .ctx-strip 이식) */
+  .hdrctx{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .hdr-search input{border:1px solid var(--border);border-radius:999px;background:var(--surface2);
+    padding:5px 13px;font-size:12.5px;color:var(--text);font-family:inherit;width:170px}
+  .hdr-search input:focus{outline:none;border-color:var(--blue);background:var(--surface)}
+  .badge-none{color:var(--muted);border-color:var(--border);background:var(--surface2)}
   .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
   .ctxbar b{color:var(--text)}
   .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
@@ -225,12 +232,17 @@
 </style>
 </head>
 <body>
+{% from "_badges.html" import badge %}
 <header class="shell">
   <div class="navrow">
     <a class="brand" href="/">SCP API Regression</a>
     <nav class="nav">
+      {# v2 접목 6a (오너 지시 2026-07-11): v2 셸의 상단 스타일 이식 — Overview
+         첫 메뉴 + 다크 pill active + 우측 검색·Published 배지. 메뉴명은 v1
+         (Modeling→Testing→Reporting) 유지. #}
       {# 2026-07-07 오너 결정: Catalog는 워크플로 단계에서 내려와 우측 유틸 링크로
          (Modeling이 서비스별 엔드포인트 인라인으로 흡수) — /catalog 라우트·딥링크는 유지 #}
+      <a href="/" class="{{ 'active' if active == 'home' else '' }}">Overview</a>
       <a href="/planning/resources/map" class="{{ 'active' if active == 'modeling' else '' }}">Modeling</a>
       <span class="arrow">→</span>
       <a href="/testing/embed" class="{{ 'active' if active == 'testing' else '' }}">Testing</a>
@@ -245,6 +257,20 @@
       <a href="/dashboard/index.html"
          title="공개 커버리지 대시보드 (면② · 별도 발행본 — 회귀/적합성 2축)">📊 대시보드</a>
     </nav>
+    <div class="hdrctx">
+      <form action="/search" method="get" class="hdr-search"><input type="search"
+        name="q" placeholder="⌕ 검색 (서비스·엔드포인트·run)" minlength="2" autocomplete="off"></form>
+      {% set hdr_snap = ctx_snapshot if ctx_snapshot is defined else none %}
+      {% if hdr_snap %}
+        {{ badge('published',
+                 ts=(snap_ts_label if snap_ts_label is defined and snap_ts_label else none),
+                 ident=('dd:' ~ dd_sha if dd_sha is defined and dd_sha else none),
+                 stale=(snap_stale is defined and snap_stale)) }}
+      {% else %}
+        <span class="badge badge-none"
+          title="발행 저장소(dashboard-data)에 접근하지 못했습니다 — git 원격 접근 확인">발행본 접근 불가</span>
+      {% endif %}
+    </div>
   </div>
   <div class="ctxbar">
     {# 환경정보 스트립 (2026-07-09 owner GO — legacy /platform 콘솔 (b) 이식):
@@ -261,14 +287,12 @@
     {% if ctx_env is defined and ctx_env %}<span class="seg"
       title="SCP_ENV — 호스트/계정을 가르는 환경 코드">env <b>{{ ctx_env }}</b></span> ·{% endif %}
     {% if snap %}
+    {# 발행 시각·노후 표기는 헤더 Published 배지로 이동 (v2 접목 6a — 중복 제거).
+       ctxbar 에는 코드 식별자(sha)·suite·env·표면 모드만 남긴다. #}
     {% if snap.get('run_type') %}<span class="seg"
       title="이 스냅샷을 발행한 run 의 suite/레인">suite <b>{{ snap.get('run_type') }}</b></span> ·{% endif %}
-    <span class="seg">sha <b>{{ snap.get('sha','') }}</b></span> ·
-    <span class="seg">{{ snap.get('ts','') }}{% if snap_age is defined and snap_age %}
-    <b>({{ snap_age }})</b>{% endif %}</span>
+    <span class="seg" title="이 스냅샷을 만든 코드 커밋 (발행 식별자 dd:는 헤더 배지)">sha <b>{{ snap.get('sha','') }}</b></span>
     · {% if ctx_is_live %}실행·자원 수치는 라이브 — 커버리지 수치만 이 스냅샷 기준{% else %}모든 수치는 이 스냅샷 기준{% endif %}
-    {% if snap_stale is defined and snap_stale %}<span class="chip s-reached"
-      title="발행 후 48시간 이상 경과 — 화면 수치가 현재 상태와 다를 수 있습니다">노후</span>{% endif %}
     {% else %}
     <span class="pip off"></span> 발행 스냅샷 정보 없음 — dashboard-data 브랜치를
     읽을 수 없거나 아직 발행된 run이 없습니다

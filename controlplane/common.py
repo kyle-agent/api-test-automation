@@ -61,6 +61,33 @@ def snap_ts_short(snap: dict | None) -> str:
         "%m-%d %H:%M")
 
 
+# 발행 식별자(dd sha) 캐시 — 헤더 배지가 페이지 렌더마다 subprocess 를 돌리지
+# 않게 60s TTL (dashdata 의 fetch TTL 과 동일한 감각).
+_DD_SHA_CACHE: dict = {"ts": 0.0, "sha": None}
+
+
+def dd_sha() -> str | None:
+    """발행 식별자 = dashboard-data 브랜치 HEAD 단축 sha (v2 접목 — v2
+    published.py._dd_sha 이식). 헤더 Published 배지의 ident 로 쓴다:
+    같은 발행본을 보고 있는지 서버·사람끼리 대조하는 용도."""
+    import subprocess
+    import time as _time
+    from pathlib import Path
+    now = _time.time()
+    if now - _DD_SHA_CACHE["ts"] < 60:
+        return _DD_SHA_CACHE["sha"]
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--short", "origin/dashboard-data"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(Path(__file__).resolve().parent.parent))
+        sha = p.stdout.strip() or None
+    except Exception:
+        sha = None
+    _DD_SHA_CACHE.update(ts=now, sha=sha)
+    return sha
+
+
 def base_ctx(active: str) -> dict:
     """Everything base.html needs, for ANY page-rendering route."""
     snap = dashdata.latest_coverage()
@@ -85,4 +112,5 @@ def base_ctx(active: str) -> dict:
         "snap_age": age["label"],
         "snap_stale": age["stale"],
         "snap_ts_label": snap_ts_short(snap),
+        "dd_sha": dd_sha(),
     }
