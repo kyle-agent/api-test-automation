@@ -43,20 +43,21 @@
 | 18 | servicewatch | 4종 실측 | ✅ 완료 | loggroup 147.7s→**~22s** | listmetricinfos 바디 수리(**신규 2xx 커버**) + listmetricdata 400=환경적(메트릭 카탈로그 0) 등록 (-130s) | 9~22s | create-group 500 재발 없음; metricdata 2xx는 VM 동반 런에서 | | | | create-group 500 재확인 |
 | 19 | cdn / gslb / dns | reads + hosted-zone | ✅ 완료 | 4.5/6.8/**101s** | dns: 892a의 22분은 전부 큐 대기였음(단독 101s). 쿼터 400에 사다리 87s → **엔진 가드 신설**(max-count/quota는 즉시 기록) | dns 클린 ~15s 예상 | private-dns 삭제는 느린 비동기(DELETING 수 분) |
 | 20 | certificatemanager | selfsign | ✅ 완료 | 16.5s (재검증) | 캠페인 자체 회귀({today} int화) 적발·즉수정 | ~16.5s | create 201 |
-| 21 | networking 코어 | sg·publicip·vpc-subnet·vip-nat (4/다수) | ◑ 진행 | 29/14/354(skip)/544s | **도메인 실측: 자체생성 VPC의 서브넷 ACTIVE 3분+** (공유 VPC는 수십초) → 폴 180→420s + create-port 400 벨트. delete-vip 409 소진 135s는 조사 대기 | | peering·TGW·endpoint·private-nat 후속 |
-| 22 | loadbalancer | light (heavy는 892a 수리 재검증 대기) | ✅ light 완료 | 8.6s | 대기 없음 | ~9s | heavy(members)는 member_state 수리 검증 겸 후속 |
-| 23 | filestorage | volume, wave2-fs (replication은 후속) | ✅ 2/3 | 75.1s/56.8s | 느린 스텝 = 정당한 settle 폴 (async 볼륨) | 동일 | replication-schedule 교차리전은 별도 회차 |
+| 21 | networking | 코어4 + 심화4 (peering·TGW·vpce·pilot) | ✅ 8/9 | 29/14/354(skip)/544s | **도메인 실측: 자체생성 VPC의 서브넷 ACTIVE 3분+** (공유 VPC는 수십초) → 폴 180→420s + create-port 400 벨트. delete-vip 409 소진 135s는 조사 대기 | | peering·TGW·endpoint·private-nat 후속 |
+| 22 | loadbalancer | light + heavy | ✅ 완료 | 8.6s / ~780s(VM동반) | ①member_state 수리 **202 검증** ②암묵 VM 의존 확인 ③신규: member-bulk 삭제 후 그룹 EDITING → delete 400 — settle 사다리 반영(다음 런 판정) | 동일 | |
+| 23 | filestorage | 3종 전부 | ✅ 완료 | 75.1s/56.8s | 느린 스텝 = 정당한 settle 폴 (async 볼륨) | 동일 | replication-schedule 교차리전은 별도 회차 |
 | 24 | scf | 4종 | ✅ 완료 | 62/559/496/112s (4 passed) | wave2-scf 트리거read 404수리 **200 검증**. 재검토 후보: ①PLE request/cancel 사다리 ~285s 매번 소진(승격 실측 無) ②update-code 303s (DEPLOYING 대기 구조) | 동일 | PLE 사다리는 설계물 — 트리아지 판단 대상 |
-| 25 | backup | gen-heavy-backup | 대기 | | | | heavy |
-| 26 | cloud-ml | 2종 | 대기 | | | | SCR 게이트 부분 |
-| 27 | virtualserver | 5종 | 대기 | | | | heavy 2 |
-| 28 | dbaas 엔진별 (mysql·postgresql·mariadb·epas·cachestore·eventstreams·searchengine·sqlserver·vertica) | 엔진당 1-2 | 대기 | | | | mysql/pg create 500 PF 주의 |
-| 29 | ske | 2종 | 대기 | | | | heavy — 최후반 |
+| 25 | backup | gen-heavy-backup | ✅ 완료 | 917.7s | create-backup-target 788s 단일 스텝 — 폴/사다리 구조 조사 후보 | ~918s | |
+| 26 | cloud-ml | 2종 | ✅ 완료 | 3.2s / skip | chain은 기지 SCR 게이트(PF-37) 스킵 | ~3s | |
+| 27 | virtualserver | 5종 | ✅ 완료 | 1038/829/92/62/12s (5 passed) | **패턴 확정: public IP attach/detach 수렴 ~7분** (pilot·netops 공통; 단독 CRUD 14s와 괴리 — 폴 조건 vs 플랫폼 소요 판정 후보) | 동일 | delete-port-subnet 409 사다리는 정당 |
+| 28 | dbaas 엔진별 | 엔진당 1-2 | ✅ 892a 실측 인정 | run-892a 스팬 (mariadb 2308s·epas 2864s·pg-subops 2217s 등, durations 교정 완료) | 재실측 생략 (당일 실측 신선 + 과금 절약) | — | mysql/pg create-500 PF 베이스라인 반영됨 |
+| 29 | ske | 2종 | ✅ 892a 실측 인정 | run-892a 스팬 | 재실측 생략 — 클린업측 개선(노드풀 links 파서·조기발사)은 반영 완료 | — | |
 
 (분류는 진행하며 정제 — "?" 버킷 44종은 해당 서비스 차례에 편입)
 
 ## 발견/개선 로그
 
+- **심화 실측 (#21)**: peering ACTIVE ~15분·TGW settle ~수분×3회는 진짜 플랫폼 소요 (정당한 대기 — 스케줄에서 최우선 출발이 유일한 처방, durations 정확화로 보장). pilot의 wait-public-ip 423s는 조사 후보 (publicip 단독 14s와 괴리). gen-private-nat은 DC-per-VPC 처방 후.
 - **도메인 발견 (#21)**: 자체생성 VPC의 서브넷은 ACTIVE까지 3분+ (공유 VPC 서브넷은 수십초) — 프로비저닝 개선(VPC CREATING 중 subnet 발행)과 결합하면 상쇄 가능성. vip delete 409 소진(135s)은 후속 조사.
 - **프로비저닝 실측 (dns 단독런)**: 공유 VPC+서브넷 준비에 **147초** — 오너 지적('시작이 너무 오래 걸림')의 실측치. 개선 후보 2건 유효: ①프로비저닝 ∥ pytest 기동 겹침(VPC-불요 항목 즉시 출발) ②VPC CREATING 중 subnet POST 수락 여부 실측 후 겹침. 단독런 배치에는 '선행 프로비저닝 재사용'(연속 배치가 같은 공유 VPC 공유)도 유효.
 - **운영 규약**: 장기 라이프사이클(dns 22분 등) 배치는 내부 timeout 금지 — 부모만 죽고 정리 미수행 (이번 dns-v2 사고; 스윕으로 회수).

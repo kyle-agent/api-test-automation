@@ -1716,9 +1716,13 @@
         },
         {
           "name": "delete-lb-server-group",
+          "_note": "svc-opt 2026-07-11 실측: member-bulk 삭제(202 비동기)가 그룹을 EDITING으로 → 즉시 삭제가 400 InvalidState. 의미상-409-를-400으로 클래스 — settle 사다리 (domain-constraints 규약)",
           "service": "loadbalancer",
           "method": "DELETE",
           "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "retry_on_status": [400],
+          "retries": 8,
+          "retry_interval": 15,
           "expect_status": [
             200,
             202,
