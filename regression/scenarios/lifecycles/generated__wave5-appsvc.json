@@ -1355,7 +1355,7 @@
       "id": "gen-wave5-scf-triggers",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "scf trigger + leftovers closure: apigateway trigger with the verbatim ApigatewayTriggerCreateRequest {apigateway_api_id (24-hex = our apigw api id), apigateway_stage_name (dev from stage_type=new), cloud_function_id} — the old coverage probe's guessed body is retired. Trigger DELETE uses the PROVEN json passthrough {cloud_function_id, trigger_type} with the 'apigateway' literal (live 400 on run 27417986669 said type must be 'apigateway' or 'cron'). listcloudfunctiontriggers carries its required cloud_function_id query. logs/metrics ride ?time=1h (undocumented-required param class, 400 tolerated). codes/file is a Java-shaped DTO probed against a Node function -> 4xx expected, owner question to prove it properly.",
+      "_note": "scf trigger + leftovers closure: apigateway trigger with the verbatim ApigatewayTriggerCreateRequest {apigateway_api_id (24-hex = our apigw api id), apigateway_stage_name (dev from stage_type=new), cloud_function_id} — the old coverage probe's guessed body is retired. Trigger DELETE uses the PROVEN json passthrough {cloud_function_id, trigger_type} with the 'apigateway' literal (live 400 on run 27417986669 said type must be 'apigateway' or 'cron'). listcloudfunctiontriggers carries its required cloud_function_id query. logs/metrics ride ?time=60 (undocumented-required param class, 400 tolerated). codes/file is a Java-shaped DTO probed against a Node function -> 4xx expected, owner question to prove it properly.",
       "steps": [
         {
           "name": "create-function",
@@ -1406,8 +1406,8 @@
           "name": "show-function-logs",
           "service": "scf",
           "method": "GET",
-          "path": "/v1/cloud-functions/{cloud_function_id}/logs?time=1h",
-          "_note": "showcloudfunctionlogs — 'must select either time or period' (run 27399448835, undiscoverable-params class; docs say all optional). time=1h format assumed; 400 tolerated and corrected from the live body if wrong.",
+          "path": "/v1/cloud-functions/{cloud_function_id}/logs?time=60",
+          "_note": "showcloudfunctionlogs — 'must select either time or period' (run 27399448835, undiscoverable-params class; docs say all optional). 2026-07-11 run-892a 정정: time은 integer ('1h'는 'unable to parse string as an integer' 400) — time=60 (단위 미문서, 분 추정; 라이브가 재정정).",
           "expect_status": [
             200,
             400
@@ -1419,7 +1419,7 @@
           "name": "show-function-metrics",
           "service": "scf",
           "method": "GET",
-          "path": "/v1/cloud-functions/{cloud_function_id}/metrics?time=1h",
+          "path": "/v1/cloud-functions/{cloud_function_id}/metrics?time=60",
           "expect_status": [
             200,
             400

@@ -1340,6 +1340,7 @@
               "member_state": "DISABLE"
             }
           },
+          "_note": "2026-07-11 run-892a: member_state=ENABLE 송신이 400 ExistRequestMemberState('이미 ENABLE') — set은 멱등 거부. 현재 상태(ENABLE)의 반대인 DISABLE로 전이시켜 2xx 유도 (멤버는 직후 teardown이라 트래픽 영향 없음).",
           "expect_status": [
             200,
             202

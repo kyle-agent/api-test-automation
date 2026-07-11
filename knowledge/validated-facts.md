@@ -2153,6 +2153,61 @@ related_resources SRN 폴백은 이런 숨은 서브넷의 기존 완화책이�
 (`_purge_409_holders`; run_scoped의 서브넷 전용 폴백을 일반화). DC 자체의
 teardown 규약: **자식 routing-rules를 먼저 비워야 DC DELETE가 수락**(rule이
 남으면 409; run_scoped도 같은 컬렉션 내 깊은 경로 우선으로 교정). 서비스
-호스트 키는 `direct-connect`(하이픈; `directconnect`는 프록시 502). 미해결:
-DC의 network-logging storage delete 400 (d5637fad… 실측, 사유 미확인 —
-network-logging 스윕 패스 부재, 재발 시 조사).
+호스트 키는 `direct-connect`(하이픈; `directconnect`는 프록시 502).
+~~미해결: DC의 network-logging storage delete 400~~ → **해소 (같은 날 오후,
+아래 블록)**: 뿌리는 DC delete 202 비동기 수렴 전의 삭제 시도 — DC가 완전히
+사라진 뒤에는 스토리지 DELETE 204 (d5637fad 수동 회수 실증). 시나리오에는
+wait-direct-connect-gone(404 폴)로 반영.
+
+## run-892a 판정 + 2라운드 수리 (2026-07-11 오후)
+
+**run 20260711-132620-892a (110 pass / 6 fail, 74분)** — 1라운드 수리 판정:
+
+### 명중 (신규 2xx 확정)
+
+- **VS image-shell 체인 7키**: createimage 200 · updateimage(visibility→shared)
+  200 · listimagemembers 200 · createimagemember 200 · showimagemember 200 ·
+  deleteimagemember 204 · deleteimage 204. updatesnapshot 200 ·
+  revertvolumetosnapshot 202 (available settle이 정답) · -full image-update 200.
+- **DBaaS**: set-security-group-rules **202 × 5엔진** (add_ip_addresses+실IP가
+  정답) · epas/pg **sync-parameters 202** (settle-cluster-after-parameters 복구
+  전진 배치가 오염 차단 실증) · cachestore resize-block-storage 202.
+- **DC**: FIREWALL 로깅 스토리지 201 → create-direct-connect 202 ·
+  showdirectconnect 200 · createroutingrule 202 · listroutingrules 200.
+
+### 라이브 프로브 확정 (2026-07-11, 이미지 API 직접 실험)
+
+- **importimage = 구조적 도달 불가**: import는 `status=queued` 전용인데
+  createimage가 url을 강제(생략·null·"" 모두 400; ""는 "URL must end with
+  '.qcow2'")하고 **url-생성 이미지는 즉시 active** — queued 이미지를 만들 방법이
+  없음. PF 후보(unreachable operation) + reachability waiver 후보.
+- **updateimagemember = 단일 계정 도달 불가**: status는 소문자
+  accepted/pending/rejected만 유효 형식이나 유효값 전부
+  `Image.MemberCannotBeUpdatedToSharingImage` — shared 이미지 member status는
+  owner 계정에서 변경 불가(member 수신 계정 전용 op 추정). waiver 후보.
+- **createsharingimage는 BDM 요구**: 셸(빈 이미지)에서 400
+  `Image.InvalidImageWithBlockDeviceMapping` — BDM은 server-유래 custom image만
+  가짐 → share 스텝을 custom-image 그룹 create 직후로 이동 (923a의 404는 verify
+  실패가 그룹 teardown을 먼저 부른 순서 문제).
+
+### 2라운드 수리 (다음 런/프로브 판정)
+
+- **DC 잔여 3키**: create 202 직후 CREATING에 set/delete가 400
+  not-editable/not-deletable → wait-direct-connect-active(+rule 후 재대기) 신설,
+  delete retry에 400 추가. **adopt 제거** — DC-routing이 공유 VPC에 DC를 만들자
+  gen-private-nat의 DC create가 400 vpc-already-connected(VPC당 1) — 1라운드
+  수리가 만든 신규 충돌, 자체 VPC(10.137/20)로 격리.
+- **DB log-export**: DAY+(-1/null)도 InvalidScheduleData → 가설 2 =
+  WEEK+MON+day_of_month:null.
+- **DB resize**: DATA 그룹([1]) 대상은 맞았으나(RoleType 에러 소멸) 104→112가
+  `InvalidBlockStorageSize` (cachestore만 202) → 208 시도(증분 제약 가설).
+- **create 백엔드 500 간헐 클래스**: mysql-cluster·servicewatch create-group이
+  ContactAdminForAssistance 500 (마리아는 어제, 오늘은 이 둘 — 엔진 무작위 간헐)
+  → 5엔진 create + create-group에 500/503 retry 2회 균일화.
+- **lb-member-set**: 400 `ExistRequestMemberState`("이미 ENABLE") — set은 멱등
+  거부 → DISABLE 전이로 수정.
+- **scf logs/metrics**: `time`은 integer ("1h" → parse 400) → time=60.
+- **eventstreams**: 프로비저닝 FAILED 2연속 (es-wait terminal-bad가 정확히 잡아
+  즉시 중단+teardown — 신규 hard-create 규약 실증). 뿌리는 백엔드/바디 — PF 후보.
+- **gen-wave2-scf cronjob-trigger 404**: 타 lifecycle 자원 dup-read가 삭제 후
+  도착하는 레이스 — 트리아지 후속.

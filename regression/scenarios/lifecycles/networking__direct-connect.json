@@ -36,7 +36,7 @@
           "capture": {"vpc_id": "$.vpc.id"},
           "expect_status": [200, 201, 202],
           "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
-          "adopt": "vpc"
+          "_note": "2026-07-11 run-892a: adopt 제거 — 공유 VPC 채택 시 이 lifecycle의 DC가 붙는 순간 gen-private-nat의 create-direct-connect가 400 vpc-already-connected (DC는 VPC당 1). 자체 VPC(10.137/20)로 격리."
         },
         {
           "name": "wait-vpc",
@@ -80,6 +80,16 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture_soft": {"direct_connect_id": "$.direct_connect.id"},
           "cleanup": {"method": "DELETE", "path": "/v1/direct-connects/{direct_connect_id}", "service": "direct-connect"}
+        },
+        {
+          "name": "wait-direct-connect-active",
+          "method": "GET",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "group": "dc",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"field": "$.direct_connect.state", "until": ["ACTIVE", "CREATED", "RUNNING"], "timeout": 600, "interval": 15},
+          "_note": "2026-07-11 run-892a: create 202 직후 CREATING 동안 set/delete가 400 not-editable/not-deletable — ACTIVE settle."
         },
         {
           "name": "get-direct-connect",
@@ -132,6 +142,16 @@
           "cleanup": {"method": "DELETE", "path": "/v1/direct-connects/{direct_connect_id}/routing-rules/{routing_rule_id}", "service": "direct-connect"}
         },
         {
+          "name": "wait-direct-connect-active-after-rule",
+          "method": "GET",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "group": "dc",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"field": "$.direct_connect.state", "until": ["ACTIVE", "CREATED", "RUNNING"], "timeout": 600, "interval": 15},
+          "_note": "2026-07-11 run-892a: rule create 202가 DC를 재전이시켜 delete-routing-rule/delete-dc가 400 not-deletable-state — rule 후 ACTIVE 재대기."
+        },
+        {
           "name": "list-routing-rules",
           "method": "GET",
           "path": "/v1/direct-connects/{direct_connect_id}/routing-rules",
@@ -151,7 +171,7 @@
           "optional": true,
           "destructive": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409],
-          "retry_on_status": [409],
+          "retry_on_status": [400, 409],
           "retries": 6,
           "retry_interval": 15
         },
@@ -163,7 +183,7 @@
           "optional": true,
           "destructive": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409],
-          "retry_on_status": [409],
+          "retry_on_status": [400, 409],
           "retries": 8,
           "retry_interval": 15
         },

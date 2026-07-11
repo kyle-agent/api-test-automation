@@ -194,6 +194,12 @@
             201,
             202
           ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
@@ -438,9 +444,9 @@
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "alert",
-            "schedule_day_of_month": "-1",
-            "schedule_day_of_week": null,
-            "schedule_frequency_type": "DAY",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
             "secret_key": ""
           },
@@ -511,9 +517,9 @@
           "json": {
             "access_key": "",
             "delete_on_export": true,
-            "schedule_day_of_month": "-1",
-            "schedule_day_of_week": null,
-            "schedule_frequency_type": "DAY",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
             "secret_key": ""
           },
@@ -1341,6 +1347,12 @@
             201,
             202
           ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
           "capture": {
             "cluster_id": "$.resource.id"
           },
@@ -2087,9 +2099,9 @@
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "alert",
-            "schedule_day_of_month": "-1",
-            "schedule_day_of_week": null,
-            "schedule_frequency_type": "DAY",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
             "secret_key": ""
           },
@@ -2160,9 +2172,9 @@
           "json": {
             "access_key": "",
             "delete_on_export": true,
-            "schedule_day_of_month": "-1",
-            "schedule_day_of_week": null,
-            "schedule_frequency_type": "DAY",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
             "secret_key": ""
           },
@@ -2758,7 +2770,7 @@
           "method": "POST",
           "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
           "json": {
-            "size_gb": 112
+            "size_gb": 208
           },
           "expect_status": [
             200,
@@ -3760,9 +3772,9 @@
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "alert",
-            "schedule_day_of_month": "-1",
-            "schedule_day_of_week": null,
-            "schedule_frequency_type": "DAY",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
             "secret_key": ""
           },
@@ -3833,9 +3845,9 @@
           "json": {
             "access_key": "",
             "delete_on_export": true,
-            "schedule_day_of_month": "-1",
-            "schedule_day_of_week": null,
-            "schedule_frequency_type": "DAY",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
             "secret_key": ""
           },
@@ -4432,7 +4444,7 @@
           "method": "POST",
           "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
           "json": {
-            "size_gb": 112
+            "size_gb": 208
           },
           "expect_status": [
             200,
@@ -4750,6 +4762,12 @@
             201,
             202
           ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
           "capture": {
             "cluster_id": "$.resource.id"
           },
@@ -5750,7 +5768,7 @@
           "method": "POST",
           "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
           "json": {
-            "size_gb": 112
+            "size_gb": 208
           },
           "expect_status": [
             200,
@@ -6072,6 +6090,12 @@
             201,
             202
           ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
@@ -6759,9 +6783,9 @@
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "alert",
-            "schedule_day_of_month": "-1",
-            "schedule_day_of_week": null,
-            "schedule_frequency_type": "DAY",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
             "secret_key": ""
           },
@@ -6832,9 +6856,9 @@
           "json": {
             "access_key": "",
             "delete_on_export": true,
-            "schedule_day_of_month": "-1",
-            "schedule_day_of_week": null,
-            "schedule_frequency_type": "DAY",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
             "secret_key": ""
           },
@@ -7477,7 +7501,7 @@
           "method": "POST",
           "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
           "json": {
-            "size_gb": 112
+            "size_gb": 208
           },
           "expect_status": [
             200,

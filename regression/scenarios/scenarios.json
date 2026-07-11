@@ -4597,6 +4597,12 @@
             201,
             202
           ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
@@ -9440,6 +9446,12 @@
             200,
             201
           ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
           "capture": {
             "log_group_id": "$.log_group.id"
           },
