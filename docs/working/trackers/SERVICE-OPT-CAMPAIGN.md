@@ -1,0 +1,60 @@
+# 서비스별 단독 실행 최적화 캠페인 (2026-07-11 시작)
+
+> 오너 지시: "각 서비스별로 한번에 하나씩 수행해 보면서 의존관계나, API가
+> 필요없이 기다리거나 하는 건 없는지, 각 서비스마다의 최적 수행시간은 뭔지 —
+> 니가 직접 테스트하고 개선해봐. 전체 서비스를 한번씩은 한다 생각하고."
+
+## 루프 (서비스당)
+
+1. 활성 런 확인 (경합 금지) → 해당 서비스 라이프사이클만 `SCP_CRUD_IDS` 단독 실행
+   (`local_run.live_run`; 런 종료 자동 정리 포함, heavy는 해당 서비스 차례에만 opt-in)
+2. events 스팬 분석: 스텝별 시간 · 폴 대기 · 재시도 · 스텝 간 공백 분해
+   → "필요한 대기(비동기 수렴)" vs "불필요한 대기(고정 sleep/과도 interval/무의미 wait)"
+3. 수리 반영 (poll interval/timeout·스텝 순서·그룹 병렬화·레이스 settle)
+4. 재실행 검증 → 최적 수행시간을 durations.json에 기록(source: svc-opt) + knowledge 축적
+5. 트래커 갱신 → 다음 서비스
+
+## 순서 원칙
+
+경량 컨트롤플레인(reads/CRUD-light) → 네트워킹 → heavy(VM·DB엔진별·SKE·backup).
+과금 최소화: heavy는 서비스당 1회, 즉시 teardown.
+
+## 상태 보드
+
+| # | 서비스 | lifecycles | 상태 | 1차 실측 | 개선 | 최적 실측 | 노트 |
+|---|---|---|---|---|---|---|---|
+| 1 | cloudmonitoring | gen-cm-event-policy, gen-cm-account-resource | ▶ 진행 | | | | |
+| 2 | scr | container-scr-registry | 대기 | | | | PF-37 게이트 — reads만 |
+| 3 | baremetal | baremetal-catalog-reads | 대기 | | | | |
+| 4 | quick-query | gen-quick-query-* ×2 | 대기 | | | | |
+| 5 | configinspection | configinspection-read-coverage | 대기 | | | | |
+| 6 | support / quota / pricing / costexplorer | 각 1 (reads) | 대기 | | | | 묶음 실행 후보 (전부 read) |
+| 7 | network-logging | gen-wave4-nlog | 대기 | | | | |
+| 8 | multinodegpucluster | gen-gpu-node-image | 대기 | | | | |
+| 9 | queueservice | gen-wave3-qfifo (+ application-queueservice-queue) | 대기 | | | | |
+| 10 | iam-identity-center | idc-read-coverage | 대기 | | | | |
+| 11 | direct-connect | gen-direct-connect (+ routing) | 대기 | | | | DC 1:1-per-VPC 규약 |
+| 12 | iam | iam-group, gen-wave5-iam-bindings (+ user/role) | 대기 | | | | |
+| 13 | kms | gen-wave2-sec, security-kms-transit-crypto | 대기 | | | | PF-09 예약삭제 |
+| 14 | secretsmanager | security-secretsmanager-writes | 대기 | | | | |
+| 15 | apigateway | gen-wave-apigw, gen-wave5-apigw-policy | 대기 | | | | |
+| 16 | firewall | gen-wave5-fw | 대기 | | | | 캐리어 암묵 생성 |
+| 17 | resourcemanager | 4종 | 대기 | | | | |
+| 18 | servicewatch | 8종 | 대기 | | | | create-group 500 재확인 |
+| 19 | cdn / dns / gslb | reads+CRUD | 대기 | | | | CDN stop 상태기계 |
+| 20 | certificatemanager | selfsign 등 | 대기 | | | | |
+| 21 | networking (vpc/subnet/port/publicip/peering/TGW/endpoint/NAT) | 다수 | 대기 | | | | 슬롯 소비 — 후반 |
+| 22 | loadbalancer | light + heavy | 대기 | | | | |
+| 23 | filestorage | 3종 | 대기 | | | | 교차리전 replication |
+| 24 | scf | 4종 | 대기 | | | | PLE 연쇄 규약 |
+| 25 | backup | gen-heavy-backup | 대기 | | | | heavy |
+| 26 | cloud-ml | 2종 | 대기 | | | | SCR 게이트 부분 |
+| 27 | virtualserver | 5종 | 대기 | | | | heavy 2 |
+| 28 | dbaas 엔진별 (mysql·postgresql·mariadb·epas·cachestore·eventstreams·searchengine·sqlserver·vertica) | 엔진당 1-2 | 대기 | | | | mysql/pg create 500 PF 주의 |
+| 29 | ske | 2종 | 대기 | | | | heavy — 최후반 |
+
+(분류는 진행하며 정제 — "?" 버킷 44종은 해당 서비스 차례에 편입)
+
+## 발견/개선 로그
+
+- (누적 기록)
