@@ -926,3 +926,35 @@ def test_fold_evidence_endpoint_counts_unpublished_2xx(tmp_path, monkeypatch):
     finally:
         with c2._LOCK:
             c2._RUNS.pop("t-fold-1", None)
+
+
+# --------------------------------------------------------------------------- #
+# 성능 수리 (2026-07-11, 오너 실측 제보) — 1,500+ 호출 런에서 클릭/폴 멈춤
+# --------------------------------------------------------------------------- #
+def test_large_run_render_diet_frontend_contract():
+    """Pin the large-run render diet (오너 제보: 'soft 건수를 누르면 화면이
+    멈춤'). 실측 재현: 2,200 호출 라이브 런에서 폴 틱당 54–274ms 롱태스크 +
+    soft 타일은 클릭해도 무동작. 수리 3종 — 수리 후 롱태스크 0 실측:
+
+      1. groupedRun() 메모이즈 — runEvents 배열 참조가 캐시 키 (폴마다 새
+         배열). 한 틱의 여러 소비자(drawReport·runProgress·rail·간트)가 전체
+         이벤트를 각자 재스캔하지 않는다. lifecycleStates()도 캐시를 읽는다.
+      2. kpi 타일(api 호출/ok/soft/fail) = 결과 필터 토글. 타일 필터는
+         dup-hide 를 무시하고 원본에서 거른다 (soft N 타일 vs 0행 모순 방지).
+      3. API 표 행 상한(API_ROW_CAP) — 초과분은 최신순으로 자르고 생략 수 +
+         [전체 표시] opt-in 을 표 첫 행에 명시 (묵살 금지)."""
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
+    # 1) 메모이즈 — 재스캔 제거
+    assert "_grCache" in js and "_grCache.ref !== runEvents" in js
+    lc = js.split("function lifecycleStates", 1)[1].split("function liveProgress")[0]
+    assert "groupedRun()" in lc and "runEvents.forEach" not in lc
+    # 2) kpi 타일 필터 (+ dup-hide 무시 규칙)
+    assert "apiCatFilter" in js and '.selcat[data-cat]' in js
+    assert "calls.filter(c => c.category === apiCatFilter)" in js
+    assert ".kpi .s.selcat" in css and ".selcat.on" in css
+    # 3) 행 상한 + 명시적 해제
+    assert "API_ROW_CAP = 500" in js and 'id="api-showall"' in js
+    assert "생략 (성능 보호)" in js
+    # 스코프/런 전환 시 필터·상한 상태 리셋 (stale 필터로 빈 화면 방지)
+    assert js.count('apiCatFilter = "all"; apiShowAll = false;') >= 3

@@ -55,6 +55,11 @@ let lastLogText = null;     // last log text written to the 로그 <pre> (in-pla
 let r4LogTimer = null;      // dedicated slow (2s) log poller while running (detail 로그 tab)
 let expandedApi = null;     // key of the currently-expanded API row (detail API tab)
 let hideDupSoft = true;     // §5: 중복-soft(다른 곳에서 이미 2xx 검증된 것) 행은 기본 접힘
+// 성능 수리 + UX (2026-07-11 오너 제보 "soft 건수 클릭 시 멈춤"): kpi 타일이
+// 클릭돼도 아무 동작이 없었다 → 결과 필터로 승격. 대형 런 표는 행 상한.
+let apiCatFilter = "all";   // API 탭 결과 필터 — all|ok|soft|fail (kpi 타일 클릭)
+let apiShowAll = false;     // 행 상한(API_ROW_CAP) 해제 여부 — 스코프 전환 시 리셋
+const API_ROW_CAP = 500;    // 이 이상은 최신순으로 자르고 '전체 표시'로 해제
 
 // ---- run 뷰 바인딩 (F1·F2): the master 흐름 graph binds to the RUN, not to the
 // 구성 selection. runGraph = /api/runs/<id>/graph (the run's lifecycle closure,
@@ -137,7 +142,7 @@ function reattachActiveRun() {
     const act = (j.runs || []).find(r => r.status === "running" || r.status === "queued");
     if (!act || runId) return;
     runId = act.id; runEvents = []; evOffset = 0; runStatus = act.status || "running";
-    detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;
+    detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null; apiCatFilter = "all"; apiShowAll = false;
     graphMode = "run"; ensureRunGraph();
     go("run");
     pollEvents();
@@ -413,6 +418,19 @@ function wireReportDelegation() {
       if (ev.target.closest("#hidedup-soft") || ev.target.closest("label")) return;  // change 가 처리
       const dl = ev.target.closest("[data-defsvc]");
       if (dl) { openDefinition(dl.dataset.defsvc); return; }
+      // kpi 타일 = 결과 필터 토글 (2026-07-11 성능 수리 + 오너 기대 동작)
+      const tile = ev.target.closest("#r3-kpi .selcat[data-cat]");
+      if (tile) {
+        const cat = tile.dataset.cat;
+        apiCatFilter = (apiCatFilter === cat || cat === "all") ? "all" : cat;
+        keepDetailScroll(reportR3);
+        return;
+      }
+      if (ev.target.closest("#api-showall")) {   // 행 상한 해제 (명시적 opt-in)
+        apiShowAll = true;
+        keepDetailScroll(reportR3);
+        return;
+      }
       const row = ev.target.closest(".apirow[data-apik]");
       if (row) {
         expandedApi = expandedApi === row.dataset.apik ? null : row.dataset.apik;
@@ -1496,7 +1514,7 @@ function loadRunIntoReport(id) {
   // "run 종료" (M1 review 2026-07-04) — cancel it on rebind.
   if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
   runId = id; runEvents = []; evOffset = 0; runStatus = "…";
-  detailScope = "*"; scopeAuto = true; expandedApi = null;
+  detailScope = "*"; scopeAuto = true; expandedApi = null; apiCatFilter = "all"; apiShowAll = false;
   graphMode = "run"; ensureRunGraph();       // run 클릭 = run 뷰로 재바인딩 (F2)
   fetch("/api/runs/" + id + "/events?offset=0").then(r => r.json()).then(j => {
     runEvents = j.events || []; runStatus = j.status || "done";
@@ -1918,7 +1936,7 @@ function postRun(sel, cb) {
         if (cb) cb(msg, null); return;
       }
       runId = j.id; runEvents = []; evOffset = 0; runStatus = j.status || "running";
-      detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;   // fresh run → reconcile auto-selects
+      detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null; apiCatFilter = "all"; apiShowAll = false;   // fresh run → reconcile auto-selects
       loadRunRecords();   // P2C-24: /api/runs 는 이벤트 시점(시작)에만 — 폴 동승 제거
       graphMode = "run"; ensureRunGraph();   // 흐름 = 이 run 의 그래프 (F1)
       // A QUEUED run has no events / no live scene yet: show the wait banner and let
@@ -2398,8 +2416,19 @@ function groupEventsByLifecycle(events) {
   return { lcs, order };
 }
 
-// the current scope's grouped buckets (recomputed each call from the live stream).
-function groupedRun() { return groupEventsByLifecycle(runEvents); }
+// the current scope's grouped buckets. 성능 수리 (2026-07-11 오너 제보 "1,500+
+// 호출 런에서 클릭 시 화면 멈춤"): 종전엔 호출마다 전체 이벤트를 재스캔했고,
+// 한 폴 틱에 소비자가 여럿(drawReport·runProgress·rail·PLAN/ACTUAL·간트)이라
+// 대형 런에서 틱당 수백 ms 롱태스크가 됐다. runEvents 는 폴마다 새 배열로
+// 교체되므로(concat/재전송) 배열 참조가 곧 캐시 키 — 같은 틱 안에서는 1회만
+// 계산한다.
+let _grCache = { ref: null, val: null };
+function groupedRun() {
+  if (_grCache.ref !== runEvents) {
+    _grCache = { ref: runEvents, val: groupEventsByLifecycle(runEvents) };
+  }
+  return _grCache.val;
+}
 const isAggScope = () => detailScope === "*";
 
 // auto-select the scope for a single-lifecycle run (so the detail shows without an
@@ -2654,14 +2683,12 @@ function keepDetailScroll(render) {
 
 // derive live lifecycle state from events: queued/running/done/fail/skip
 function lifecycleStates() {
+  // 성능 수리 (2026-07-11): 전체 이벤트 재스캔 대신 groupedRun() 캐시의 버킷
+  // status 를 그대로 읽는다 — 어휘 동일(queued/running/done/skip/fail),
+  // run-meta/wave-start 의 ensure 도 groupEventsByLifecycle 가 이미 수행.
+  const { lcs, order } = groupedRun();
   const st = {};
-  runEvents.forEach(e => {
-    if (e.kind === "run-meta") (e.runnable || []).forEach(l => { if (!st[l]) st[l] = "queued"; });
-    if (e.kind === "wave-start") (e.lifecycles || []).forEach(l => { if (!st[l]) st[l] = "queued"; });
-    if (e.kind === "lifecycle-start") st[e.lifecycle] = "running";
-    if (e.kind === "lifecycle-end") st[e.lifecycle] =
-      e.status === "passed" ? "done" : e.status === "skipped" ? "skip" : "fail";
-  });
+  order.forEach(id => { st[id] = lcs[id].status; });
   return st;
 }
 
@@ -3035,10 +3062,20 @@ function reportR3() {
                 policy: ["정책", "pol", "reachability waiver — 만점=도달(4xx=접근 증거)"] };
     const x = m[cls]; return x ? ` <span class="schip ${x[1]}" title="${x[2]}">${x[0]}</span>` : "";
   };
-  const visCalls = hasSC && hideDupSoft
+  const dupVis = hasSC && hideDupSoft
     ? calls.filter(c => !(c.category === "soft" &&
         (c.soft_class === "dup_run" || c.soft_class === "duplicate"))) : calls;
-  const hiddenN = calls.length - visCalls.length;
+  const hiddenN = calls.length - dupVis.length;
+  // kpi 타일 결과 필터 (2026-07-11) — soft/fail 만 보기. 카운트는 전체 기준
+  // 유지. 타일 필터는 dup-hide 를 무시하고 원본(calls)에서 거른다 — soft 266
+  // 을 눌렀는데 전부 dup 이라 0행이 나오면 타일 숫자와 표가 모순 (실측).
+  const catVis = apiCatFilter === "all" ? dupVis
+    : calls.filter(c => c.category === apiCatFilter);
+  // 대형 런 행 상한 — 최신 API_ROW_CAP 건만 렌더 (묵살 금지: 생략 수 + 해제
+  // 버튼을 표 첫 행으로). 필터를 걸면 자연히 상한 아래로 내려간다.
+  const capped = !apiShowAll && catVis.length > API_ROW_CAP;
+  const visCalls = capped ? catVis.slice(-API_ROW_CAP) : catVis;
+  const cappedN = catVis.length - visCalls.length;
   const apiUnit = c => {
     const k = rowKey(c);
     const isOpen = expandedApi === k;
@@ -3064,8 +3101,15 @@ function reportR3() {
   } else {
     units = visCalls.map(apiUnit);
   }
+  if (capped) units.unshift({ k: "__cap", html:
+    `<tr data-k="__cap"><td colspan="4" class="empty">⚡ 최근 ${API_ROW_CAP}건만 표시 —
+      이전 ${cappedN}건 생략 (성능 보호). <button class="minibtn" id="api-showall"
+      title="전체 ${catVis.length}건 렌더 — 대형 런에서는 느려질 수 있습니다">전체 표시</button>
+      <span class="muted small">또는 kpi 타일(ok/soft/fail)·라이프사이클 스코프로 좁히세요</span></td></tr>` });
   if (!units.length) units.push({ k: "__empty", html:
-    `<tr data-k="__empty"><td colspan="4" class="empty">${d.status === "running" ? "API 호출 대기 중 (진행 중)…" : "이 스코프에 API 호출이 없습니다."}</td></tr>` });
+    `<tr data-k="__empty"><td colspan="4" class="empty">${apiCatFilter !== "all"
+      ? `'${apiCatFilter}' 필터와 일치하는 호출이 없습니다 — 타일을 다시 눌러 해제`
+      : (d.status === "running" ? "API 호출 대기 중 (진행 중)…" : "이 스코프에 API 호출이 없습니다.")}</td></tr>` });
   // 📖 정의 link(s) for the service(s) this scope's calls belong to (lifecycle→service
   // via the model) — jump from "what ran" to "what the definition + knowledge say".
   const defSvcs = [...new Set(calls.map(c => ((MODEL && MODEL.lifecycles || {})[c._lc || c.lifecycle] || {}).service).filter(Boolean))];
@@ -3084,11 +3128,15 @@ function reportR3() {
       <tbody id="r3-body"></tbody></table></div>`;
   }
   setHtmlIfChanged($("r3-head"), `<h3 class="detail-h">API <span class="muted small">· ${d.agg ? "런 전체" : "이 라이프사이클"} — 행 클릭 → 요청·응답·파라미터 스키마</span> ${defLinks}</h3>`);
+  // kpi 타일 = 결과 필터 (클릭 토글) — 2026-07-11 오너 제보의 기대 동작
+  const tile = (cat, n, color, label, tip) =>
+    `<div class="s selcat ${apiCatFilter === cat ? "on" : ""}" data-cat="${cat}"
+       title="${esc(tip)} — 클릭: 이 결과만 보기 (다시 클릭 = 해제)"><b${color ? ` style="color:var(--${color})"` : ""}>${n}</b><span>${label}</span></div>`;
   setHtmlIfChanged($("r3-kpi"), `<div class="kpi">
-      <div class="s"><b>${calls.length}</b><span>api 호출</span></div>
-      <div class="s" title="${esc(CAT_TIP.ok)}"><b style="color:var(--ok)">${okN}</b><span>ok</span></div>
-      <div class="s" title="${esc(CAT_TIP.soft)}"><b style="color:var(--soft)">${softN}</b><span>soft</span></div>
-      <div class="s" title="${esc(CAT_TIP.fail)}"><b style="color:var(--fail)">${failN}</b><span>fail</span></div>
+      <div class="s selcat ${apiCatFilter === "all" ? "on" : ""}" data-cat="all" title="전체 보기"><b>${calls.length}</b><span>api 호출</span></div>
+      ${tile("ok", okN, "ok", "ok", CAT_TIP.ok)}
+      ${tile("soft", softN, "soft", "soft", CAT_TIP.soft)}
+      ${tile("fail", failN, "fail", "fail", CAT_TIP.fail)}
     </div>`);
   setHtmlIfChanged($("r3-soft"), hasSC ? `<div class="softbrk small">soft 분류:
         ${sc.confirm ? `<span class="schip cfm">삭제확인 ${sc.confirm}</span>` : ""}
