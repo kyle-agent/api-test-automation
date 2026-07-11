@@ -50,9 +50,9 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   in-flight(running/queued)일 때만 표시 (donor: v2 `run_exec.js` B층 +
   `run_detail.html` plan-strip, 오너 승인 목업 §2.9).
 - **PLAN**: `POST /api/plan {lifecycle_ids: rec.lifecycle_ids}` 서버 재계산
-  (run별 1회 캐시) — 생성 ~n · 삭제 ~n · peak VPC · ETA. **ETA는 donor의
-  순차합산이 아니라 v1 now-playing 잔여와 같은 병렬 6 가정**으로 통일 (같은
-  화면에서 두 ETA의 가정이 다르면 비교 불능 — 결정 지점 4).
+  (run별 1회 캐시) — 생성 ~n · 삭제 ~n · peak VPC. **시간 예측은 2026-07-11
+  정합 개정(아래)에 따라 schedule-sim makespan 단일 소스** — 초기 접목의
+  병렬-6 근사는 제거(결정 지점 4 개정).
 - **ACTUAL**: 이벤트 실측(resource-tracked/-deleted 집계) + 경과 + VPC 슬롯
   미터(`/api/capacity` — 기존/이 런 peak/다른 런/여유 구분). queued면
   **WHY QUEUED**(여유 < 필요 peak 수치).
@@ -92,8 +92,15 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
    섹션 헤더 배지 1개 + 회색화만(같은 출처 반복 노이즈 절충). 오너 검수 시 조정.
 3. 배지 라벨은 donor 그대로 영어(Published/This server/This run/CI), 툴팁
    한국어 — D7 개정과 정합. v1 전반의 용어 정비는 접목 6에서 별도.
-4. **PLAN ETA 가정 = 병렬 6** (donor v2는 p50 순차합산) — v1 now-playing 잔여
-   ETA와 가정 통일이 우선이라 판단. durations 근사의 한계는 툴팁에 명시.
+4. ~~PLAN ETA 가정 = 병렬 6~~ **개정 (2026-07-11): 예측 단일 소스 =
+   `/api/schedule-sim` makespan** — 기존 세션이 main에 넣은 콘솔 간트
+   (cf8792b3, '예측 vs 실제 타임라인' 패널)와 같은 예측을 스트립·종료 카드가
+   **pvaSim 캐시 공유**로 그대로 쓴다 (같은 화면에 가정이 다른 예측 둘 금지,
+   run 당 POST 1회). 편차 칩 용어도 패널 amber와 동일한 "예측 초과"로 정합.
+   스트립 [📊 타임라인] 딥링크 = 요약(스트립) → 상세(간트 패널) 역할 분담.
+   부수 수리: 이벤트 도착 전 빈 lifecycle_ids로 예측 요청 시 서버가 전체
+   플랫폼(124종) makespan을 돌려줘 이 run 예측처럼 오독되던 것 — ids 확보
+   전에는 요청하지 않게 (기존 패널 코드의 잠재 결함이었음).
 
 ## 경계 메모
 

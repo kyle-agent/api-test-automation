@@ -819,8 +819,11 @@ def test_plan_actual_strip_frontend_contract():
          (never a client-side re-derivation of the schedule).
       3. ACTUAL aggregates run events (resource-tracked/-deleted) + capacity
          slot meter; queued state renders WHY QUEUED (여유 < 필요 peak).
-      4. Deviation is conservative: ETA-초과 chip only — 지연 의심 판정은
-         접목 4(엔진 요청 #5 세마포어 이벤트) 전에는 하지 않는다."""
+      4. Deviation is conservative: '예측 초과' chip only — 지연 의심 판정은
+         접목 4(엔진 요청 #5 세마포어 이벤트) 전에는 하지 않는다.
+      5. 예측 단일 소스 (콘솔 간트 cf8792b3 과의 정합): 스트립의 시간 예측은
+         '예측 vs 실제 타임라인' 패널과 같은 schedule-sim 캐시(pvaSim)를 공유
+         — 자체 ETA 재계산 금지, simFetch POST 도 코드베이스에 1곳뿐."""
     html = (ROOT / "console2" / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
     css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
@@ -834,11 +837,17 @@ def test_plan_actual_strip_frontend_contract():
     assert 'e.kind === "resource-tracked"' in js and 'e.kind === "resource-deleted"' in js
     assert "function slotMeterHtml" in js and ".slotmeter" in css
     assert "WHY QUEUED" in js and "필요 peak" in js
-    # 4) conservative deviation only (no 지연 의심 before engine request #5)
-    assert "ETA 초과" in js
-    assert "지연 의심" not in js.split("function renderPlanActual")[1].split("function renderNowPlaying")[0] \
-        or True  # 주석 언급은 허용 — 판정 로직 문자열은 아래에서 금지
+    # 4) conservative deviation only (no 지연 의심 before engine request #5) —
+    #    용어·기준은 간트 패널의 amber 와 동일한 '예측 초과'(makespan 초과)
+    assert "예측 초과" in js and "ETA 초과" not in js
     assert "avg * 3" not in js, "지연 의심(×3) 판정은 접목 4 전 금지 (세마포어 오탐)"
+    # 5) 예측 단일 소스 — 스트립은 pvaSim(schedule-sim)을 공유, 자체 ETA 계산 없음
+    assert "function ensurePvaSim" in js
+    assert js.count("simFetch({ lifecycle_ids") == 1, \
+        "schedule-sim 예측 fetch 는 ensurePvaSim 한 곳이어야 한다 (중복 POST/이중 예측 금지)"
+    strip = js.split("function renderPlanActual", 1)[1].split("function renderNowPlaying")[0]
+    assert "makespan_s" in strip and "ensurePvaSim()" in strip
+    assert 'id="pa-tl"' in strip  # 요약(스트립) → 상세(간트 패널) 딥링크
 
 
 # --------------------------------------------------------------------------- #

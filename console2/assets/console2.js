@@ -2028,8 +2028,10 @@ function renderDoneCard(sum) {
   let retro = `생성 ${created} · 삭제 ${deleted}` +
     (prog.elapsed != null ? ` · 경과 ${fmtElapsed(prog.elapsed)}` : "");
   if (runPlan && !runPlan._failed && runPlanFor === rid) {
+    // 회고의 예측도 스트립·간트 패널과 같은 단일 소스(schedule-sim makespan)
     const t = planTotals(runPlan);
-    retro = `계획 생성 ~${t.creates}·ETA ${t.eta != null ? "~" + fmtElapsed(t.eta) : "미측정"} → 실제 ${retro}`;
+    const sim = (pvaSimFor === rid && pvaSim && !pvaSim.error && pvaSim.makespan_s) ? pvaSim : null;
+    retro = `계획 생성 ~${t.creates}${sim ? ` · 예측 ~${fmtDur(sim.makespan_s)}` : ""} → 실제 ${retro}`;
   }
   const failRow = sum.failed.length
     ? `<div class="dc-row bad"><span class="dc-k">fail</span> <b>${sum.failed.length}건</b> — ${sum.failed.slice(0, 4).map(esc).join(", ")}${sum.failed.length > 4 ? " …" : ""}
@@ -2133,16 +2135,14 @@ function ensureRunPlan() {
     .catch(() => { if (runPlanFor === reqFor) { runPlan = { _failed: true }; renderPlanActual(); } });
 }
 function planTotals(p) {
-  let creates = 0, deletes = 0, dur = 0, measured = 0, total = 0;
+  let creates = 0, deletes = 0;
   Object.values(p.preview || {}).forEach(pv => {
-    total++; creates += pv.est_creates || 0; deletes += pv.est_deletes || 0;
-    if (pv.duration_s != null) { dur += pv.duration_s; measured++; }
+    creates += pv.est_creates || 0; deletes += pv.est_deletes || 0;
   });
-  // ETA = durations 실측 합 / 병렬 가정 — runProgress()의 잔여 추정과 같은 가정
-  // (donor v2는 순차합산이었으나, v1은 now-playing 잔여가 병렬 6 가정이라
-  //  같은 화면에서 대조 축을 통일한다).
-  const eta = measured ? dur / Math.min(ETA_PARALLEL, measured) : null;
-  return { creates, deletes, eta, measured, total };
+  // 시간 예측은 여기서 하지 않는다 — 단일 예측 소스는 schedule-sim(pvaSim,
+  // '예측 vs 실제 타임라인' 패널과 공유 캐시). 같은 화면에 가정이 다른 예측이
+  // 둘 뜨는 것 금지 (초기 접목 2의 병렬-6 근사를 콘솔 간트 작업과 정합·대체).
+  return { creates, deletes };
 }
 function slotMeterHtml(cap, minePeak) {
   if (!cap || !cap.cap) return "";
@@ -2164,13 +2164,27 @@ function renderPlanActual() {
   if (inFlight) { const dc = $("donecard"); if (dc && !dc.classList.contains("hidden")) { dc.classList.add("hidden"); dc._h = null; } }
   if (!inFlight) { host.classList.add("hidden"); host._h = null; host.innerHTML = ""; return; }
   host.classList.remove("hidden");
+  if (!host._wired) {          // [📊 타임라인] — 요약(스트립) → 상세(간트 패널) 딥링크
+    host._wired = true;
+    host.addEventListener("click", ev => {
+      if (!ev.target.closest("#pa-tl")) return;
+      ev.preventDefault();
+      const d = pvaEnsure(); if (!d) return;
+      go("run"); d.open = true; renderPva();
+      d.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
   ensureRunPlan();
-  let t = null, planTxt = "견적 계산 중…";
-  if (runPlan && runPlan._failed) planTxt = "견적 계산 불가 (/api/plan 실패)";
+  ensurePvaSim();              // 예측은 간트 패널과 같은 캐시(pvaSim) — 단일 소스
+  const sim = (pvaSimFor === runId && pvaSim && !pvaSim.error && pvaSim.makespan_s) ? pvaSim : null;
+  const predTxt = sim ? "~" + fmtDur(sim.makespan_s)
+    : (pvaSimFor === runId && pvaSim && pvaSim.error ? "불가" : "계산 중…");
+  const tlLink = ` <a href="#" id="pa-tl" title="예측 vs 실제 타임라인(간트) 패널 열기 — 이 예측(schedule-sim)의 lifecycle별 상세">📊 타임라인</a>`;
+  let t = null, planTxt = `예측 <b>${predTxt}</b>${tlLink}`;
+  if (runPlan && runPlan._failed) planTxt = `예측 <b>${predTxt}</b> · 생성/삭제 견적 불가 (/api/plan 실패)${tlLink}`;
   else if (runPlan) {
     t = planTotals(runPlan);
-    planTxt = `생성 ~<b>${t.creates}</b> · 삭제 ~${t.deletes} · peak VPC <b>${runPlan.peak_vpcs || 0}</b> · ETA <b>${t.eta != null ? "~" + fmtElapsed(t.eta) : "미측정"}</b>`
-      + (t.eta != null && t.measured < t.total ? ` <span class="muted small">(측정 ${t.measured}/${t.total})</span>` : "");
+    planTxt = `생성 ~<b>${t.creates}</b> · 삭제 ~${t.deletes} · peak VPC <b>${runPlan.peak_vpcs || 0}</b> · 예측 <b>${predTxt}</b>${tlLink}`;
   }
   let actTxt;
   if (runStatus === "queued") {
@@ -2183,15 +2197,16 @@ function renderPlanActual() {
     const created = runEvents.filter(e => e.kind === "resource-tracked").length;
     const deleted = runEvents.filter(e => e.kind === "resource-deleted").length;
     const prog = runProgress();
-    // 편차 칩 — 보수적으로 "계획 ETA 초과"만 (지연 의심의 정식 판정은 접목 4:
-    // 세마포어 대기 이벤트(엔진 요청 #5) 전에는 오탐 위험이 있어 여기 안 한다)
-    const over = t && t.eta != null && prog.elapsed != null && prog.elapsed > t.eta;
+    // 편차 칩 — '예측 초과'만, 간트 패널의 amber 와 같은 기준(schedule-sim
+    // makespan 초과). 지연 의심의 정식 판정은 접목 4(엔진 요청 #5 세마포어
+    // 대기 이벤트) 전에는 오탐 위험이 있어 여기서 하지 않는다.
+    const over = sim && prog.elapsed != null && prog.elapsed > sim.makespan_s;
     actTxt = `생성 <b>${created}</b>${t ? `/~${t.creates}` : ""} · 삭제 ${deleted}${t ? `/~${t.deletes}` : ""} · 경과 <b>${prog.elapsed != null ? fmtElapsed(prog.elapsed) : "—"}</b>`
-      + (over ? ` <span class="pa-over" title="경과가 계획 ETA(~${fmtElapsed(t.eta)})를 넘었습니다 — 실측 평균 기반 근사라 초과 자체가 이상은 아닙니다">ETA 초과</span>` : "")
+      + (over ? ` <span class="pa-over" title="경과가 예측 makespan(~${fmtDur(sim.makespan_s)})을 넘었습니다 — 타임라인 패널의 amber(예측 초과)와 같은 기준. 근사 예측이라 초과 자체가 이상은 아닙니다">예측 초과</span>` : "")
       + " " + slotMeterHtml(lastCapacity, runPlan && !runPlan._failed ? runPlan.peak_vpcs : 0);
   }
   setHtmlIfChanged(host,
-    `<span class="pa-col"><span class="pa-k" title="pre-flight 견적 — /api/plan(rec.lifecycle_ids) 서버 재계산 · durations.json 실측 평균 기반">PLAN</span> <span class="pa-v">${planTxt}</span></span>`
+    `<span class="pa-col"><span class="pa-k" title="pre-flight 견적(/api/plan 서버 재계산) + 예측 makespan(schedule-sim — '예측 vs 실제 타임라인' 패널과 동일 소스)">PLAN</span> <span class="pa-v">${planTxt}</span></span>`
     + `<span class="pa-mid">→</span>`
     + `<span class="pa-col"><span class="pa-k" title="이 run의 이벤트 실측 (resource-tracked/-deleted 집계) + /api/capacity 슬롯">${runStatus === "queued" ? "WHY QUEUED" : "ACTUAL"}</span> <span class="pa-v">${actTxt}</span></span>`);
 }
@@ -3416,6 +3431,32 @@ let pvaSim = null;          // 이 run 의 예측 결과 (/api/schedule-sim, run
 let pvaSimFor = null;       // pvaSim 이 속한 runId — 재바인딩 시 재요청
 let pvaLoading = false;     // 요청 in-flight 가드 (폴마다 중복 POST 방지)
 
+// 예측 공유 로더 — PLAN/ACTUAL 스트립(접목 2)과 '예측 vs 실제' 패널이 같은
+// pvaSim 캐시를 쓴다: 같은 화면에 가정이 다른 예측이 둘 뜨지 않게 (단일 소스),
+// POST 도 run 당 1회로 유지. 완료 시 두 표면을 모두 재렌더.
+function ensurePvaSim() {
+  if (!runId || pvaSimFor === runId || pvaLoading) return;
+  const ids = (runSelIds && runSelIds.length) ? runSelIds : Object.keys(lifecycleStates());
+  // 이 run 의 선택이 아직 안 왔으면 기다린다 (첫 이벤트 응답 전) — 빈 ids 로
+  // 보내면 서버가 "전체 플랫폼(124종)" 예측을 돌려줘 이 run 예측처럼 오독된다.
+  if (!ids.length) return;
+  pvaLoading = true;
+  const rid = runId;
+  simFetch({ lifecycle_ids: ids }).then(({ ok, j }) => {
+    pvaLoading = false;
+    if (runId !== rid) return;               // 폴 도중 재바인딩 — 응답 폐기
+    pvaSimFor = rid;
+    pvaSim = (ok && !j.error) ? j
+      : { error: (j && j.error) || "서버가 /api/schedule-sim 을 지원하지 않습니다" };
+    renderPva(); renderPlanActual();
+  }).catch(e => {
+    pvaLoading = false;
+    if (runId !== rid) return;
+    pvaSimFor = rid; pvaSim = { error: e.message };
+    renderPva(); renderPlanActual();
+  });
+}
+
 function simFetch(body) {
   return fetch("/api/schedule-sim", { method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -3553,24 +3594,8 @@ function renderPva() {
   }
   if (!d.open) return;                       // 접힌 동안은 렌더/페치 생략 (비용 0)
   if (pvaSimFor !== runId) {                 // 열릴 때 / run 재바인딩 시 1회 예측
-    if (pvaLoading) return;
-    pvaLoading = true;
-    const rid = runId;
-    const ids = (runSelIds && runSelIds.length) ? runSelIds : Object.keys(lifecycleStates());
     setHtmlIfChanged(body, '<p class="muted small pva-empty">예측 스케줄 계산 중…</p>');
-    simFetch({ lifecycle_ids: ids }).then(({ ok, j }) => {
-      pvaLoading = false;
-      if (runId !== rid) return;             // 폴 도중 재바인딩 — 응답 폐기
-      pvaSimFor = rid;
-      pvaSim = (ok && !j.error) ? j
-        : { error: (j && j.error) || "서버가 /api/schedule-sim 을 지원하지 않습니다" };
-      renderPva();
-    }).catch(e => {
-      pvaLoading = false;
-      if (runId !== rid) return;
-      pvaSimFor = rid; pvaSim = { error: e.message };
-      renderPva();
-    });
+    ensurePvaSim();                          // 공유 로더 — 스트립과 같은 캐시/가드
     return;
   }
   if (pvaSim && pvaSim.error) {
