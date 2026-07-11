@@ -637,6 +637,33 @@ def test_items_prefers_first_nonempty_dict_list():
     assert recon._items(body) == [{"id": "a"}]
 
 
+def test_endpoint_type_subnet_swept_via_type_query():
+    """PF-47: an owned VPC_ENDPOINT-type subnet lists ONLY under
+    /v1/subnets?type=VPC_ENDPOINT (the bare list hides it) — the sweep must
+    still find and delete it, and a subnet appearing in both collections must
+    be deleted once (dedup)."""
+    ep = _owned("regrsubc86cfbf3", id="sub-ep1")
+    both = _owned("regrsubboth", id="sub-both")
+
+    class QueryFakeClient(FakeClient):
+        def _key(self, path):
+            # query-SENSITIVE keying: the type= query addresses a different
+            # collection view (the real API hides endpoint subnets from the
+            # bare list), unlike the base class which strips queries.
+            return path if "type=VPC_ENDPOINT" in path else path.split("?", 1)[0]
+
+    client = QueryFakeClient(lists={
+        "/v1/subnets": [both],
+        "/v1/subnets?type=VPC_ENDPOINT": [ep, both],
+    })
+    recon.run_sweep(client)
+    dels = [p for p in _delete_paths(client) if p.startswith("/v1/subnets/")]
+    assert "/v1/subnets/sub-ep1" in dels, \
+        "endpoint-type subnet must be swept via the ?type= collection (PF-47)"
+    assert dels.count("/v1/subnets/sub-both") == 1, \
+        "a subnet visible in both collections is deleted exactly once"
+
+
 def test_unowned_items_never_selected():
     """Items with neither owner tag nor a regr* name must never be selected for
     deletion by any of the new passes."""

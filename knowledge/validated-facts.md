@@ -2129,3 +2129,15 @@ body `{"privatelink_service_enabled": false}` → 그 다음 함수 DELETE.
 _pass_scf에 ladder 반영). SCF 전용 privatelink 경로는 scf 서비스의
 `/configurations/privatelink-services|endpoints`이며 VPC의
 `/v1/privatelink-services`에는 나타나지 않는다.
+
+## 서브넷 기본 목록이 VPC_ENDPOINT 타입을 숨긴다 (2026-07-11, PF-47)
+
+`GET /v1/subnets`(쿼리 없음)는 **type=GENERAL 계열만** 반환하고 VPC 엔드포인트가
+만든 **VPC_ENDPOINT 타입 서브넷을 숨긴다** — 콘솔에는 보이는데 API 목록에 없어
+"스윕이 못 보는 유령 서브넷"이 되고, VPC 삭제를 409로 잡는데 holder 탐지에도
+안 걸린다 (아침 regrsubb6750b93·오후 regrsubc86cfbf3 실측; 수작업 삭제는 됐음 —
+show/DELETE by id는 정상 동작). 조회는 `?type=VPC_ENDPOINT` (enum: GENERAL·
+LOCAL·VPC_ENDPOINT; 잘못된 값은 400에 enum 명시, 미지의 쿼리키는 조용히 무시됨
+— `subnet_type=`은 무시되고 기본 목록 반환). reconciler의 서브넷 패스와
+_purge_vpc_children이 두 컬렉션을 모두 훑도록 수정(PF-47). run_scoped의 409
+related_resources SRN 폴백은 이런 숨은 서브넷의 기존 완화책이었다.

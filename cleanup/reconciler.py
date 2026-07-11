@@ -738,10 +738,15 @@ def _purge_vpc_children(client, vid):
                     n += 1
                     _coll_wait.append((svc, f"{coll}/{it['id']}"))
         _wait_all_gone(client, _coll_wait, 180, 10)
-    try:
-        subs = _items(client.get("/v1/subnets", service="vpc").body)
-    except Exception:
-        subs = []
+    subs = []
+    for _sc in ("/v1/subnets", "/v1/subnets?type=VPC_ENDPOINT"):  # PF-47
+        try:
+            subs.extend(_items(client.get(_sc, service="vpc").body))
+        except Exception:
+            pass
+    _pv_seen: set = set()
+    subs = [s for s in subs if isinstance(s, dict) and s.get("id")
+            and s["id"] not in _pv_seen and not _pv_seen.add(s["id"])]
     _sub_wait = []
     for sn in subs:
         if isinstance(sn, dict) and sn.get("id") and str(sn.get("vpc_id")) == vid:
@@ -1708,18 +1713,31 @@ def run_sweep(client) -> int:
     # list / progress tally — the old `if _delete(...)` also treated a truthy
     # 409 as deleted and would have parked the barrier on a subnet that was
     # never accepted for deletion.
+    # PF-47 (2026-07-11 live): the bare /v1/subnets list HIDES subnets whose
+    # type is VPC_ENDPOINT (enum GENERAL/LOCAL/VPC_ENDPOINT; only the ?type=
+    # query reveals them — live: bare list 2, ?type=VPC_ENDPOINT +1 more). A
+    # leaked endpoint-type subnet (regrsubb*/regrsubc*, gen-vpc-endpoint) was
+    # therefore INVISIBLE to every sweep pass while it 409-held its VPC — the
+    # morning "no detectable holder" strandings. Sweep BOTH collections; ids
+    # deduped in case a future API change folds them together.
     subnet_ids, subnet_retry = [], []
-    for it in _select(c, "vpc", "/v1/subnets",
-                      name_prefixes=("regrsub", "zznetsub")):
-        st = _delete(c, "vpc", f"/v1/subnets/{it['id']}")
-        if _is_2xx_or_gone(st):
-            _note_progress(st)
-            deleted += 1
-            subnet_ids.append(it["id"])
-        elif st:
-            print(f"  subnet {_name_of(it)} ({it['id']}) delete -> {st} "
-                  f"(tenant still draining — retried after the dbaas barrier)")
-            subnet_retry.append(it["id"])
+    _seen_sub_ids: set = set()
+    for _sub_coll in ("/v1/subnets", "/v1/subnets?type=VPC_ENDPOINT"):
+        for it in _select(c, "vpc", _sub_coll,
+                          name_prefixes=("regrsub", "zznetsub")):
+            sid_ = it["id"]
+            if sid_ in _seen_sub_ids:
+                continue
+            _seen_sub_ids.add(sid_)
+            st = _delete(c, "vpc", f"/v1/subnets/{sid_}")
+            if _is_2xx_or_gone(st):
+                _note_progress(st)
+                deleted += 1
+                subnet_ids.append(sid_)
+            elif st:
+                print(f"  subnet {_name_of(it)} ({sid_}) delete -> {st} "
+                      f"(tenant still draining — retried after the dbaas barrier)")
+                subnet_retry.append(sid_)
     # dbaas barrier (moved from 2d): clusters release their subnet ports here.
     _wait_all_gone(c, [(svc, f"/v1/clusters/{cid}") for svc, cid in
                        dbaas_deleted], 900, 20)
