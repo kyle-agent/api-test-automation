@@ -24,10 +24,10 @@
 | # | 서비스 | lifecycles | 상태 | 1차 실측 | 개선 | 최적 실측 | 노트 |
 |---|---|---|---|---|---|---|---|
 | 1 | cloudmonitoring | gen-cm-event-policy, gen-cm-account-resource | ✅ 완료 | 4.5s+5.9s (2 passed) | 불필요 대기 없음 (스텝 공백 0.01s, 폴 없음) | ~6s/개 | 404-관용은 문서화된 fail-fast (undocumented X-ResourceType 필수, Running VM 없으면 404). 개선 기회: VS 라이프사이클 뒤 배치 시 2xx 승격 가능 — 의존관계 노트 |
-| 2 | scr | container-scr-registry | ▶ 진행 | | | | PF-37 게이트 — reads만 |
-| 3 | baremetal | baremetal-catalog-reads | 대기 | | | | |
-| 4 | quick-query | gen-quick-query-* ×2 | 대기 | | | | |
-| 5 | configinspection | configinspection-read-coverage | 대기 | | | | |
+| 2 | scr | container-scr-registry | ✅ 완료(스킵) | 6.5s (403→skip) | 대기 없음 | ~6.5s | PF-37 entitlement 게이트 — SDS 해소 후 재실측 | | | | PF-37 게이트 — reads만 |
+| 3 | baremetal | baremetal-catalog-reads | ▶ 진행 | | | | |
+| 4 | quick-query | gen-quick-query-* ×2 | ▶ 진행 | | | | |
+| 5 | configinspection | configinspection-read-coverage | ▶ 진행 | | | | |
 | 6 | support / quota / pricing / costexplorer | 각 1 (reads) | 대기 | | | | 묶음 실행 후보 (전부 read) |
 | 7 | network-logging | gen-wave4-nlog | 대기 | | | | |
 | 8 | multinodegpucluster | gen-gpu-node-image | 대기 | | | | |
