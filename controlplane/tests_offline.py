@@ -219,13 +219,14 @@ def test_error_empty_states():
 
 
 def test_reporting_subtabs_single_include():
-    # 서브탭 단일 정의 (P2-8): 세 화면 모두 같은 6탭 세트를 렌더한다
+    # 서브탭 단일 정의 (P2-8) — 2026-07-11 색칠지도 탭 제거(오너 결정): 5탭.
+    # /reporting/coverage 는 요약으로 리다이렉트되므로 같은 탭 세트가 나온다.
     for path in ("/reporting?tab=summary", "/reporting/coverage",
                  "/reporting/compare"):
         page = client.get(path).text
-        for label in ("색칠지도", "요약", "대시보드", "실행 기록", "비교",
-                      "트리아지"):
+        for label in ("요약", "대시보드", "실행 기록", "비교", "트리아지"):
             assert label in page, (path, label)
+        assert "색칠지도" not in page, path
 
 
 def test_ia_catalog_absorbed_into_modeling():
@@ -678,6 +679,39 @@ def test_triage_new_fail_detail_and_known_list():
     assert "상세 목록을 가져올 수 없습니다" in page2
 
 
+def test_coverage_map_removed_and_runs_timeline_merged():
+    """색칠지도 제거(오너 결정 2026-07-11) + Reporting 개선 C (병합 타임라인).
+
+    1. /reporting/coverage → 요약 탭 302 (딥링크 호환), map.json 데이터 API 보존.
+    2. 상단 네비 Reporting 랜딩 = /reporting (요약).
+    3. 실행 기록 탭: RUN 히스토리 ∪ 아카이브 병합 단일 타임라인 —
+       gh_run_id dedupe, 아카이브 전용 런은 '아카이브' 태그, 행별 출처 배지."""
+    # 1) 리다이렉트 + 데이터 API 보존
+    r = client.get("/reporting/coverage", follow_redirects=False)
+    assert r.status_code == 302 and "/reporting?tab=summary" in r.headers["location"]
+    assert client.get("/reporting/coverage/map.json").status_code == 200
+    # 2) 네비 랜딩
+    home = client.get("/").text
+    assert '<a href="/reporting" class=' in home
+    assert 'href="/reporting/coverage"' not in home
+    # 3) 병합 타임라인 — db 런(9200, 앞 테스트가 생성) + 아카이브 스텁 2건
+    #    (하나는 db 와 중복 → dedupe, 하나는 아카이브 전용 → 태그)
+    real = snapshots.archive_index
+    snapshots.archive_index = lambda limit=100: [
+        {"run_id": "9200", "sha": "dupsha", "finished": "2026-07-10T00:00:00Z"},
+        {"run_id": "7777", "sha": "arcsha", "finished": "2026-07-09T00:00:00Z"},
+    ]
+    try:
+        page = client.get("/reporting?tab=runs").text
+    finally:
+        snapshots.archive_index = real
+    assert "RUN 타임라인" in page and "아카이브(oplog" in page
+    assert "RUN 히스토리" not in page          # 두 표 체제 종료
+    assert page.count("/runs/9200") == 1       # dedupe — 한 행만
+    assert "/runs/7777" in page and ">아카이브</span>" in page and "arcsha" in page
+    assert page.count("badge badge-") >= 2     # 행별 출처 배지
+
+
 # --- runner -----------------------------------------------------------------------
 
 TESTS = [
@@ -706,6 +740,7 @@ TESTS = [
     test_v2_shell_header_and_global_search,
     test_modeling_improvements_batch,
     test_triage_new_fail_detail_and_known_list,
+    test_coverage_map_removed_and_runs_timeline_merged,
 ]
 
 

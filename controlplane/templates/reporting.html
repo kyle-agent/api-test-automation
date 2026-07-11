@@ -91,27 +91,33 @@
     <a href="/reporting/compare">⚖️ Run 비교 (A vs B) — 무엇이 새로 깨졌나/고쳐졌나 →</a>
   </div>
 
-  <h2>RUN 히스토리 <span class="hint">control plane 기록 — 15초마다 갱신</span></h2>
-  <div class="card pad" style="padding-top:4px">
-    <div hx-get="/partials/runs?limit=100" hx-trigger="every 15s" hx-swap="innerHTML">
-      {% include "_runs_table.html" %}
-    </div>
-  </div>
-
-  <h2>아카이브 <span class="hint">oplog 버킷 index — control plane 이전 run 포함</span></h2>
+  {# Reporting 개선 C (계약 §2.1): RUN 히스토리 + 아카이브 두 표 → 병합 단일
+     타임라인. 종전엔 서로 다른 부분집합 두 개라 "어제 런"의 단일한 답이
+     없었다 (페르소나 P2 막힘). gh_run_id dedupe, 행별 출처 배지. #}
+  <h2>RUN 타임라인 <span class="hint">control plane 기록 ∪ 아카이브(oplog,
+    구형 CI 런 포함) — 시간순 병합 · 이것이 이 서버가 아는 전체 런입니다</span></h2>
   <div class="card pad" style="padding-top:4px">
     <table>
-      <thead><tr><th>run</th><th>sha</th><th>finished</th></tr></thead>
+      <thead><tr><th>source</th><th>run</th><th>suite</th><th>profile</th><th>trigger</th>
+        <th>status</th><th>requested</th><th>finished</th><th>sha</th></tr></thead>
       <tbody>
-      {% for row in archive %}
+      {% for r in merged_runs %}
       <tr>
-        <td><a href="/runs/{{ row['run_id'] }}">{{ row['run_id'] }}</a></td>
-        <td class="muted">{{ row.get('sha', '') }}</td>
-        <td class="muted">{{ row.get('finished', '') }}</td>
+        <td>{{ badge('local') if (r.gh_run_id or '').startswith('local-') else badge('ci') }}</td>
+        <td>{% if r.gh_run_id %}<a href="/runs/{{ r.gh_run_id }}"><code>{{ r.gh_run_id }}</code></a>
+            {% else %}<span class="muted">#{{ r.id }} (대기)</span>{% endif %}
+            {% if r.archive_only %}<span class="tag" title="control plane DB에는 없고 아카이브(oplog 버킷)에만 있는 구형 런 — 상세는 스냅샷 복원">아카이브</span>{% endif %}</td>
+        <td>{{ r.suite or '-' }}</td>
+        <td>{{ r.profile or '-' }}</td>
+        <td>{{ r.trigger or '-' }}</td>
+        <td><span class="status {{ r.status }}">{{ r.status }}</span></td>
+        <td class="muted small">{{ r.requested_at or '' }}</td>
+        <td class="muted small">{{ r.finished_at or '' }}</td>
+        <td class="muted small">{{ r.sha }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="3" class="muted">버킷 index를 읽을 수 없습니다
-          (credential 미설정이거나 아직 run이 없음).</td></tr>
+      <tr><td colspan="9" class="muted">이 서버에 run 기록이 없고 아카이브도
+          비어 있습니다 — 공식 실행 이력은 발행 대시보드 참조.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -159,10 +165,13 @@
   <div class="card pad" style="padding-top:4px">
     {% if triage_detail is none %}
     <p class="muted small">상세 목록을 가져올 수 없습니다 — 발행물
-      (fail_new.json/index.html)에 접근하지 못했거나 회귀 0건입니다. 공식
-      카운트는 위 분류 표(신규 fail) 참조.</p>
+      (fail_new.json/index.html)에 접근하지 못했습니다. 공식 카운트는 위
+      분류 표(신규 fail) 참조.</p>
     {% elif not triage_detail['items'] %}
-    <p class="muted small">신규 fail 0건 — 목록 없음.</p>
+    <p class="muted small">이 발행물 기준 신규 fail 0건 — 목록 없음.
+      {% if coverage and (coverage.get('fail_new') or 0) > 0 %}
+      <span class="chip s-reached" title="판정 카운트(history 마지막 줄)는 이전 결과 런 기준이고, 발행물(index.html)은 그 뒤 결과 없는 갱신으로 재발행된 상태일 수 있습니다 — 다음 발행부터 fail_new.json이 판정과 같은 사이클로 나와 이 어긋남이 사라집니다">⚠ 위 분류 표는 신규 fail {{ coverage.get('fail_new') }}건 — 판정 런과 발행물의 시점 차이</span>
+      {% endif %}</p>
     {% else %}
     <table>
       <thead><tr><th>endpoint</th><th>당시</th><th>현재</th><th>비고</th><th></th></tr></thead>

@@ -53,14 +53,20 @@ def _from_fail_new_json() -> tuple[list[tuple[str, int]], bool] | None:
 
 
 def _from_index_banner() -> tuple[list[tuple[str, int]], bool] | None:
-    """폴백 — index.html 배너 파싱 (최대 6건, capped=True)."""
+    """폴백 — index.html 배너 파싱 (최대 6건, capped=True).
+
+    구분(실측 2026-07-11): index.html 접근 불가 → None(계산 불가) ·
+    접근됐는데 배너 없음 → ([], True) = **그 발행 시점 기준 회귀 0건**.
+    후자는 판정 카운트(history 마지막 줄)와 다를 수 있다 — 수동 발행이 결과
+    없는 갱신을 하면 index는 앞서가고 판정은 이전 런에 머문다(v2 published.py
+    실측과 같은 어긋남). 화면이 이 차이를 명시한다."""
     from controlplane import dashdata
     got = dashdata.file("index.html")
     if not got:
         return None
     m = _BANNER_RE.search(got[0].decode(errors="replace"))
     if not m:
-        return None
+        return [], True
     items: list[tuple[str, int]] = []
     for raw_key, raw_status in _ITEM_RE.findall(m.group(1)):
         key = html.unescape(raw_key).strip()
@@ -69,7 +75,7 @@ def _from_index_banner() -> tuple[list[tuple[str, int]], bool] | None:
                 items.append((key, int(raw_status)))
             except ValueError:
                 continue
-    return (items, True) if items else None
+    return items, True
 
 
 def _split_catalog_key(key: str) -> tuple[str, str, str] | None:
