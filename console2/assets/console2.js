@@ -998,6 +998,13 @@ function renderDefBody(lc, kn) {
 function wireLaunch() {
   const lg = $("launch-go"); if (lg) lg.onclick = stageRun;
   const rg = $("run-go"); if (rg) rg.onclick = startRun;   // drawRunSettings rebuilds + rebinds this too
+  // 📊 예상 타임라인 — launchSum 은 launchSummary() 가 폴/선택 변경마다 innerHTML
+  // 재생성하므로 위임 1회 배선 (재배선 불요, 클릭 불멸).
+  const ls = $("launchSum");
+  if (ls && !ls._simWired) {
+    ls._simWired = true;
+    ls.addEventListener("click", e => { if (e.target.closest("#sim-open")) openSimModal(); });
+  }
 }
 
 // a small uuid for a staged item key (crypto.randomUUID when available, else a
@@ -1165,7 +1172,11 @@ function launchSummary() {
   $("launchSum").innerHTML =
     `대상 <b>${svcs.size}</b> svc / <b>${targets.size}</b> 리소스 · ` +
     closureLabel() + ` · peak quota <b>${pq}</b> · ` +
-    `과금 자원 <span class="${heavy ? "hv" : ""}">${heavy ? "포함" : "없음"}</span>`;
+    `과금 자원 <span class="${heavy ? "hv" : ""}">${heavy ? "포함" : "없음"}</span> ` +
+    // 📊 스케줄 시뮬 (오너 2026-07-11): 선택(비면 전체 enabled)의 예상 동시 배치
+    // 간트 — /api/schedule-sim 오프라인 계산, 워커/VPC 슬롯 조정 후 재계산 가능.
+    `<button class="minibtn" id="sim-open"
+       title="예상 동시 배치 간트 — 선택(비어 있으면 전체 enabled)을 conftest 와 동일 규칙으로 오프라인 시뮬 (API 호출 없음) · 워커/VPC 슬롯 조정">📊 예상 타임라인</button>`;
   const go = $("launch-go");
   if (go) {
     go.disabled = !targets.size;
@@ -1683,6 +1694,7 @@ function pfEnsure() {
 }
 function pfOpen(title) {
   pfEnsure();
+  $("pf-modal").classList.remove("sim-wide");   // 시뮬 간트가 넓힌 모달 폭 리셋
   $("pf-title").textContent = title;
   $("pf-body").innerHTML = ""; $("pf-foot").innerHTML = "";
   $("pf-modal").classList.add("open"); $("pf-scrim").classList.add("open");
@@ -2140,6 +2152,7 @@ function drawReport() {
     stopR4Poll();
     renderStagedPreview();   // 흐름 area shows the OPEN 대기열 item's DAG (else placeholder)
     loadRunRecords();
+    renderPva();             // 예측 vs 실제 패널 — 런 없음 상태 표시
     return;
   }
   if (stagedScene) { stagedScene.destroy(); stagedScene = null; }   // a run owns the 흐름 area now
@@ -2147,6 +2160,7 @@ function drawReport() {
   reportR1();              // MASTER: the 흐름 scene (B2) — persistent, refresh in place
   renderLcPicker();        // MASTER: compact lifecycle list (collapsed-group / dense escape)
   renderDetail();          // DETAIL: scope bar + 자원/API/로그 for the current scope
+  renderPva();             // 예측 vs 실제 타임라인 — 기존 폴 사이클 동승 (새 타이머 금지)
   // P2C-24: 여기 있던 실행 기록(/api/runs) fetch 동승 제거 — 이벤트 폴마다 백엔드를
   // 때리던 폭주 원인. 실행 기록은 시작/종료/종료 후 감시(startRunsWatch)로만 갱신.
 }
@@ -3233,6 +3247,246 @@ function handleLateAlerts(runs) {
     toast("⚠ " + lateAlertBanner, "fail");
     if (screen === "run") scanOwned();       // 남은 자원 패널 실측 자동 갱신
   });
+}
+
+// ================= 📊 스케줄 시뮬 간트 (오너 2026-07-11) ========================
+// ① 구성: launchSum 의 [📊 예상 타임라인] → pf 모달에 /api/schedule-sim 간트 +
+//    워커/VPC 슬롯 조정·재계산. ② 실행: 리포트의 "예측 vs 실제 타임라인" 접이식
+//    패널 — 예측(고스트, 열릴 때 1회 POST) 위에 lifecycle-start/end 실측을 겹친다.
+//    재렌더는 기존 폴 사이클(drawReport)에 동승 — 새 폴링 타이머 금지 (P2C-24
+//    폴링 스톰 회귀 방지). schedule-sim 은 오프라인 계산이라 라이브 API 호출 없음.
+let pvaSim = null;          // 이 run 의 예측 결과 (/api/schedule-sim, run 당 1회)
+let pvaSimFor = null;       // pvaSim 이 속한 runId — 재바인딩 시 재요청
+let pvaLoading = false;     // 요청 in-flight 가드 (폴마다 중복 POST 방지)
+
+function simFetch(body) {
+  return fetch("/api/schedule-sim", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}) })
+    .then(r => r.json().then(j => ({ ok: r.ok, j })));
+}
+const simMin = s => (s / 60).toFixed(1);
+const laneName = w => "w" + String(w).padStart(2, "0");
+
+// ---- 공용 간트 조각: 스케일(분→px) · 분 축 · hover 툴팁 -----------------------
+// 가로 넘침은 .sim-gantt(overflow-x:auto)가 소화 — 페이지 가로 스크롤 금지.
+function simScale(horizonS) {
+  const mins = Math.max(horizonS / 60, 0.5);
+  const ppm = Math.max(4, Math.min(60, 720 / mins));   // 분당 px — 총폭 ~720px 목표
+  return { ppm, totalW: Math.ceil(mins * ppm) + 4, mins };
+}
+function simAxisHtml(sc) {
+  const steps = [1, 2, 5, 10, 15, 30, 60, 120, 240];
+  const step = steps.find(s => s * sc.ppm >= 64) || 480;   // 눈금 간 ≥64px
+  let t = "";
+  for (let m = 0; m <= sc.mins; m += step)
+    t += `<div class="sim-tick" style="left:${Math.round(m * sc.ppm)}px"><i></i>${m}분</div>`;
+  return `<div class="sim-row axis"><span class="sim-lane"></span>
+    <div class="sim-track axis" style="width:${sc.totalW}px">${t}</div></div>`;
+}
+// fixed 툴팁 1개를 공유 — 컨테이너에 mousemove 위임 (기존 title 툴팁보다 즉답).
+function simTipEl() {
+  let t = $("sim-tip");
+  if (!t) { t = document.createElement("div"); t.id = "sim-tip"; t.className = "sim-tip"; document.body.appendChild(t); }
+  return t;
+}
+function wireSimTips(host) {
+  if (!host || host._simTip) return;
+  host._simTip = true;
+  host.addEventListener("mousemove", e => {
+    const b = e.target.closest("[data-tip]");
+    const t = simTipEl();
+    if (!b || !host.contains(b)) { t.style.display = "none"; return; }
+    t.textContent = b.dataset.tip;
+    t.style.display = "block";
+    t.style.left = Math.min(e.clientX + 14, window.innerWidth - t.offsetWidth - 10) + "px";
+    t.style.top = Math.min(e.clientY + 18, window.innerHeight - t.offsetHeight - 8) + "px";
+  });
+  host.addEventListener("mouseleave", () => { simTipEl().style.display = "none"; });
+}
+
+// ---- ① 구성: 예상 타임라인 모달 — 행=워커(w00~), 가로=분 ---------------------
+function simGanttHtml(sim) {
+  const bars = sim.bars || [];
+  if (!bars.length) return '<p class="empty">배치할 시나리오가 없습니다.</p>';
+  const sc = simScale(sim.makespan_s);
+  const lanes = [];
+  bars.forEach(b => { (lanes[b.w] = lanes[b.w] || []).push(b); });
+  const rows = lanes.map((bs, w) => {
+    const cells = (bs || []).map(b => {
+      const x = b.s / 60 * sc.ppm, wpx = Math.max((b.e - b.s) / 60 * sc.ppm, 3);
+      const tip = `${b.id} · ${simMin(b.s)}→${simMin(b.e)}분 · 소요 ${fmtDur(b.e - b.s)} · ${laneName(w)}`
+        + ` · ${b.vpc ? "VPC 자체생성 (슬롯 점유)" : "공유 VPC"}${b.measured ? "" : " · 미측정(클래스 기본값)"}`;
+      return `<div class="sim-bar${b.vpc ? " vpc" : ""}${b.measured ? "" : " est"}"
+        style="left:${x.toFixed(1)}px;width:${wpx.toFixed(1)}px" data-tip="${esc(tip)}">${
+        wpx >= 90 ? `<span>${esc(b.id)}</span>` : ""}</div>`;
+    }).join("");
+    return `<div class="sim-row"><span class="sim-lane">${laneName(w)}</span>
+      <div class="sim-track" style="width:${sc.totalW}px">${cells}</div></div>`;
+  }).join("");
+  return `<div class="sim-gantt">${simAxisHtml(sc)}${rows}</div>`;
+}
+function openSimModal() {
+  pfOpen("📊 예상 타임라인 — 스케줄 시뮬레이션 (오프라인 계산)");
+  $("pf-modal").classList.add("sim-wide");
+  simRecalc(null, null);
+}
+function simRecalc(workers, slots) {
+  $("pf-body").innerHTML = '<p class="muted small">예상 배치 계산 중… (/api/schedule-sim)</p>';
+  const body = targets.size ? selectionPayload() : {};   // 선택 비면 {} → 서버가 전체 enabled
+  if (workers) body.workers = workers;
+  if (slots) body.vpc_slots = slots;
+  simFetch(body).then(({ ok, j }) => {
+    if (!ok || j.error) {
+      $("pf-body").innerHTML = '<p class="empty">시뮬레이션 실패: '
+        + esc((j && j.error) || "서버가 /api/schedule-sim 을 지원하지 않습니다") + "</p>";
+      return;
+    }
+    renderSimModal(j);
+  }).catch(e => {
+    $("pf-body").innerHTML = '<p class="empty">시뮬레이션 연결 실패: ' + esc(e.message) + "</p>";
+  });
+}
+function renderSimModal(sim) {
+  $("pf-body").innerHTML =
+    `<div class="sim-stats">예상 makespan <b>${simMin(sim.makespan_s)}분</b>
+       · 시나리오 <b>${(sim.bars || []).length}</b> (${targets.size ? "현재 선택" : "전체 enabled"})
+       · 워커 <b>${sim.workers}</b> · VPC 슬롯 <b>${sim.vpc_slots}</b></div>
+     <div class="legend sim-legend">${legend([["#2563c9", "일반 (공유 VPC)"], ["#eb6834", "VPC 자체생성 (슬롯 점유)"]])}
+       <span>점선 테두리 = 미측정(클래스 기본값) · 막대 hover = 상세</span></div>
+     ${simGanttHtml(sim)}`;
+  $("pf-foot").innerHTML =
+    `<span class="muted small">conftest 와 동일 규칙(실측 LPT greedy) · 미모델: IGW/NAT 1:1 대기·재시도</span>
+     <label class="small muted">워커 <input type="number" class="sim-num" id="sim-w" min="1" max="64" value="${sim.workers}"></label>
+     <label class="small muted">VPC 슬롯 <input type="number" class="sim-num" id="sim-v" min="1" max="16" value="${sim.vpc_slots}"></label>
+     <button class="btn" id="sim-recalc">↻ 재계산</button>`;
+  $("sim-recalc").onclick = () => simRecalc(
+    parseInt($("sim-w").value, 10) || sim.workers,
+    parseInt($("sim-v").value, 10) || sim.vpc_slots);
+  wireSimTips($("pf-body"));
+}
+
+// ---- ② 실행: 예측 vs 실제 타임라인 (실시간) ----------------------------------
+// 행=시나리오(예측 시작순), 고스트=예측(테두리+8% 틴트), 채움=실측 start→(end|now),
+// 예측 종료 초과분은 amber. 실측 소스 = runEvents 의 lifecycle-start/end ts,
+// t0 = 이 run 의 최소 ts (groupEventsByLifecycle 과 같은 스트림).
+function pvaEnsure() {
+  const master = $("report-master");
+  if (!master) return null;
+  let d = $("pva-panel");
+  if (!d) {
+    d = document.createElement("details");
+    d.id = "pva-panel"; d.className = "pva";
+    d.innerHTML = `<summary>📊 예측 vs 실제 타임라인
+        <span class="muted small">— 고스트=예측(schedule-sim) · 채움=실측 · amber=예측 초과</span></summary>
+      <div id="pva-body"></div>`;
+    master.appendChild(d);
+    d.addEventListener("toggle", () => { if (d.open) renderPva(); });
+    wireSimTips(d);
+  }
+  return d;
+}
+function renderPva() {
+  const d = pvaEnsure(); if (!d) return;
+  const body = $("pva-body"); if (!body) return;
+  if (!runId) {
+    pvaSim = null; pvaSimFor = null;
+    setHtmlIfChanged(body, '<p class="muted small pva-empty">실행 중인 런 없음</p>');
+    return;
+  }
+  if (!d.open) return;                       // 접힌 동안은 렌더/페치 생략 (비용 0)
+  if (pvaSimFor !== runId) {                 // 열릴 때 / run 재바인딩 시 1회 예측
+    if (pvaLoading) return;
+    pvaLoading = true;
+    const rid = runId;
+    const ids = (runSelIds && runSelIds.length) ? runSelIds : Object.keys(lifecycleStates());
+    setHtmlIfChanged(body, '<p class="muted small pva-empty">예측 스케줄 계산 중…</p>');
+    simFetch({ lifecycle_ids: ids }).then(({ ok, j }) => {
+      pvaLoading = false;
+      if (runId !== rid) return;             // 폴 도중 재바인딩 — 응답 폐기
+      pvaSimFor = rid;
+      pvaSim = (ok && !j.error) ? j
+        : { error: (j && j.error) || "서버가 /api/schedule-sim 을 지원하지 않습니다" };
+      renderPva();
+    }).catch(e => {
+      pvaLoading = false;
+      if (runId !== rid) return;
+      pvaSimFor = rid; pvaSim = { error: e.message };
+      renderPva();
+    });
+    return;
+  }
+  if (pvaSim && pvaSim.error) {
+    setHtmlIfChanged(body, '<p class="empty">예측 실패: ' + esc(pvaSim.error) + "</p>");
+    return;
+  }
+  setHtmlIfChanged(body, pvaHtml(pvaSim || {}));
+}
+function pvaHtml(sim) {
+  const act = {}; let t0 = null, tLast = null;
+  (runEvents || []).forEach(e => {
+    if (e.ts == null) return;
+    if (t0 === null || e.ts < t0) t0 = e.ts;
+    if (tLast === null || e.ts > tLast) tLast = e.ts;
+    if (!e.lifecycle) return;
+    const a = act[e.lifecycle] = act[e.lifecycle] || {};
+    if (e.kind === "lifecycle-start") { if (a.s == null) a.s = e.ts; }
+    else if (e.kind === "lifecycle-end") a.e = e.ts;
+  });
+  const running = runStatus === "running" || runStatus === "queued";
+  // 진행 중 = now 까지 자라는 막대 (폴 재렌더로 충분히 부드럽다); 종료 런의
+  // 미종결(중단) lifecycle 은 마지막 이벤트 시각까지만 — 영원히 자라지 않게.
+  const nowRel = t0 != null ? (running ? Date.now() / 1000 : tLast) - t0 : 0;
+  const bars = ((sim && sim.bars) || []).slice()
+    .sort((a, b) => a.s - b.s || a.e - b.e || (a.id < b.id ? -1 : 1));
+  const known = new Set(bars.map(b => b.id));
+  // 예측에 없는 실측 lifecycle(합성 등) 도 행으로 — 고스트 없이 실측만.
+  Object.keys(act).sort().forEach(id => { if (!known.has(id)) bars.push({ id, s: null, e: null, vpc: false }); });
+  if (!bars.length) return '<p class="muted small pva-empty">표시할 시나리오 없음 — 이벤트 대기 중</p>';
+  let hor = 0;
+  bars.forEach(b => {
+    if (b.e != null) hor = Math.max(hor, b.e);
+    const a = act[b.id];
+    if (a && a.s != null && t0 != null) hor = Math.max(hor, a.e != null ? a.e - t0 : nowRel);
+  });
+  const sc = simScale(Math.max(hor, 60));
+  const px = s => s / 60 * sc.ppm;
+  const rows = bars.map(b => {
+    const a = act[b.id] || {};
+    let seg = "";
+    if (b.s != null) {
+      const gtip = `${b.id} · 예측 ${simMin(b.s)}→${simMin(b.e)}분 · ${fmtDur(b.e - b.s)}`
+        + ` · ${laneName(b.w || 0)}${b.vpc ? " · VPC 자체생성" : ""}`;
+      seg += `<div class="pva-ghost${b.vpc ? " vpc" : ""}" style="left:${px(b.s).toFixed(1)}px;width:${
+        Math.max(px(b.e - b.s), 3).toFixed(1)}px" data-tip="${esc(gtip)}"></div>`;
+    }
+    if (a.s != null && t0 != null) {
+      const as = a.s - t0;
+      const ae = a.e != null ? a.e - t0 : nowRel;
+      const live = a.e == null && running;
+      const atip = `${b.id} · 실제 ${simMin(as)}→${a.e != null ? simMin(ae) + "분" : (live ? "진행 중" : "미종료(중단)")}`
+        + ` · ${fmtDur(Math.max(ae - as, 0))}`
+        + (b.e != null && ae > b.e ? ` · 예측 대비 +${fmtDur(ae - b.e)}` : "");
+      if (b.e != null && ae > b.e && as < b.e) {           // 예측 안 구간 + 초과 구간
+        seg += `<div class="pva-act${live ? " live" : ""}" style="left:${px(as).toFixed(1)}px;width:${
+          Math.max(px(b.e - as), 2).toFixed(1)}px" data-tip="${esc(atip)}"></div>`
+          + `<div class="pva-act over${live ? " live" : ""}" style="left:${px(b.e).toFixed(1)}px;width:${
+            Math.max(px(ae - b.e), 2).toFixed(1)}px" data-tip="${esc(atip)}"></div>`;
+      } else {
+        const over = b.e != null && as >= b.e;             // 통째로 예측 종료 이후 시작
+        seg += `<div class="pva-act${over ? " over" : ""}${live ? " live" : ""}" style="left:${
+          px(as).toFixed(1)}px;width:${Math.max(px(ae - as), 2).toFixed(1)}px" data-tip="${esc(atip)}"></div>`;
+      }
+    }
+    return `<div class="sim-row pva-row"><span class="sim-lane pva-lbl" title="${esc(b.id)}">${esc(b.id)}</span>
+      <div class="sim-track pva-track" style="width:${sc.totalW}px">${seg}</div></div>`;
+  }).join("");
+  const head = sim && sim.makespan_s != null
+    ? `<div class="sim-stats small">예측 makespan <b>${simMin(sim.makespan_s)}분</b>
+        (워커 ${sim.workers} · VPC 슬롯 ${sim.vpc_slots}) · 실제 경과 <b>${
+        t0 != null ? simMin(Math.max(nowRel, 0)) + "분" : "—"}</b>${running ? " · 진행 중" : ""}</div>`
+    : "";
+  return `${head}<div class="sim-gantt pva-gantt">${simAxisHtml(sc)}${rows}</div>`;
 }
 
 // ================= shared helpers =================

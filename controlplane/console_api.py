@@ -211,6 +211,23 @@ async def api_plan(request: Request) -> JSONResponse:
         return _json({"error": f"plan failed: {exc}"}, 500)
 
 
+@router.post("/api/schedule-sim")
+async def api_schedule_sim(request: Request) -> JSONResponse:
+    """오프라인 스케줄 시뮬 (오너 2026-07-11 '간트를 실제 화면에서 보고 조정') —
+    conftest 와 동일 규칙의 예상 동시 배치. API 호출 없음. console2 stdlib
+    Handler 의 동명 라우트와 동일 계약 (실서빙은 이 스파인 경로)."""
+    b = await _body(request)
+    ids = b.get("lifecycle_ids") or None
+    if not ids and (b.get("node_ids") or b.get("services") or b.get("categories")):
+        ids = c2._resolve_lifecycle_ids(b)
+    try:
+        from regression.scenarios import local_run as _lr
+        return _json(_lr.simulate_schedule(
+            ids, workers=b.get("workers"), vpc_slots=int(b.get("vpc_slots") or 4)))
+    except Exception as exc:                               # noqa: BLE001
+        return _json({"error": f"schedule-sim failed: {exc}"}, 500)
+
+
 @router.post("/api/preflight")
 async def api_preflight(request: Request) -> JSONResponse:
     """HEAVY-PREMISE-CONTRACT §3 — 실행 전 confirm의 정보원 (자원·과금·예상시간).

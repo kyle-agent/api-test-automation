@@ -636,7 +636,7 @@ g.rg-selbox{cursor:pointer}
 .schip.pol{color:var(--run);border-color:rgba(37,99,201,.4);background:rgba(37,99,201,.08)}
 .softbrk{margin:6px 0 0;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .softbrk .schip{font-size:10.5px;padding:1px 8px}
-=======
+
 /* ===== Run 관측성 개편 (2026-07-04) ===== */
 /* now-playing bar (신규4): persistent strip above the tabs */
 .nowplaying{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 2px;padding:7px 12px;
@@ -773,3 +773,62 @@ g.rg-selbox{cursor:pointer}
 .r1-kpis{margin-left:auto;display:inline-flex;align-items:center;gap:12px;
   font-size:12.5px;color:var(--muted);white-space:nowrap}
 .r1-kpis b{color:var(--text)}
+
+/* ============================================================================
+ * 📊 스케줄 시뮬 간트 (오너 2026-07-11) — ① 예상 타임라인 모달(행=워커) ·
+ * ② 예측 vs 실제 타임라인(행=시나리오). 시리즈 색: 일반=accent 파랑,
+ * VPC 자체생성=#eb6834 주황, 예측 초과=#eda100 amber (validate_palette PASS).
+ * 라벨/텍스트는 기본 잉크색 — 시리즈 색을 입히지 않는다. 막대 간 2px surface ring.
+ * ========================================================================== */
+.modal.sim-wide{width:min(1100px,94vw)}
+.sim-num{width:60px;background:#fff;border:1px solid var(--line2);border-radius:6px;
+  padding:4px 6px;font:inherit;color:var(--ink)}
+.sim-num:focus{outline:none;border-color:var(--accent)}
+.sim-stats{font-size:12.5px;color:var(--muted);margin:2px 0 8px}
+.sim-stats b{color:var(--ink);font-variant-numeric:tabular-nums}
+.sim-legend{margin:0 0 9px}
+/* 간트 컨테이너 — 가로 넘침은 여기서만 스크롤 (페이지 가로 스크롤 금지) */
+.sim-gantt{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:#fff;
+  padding:6px 8px 8px}
+.sim-row{display:flex;align-items:center;height:22px}
+.sim-row.axis{height:20px}
+.sim-lane{position:sticky;left:0;z-index:2;flex:0 0 auto;width:44px;padding-right:8px;
+  background:#fff;font:10.5px/1 ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;
+  color:var(--muted);text-align:right}
+.sim-track{position:relative;flex:0 0 auto;height:18px;border-left:1px solid var(--line)}
+.sim-track.axis{height:16px;border-left:1px solid transparent}
+.sim-tick{position:absolute;top:0;font-size:9.5px;color:var(--muted);white-space:nowrap;padding-left:3px}
+.sim-tick i{position:absolute;left:0;top:0;width:1px;height:15px;background:var(--line);display:block}
+/* ① 워커-레인 막대: 틴트 채움 + 시리즈색 테두리 (안 라벨은 잉크색 유지 가능),
+   점선 테두리 = 미측정(클래스 기본값 추정), box-shadow 링 = 막대 간 2px 간격 */
+.sim-bar{position:absolute;top:2px;height:14px;border-radius:4px;cursor:default;overflow:hidden;
+  background:rgba(37,99,201,.16);border:1.5px solid var(--accent);box-shadow:0 0 0 2px #fff}
+.sim-bar.vpc{background:rgba(235,104,52,.16);border-color:#eb6834}
+.sim-bar.est{border-style:dashed}
+.sim-bar span{display:block;padding:0 5px;font-size:10px;line-height:11px;font-weight:600;
+  color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* hover 툴팁 — fixed 단일 div (컨테이너 mousemove 위임) */
+.sim-tip{position:fixed;z-index:120;display:none;max-width:440px;background:#1f2328;color:#fff;
+  font-size:11.5px;line-height:1.45;padding:6px 10px;border-radius:7px;
+  box-shadow:0 6px 18px rgba(31,35,40,.3);pointer-events:none}
+
+/* ② 예측 vs 실제 — 접이식 패널 (report-master 하단, drawReport 폴 동승 재렌더) */
+.pva{margin:10px 0 4px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.pva>summary{cursor:pointer;padding:8px 12px;font-weight:700;font-size:12.5px;list-style:none}
+.pva>summary::-webkit-details-marker{display:none}
+.pva>summary:before{content:"▸ ";color:var(--muted)}
+.pva[open]>summary:before{content:"▾ "}
+#pva-body{padding:2px 12px 10px}
+.pva-empty{margin:0;padding:2px 0 6px}
+.pva-gantt .sim-row{height:16px}                  /* 행 높이 14~16px (스펙) */
+.pva-gantt .sim-track{height:14px}
+.pva-gantt .sim-lane{width:190px;text-align:left;color:var(--ink);font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pva-gantt .sim-row.axis .sim-lane{color:var(--muted)}
+/* 고스트 = 예측 (테두리 + 8% 틴트) · 채움 = 실측 · amber = 예측 종료 초과 구간 */
+.pva-ghost{position:absolute;top:1px;height:11px;border-radius:4px;
+  border:1.5px solid var(--accent);background:rgba(37,99,201,.08)}
+.pva-ghost.vpc{border-color:#eb6834;background:rgba(235,104,52,.08)}
+.pva-act{position:absolute;top:3px;height:7px;border-radius:3px;background:var(--accent);
+  box-shadow:0 0 0 2px #fff}
+.pva-act.over{background:#eda100}
