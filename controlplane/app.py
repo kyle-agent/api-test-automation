@@ -704,9 +704,18 @@ REPORT_TABS = ("summary", "dashboard", "runs", "triage")
 def reporting(request: Request, tab: str = "summary"):
     if tab not in REPORT_TABS:
         tab = "summary"
+    # Reporting 개선 A (계약 §2.5): 트리아지 탭에 "신규 fail 상세 목록" + known
+    # 목록 — 발행 fail_new.json(정공법) 우선, 미발행 동안 index.html 배너 파싱
+    # 폴백. 실패는 None → 해당 섹션만 empty-state.
+    triage_detail = triage_known = None
+    if tab == "triage":
+        from controlplane import results_data
+        triage_detail = results_data.get_new_regressions()
+        triage_known = results_data.get_known_issues()
     return _render(request, "reporting.html", "reporting",
                    tab=tab,
                    coverage=dashdata.latest_coverage(),
+                   triage_detail=triage_detail, triage_known=triage_known,
                    runs=db.list_runs(limit=100),
                    archive=snapshots.archive_index(limit=100))
 

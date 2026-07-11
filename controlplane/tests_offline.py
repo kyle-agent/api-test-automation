@@ -628,6 +628,56 @@ def test_modeling_improvements_batch():
     assert "/planning/resources/map?q=" in sr
 
 
+
+def test_triage_new_fail_detail_and_known_list():
+    """Reporting 개선 A (계약 §2.5, donor: v2 results_data) — 트리아지 탭이
+    '신규 fail N건'의 정체를 직접 답한다.
+
+    1. 발행 fail_new.json(정공법 — 이번에 build.py 가 신설 발행) 우선 소비.
+    2. '당시 500 → 현재 201'을 분리 표기 (복구 관측 — 누적 최신값이 재시도
+       복구를 숨기는 문제 방지).
+    3. 같은 호출의 이중 기록(카탈로그/라이프사이클 키) 힌트 — 병합하지 않고
+       정직하게 둘 다 + 배지.
+    4. known 목록 = 저장소 baseline (알림 대상 아님 섹션)."""
+    from controlplane import dashdata
+
+    orig = dashdata.file
+
+    def fake(name):
+        if name == "fail_new.json":
+            return (json.dumps({"new": [
+                {"key": "networking/vpc/createvpc", "status": 500, "path": "/v1/vpcs"},
+                {"key": "lifecycle-networking-vpc:create-vpc", "status": 500, "path": ""},
+            ], "known": [], "updated": "2026-07-11 12:00 KST"}).encode(), "application/json")
+        if name == "endpoint_status.json":
+            return (json.dumps({"status": {"networking/vpc/createvpc": [201, 320]}}).encode(),
+                    "application/json")
+        return None
+
+    dashdata.file = fake
+    try:
+        page = client.get("/reporting?tab=triage").text
+    finally:
+        dashdata.file = orig
+    assert "신규 fail 상세" in page
+    assert "networking/vpc/createvpc" in page
+    assert "복구 관측" in page                       # 당시 500 → 현재 201 분리 표기
+    assert "이중 기록?" in page                      # 합성/카탈로그 쌍 힌트
+    assert "/dashboard/services/networking__vpc.html" in page   # 발행 상세 딥링크
+    assert "라이프사이클 단계 —" in page              # 합성 키 라벨 (링크 없음)
+    assert "최대 6건" not in page                    # 파일 경로는 상한 없음
+    # known 섹션 — 저장소 baseline 실제 렌더
+    assert "이미 알던 실패" in page
+    assert "listplannedcomputeservertypes" in page
+    # 발행물 접근 불가 → 섹션 empty-state (0 위장 금지)
+    dashdata.file = lambda name: None
+    try:
+        page2 = client.get("/reporting?tab=triage").text
+    finally:
+        dashdata.file = orig
+    assert "상세 목록을 가져올 수 없습니다" in page2
+
+
 # --- runner -----------------------------------------------------------------------
 
 TESTS = [
@@ -655,6 +705,7 @@ TESTS = [
     test_source_badges_and_empty_states,
     test_v2_shell_header_and_global_search,
     test_modeling_improvements_batch,
+    test_triage_new_fail_detail_and_known_list,
 ]
 
 

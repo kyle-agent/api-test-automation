@@ -1865,6 +1865,19 @@ def build(
     # status/elapsed cells survive scoped runs instead of going blank.
     with open(os.path.join(outdir, "endpoint_status.json"), "w") as fh:
         json.dump({"status": merged_status, "updated": meta["when"]}, fh)
+    # …and the regression DETAIL lists as a first-class artifact (엔진 요청 #1 /
+    # Reporting 개선 A). Until now the only published detail was the index.html
+    # banner (capped at [:6]) — consumers had to parse presentation HTML (the
+    # v2 session's results_data did exactly that, flagged as a fragile stopgap).
+    # Full lists, machine-readable, same publish cycle as the headline counts.
+    with open(os.path.join(outdir, "fail_new.json"), "w") as fh:
+        json.dump({
+            "new": [{"key": k, "status": st, "path": p}
+                    for k, st, p in d.get("new_regressions", [])],
+            "known": [{"key": k, "status": st, "path": p}
+                      for k, st, p in d.get("known_red", [])],
+            "updated": meta["when"], "run_type": run_type,
+        }, fh)
 
     # Write per-service drill-down pages
     sdir = os.path.join(outdir, "services")

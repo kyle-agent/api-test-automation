@@ -126,6 +126,23 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   controlplane 22/22) + simulate 실주행(Playwright — 종료 전이 시 카드 렌더,
   스트립→카드 교대, 관측 파일 없는 환경의 '계산 불가' 정직 표기 확인).
 
+## Reporting 개선 A (오너 승인 2026-07-11) — 트리아지 신규 fail 상세
+
+- **fail_new.json 신설 발행** (`dashboard/build.py` — 엔진 요청 #1 정공법):
+  new/known 전체 목록(배너 [:6] 상한 없음) + updated·run_type. 발행 검증 완료
+  (오프라인 빌드 실행 — 스키마 {new, known, updated, run_type}).
+- **`controlplane/results_data.py`** (donor: v2 results_data.py §2.5):
+  fail_new.json 우선 + 미발행 동안 index.html 배너 파싱 폴백(상한 6건을
+  화면에 명시). 보강: "당시 500 → 현재 201 (복구 관측)" 분리 표기 ·
+  발행 서비스 상세 딥링크(`/dashboard/services/<slug>.html`) + Modeling ?q= ·
+  합성/카탈로그 이중 기록 힌트(병합 않고 배지만) · known 목록(저장소 baseline).
+- **트리아지 탭**: "신규 fail 상세" + "이미 알던 실패 — 추적 중" 2섹션 추가.
+  empty-state 규율 준수 (접근 불가 ≠ 0건).
+- 검증: `test_triage_new_fail_detail_and_known_list` (25/25).
+- **미결(오너 질문 2026-07-11)**: 색칠지도(/reporting/coverage) 존폐 —
+  세션 의견은 제거(전체-지도 뷰의 3번째 반복 탈락 + 로컬 관측 원천의 오독,
+  기능은 발행 대시보드·Modeling 진척 바가 대체). 오너 결정 대기.
+
 ## 결정 지점 (오너가 뒤집을 수 있게 기록)
 
 1. **노후 기준 48h 유지** — v2 계약은 24h, v1은 기존 P2C-12 결정(공용

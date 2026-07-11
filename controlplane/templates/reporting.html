@@ -149,6 +149,73 @@
   <div class="card pad"><span class="muted small">발행된 공식 수치를 가져올 수
     없어 분류를 표시할 수 없습니다 — 관측 없음(0 아님).</span></div>
   {% endif %}
+
+  {# Reporting 개선 A (계약 §2.5, donor: v2 results_data): 신규 fail 의 정체 —
+     "그 N건이 어느 엔드포인트인지"를 이 화면이 직접 답한다 (종전엔 집계뿐이라
+     알림의 종착지가 비어 있었다). '당시'와 '현재'를 분리 표기 — 누적 최신
+     status 는 재시도 복구를 숨긴다. #}
+  <h2>신규 fail 상세 <span class="hint">발행 기준 — 당시 status vs 현재 status
+    분리 표기</span> {{ badge('published', stale=(snap_stale is defined and snap_stale)) }}</h2>
+  <div class="card pad" style="padding-top:4px">
+    {% if triage_detail is none %}
+    <p class="muted small">상세 목록을 가져올 수 없습니다 — 발행물
+      (fail_new.json/index.html)에 접근하지 못했거나 회귀 0건입니다. 공식
+      카운트는 위 분류 표(신규 fail) 참조.</p>
+    {% elif not triage_detail['items'] %}
+    <p class="muted small">신규 fail 0건 — 목록 없음.</p>
+    {% else %}
+    <table>
+      <thead><tr><th>endpoint</th><th>당시</th><th>현재</th><th>비고</th><th></th></tr></thead>
+      <tbody>
+      {% for r in triage_detail['items'] %}
+      <tr>
+        <td><code>{{ r.key }}</code>
+          {% if r.dup_of %}<span class="tag" title="같은 호출이 두 키 포맷(카탈로그/라이프사이클)으로 이중 기록됐을 가능성 — 병합하지 않고 둘 다 표시: {{ r.dup_of|join(', ') }}">이중 기록?</span>{% endif %}</td>
+        <td><span class="chip s-regress">{{ r.status }}</span></td>
+        <td>{% if r.current_status is not none %}
+            <span class="chip {{ 's-verified' if r.current_changed and r.current_note == '복구 관측' else ('s-reached' if r.current_changed else 's-regress') }}">{{ r.current_status }}</span>
+            {% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="muted small">{% if r.current_note %}{{ r.current_note }}{% elif r.current_status is not none %}지속{% endif %}
+          {% if r.lifecycle_label %}· {{ r.lifecycle_label }}{% endif %}</td>
+        <td class="small">{% if r.link %}<a href="{{ r.link }}" target="_blank">{{ r.service_label }} 상세 ↗</a>
+          · <a href="/planning/resources/map?q={{ r.svc|urlencode }}">Modeling</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if triage_detail['capped'] %}
+    <p class="muted small" style="margin-top:8px">⚠ 발행 배너 파싱 폴백 —
+      <b>최대 6건까지만</b> 표시됩니다. 다음 발행부터 전용 파일(fail_new.json)로
+      전체 목록이 나옵니다.</p>
+    {% endif %}
+    {% endif %}
+  </div>
+
+  <h2>이미 알던 실패 — 추적 중 <span class="hint">data/baselines/known_issues.json
+    (저장소) — 알림 대상 아님</span></h2>
+  <div class="card pad" style="padding-top:4px">
+    {% if triage_known is none %}
+    <p class="muted small">baseline 파일을 읽을 수 없습니다.</p>
+    {% elif not triage_known %}
+    <p class="muted small">등록된 known issue 없음.</p>
+    {% else %}
+    <table>
+      <thead><tr><th>endpoint</th><th>status</th><th>분류</th><th>since</th><th>비고</th></tr></thead>
+      <tbody>
+      {% for k in triage_known %}
+      <tr>
+        <td><code>{{ k.key }}</code></td>
+        <td><span class="chip s-known">{{ k.status }}</span></td>
+        <td class="small">{{ k.type }}</td>
+        <td class="muted small">{{ k.since }}</td>
+        <td class="muted small">{{ k.note }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
   <p class="small muted" style="margin-top:10px">개별 run의 AI triage(분류·원인·조치)는
     RUN 히스토리에서 run을 열어 실행/확인합니다 —
     <a href="/reporting?tab=runs">Runs &amp; Archive →</a></p>
