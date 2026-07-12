@@ -2156,3 +2156,17 @@ teardown 규약: **자식 routing-rules를 먼저 비워야 DC DELETE가 수락*
 호스트 키는 `direct-connect`(하이픈; `directconnect`는 프록시 502). 미해결:
 DC의 network-logging storage delete 400 (d5637fad… 실측, 사유 미확인 —
 network-logging 스윕 패스 부재, 재발 시 조사).
+
+## 공유 VPC teardown은 subnet 소멸 대기가 필수 — 아니면 VPC만 잔존해 다음 런을 큐에 가둔다 (2026-07-12)
+
+`shared_infra --teardown`이 subnet DELETE(202, **비동기** — DELETING이
+30초~3분 지속)를 발행한 직후 곧바로 VPC DELETE를 날리면 409로 거부되는데,
+종전 코드는 상태코드를 안 보고 예외만 잡아 "deleted"로 기록했다 → **중단/
+실패한 런마다 공유 VPC 1개가 ACTIVE로 잔존** (2026-07-11 regrvpcsh6a5423ea,
+2026-07-12 regrvpcsh6a54273f 두 번 연속 같은 패턴 실측). 잔존 VPC는 console2
+admission의 baseline/mine_live로 잡혀 다음 런의 headroom을 깎고, **실행 중인
+런이 0개면 `_try_admit_queue`를 다시 불러줄 이벤트가 없어**(finish/abort에서만
+호출) 큐의 런이 영원히 대기했다. 수리: teardown이 subnet 404 확인까지 대기
+(≤240s) 후 VPC를 409 사다리(5×15s)로 삭제 + console2에 20s 재입장 티커
+(`_ensure_admit_ticker`, 큐 빌 때까지). 오프라인 회귀:
+tests/offline/test_shared_infra_teardown.py · test_console2.py(ticker).
