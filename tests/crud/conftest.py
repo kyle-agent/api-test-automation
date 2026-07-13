@@ -78,7 +78,7 @@ def _class_default_s(lc: dict) -> float:
 
 
 def _interleave_for_workers(ordered: list, n: int) -> list:
-    """desc 정렬 → [heavy_i, light_i] 페어 인터리브 (LPT 페어링).
+    """desc 정렬 → [heavy_i, light_i] 페어 인터리브 (LPT 페어링, --dist=load용).
 
     xdist load 스케줄러의 초기 배정은 수집 순서의 연속 청크(워커당 2개)라
     순수 내림차순이면 인접한 최상위 항목들이 같은 워커에서 직렬화된다.
@@ -96,6 +96,27 @@ def _interleave_for_workers(ordered: list, n: int) -> list:
         if i < len(fillers):
             out.append(fillers[i])
     return out + remainder
+
+
+def _roundrobin_blocks_for_workers(ordered: list, n: int) -> list:
+    """desc 정렬 → 라운드로빈 버킷 연접 (--dist=worksteal용, 2026-07-13 run-c373).
+
+    worksteal은 수집 순서를 워커별 **연속 블록**으로 통째로 선분배한다 — 순수
+    내림차순이나 페어 인터리브는 최상위 몬스터들이 같은 블록(=같은 워커)에
+    직렬로 묶인다 (실측 c373: LPT rank 11 pg-cluster가 +42분 지각, 홀로 런
+    꼬리 23분; 실제 시작 순서와 LPT의 스피어만 상관 +0.11 = 정렬 무효화).
+    rank j를 버킷 j%n에 라운드로빈 배분 후 버킷을 이어붙이면, 연속 블록 b의
+    첫 항목 = 전체 rank b — 상위 n개가 전부 서로 다른 워커에서 t≈0 출발하고
+    각 블록 안은 desc라 유휴 워커의 스틸이 꼬리(경량)부터 가져간다."""
+    if n < 2 or len(ordered) <= n:
+        return list(ordered)
+    buckets = [[] for _ in range(n)]
+    for j, item in enumerate(ordered):
+        buckets[j % n].append(item)
+    out = []
+    for b in buckets:
+        out.extend(b)
+    return out
 
 
 def _worker_count(config) -> int:
@@ -163,7 +184,9 @@ def pytest_collection_modifyitems(config, items) -> None:
         return (lid in pinned, v, len(lc.get("steps") or []))
 
     ordered = sorted((items[i] for i in slots), key=_key, reverse=True)
-    ordered = _interleave_for_workers(ordered, _worker_count(config))
+    # 실행 경로(local_run/console2)는 --dist=worksteal — 연속 블록 선분배에
+    # 맞는 라운드로빈 버킷 순서를 쓴다. (--dist=load로 되돌리면 인터리브로 교체)
+    ordered = _roundrobin_blocks_for_workers(ordered, _worker_count(config))
     for slot, it in zip(slots, ordered):
         items[slot] = it
 

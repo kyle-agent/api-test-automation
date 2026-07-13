@@ -41,6 +41,25 @@ def test_interleave_preserves_membership():
     assert sorted(out) == sorted(ordered) and len(out) == 25
 
 
+def test_roundrobin_blocks_top_n_lead_each_block():
+    """worksteal(연속 블록 선분배)용 순서 (run-c373 실측 수리): 블록 b의 첫
+    항목이 전체 rank b — 상위 n개 몬스터가 전부 서로 다른 워커에서 t≈0 출발."""
+    ordered = list("ABCDEFGH")   # A=가장 무거움 … H=가장 가벼움
+    out = crud_conftest._roundrobin_blocks_for_workers(ordered, 3)
+    # 버킷: [A,D,G] [B,E,H] [C,F] → 연접
+    assert out == ["A", "D", "G", "B", "E", "H", "C", "F"]
+    # 연속 블록(worksteal 선분배 단위)의 선두들 = 최상위 3개
+    assert [out[0], out[3], out[6]] == ["A", "B", "C"]
+    # 블록 내부는 desc — 유휴 워커의 스틸이 꼬리(경량)부터 가져간다
+    assert sorted(out) == sorted(ordered) and len(out) == 8
+
+
+def test_roundrobin_blocks_noop_when_few_items_or_serial():
+    assert crud_conftest._roundrobin_blocks_for_workers(["A", "B"], 0) == ["A", "B"]
+    assert crud_conftest._roundrobin_blocks_for_workers(["A", "B"], 1) == ["A", "B"]
+    assert crud_conftest._roundrobin_blocks_for_workers(["A", "B"], 4) == ["A", "B"]
+
+
 def test_priority_first_pins_read_from_dependencies():
     """priority_first(오너 2026-07-13)는 dependencies.json이 원천 — conftest와
     schedule_optimizer가 같은 목록을 읽는다."""
