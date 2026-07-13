@@ -150,7 +150,7 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 <div class="hero">
   <div class="gauge">
     <div class="ring"><span>—%</span></div>
-    <div class="lbl">검증(2xx) 커버<br><b>— / 11</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 0</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>— / 11</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 1</span></div>
   </div>
   <h1><span style='color:#8b949e'>parallel-filestorage</span> <span class="tag">기능 테스트 제외</span> <span class="tag">storage</span></h1>
   <div class="split">
@@ -160,7 +160,7 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
   </div>
 </div>
 
-<div class="action"><div><b>기능 테스트 제외 서비스</b> — PFS 자원 미프로비저닝 — 접근성만 (owner 2026-06-16, reachability waiver와 동일 근거) (owner 2026-06-13). smoke가 각 API의 <b>접근성만</b> 확인한다: 9/11개 엔드포인트가 응답(4xx 포함 = 도달). 커버리지 분모에서는 waiver로 제외되어 있다.</div></div>
+<div class="action"><div><b>기능 테스트 제외 서비스</b> — PFS 자원 미프로비저닝 — 접근성만 (owner 2026-06-16, reachability waiver와 동일 근거) (owner 2026-06-13). smoke가 각 API의 <b>접근성만</b> 확인한다: 10/11개 엔드포인트가 응답(4xx 포함 = 도달). 커버리지 분모에서는 waiver로 제외되어 있다.</div></div>
 
 <div class="controls">
   <div class="row1">
@@ -205,12 +205,12 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-07-10 13:33 KST · branch <code>claude/continuation-uk2rwc</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-07-14 00:26 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/snapshots/{snapshot_id}", "api": "deletesnapshot", "c": "n", "s": 400, "t": 2.2, "src": "fe79059", "d": [], "ev": null}, {"m": "DELETE", "p": "/v1/volumes/{volume_id}", "api": "deletevolume", "c": "n", "s": 404, "t": 1.2, "src": "fe79059", "d": [], "ev": null}, {"m": "GET", "p": "/v1/snapshots", "api": "listsnapshots", "c": "n", "s": 400, "t": 1.9, "src": "44db789", "d": [], "ev": null}, {"m": "GET", "p": "/v1/volumes", "api": "listvolumes", "c": "y", "s": 200, "t": 1.4, "src": "44db789", "d": [], "ev": null}, {"m": "GET", "p": "/v1/volumes/{volume_id}", "api": "showvolume", "c": "n", "s": null, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/volumes/{volume_id}/access-rules", "api": "listaccessrule", "c": "n", "s": null, "t": null, "src": "", "d": [], "ev": null}, {"m": "POST", "p": "/v1/snapshots", "api": "createsnapshot", "c": "n", "s": 404, "t": 1.1, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: volume_id", "crit": false}], "ev": null}, {"m": "POST", "p": "/v1/volumes", "api": "createvolume", "c": "n", "s": 500, "t": 4.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: name", "crit": false}], "ev": null}, {"m": "PUT", "p": "/v1/snapshots/{snapshot_id}/restore", "api": "restoresnapshot", "c": "n", "s": 400, "t": 2.3, "src": "fe79059", "d": [{"label": "no-success-schema", "issue": "16", "kind": "static", "detail": "PUT 2xx documents no schema", "crit": false}], "ev": null}, {"m": "PUT", "p": "/v1/volumes/{volume_id}/access-rules", "api": "setaccessrule", "c": "n", "s": 400, "t": 1.3, "src": "fe79059", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/volumes/{volume_id}/capacity", "api": "setvolumecapacity", "c": "n", "s": 404, "t": 1.2, "src": "fe79059", "d": [{"label": "no-success-schema", "issue": "16", "kind": "static", "detail": "PUT 2xx documents no schema", "crit": false}], "ev": null}];
-var CONF_EVAL=true;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
+var R=[{"m": "DELETE", "p": "/v1/snapshots/{snapshot_id}", "api": "deletesnapshot", "c": "n", "s": 400, "t": 2.2, "src": "fe79059", "d": [], "ev": null}, {"m": "DELETE", "p": "/v1/volumes/{volume_id}", "api": "deletevolume", "c": "n", "s": 404, "t": 1.2, "src": "fe79059", "d": [], "ev": null}, {"m": "GET", "p": "/v1/snapshots", "api": "listsnapshots", "c": "n", "s": 400, "t": 1.9, "src": "44db789", "d": [], "ev": null}, {"m": "GET", "p": "/v1/volumes", "api": "listvolumes", "c": "y", "s": 200, "t": 2.0, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/volumes/{volume_id}", "api": "showvolume", "c": "n", "s": null, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/volumes/{volume_id}/access-rules", "api": "listaccessrule", "c": "p", "s": 404, "t": 2.7, "src": "", "d": [], "ev": null}, {"m": "POST", "p": "/v1/snapshots", "api": "createsnapshot", "c": "n", "s": 404, "t": 1.1, "src": "fe79059", "d": [], "ev": null}, {"m": "POST", "p": "/v1/volumes", "api": "createvolume", "c": "n", "s": 500, "t": 4.2, "src": "fe79059", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/snapshots/{snapshot_id}/restore", "api": "restoresnapshot", "c": "n", "s": 400, "t": 2.3, "src": "fe79059", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/volumes/{volume_id}/access-rules", "api": "setaccessrule", "c": "n", "s": 400, "t": 1.3, "src": "fe79059", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/volumes/{volume_id}/capacity", "api": "setvolumecapacity", "c": "n", "s": 404, "t": 1.2, "src": "fe79059", "d": [], "ev": null}];
+var CONF_EVAL=false;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');

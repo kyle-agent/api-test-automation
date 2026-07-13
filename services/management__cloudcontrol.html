@@ -26,7 +26,7 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-bg);color:var(--blue)}
 .gauge{display:flex;align-items:center;gap:14px}
 .ring{width:62px;height:62px;border-radius:50%;flex:none;
-  background:conic-gradient(var(--red) calc(0*1%),var(--grey-bg) 0);
+  background:conic-gradient(#d0d7de calc(—*1%),var(--grey-bg) 0);
   display:grid;place-items:center;position:relative}
 .ring::after{content:"";position:absolute;inset:7px;background:var(--surface);border-radius:50%}
 .ring span{position:relative;font-weight:700;font-size:15px}
@@ -149,18 +149,18 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div class="hero">
   <div class="gauge">
-    <div class="ring"><span>0%</span></div>
-    <div class="lbl">검증(2xx) 커버<br><b>0 / 15</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 0</span></div>
+    <div class="ring"><span>—%</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>— / 15</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 0</span></div>
   </div>
-  <h1>cloudcontrol <span class="tag">management</span></h1>
+  <h1><span style='color:#8b949e'>cloudcontrol</span> <span class="tag">기능 테스트 제외</span> <span class="tag">management</span></h1>
   <div class="split">
-    <div><div class="k">읽기 GET</div><div class="v" style="color:var(--red)">0% <span class="sub">0/6</span></div></div>
-    <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--red)">0% <span class="sub">0/9</span></div></div>
-    <div><div class="k">설계/동작 결함</div><div class="v">7 <span class="sub">개선 · 결함 0</span></div></div>
+    <div><div class="k">읽기 GET</div><div class="v" style="color:#d0d7de">—% <span class="sub">0/6</span></div></div>
+    <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:#d0d7de">—% <span class="sub">0/9</span></div></div>
+    <div><div class="k">설계/동작 결함</div><div class="v">0 <span class="sub">개선 · 결함 0</span></div></div>
   </div>
 </div>
 
-<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0). 문서/설계 결함 중 가장 흔한 건 <b>undiscoverable-params(5)</b>와 <b>notfound-inconsistent(2)</b>.</div></div>
+<div class="action"><div><b>기능 테스트 제외 서비스</b> — org-master 전용 (Landing Zone/Account Factory/guardrail) — 공유 계정에서 전 엔드포인트 403, 접근성만 (owner 2026-07-10, reachability waiver 15/15와 동일 근거) (owner 2026-06-13). smoke가 각 API의 <b>접근성만</b> 확인한다: 11/15개 엔드포인트가 응답(4xx 포함 = 도달). 커버리지 분모에서는 waiver로 제외되어 있다.</div></div>
 
 <div class="controls">
   <div class="row1">
@@ -205,12 +205,12 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-07-10 13:33 KST · branch <code>claude/continuation-uk2rwc</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-07-14 00:26 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/baseline-assignments/{assignment_id}", "api": "removebaselineassignment", "c": "n", "s": 400, "t": 0.9, "src": "fe79059", "d": [], "ev": null}, {"m": "DELETE", "p": "/v1/guardrail-bindings", "api": "disableguardrailbindings", "c": "n", "s": 400, "t": 2.1, "src": "fe79059", "d": [], "ev": null}, {"m": "DELETE", "p": "/v1/landing-zones/{landing_zone_id}", "api": "deletelandingzone", "c": "n", "s": null, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/baseline-assignments", "api": "listbaselineassignments", "c": "n", "s": 403, "t": 1.6, "src": "44db789", "d": [], "ev": null}, {"m": "GET", "p": "/v1/guardrail-bindings/guardrails", "api": "listguardrailsfortarget", "c": "n", "s": 403, "t": 1.2, "src": "fe79059", "d": [], "ev": null}, {"m": "GET", "p": "/v1/guardrail-bindings/targets", "api": "listtargetsforguardrail", "c": "n", "s": 403, "t": 2.1, "src": "fe79059", "d": [], "ev": null}, {"m": "GET", "p": "/v1/guardrails", "api": "listguardrails", "c": "n", "s": 403, "t": 1.7, "src": "44db789", "d": [], "ev": null}, {"m": "GET", "p": "/v1/guardrails/{guardrail_id}", "api": "showguardrail", "c": "n", "s": null, "t": null, "src": "", "d": [{"label": "notfound-inconsistent", "issue": "35", "kind": "runtime", "detail": "non-existent id -> 403 (not 404)", "crit": false}], "ev": null}, {"m": "GET", "p": "/v1/landing-zones/{landing_zone_id}", "api": "showlandingzone", "c": "n", "s": null, "t": null, "src": "", "d": [{"label": "notfound-inconsistent", "issue": "35", "kind": "runtime", "detail": "non-existent id -> 403 (not 404)", "crit": false}], "ev": null}, {"m": "POST", "p": "/v1/accounts", "api": "createaccountfactoryaccount", "c": "n", "s": 400, "t": 2.2, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: landing_zone_id, name, parent_unit_id", "crit": false}], "ev": null}, {"m": "POST", "p": "/v1/baseline-assignments/{assignment_id}", "api": "addbaselineassignment", "c": "n", "s": 400, "t": 2.0, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: landing_zone_id", "crit": false}], "ev": null}, {"m": "POST", "p": "/v1/guardrail-bindings", "api": "enableguardrailbindings", "c": "n", "s": 400, "t": 0.9, "src": "fe79059", "d": [], "ev": null}, {"m": "POST", "p": "/v1/landing-zones", "api": "createlandingzone", "c": "n", "s": 400, "t": 1.0, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: additional_ou_name, audit_account_name, audit_login_id, basic_ou_name, log_archive_account_name, log_archive_login_id", "crit": false}], "ev": null}, {"m": "PUT", "p": "/v1/baseline-assignments/{assignment_id}", "api": "updatebaselineassignment", "c": "n", "s": 400, "t": 1.1, "src": "fe79059", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: landing_zone_id", "crit": false}], "ev": null}, {"m": "PUT", "p": "/v1/landing-zones/{landing_zone_id}", "api": "setlandingzone", "c": "n", "s": null, "t": null, "src": "", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: detective_guardrail_status", "crit": false}], "ev": null}];
-var CONF_EVAL=true;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
+var R=[{"m": "DELETE", "p": "/v1/baseline-assignments/{assignment_id}", "api": "removebaselineassignment", "c": "n", "s": 400, "t": 0.9, "src": "fe79059", "d": [], "ev": null}, {"m": "DELETE", "p": "/v1/guardrail-bindings", "api": "disableguardrailbindings", "c": "n", "s": 400, "t": 2.1, "src": "fe79059", "d": [], "ev": null}, {"m": "DELETE", "p": "/v1/landing-zones/{landing_zone_id}", "api": "deletelandingzone", "c": "n", "s": null, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/baseline-assignments", "api": "listbaselineassignments", "c": "n", "s": 403, "t": 1.6, "src": "44db789", "d": [], "ev": null}, {"m": "GET", "p": "/v1/guardrail-bindings/guardrails", "api": "listguardrailsfortarget", "c": "n", "s": 403, "t": 1.2, "src": "fe79059", "d": [], "ev": null}, {"m": "GET", "p": "/v1/guardrail-bindings/targets", "api": "listtargetsforguardrail", "c": "n", "s": 403, "t": 2.1, "src": "fe79059", "d": [], "ev": null}, {"m": "GET", "p": "/v1/guardrails", "api": "listguardrails", "c": "n", "s": 403, "t": 1.7, "src": "44db789", "d": [], "ev": null}, {"m": "GET", "p": "/v1/guardrails/{guardrail_id}", "api": "showguardrail", "c": "n", "s": null, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/landing-zones/{landing_zone_id}", "api": "showlandingzone", "c": "n", "s": null, "t": null, "src": "", "d": [], "ev": null}, {"m": "POST", "p": "/v1/accounts", "api": "createaccountfactoryaccount", "c": "n", "s": 400, "t": 2.2, "src": "fe79059", "d": [], "ev": null}, {"m": "POST", "p": "/v1/baseline-assignments/{assignment_id}", "api": "addbaselineassignment", "c": "n", "s": 400, "t": 2.0, "src": "fe79059", "d": [], "ev": null}, {"m": "POST", "p": "/v1/guardrail-bindings", "api": "enableguardrailbindings", "c": "n", "s": 400, "t": 0.9, "src": "fe79059", "d": [], "ev": null}, {"m": "POST", "p": "/v1/landing-zones", "api": "createlandingzone", "c": "n", "s": 400, "t": 1.0, "src": "fe79059", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/baseline-assignments/{assignment_id}", "api": "updatebaselineassignment", "c": "n", "s": 400, "t": 1.1, "src": "fe79059", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/landing-zones/{landing_zone_id}", "api": "setlandingzone", "c": "n", "s": null, "t": null, "src": "", "d": [], "ev": null}];
+var CONF_EVAL=false;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
