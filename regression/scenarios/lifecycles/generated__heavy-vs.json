@@ -746,10 +746,25 @@
           "group": "server-interface"
         },
         {
+          "name": "list-igw-for-netops",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways?vpc_id={vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "internet_gateway_id": "$.internet_gateways[0].id"
+          },
+          "_note": "2026-07-13 run-543a 수리: create-internet-gateway 400 already-associated — 공유 VPC에 다른 패밀리(LB/VPN/NAT)가 먼저 IGW를 붙임 (IGW는 VPC당 1, HB4c 기확정). networking__vpn.json의 검증된 adopt-or-create 부트스트랩 이식: 기존 IGW가 있으면 그 id를 채택하고 아래 create의 400은 non-event."
+        },
+        {
           "name": "create-internet-gateway",
           "service": "vpc",
           "method": "POST",
           "path": "/v1/internet-gateways",
+          "group": "igw",
+          "optional": true,
           "json": {
             "description": "API regression suite",
             "firewall_enabled": false,
@@ -761,16 +776,19 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
-          "capture": {
-            "internet_gateway_id": "$.internet_gateway.id"
+          "capture_soft": {
+            "internet_gateway_id": "$.internet_gateway.id",
+            "owned_igw_id": "$.internet_gateway.id"
           },
           "cleanup": {
             "method": "DELETE",
-            "path": "/v1/internet-gateways/{internet_gateway_id}",
+            "path": "/v1/internet-gateways/{owned_igw_id}",
             "service": "vpc"
-          }
+          },
+          "_note": "2026-07-13: adopt-or-create — 이미 IGW가 있으면 400 already-associated 관용(위 list가 id 채택). owned_igw_id는 우리가 만든 경우에만 캡처 — teardown이 남의 IGW를 지우지 않게 분리 (vpn.json HB4c 규약)."
         },
         {
           "name": "wait-internet-gateway",
@@ -1012,7 +1030,7 @@
           "name": "delete-internet-gateway",
           "service": "vpc",
           "method": "DELETE",
-          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "path": "/v1/internet-gateways/{owned_igw_id}",
           "expect_status": [
             200,
             202,

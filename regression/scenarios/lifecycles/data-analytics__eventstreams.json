@@ -405,6 +405,21 @@
           }
         },
         {
+          "name": "es-prefer-older-version",
+          "service": "eventstreams",
+          "group": "es-create",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "es_ver": "$.contents[1].id"
+          },
+          "_note": "2026-07-13: Kafka 프로비저닝 4연속 FAILED (es-wait terminal-bad; 최신 3.9.1, 202 수락 후 6-8분차 비동기 실패 — PF 후보). SKE [1]→[0] 선례대로 구버전이 있으면 그걸로 생성 시도 (soft — 버전이 1개뿐이면 [0] 유지)."
+        },
+        {
           "name": "es-find-stype",
           "service": "eventstreams",
           "group": "es-create",

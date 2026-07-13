@@ -2249,3 +2249,39 @@ admission의 baseline/mine_live로 잡혀 다음 런의 headroom을 깎고, **�
 (≤240s) 후 VPC를 409 사다리(5×15s)로 삭제 + console2에 20s 재입장 티커
 (`_ensure_admit_ticker`, 큐 빌 때까지). 오프라인 회귀:
 tests/offline/test_shared_infra_teardown.py · test_console2.py(ticker).
+=======
+## run-543a (2026-07-13 오너 풀런) 판정 — 115/119 pass, 수리 대량 확정 (2026-07-13)
+
+주의: 이 런은 **2라운드까지의 main**으로 실행됨 (3라운드 커밋 ad7b4530 이전 pull)
+— rmtags b64·cloudmonitoring datetime·fifo dedup·scf time=60·secretsmanager CIDR
+리스트의 실패 재현은 예상된 것 (수리는 main에 반영 완료, 다음 pull 런이 판정).
+
+### 이번 런으로 라이브 확정된 수리
+
+- **vpc-peering 완전 그린**: wait ACTIVE → rule create 202 → capture(재조회) →
+  rule delete 202 — createvpcpeeringrule/deletevpcpeeringrule 신규 2xx
+  (adopt-cidr 불일치 수리 + envelope 캡처의 첫 정상 완주).
+- **DC 체인 완전 그린 재확인** + wait-direct-connect-gone 404 종착 정상 동작
+  (잔존 0 — 로깅 스토리지/VPC 누수 재발 없음).
+- **DB resize-block-storage 202 × 4엔진** (epas/pg/mariadb/cachestore) —
+  DATA 그룹([1]) 재캡처가 정답으로 확정.
+- **createsharingimage 202** — BDM 있는 custom image 대상 이동이 정답.
+- mysql-cluster·servicewatch create 정상 (500 간헐 재발 없음, retry 보험 유지).
+- publicip RESERVED 폴 즉시 통과 (5분 공회전 제거 확인).
+- register-log-export-config: InvalidScheduleData **소멸** (WEEK+MON 형식 통과)
+  — 새 에러는 500 ContactAdmin. 유력 원인: bucket_name `regrcoveragebucket`이
+  실존하지 않음 (존재 검증이 500으로 표면화 — PF 후보) → 실존 버킷
+  `apitest-logsink`로 교체 (다음 런 판정).
+
+### 신규/잔여 실패와 처치
+
+- **gen-heavy-vs-netops create-internet-gateway 400 already-associated** —
+  공유 VPC에 타 패밀리가 먼저 IGW 부착 (HB4c 기확정 클래스). vpn.json의
+  adopt-or-create 부트스트랩 이식 (list-igw 채택 + owned_igw_id 분리 teardown).
+- **eventstreams 프로비저닝 4연속 FAILED** (Kafka 3.9.1, 202 수락 후 6-8분차) —
+  PF 후보 승격. 완화 시도: es-prefer-older-version(soft [1]) 신설.
+- **gen-heavy-lb-members create-lb-member 400** = {member_vm_ip} 미해석 —
+  svc-opt 세션이 잡은 '암묵 VM 의존'과 동일 뿌리 (그쪽 트랙 진행 중, 중복 회피).
+- container-scr-registry skip = registry quota=1 환경 (기지).
+- import-image 409·update-image-member 400·switchover 404·patch Unpatchable =
+  구조적 확정분 재확인 (waiver/백로그 후보 그대로).
