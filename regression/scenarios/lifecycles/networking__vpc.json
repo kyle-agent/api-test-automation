@@ -2304,8 +2304,9 @@
           "optional": true,
           "json": {
             "description": "API regression subnet vip",
-            "virtual_ip_address": "10.132.9.6"
+            "virtual_ip_address": "10.130.9.6"
           },
+          "_note": "2026-07-13 라이브 판정(net-VPC 첫 런): 서브넷을 10.130.9.0/24(net-A)로 재배치했는데 이 VIP IP가 10.132.9.6으로 남아 400 check-ip-address-overlap — 같은 /24 안의 .6으로 정렬.",
           "expect_status": [
             200,
             201,
