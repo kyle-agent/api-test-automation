@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 
 from regression.scenarios import engine
 
@@ -188,30 +189,64 @@ def teardown():
         _eprint("[shared_infra] no SCP_SHARED_VPC_ID / SCP_SHARED_SUBNET_ID set — "
                 "nothing to tear down.")
         return 0
-    # subnets THEN vpc (children before parent)
-    if db_subnet_id:
+    # subnets THEN vpc (children before parent). Subnet delete is ASYNC
+    # (DELETING lingers 30s~3min); firing the VPC delete immediately gets a 409
+    # and the shared VPC survives every aborted run (관측 2026-07-12: 두 런
+    # 연속 VPC만 잔존 → 다음 런이 admission 큐에 걸림). So: issue both subnet
+    # deletes, WAIT for them to be gone, then delete the VPC with a short
+    # 409-retry ladder. Budget ≤ ~5min total; on timeout the sweep reclaims.
+    issued: list[str] = []
+    for sid, label in ((db_subnet_id, "DB subnet"), (subnet_id, "subnet")):
+        if not sid:
+            continue
         try:
-            client.request("DELETE", f"{engine._SUBNET_CREATE_PATH}/{db_subnet_id}",
-                           service="vpc")
-            _eprint(f"[shared_infra] shared DB subnet {db_subnet_id} deleted")
+            r = client.request("DELETE", f"{engine._SUBNET_CREATE_PATH}/{sid}",
+                               service="vpc")
+            st = getattr(r, "status", None)
+            if st in (200, 202, 204, 404):
+                issued.append(sid)
+                _eprint(f"[shared_infra] shared {label} {sid} delete -> {st}")
+            else:
+                _eprint(f"[shared_infra] shared {label} {sid} delete -> {st}; "
+                        f"sweep will reclaim")
         except Exception as exc:
-            _eprint(f"[shared_infra] shared DB subnet {db_subnet_id} delete failed "
+            _eprint(f"[shared_infra] shared {label} {sid} delete failed "
                     f"({exc}); sweep will reclaim")
-    if subnet_id:
-        try:
-            client.request("DELETE", f"{engine._SUBNET_CREATE_PATH}/{subnet_id}",
-                           service="vpc")
-            _eprint(f"[shared_infra] shared subnet {subnet_id} deleted")
-        except Exception as exc:
-            _eprint(f"[shared_infra] shared subnet {subnet_id} delete failed "
-                    f"({exc}); sweep will reclaim")
+    if vpc_id and issued:
+        deadline = time.time() + 240
+        pending = list(issued)
+        while pending and time.time() < deadline:
+            still = []
+            for sid in pending:
+                try:
+                    g = client.get(f"{engine._SUBNET_CREATE_PATH}/{sid}",
+                                   service="vpc")
+                    if getattr(g, "status", None) != 404:
+                        still.append(sid)
+                except Exception:
+                    pass  # read hiccup — treat as gone next round decides
+            pending = still
+            if pending:
+                _eprint(f"[shared_infra] waiting subnet(s) gone: {pending}")
+                time.sleep(10)
     if vpc_id:
-        try:
-            client.request("DELETE", f"{engine._VPC_CREATE_PATH}/{vpc_id}",
-                           service="vpc")
-            _eprint(f"[shared_infra] shared VPC {vpc_id} deleted")
-        except Exception as exc:
-            _eprint(f"[shared_infra] shared VPC {vpc_id} delete failed ({exc}); "
+        for attempt in range(5):
+            try:
+                r = client.request("DELETE", f"{engine._VPC_CREATE_PATH}/{vpc_id}",
+                                   service="vpc")
+                st = getattr(r, "status", None)
+            except Exception as exc:
+                _eprint(f"[shared_infra] shared VPC {vpc_id} delete failed ({exc}); "
+                        f"sweep will reclaim")
+                break
+            if st in (200, 202, 204, 404):
+                _eprint(f"[shared_infra] shared VPC {vpc_id} delete -> {st}")
+                break
+            _eprint(f"[shared_infra] shared VPC {vpc_id} delete -> {st} "
+                    f"(attempt {attempt + 1}/5); retrying in 15s")
+            time.sleep(15)
+        else:
+            _eprint(f"[shared_infra] shared VPC {vpc_id} still not deleted; "
                     f"sweep will reclaim")
     return 0
 

@@ -958,3 +958,30 @@ def test_large_run_render_diet_frontend_contract():
     assert "생략 (성능 보호)" in js
     # 스코프/런 전환 시 필터·상한 상태 리셋 (stale 필터로 빈 화면 방지)
     assert js.count('apiCatFilter = "all"; apiShowAll = false;') >= 3
+
+# --------------------------------------------------------------------------- #
+# admission 큐 재입장 티커 (2026-07-12): 실행 중인 런이 0개일 때 큐에 걸린 런은
+# 종전엔 어떤 이벤트로도 재심사되지 않았다(다른 런의 finish/abort에서만
+# _try_admit_queue 호출). 잔존 공유 VPC가 사라져 headroom이 생겨도 영원히
+# 대기 — 티커가 큐가 빌 때까지 주기 재심사한다.
+def test_queued_run_admitted_by_ticker_when_capacity_frees(monkeypatch):
+    mod = _load_server()  # fresh module state (queue/reserved/baseline)
+    monkeypatch.setattr(mod.time, "sleep", lambda s: None)
+    acct = {"n": 4}  # 잔존 VPC 4개 → cap 5에서 peak 5짜리 런이 못 들어감
+    monkeypatch.setattr(mod, "_account_vpc_count", lambda ttl=12.0: acct["n"])
+    monkeypatch.setattr(mod, "_vpc_cap", lambda: 5)
+    monkeypatch.setattr(mod, "_mine_live_vpcs", lambda: 0)
+    started = []
+    rec = {"id": "r1", "peak_vpcs": 5}
+    mod._RUNS["r1"] = rec
+    mod._admit_or_queue(rec, lambda r: started.append(r["id"]))
+    assert rec["status"] == "queued" and "r1" in mod._QUEUE
+    # 잔존 VPC 소멸 → 다음 틱에서 admit되어야 한다
+    acct["n"] = 0
+    import time as _t
+    deadline = _t.time() + 5
+    while _t.time() < deadline and not started:
+        _t.sleep(0.05)
+    assert rec["status"] == "running"
+    assert started == ["r1"]
+    assert not mod._QUEUE

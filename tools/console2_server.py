@@ -1952,7 +1952,44 @@ def _admit_or_queue(rec: dict, worker) -> dict:
             _QUEUE.append(rec["id"])
     if spawn:
         _spawn_run(rec, worker)
+    else:
+        _ensure_admit_ticker()
     return rec
+
+
+_ADMIT_TICKER_ON = False
+
+
+def _ensure_admit_ticker() -> None:
+    """Background re-admission poll while anything is queued. Without it a
+    queued run only re-checks the cap when ANOTHER run finishes/aborts — with
+    zero runs in flight (e.g. queued behind a still-DELETING leftover shared
+    VPC, 관측 2026-07-12) nothing ever re-opens the queue and the run waits
+    forever. Ticks every 20s (>_VPCCNT ttl 12s, so each tick sees a fresh
+    account VPC count); exits when the queue drains."""
+    global _ADMIT_TICKER_ON
+    with _ADMIT:
+        if _ADMIT_TICKER_ON:
+            return
+        _ADMIT_TICKER_ON = True
+
+    def _tick():
+        global _ADMIT_TICKER_ON
+        while True:
+            time.sleep(20)
+            with _ADMIT:
+                if not _QUEUE:
+                    # reset INSIDE the lock so a concurrent _ensure_admit_ticker
+                    # (new run queued at this instant) can't see a stale True
+                    # and skip spawning a fresh ticker
+                    _ADMIT_TICKER_ON = False
+                    return
+            try:
+                _try_admit_queue()
+            except Exception:  # noqa: BLE001 — ticker must never die mid-queue
+                pass
+
+    threading.Thread(target=_tick, daemon=True, name="admit-ticker").start()
 
 
 def _try_admit_queue() -> None:
