@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 68 docs · 25 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 69 docs · 25 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -39,6 +39,7 @@
 | [`working/plans/COVERAGE-GETID-PLAN.md`](working/plans/COVERAGE-GETID-PLAN.md) | coverage | the id-bound GET gap, classified and attacked |  superseded (2026-06-12 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체) |
 | [`working/plans/COVERAGE-WAVE-PLAN.md`](working/plans/COVERAGE-WAVE-PLAN.md) | coverage | the remaining static gap, prioritized |  superseded (2026-06-11 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체) |
 | [`working/plans/CX-IA-DESIGN-2026-07-09.md`](working/plans/CX-IA-DESIGN-2026-07-09.md) | all | CX·IA 디자인 안 — 제3자 UX 컨설턴트 리뷰 (2026-07-09) | 🟢 active |
+| [`working/plans/DYNAMIC-INJECTION.md`](working/plans/DYNAMIC-INJECTION.md) | orchestrator | 런 중 시나리오 동적 주입 (native_runner) — 설계 | 🟡 draft |
 | [`working/plans/HEAVY-PREMISE-CONTRACT.md`](working/plans/HEAVY-PREMISE-CONTRACT.md) | all | HEAVY-PREMISE CONTRACT — Testing 단순화 (Model B) 공유 계약 | 🟢 active |
 | [`working/plans/IA-BUILD-CONTRACT.md`](working/plans/IA-BUILD-CONTRACT.md) | the IA-build agents (Catalog · Modeling · Reporting) + integration owner | IA build contract — "그림 하나, 여러 얼굴" parallel build |  superseded (이행 완료된 빌드 계약 — 확정 IA 빌드 완료) |
 | [`working/plans/NATIVE-SCHEDULER.md`](working/plans/NATIVE-SCHEDULER.md) | orchestrator | 목적특화 스케줄러 (native_runner) — xdist 대체 | 🟡 draft |
