@@ -2433,4 +2433,21 @@ vpc 호스트 순간 burst 스로틀로 서로 다른 5개 lifecycle이 각 1건
   **duration 병합을 max-merge로 변경** (conftest·simulate 동일) — LPT에서
   과대추정은 무해, 과소추정은 몬스터 꼬리. 이 수리로 다음 런 pg는 t≈0 시작,
   꼬리 23분 제거 → **기대 makespan ~43분** (66.3-23).
-- run-c373 passed 111종 스팬 fold (rolling avg).
+- eventstreams 실패는 기지 PF 후보 재확인. run-c373 passed 111종 스팬 fold (rolling avg).
+
+## 실행계획 미적용의 진범 = --dist=worksteal 연속 블록 선분배 (2026-07-13, run-c373 판정)
+
+schedule_verdict: 첫 배치 겹침율 21%, 실제 시작 순서 vs LPT 스피어만 +0.11
+(원시/스텝수/알파벳도 전부 ~0) — **정렬이 무효화**된 무작위 양상. 원인:
+local_run/console2가 xdist를 `--dist=worksteal`로 실행하는데, worksteal은
+수집 순서를 **워커별 연속 블록으로 통째로 선분배**한다 → LPT 내림차순이
+24조각으로 잘려 최상위 몬스터들이 같은 워커에 직렬로 묶임 (pg-cluster
+rank 11이 +42분 지각, vs-server-actions +34.5분 — 같은 블록 앞 항목 뒤에서
+대기). 543a까지의 --dist=load(청크 2개)용 페어 인터리브도 worksteal에선 역효과
+(블록 하나에 heavy 3개).
+
+수리: conftest 정렬을 **라운드로빈 버킷 연접**(`_roundrobin_blocks_for_workers`)
+으로 — rank j → 버킷 j%n, 연속 블록 b의 선두가 전체 rank b가 되어 상위 n개가
+전부 다른 워커에서 t≈0 출발, 블록 내부 desc라 스틸은 경량 꼬리부터 가져간다.
+(--dist=load로 되돌리면 인터리브로 교체할 것 — dist 모드와 정렬은 한 쌍이다.)
+>>>>>>> claude/resource-cleanup-optimization-1qpre9
