@@ -2483,3 +2483,40 @@ xdist 3.8 worksteal 소스를 실측 검증. 정정된 인과:
   0,3,6(균등)으로 잘못 가정(실제 worksteal 8/3 = 0,2,5) → 실제 분배를 흉내 내
   "몬스터는 경량 뒤에만"을 단언하도록 교체. schedule_verdict에 판정 C 헬퍼
   `monster_start_verdict` + offline 테스트 신설.
+
+## worksteal 꼬리 붕괴 → --dist=load --maxschedchunk=1 전환 (2026-07-13, run-afa8 실측)
+
+run-afa8(worksteal 라운드로빈 수리 후 첫 풀런): **몬스터 정렬 수리는 완벽**
+(판정 C 최대시작 4.6분·>5분지각 0). c373 66.3분 → **48.3분(−18분)**. 그러나
+예측 42.2분엔 못 미쳤고, 오너가 타임라인에서 "중간 것들이 늦어져 makespan을
+늘림 + 의존성 없는 시나리오가 큐를 못 잡음"을 지적 → fold로 정범 분해:
+
+- **48.3 = 46.3(진짜 무거운 하한) + 2.0(worksteal 꼬리 붕괴)**. makespan 정범 =
+  `scr-repo-borrow-coverage` — **2분짜리 라이트가 46.3분에 시작**해 makespan 정의.
+  apigateway(45분)·vpn-tunnel(44분)·gen-vpc-endpoint(36분)·direct-connect(35분)도
+  전부 2분짜리 의존성-없는 라이트가 30~46분에 시작.
+- 뿌리 = **worksteal의 유휴 워커 shutdown**. worksteal `schedule()`은 수집 순서를
+  워커별 연속 블록으로 **전부 선분배**(pending 비움) → 초반 라이트 소진 후 유휴
+  워커가 "훔칠 게 없으면" **종료(`check_schedule`의 `node.shutdown()`)**. 나중에
+  무거운 게 끝나 일이 풀려도 집을 워커가 없어 라이트 꼬리가 살아남은 소수 워커
+  뒤로 밀린다. worksteal이 고치려던 "진행 N≈대기 N" 꼬리를 shutdown으로 재생산.
+- "진행 N≈대기 N"은 스케줄러 무관 = xdist **워커당 2-깊이 버퍼**(worksteal
+  `MIN_PENDING=2`, load도 노드당 min 2). 살아있는 워커가 (1실행+1대기)를 쥐니
+  진행=대기=활성 워커 수. **이전 load→worksteal 전환(b4b9bc7e)이 이걸 고치려
+  했으나 실패한 이유** — dist 모드로 못 없애는 구조. 게다가 그 판단은 워커수
+  버그(_worker_count=0, 2026-07-11 수리)로 인터리브가 죽어 load 초기 청크가
+  직렬화된 오염 런 근거였을 가능성.
+
+**수리 = --dist=load --maxschedchunk=1** (local_run + console2, conftest 정렬은
+`_interleave_for_workers`로 페어링): load `check_schedule`은 **글로벌 pending
+풀을 유지**해 워커 완료 시마다 리필하고 `node.shutdown()`은 **pending이 빌 때만**
+→ pending이 남는 한 워커가 안 죽고 **빈 워커가 다음 대기를 즉시 집는다**(오너가
+말한 "큐 잡고 들어가기", work-conserving). load 초기 청크=워커당 2
+(`max(node_chunksize,2)`)라 [heavy,light] 인터리브면 **상위 n 몬스터 전부
+offset 0(t=0)**, 나머지는 풀에서 동적 리필(시뮬레이션 실측: interleave 24/24
+offset0 vs desc 직렬 offset1). worksteal용 라운드로빈은 대안 경로로 보존 —
+**dist 모드와 정렬은 한 쌍**. 예측(simulate_schedule=이상적 LPT)이 work-conserving
+load와 더 잘 맞아 예측≈실측도 개선. **다음 풀런에서 라이트 꼬리 조기화 실측 대기.**
+- 남은 큰 지렛대(백로그): 무거운 DB 하한 46분 자체 단축(provision·병렬) + durations
+  과소추정(mariadb 실측 46 vs 커밋 40) 커밋본 fold + prereq-blocking 워커 점유
+  (gen-cloudml-chain이 ske 대기하며 워커 잡음 → skip-when-not-ready 검토).

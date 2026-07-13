@@ -1,10 +1,17 @@
 """Offline tests for the worker-aware CRUD collection ordering (A1/A3, 2026-07-10)
-and the duration-learning gate (A2) — run-85b2/377e 스케줄 분석의 회귀 고정.
+and the duration-learning gate (A2) — run-85b2/377e/afa8 스케줄 분석의 회귀 고정.
 
 근거: 순수 duration 내림차순은 xdist 초기 연속-청크 배정에서 최상위 무거운
 2개를 같은 워커에 직렬화시켰다 (mysql 종료 0.2s 뒤 postgresql 시작 — 그
 postgresql이 run-377e makespan 결정). 인터리브는 [heavy, light] 페어로 긴
 작업들을 서로 다른 워커에 t≈0 배정한다.
+
+**활성 스케줄러 = --dist=load --maxschedchunk=1 (2026-07-13 run-afa8 판정).**
+load는 글로벌 pending 풀을 유지해 work-conserving하다 — 빈 워커가 의존성 없는
+대기를 즉시 집으므로 worksteal의 워커 shutdown→라이트 꼬리 지각(afa8: 2분짜리
+scr-repo가 46.3분 시작)이 없다. load 초기 청크=워커당 2라 인터리브와 한 쌍
+(상위 n 몬스터 offset0). worksteal용 라운드로빈(_roundrobin_blocks_for_workers)은
+대안 경로로 보존 — dist 모드와 정렬은 한 쌍이다.
 """
 from __future__ import annotations
 
@@ -39,6 +46,49 @@ def test_interleave_preserves_membership():
     ordered = [f"lc{i}" for i in range(25)]
     out = crud_conftest._interleave_for_workers(ordered, 18)
     assert sorted(out) == sorted(ordered) and len(out) == 25
+
+
+def _xdist_load_initial_chunks(order: list, n: int, maxschedchunk: int = 1):
+    """xdist load `schedule()`의 **초기 분배** 재현 (버전 3.8 검증).
+
+    load는 pending=range(N)로 놓고, 각 노드에 `node_chunksize=max(min(items//4,
+    maxschedchunk), 2)`개의 **연속 청크**를 1회 배정한 뒤 나머지는 **글로벌
+    pending 풀**에 남긴다(이후 완료 시마다 동적 리필). worksteal과 달리 pending이
+    남아있는 한 워커를 죽이지 않으므로, 초기 청크 배치만 makespan 리스크다.
+    반환: (초기청크 리스트, 글로벌 pending 잔여)."""
+    N = len(order)
+    if N < 2 * n:                                   # round-robin 1개씩
+        chunks = [[] for _ in range(n)]
+        for i, it in enumerate(order):
+            chunks[i % n].append(it)
+        return chunks, []
+    cs = max(min((N // n) // 4, maxschedchunk), 2)
+    chunks, pos = [], 0
+    for _ in range(n):
+        chunks.append(order[pos:pos + cs]); pos += cs
+    return chunks, order[pos:]
+
+
+def test_interleave_puts_every_monster_at_offset0_under_load():
+    """활성 경로 회귀 (run-afa8): load 초기 청크(워커당 2) 하에서 [heavy,light]
+    인터리브는 상위 n 몬스터를 **전부 각 워커 초기 청크의 offset 0**(=t=0 시작)에
+    놓는다 — 순수 desc는 인접 몬스터를 같은 워커 청크에 직렬화(offset 1)한다."""
+    N, n = 119, 24
+    ordered = [f"lc{i}" for i in range(N)]          # lc0=가장 무거움
+    weights = {f"lc{i}": N - i for i in range(N)}
+    il = crud_conftest._interleave_for_workers(ordered, n)
+    chunks, pool = _xdist_load_initial_chunks(il, n)
+    pos = {it: off for ch in chunks for off, it in enumerate(ch)}
+    monsters = sorted(weights, key=lambda k: weights[k], reverse=True)[:n]
+    # 상위 n 몬스터가 전부 초기 청크에 있고, 전부 offset 0
+    assert all(m in pos for m in monsters), "몬스터가 초기 청크 밖(풀)으로 밀림"
+    assert all(pos[m] == 0 for m in monsters), \
+        f"몬스터 offset 0 아님: {[pos[m] for m in monsters]}"
+
+    # 대조군: 순수 desc는 직렬화(offset 1 존재)
+    dchunks, _ = _xdist_load_initial_chunks(ordered, n)
+    dpos = {it: off for ch in dchunks for off, it in enumerate(ch)}
+    assert any(dpos.get(m) == 1 for m in monsters), "desc가 직렬화를 재현해야 유효"
 
 
 def _xdist_worksteal_blocks(collection_order: list, n: int) -> list[list]:

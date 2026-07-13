@@ -304,14 +304,17 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
         pos = f.tell()
         rc = subprocess.run(
             [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
-             # worksteal (xdist ≥3.2): 유휴 워커가 바쁜 워커의 대기 항목을
-             # 훔쳐간다 — 런 꼬리의 "진행 N ≈ 대기 N"(워커별 선배정 큐에 묶여
-             # 유휴 워커가 있어도 못 가져가던 현상, 오너 실측 2026-07-11
-             # 진행7·대기5)의 직접 해법. maxschedchunk는 load 스케줄러
-             # 전용이라 함께 제거. 초기 분배는 수집 순서의 연속 블록이므로
-             # conftest의 LPT+인터리브 정렬과도 궁합이 맞는다(블록마다
-             # heavy+light 혼합).
-             "-n", n, "--dist=worksteal", "-o", "addopts=", "-q"],
+             # --dist=load --maxschedchunk=1 (2026-07-13 run-afa8 판정): load는
+             # 글로벌 pending 풀을 유지해 워커가 완료할 때마다 리필하고, pending이
+             # 남아있는 한 워커를 죽이지 않는다 → 빈 워커가 의존성 없는 대기를
+             # 즉시 집는다(work-conserving). worksteal은 수집 순서를 워커별 블록으로
+             # 전부 선분배 후 "훔칠 게 없으면 유휴 워커 shutdown"이라, 나중에 무거운
+             # 게 끝나 일이 풀려도 집을 워커가 없어 라이트 꼬리가 30~46분까지 밀렸다
+             # (afa8: 2분짜리 scr-repo가 46.3분에 시작해 makespan 정의). load의 초기
+             # 청크=워커당 2개라 conftest의 [heavy,light] 인터리브와 한 쌍 — 상위 n
+             # 몬스터가 전부 offset 0(t=0)에서 출발. (이전 worksteal 전환은 워커수
+             # 버그로 인터리브가 죽은 상태의 오판 — 그 버그는 2026-07-11 수리됨.)
+             "-n", n, "--dist=load", "--maxschedchunk=1", "-o", "addopts=", "-q"],
             cwd=str(_ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT).returncode
         f.flush()
         try:

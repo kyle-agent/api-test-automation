@@ -184,9 +184,14 @@ def pytest_collection_modifyitems(config, items) -> None:
         return (lid in pinned, v, len(lc.get("steps") or []))
 
     ordered = sorted((items[i] for i in slots), key=_key, reverse=True)
-    # 실행 경로(local_run/console2)는 --dist=worksteal — 연속 블록 선분배에
-    # 맞는 라운드로빈 버킷 순서를 쓴다. (--dist=load로 되돌리면 인터리브로 교체)
-    ordered = _roundrobin_blocks_for_workers(ordered, _worker_count(config))
+    # 실행 경로(local_run/console2)는 --dist=load --maxschedchunk=1 (2026-07-13
+    # run-afa8 판정): load는 글로벌 pending 풀을 유지해 빈 워커가 다음 대기를
+    # 동적으로 집는다(worksteal의 워커 shutdown→꼬리 붕괴 제거). 초기 청크는
+    # 워커당 2개(max(node_chunksize,2))이므로, [heavy,light] 페어 인터리브면
+    # 각 워커 초기 청크 = 1무거움+1가벼움 → 상위 n 몬스터 전부 offset 0(t=0)
+    # 시작, 나머지는 풀에서 리필. (--dist=worksteal로 되돌리면 라운드로빈으로
+    # 교체할 것 — dist 모드와 정렬은 한 쌍이다.)
+    ordered = _interleave_for_workers(ordered, _worker_count(config))
     for slot, it in zip(slots, ordered):
         items[slot] = it
 
