@@ -768,6 +768,7 @@
           "service": "vpc",
           "method": "POST",
           "path": "/v1/vpcs",
+          "adopt": "vpc#a",
           "json": {
             "name": "regrvpc{unique}",
             "description": "API regression peering",
@@ -787,7 +788,7 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "_note": "2026-07-11 라이브 프로브 확정: adopt 제거 — 공유 VPC(10.124/20)를 adopt하면 requester cidr이 바뀌는데 rule의 destination_cidr(10.130.1.0/24 하드코딩)은 그대로라 'must be included in the destination VPC IP cidr' 400 (DC와 동일한 adopt-cidr 불일치 클래스). 프로브: 자체 VPC 10.150/20 + ACTIVE 피어링에서 REQUESTER_VPC+requester-cidr 부분집합 = 202 실증."
+          "_note": "2026-07-13 오너 설계: net-VPC A(10.130/20) adopt 재도입. 2026-07-11의 'adopt 제거'는 공유 VPC(10.124/20) adopt 시 requester cidr과 rule destination_cidr(10.130.1.0/24 하드코딩)이 불일치해서였다 — net-A는 처음부터 10.130/20으로 프로비저닝되므로(engine._NET_VPC_A_CIDR) 하드코딩과 일치, 그 클래스가 성립하지 않는다. 폴백(단독 실행)은 종전대로 자체 생성."
         },
         {
           "name": "wait-vpc",
@@ -811,6 +812,7 @@
           "service": "vpc",
           "method": "POST",
           "path": "/v1/vpcs",
+          "adopt": "vpc#b",
           "json": {
             "name": "regrvpcb{unique}",
             "description": "API regression peering approver",
@@ -849,7 +851,11 @@
             ],
             "timeout": 180,
             "interval": 10
-          }
+          },
+          "capture_soft": {
+            "account_id": "$.vpc.account_id"
+          },
+          "_note": "account_id 소프트 캡처를 GET에도 복제 (2026-07-13): create-vpc-b가 vpc#b adopt로 스킵되면 create 응답 캡처가 없다 — show 응답의 동일 envelope에서 회수 (create 쪽은 폴백용 유지)."
         },
         {
           "name": "create-vpc-peering",
@@ -1169,6 +1175,7 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id_b}",
+          "adopt": "vpc#b",
           "expect_status": [
             200,
             202,
@@ -1187,6 +1194,7 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
+          "adopt": "vpc#a",
           "expect_status": [
             200,
             202,
@@ -2053,10 +2061,12 @@
           "service": "vpc",
           "method": "POST",
           "path": "/v1/vpcs",
+          "adopt": "vpc#a",
+          "_note": "2026-07-13 오너 설계: net-VPC A(10.130/20) adopt — vip-nat은 A의 유일한 IGW 소유자. 폴백 cidr도 10.130/20으로 정렬(서브넷 10.130.9.0/24가 항상 VPC 대역 안이도록). 폴백에서 peering-A와 동시 존재 불가(cidr overlap)지만 단독 실행은 직렬이라 실충돌 없음.",
           "json": {
             "name": "regrvpc{unique}",
             "description": "API regression vip-nat",
-            "cidr": "10.132.0.0/20",
+            "cidr": "10.130.0.0/20",
             "tags": []
           },
           "expect_status": [
@@ -2112,7 +2122,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression vip-nat",
-            "cidr": "10.132.9.0/24",
+            "cidr": "10.130.9.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -2668,6 +2678,7 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
+          "adopt": "vpc#a",
           "expect_status": [
             200,
             202,
@@ -2679,7 +2690,7 @@
           ],
           "retries": 8,
           "retry_interval": 20,
-          "_note": "2026-07-09b 클래스 수리 (run-2b vpc-subnet-vip-nat 실측): 서브넷 202 비동기 삭제가 180s gone-폴을 pass-through → delete-vpc 409 related-resource. 폴 600s/15s 상향 + 409 사다리 8×20s (networking-vpc-subnet 81d67600과 동일 패턴, 파일 내 4개 lifecycle 일괄)."
+          "_note": "2026-07-09b 클래스 수리 (run-2b vpc-subnet-vip-nat 실측): 서브넷 202 비동기 삭제가 180s gone-폴을 pass-through → delete-vpc 409 related-resource. 폴 600s/15s 상향 + 409 사다리 8×20s (networking-vpc-subnet 81d67600과 동일 패턴, 파일 내 4개 lifecycle 일괄). 2026-07-13: vpc#a adopt 시 스킵(공유 net-VPC 유지)."
         }
       ]
     },

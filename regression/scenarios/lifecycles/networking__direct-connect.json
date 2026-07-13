@@ -27,6 +27,7 @@
           "service": "vpc",
           "method": "POST",
           "path": "/v1/vpcs",
+          "adopt": "vpc#b",
           "json": {
             "name": "regrvpc{unique}",
             "description": "API regression dc",
@@ -36,7 +37,7 @@
           "capture": {"vpc_id": "$.vpc.id"},
           "expect_status": [200, 201, 202],
           "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
-          "_note": "2026-07-11 run-892a: adopt 제거 — 공유 VPC 채택 시 이 lifecycle의 DC가 붙는 순간 gen-private-nat의 create-direct-connect가 400 vpc-already-connected (DC는 VPC당 1). 자체 VPC(10.137/20)로 격리."
+          "_note": "2026-07-13 오너 설계: net-VPC B(10.141/20) adopt. 2026-07-11 run-892a의 'adopt 제거'는 메인 공유 VPC(10.124)에서 gen-private-nat의 DC와 충돌해서였다(DC는 VPC당 1) — net-B에서는 이 lifecycle이 유일한 DC 소유자라 성립하지 않는다. gen-direct-connect는 여전히 메인 공유 VPC(10.124) 쪽. 폴백(단독)은 자체 10.137/20."
         },
         {
           "name": "wait-vpc",
@@ -206,6 +207,7 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
+          "adopt": "vpc#b",
           "expect_status": [200, 202, 204, 409, 404],
           "destructive": true,
           "retry_on_status": [409],

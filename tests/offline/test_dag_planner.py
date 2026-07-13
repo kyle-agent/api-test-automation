@@ -201,13 +201,16 @@ def test_integration_full_enabled_plan():
     lcs = validate_dag._load_lifecycles()
     p = dag_planner.plan(deps=deps, lifecycles=lcs)
 
-    # closure over ALL enabled covers the three real shared roots, vpc first.
+    # closure over ALL enabled covers the five real shared roots, vpc first
+    # (vpc#a/vpc#b = 네트워킹 공유 VPC A/B, 오너 설계 2026-07-13).
     assert p.shared_roots[0] == "vpc"
-    assert set(p.shared_roots) == {"vpc", "subnet", "subnet#db"}
+    assert set(p.shared_roots) == {"vpc", "subnet", "subnet#db", "vpc#a", "vpc#b"}
 
-    # real cap from dependencies.json
+    # real cap from dependencies.json — 상주 공유 VPC 3개(메인+A+B)가 슬롯에서
+    # 상시 차감된다.
     assert p.vpc_cap == deps["vpc_schedule"]["vpc_limit"]
-    assert p.self_create_budget == p.vpc_cap - 1
+    assert p.shared_vpc_count == 3
+    assert p.self_create_budget == p.vpc_cap - 3
 
     # exactly one provision wave (first) and one adopt wave
     assert p.waves[0].kind == "provision"

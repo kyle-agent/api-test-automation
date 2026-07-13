@@ -56,17 +56,18 @@ def test_simulate_schedule_pins_priority_first_at_t0():
     회귀 근거: 2026-07-13 런에서 vpc-subnet-vip-nat ~28분, networking-vpc-subnet
     ~40분 시작(LPT 후순위 + 슬롯 대기)으로 런 꼬리가 됐다."""
     from regression.scenarios.local_run import simulate_schedule
-    # 4종 모두 self-create(VPC 슬롯 소비) — vpc-transit-gateway-children는
-    # adopt=vpc(슬롯 0)라 이 테스트에 부적합해 heavy-shared-networking 사용.
+    # net-VPC A/B 설계(2026-07-13) 이후: peering·vip-nat은 vpc#a/b adopt라
+    # 슬롯 0 — 슬롯 소비자는 networking-vpc-subnet(핀)과 heavy-shared-networking.
+    # 선택에 vpc#a/b adopter가 있어 유효 슬롯 = max(1, 2-2) = 1: 핀인 nvs가
+    # 그 하나를 선점하고, 비핀 hsn은 nvs 종료 후에야 시작해야 한다.
     ids = ["vpc-peering", "heavy-shared-networking",
            "vpc-subnet-vip-nat", "networking-vpc-subnet"]
     sim = simulate_schedule(ids, workers=4, vpc_slots=2)
     byid = {b["id"]: b for b in sim["bars"]}
-    assert byid["vpc-subnet-vip-nat"]["s"] == 0.0
-    assert byid["networking-vpc-subnet"]["s"] == 0.0
-    # 핀 2종이 슬롯 2개를 선점하므로 더 긴 비핀 슬롯 소비자는 그 뒤에 시작한다
-    assert byid["vpc-peering"]["s"] > 0.0
-    assert byid["heavy-shared-networking"]["s"] > 0.0
+    assert byid["vpc-subnet-vip-nat"]["s"] == 0.0          # 핀 (슬롯 0)
+    assert byid["networking-vpc-subnet"]["s"] == 0.0       # 핀 (슬롯 1 선점)
+    assert byid["vpc-peering"]["s"] == 0.0                  # vpc#a/b adopt — 슬롯 0
+    assert byid["heavy-shared-networking"]["s"] >= byid["networking-vpc-subnet"]["e"]
 
 
 def test_class_default_replaces_zero_for_unmeasured():

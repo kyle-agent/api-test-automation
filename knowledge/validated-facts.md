@@ -2330,3 +2330,27 @@ run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행�
   서브넷 설계 유지 근거.
 - durations.json에 run-543a passed 115종의 events wall span을 fold
   (in-run 실측 — LPT 랭크 정확도 개선; vpc-peering avg 25→31분 등).
+
+## net-VPC A/B 설계 — peering의 두 VPC를 상주 공유해 IGW/DC 배타를 분산 (2026-07-13, 오너 설계)
+
+"peering용 VPC 2개를 각각의 VPC 내부 IGW 등 테스트에도 쓰자"(오너)를 전면 구현:
+
+- provision이 **net-A(10.130.0.0/20)·net-B(10.141.0.0/20)** 를 메인 공유 VPC와
+  함께 상주 생성 (adopt 토큰 `vpc#a`/`vpc#b`, 선택-인지 스킵, no-wait+게이트 적용,
+  env `SCP_SHARED_NET_VPC_{A,B}_ID`/`_NAME`).
+- **A**: vpc-peering requester + vpc-subnet-vip-nat(서브넷 10.130.9.0/24, A의
+  유일한 IGW 소유자). **B**: peering accepter + gen-wave5-fw(IGW 방화벽, B의
+  유일한 IGW) + networking-direct-connect-routing(B의 유일한 DC).
+- 성립 근거: ① peering rule CIDR 하드코딩(10.130.x)이 A의 CIDR과 일치하므로
+  2026-07-11의 adopt-cidr 불일치 클래스가 성립 안 함 ② IGW(VPC당 1)·DC(VPC당 1)
+  배타가 A/B 분산으로 해소 ③ peering(31분)의 시간 그림자 안에 vip-nat 9분·
+  fw 1.6분·DC 체인이 다 들어감. **런당 VPC 생성 7→5회**, 상주 3 + 슬롯 cap-3.
+- 세부 수리: peering account_id 소프트 캡처를 wait-vpc-b(GET)로 복제(adopt 시
+  create 응답이 없음); fw 방화벽 조회를 `vpc_name={net_b_vpc_name}`로 파라미터화
+  (adopt=shared_ctx 시딩, 폴백=create 응답 $.vpc.name 캡처 — 엔진이 adopt 캡처
+  시딩 시 기존 ctx 값을 보존하도록 수정); IB-049 스킵 가드를 base-kind(vpc*)로
+  일반화 (A/B는 CIDR 고정이라 동시 self-create는 즉시 overlap 400).
+- **라이브 미검증 2건 (다음 풀런 판정)**: ① 피어링 걸린 VPC 안 IGW/VIP/DC 생성
+  허용 여부 ② IGW 방화벽(product_type=IGW)과 DC 방화벽의 B 동거 무충돌.
+- 회귀: tests/crud/test_shared_vpc_adopt.py 5건 신규(양측 시딩/폴백/IB-049/캡처
+  보존/provision A·B) · validate_dag --check 0 gaps · 오프라인 545 passed.

@@ -69,6 +69,16 @@
     "vpc": {
       "parent": null,
       "provisioned_by": "regression.scenarios.shared_infra"
+    },
+    "vpc#a": {
+      "parent": null,
+      "provisioned_by": "regression.scenarios.shared_infra",
+      "_comment": "네트워킹 공유 VPC A (10.130.0.0/20, 오너 설계 2026-07-13) — vpc-peering requester + vpc-subnet-vip-nat(서브넷 10.130.9.0/24 + IGW). CIDR은 peering rule 하드코딩과 일치해야 함 (engine._NET_VPC_A_CIDR)."
+    },
+    "vpc#b": {
+      "parent": null,
+      "provisioned_by": "regression.scenarios.shared_infra",
+      "_comment": "네트워킹 공유 VPC B (10.141.0.0/20) — vpc-peering accepter + gen-wave5-fw(IGW 방화벽) + networking-direct-connect-routing(DC, VPC당 1 배타). IGW 소유: A=vip-nat, B=fw — 충돌 없음."
     }
   },
   "adopt_edges": {
@@ -178,6 +188,19 @@
     "vpc-transit-gateway-children": [
       "vpc"
     ],
+    "vpc-peering": [
+      "vpc#a",
+      "vpc#b"
+    ],
+    "vpc-subnet-vip-nat": [
+      "vpc#a"
+    ],
+    "networking-direct-connect-routing": [
+      "vpc#b"
+    ],
+    "gen-wave5-fw": [
+      "vpc#b"
+    ],
     "vs-server-actions-verify": [
       "subnet",
       "vpc"
@@ -199,17 +222,17 @@
       "vpc-endpoint",
       "networking-vpn-gateway-tunnel",
       "networking-direct-connect-routing",
-      "networking-dns-hosted-zone-private"
+      "networking-dns-hosted-zone-private",
+      "vpc-peering",
+      "vpc-subnet-vip-nat",
+      "gen-wave5-fw"
     ],
+    "_net_vpc_comment": "2026-07-13 오너 설계: peering의 두 VPC를 net-A(10.130/20)/net-B(10.141/20)로 상주 프로비저닝(provision, adopt 토큰 vpc#a/vpc#b)하고 vip-nat→A, fw·DC-routing→B가 그 안에서 IGW/DC를 테스트 — IGW(VPC당 1)·DC(VPC당 1) 배타가 A/B 분산으로 해소, 런당 VPC 생성 7→5회. peering/vip-nat/fw/dc-routing은 이제 adopt-class(병렬 안전). 라이브 미검증 1건: 피어링 걸린 VPC 안 IGW/VIP 생성 허용 여부(다음 풀런 판정).",
     "vpc_crud_lifecycles": [
       "networking-vpc-subnet",
       "networking-vpc-internet-gateway",
-      "vpc-peering",
       "vpc-transit-gateway-children",
-      "heavy-shared-networking",
-      "vpc-subnet-vip-nat",
-      "gen-wave5-fw",
-      "networking-direct-connect-routing"
+      "heavy-shared-networking"
     ],
     "_priority_first_comment": "오너 지시 2026-07-13 (run Gantt 실측: 예측 58.9분/실제 53.1분 런에서 vpc-subnet-vip-nat가 ~28분, networking-vpc-subnet이 ~40분에야 시작해 런 꼬리를 만듦). 짧은 VPC-슬롯 소비자는 LPT(긴 것 우선) 정렬에서 뒤로 밀리는데, 그때는 슬롯이 장기 점유 중이라 대기까지 겹친다. t=0에는 공유 VPC 1개뿐이라 슬롯이 비어 있으므로 이 목록의 lifecycle을 최우선 투입해 슬롯을 먼저 쓰고 일찍 반납하게 한다. 적용 지점: tests/crud/conftest.py 수집 정렬(실행), local_run.simulate_schedule(예측 Gantt), dag_scheduler.priorities(dag 경로) — 세 곳 모두 schedule_optimizer.load_priority_first()로 이 목록을 읽는다.",
     "priority_first": [

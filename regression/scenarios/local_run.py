@@ -210,7 +210,9 @@ def selection_needs_shared_vpc(lifecycle_ids: Sequence[str]) -> bool:
     for lc in lcs:
         if lc["id"] in want:
             for s in lc.get("steps", []):
-                if s.get("adopt") == "vpc":
+                # vpc / vpc#a / vpc#b 전부 provision 필요 (net-VPC A/B는
+                # provision이 공유 VPC와 함께 만든다, 2026-07-13)
+                if (s.get("adopt") or "").split("#", 1)[0] == "vpc":
                     return True
     return False
 
@@ -429,7 +431,9 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
         for s in lc.get("steps", []):
             if (s.get("method") == "POST"
                     and (s.get("path") or "").rstrip("/").endswith("/vpcs")):
-                return s.get("adopt") != "vpc"
+                # vpc#a/vpc#b adopt(net-VPC 상주 공유)도 슬롯 비소비 (2026-07-13)
+                if (s.get("adopt") or "").split("#", 1)[0] != "vpc":
+                    return True
         return False
 
     # 0차 키 = priority_first 핀 — 실행 경로(tests/crud/conftest.py 수집 정렬)와
@@ -440,7 +444,11 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
                                len(lc.get("steps") or [])), reverse=True)
     cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
     n_w = int(workers) if workers else max(1, min(cap, len(items) or 1))
-    n_v = max(1, int(vpc_slots))
+    # net-VPC A/B(vpc#a/b adopt)가 선택에 있으면 상주 VPC 2개가 슬롯을 상시
+    # 점유한다 — 자체생성 가용 슬롯에서 차감해야 예측이 실제와 맞는다 (2026-07-13).
+    net_standing = 2 if any((s.get("adopt") or "") in ("vpc#a", "vpc#b")
+                            for lc in items for s in lc.get("steps", [])) else 0
+    n_v = max(1, int(vpc_slots) - net_standing)
     wfree = [0.0] * n_w
     vfree = [0.0] * n_v
     bars = []

@@ -5,13 +5,14 @@
       "id": "gen-wave5-fw",
       "service": "networking/firewall",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: firewall, firewall-rule | adopt stamps stripped on purpose: the firewall lookup (GET /v1/firewalls?vpc_name=regrvpc{unique}&product_type=IGW) only resolves against a self-created VPC, and IGW is 1:1 per VPC — must not collide with the session-shared VPC's IGW.",
+      "_note": "composed by regression/scenarios/composer.py — targets: firewall, firewall-rule | 2026-07-13 오너 설계: net-VPC B(10.141/20) adopt로 전환. 종전 'adopt 금지' 사유 두 가지가 net-B에서는 해소된다: ① IGW 1:1 — net-B의 IGW 소유자는 이 lifecycle뿐(A쪽 IGW는 vip-nat), ② vpc_name 조회 — 방화벽 조회를 {net_b_vpc_name}(shared_ctx 시딩, 폴백 시 create 응답 $.vpc.name 캡처)로 파라미터화. DC(dc-routing)와 net-B 동거: DC 방화벽은 product_type=DC라 IGW 조회와 무충돌(가정, 라이브 판정 대상).",
       "steps": [
         {
           "name": "create-vpc",
           "service": "vpc",
           "method": "POST",
           "path": "/v1/vpcs",
+          "adopt": "vpc#b",
           "json": {
             "name": "regrvpc{unique}",
             "description": "API regression suite",
@@ -24,13 +25,15 @@
             202
           ],
           "capture": {
-            "vpc_id": "$.vpc.id"
+            "vpc_id": "$.vpc.id",
+            "net_b_vpc_name": "$.vpc.name"
           },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          }
+          },
+          "_note": "net_b_vpc_name: adopt 시에는 shared_ctx가 미리 시딩(엔진이 기존 ctx 값을 보존), 폴백 시에는 create 응답에서 캡처 — 두 경로 모두 방화벽 조회 쿼리가 실제 VPC 이름을 가리킨다."
         },
         {
           "name": "wait-vpc",
@@ -100,7 +103,7 @@
           "name": "create-firewall",
           "service": "firewall",
           "method": "GET",
-          "path": "/v1/firewalls?vpc_name=regrvpc{unique}&product_type=IGW",
+          "path": "/v1/firewalls?vpc_name={net_b_vpc_name}&product_type=IGW",
           "expect_status": [
             200,
             201,
@@ -306,6 +309,7 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
+          "adopt": "vpc#b",
           "expect_status": [
             200,
             202,
