@@ -2450,4 +2450,58 @@ rank 11이 +42분 지각, vs-server-actions +34.5분 — 같은 블록 앞 항�
 으로 — rank j → 버킷 j%n, 연속 블록 b의 선두가 전체 rank b가 되어 상위 n개가
 전부 다른 워커에서 t≈0 출발, 블록 내부 desc라 스틸은 경량 꼬리부터 가져간다.
 (--dist=load로 되돌리면 인터리브로 교체할 것 — dist 모드와 정렬은 한 쌍이다.)
->>>>>>> claude/resource-cleanup-optimization-1qpre9
+
+## 배치 ① 4xx→2xx 수리 4종(+filestorage VM배선) + 블로커 2종 라이브 재확인 (2026-07-13, branch api-test-coverage-gzukh0)
+
+> conf: 0.5 · seen: 2026-07-13 · obs: 1 (offline+read-only-live; heavy 2xx는 다음 콘솔 런 판정)
+
+인계된 "①배치 코드로 즉시 노려볼 4xx" 중 **코드로 안전 수리 가능한 3종**을 반영
+(heavy 라이프사이클이라 실 2xx는 SCP_RUN_HEAVY 콘솔 런에서 판정):
+
+1. **DBaaS setblockstoragesize (mysql·postgresql) = OS 롤 그룹 리사이즈 금지.**
+   `database-mysql-cluster`/`database-postgresql-cluster`(scenarios.json)의 create
+   body는 block_storage_group을 **OS 롤 1개**만 만든다. bsg_id=block_storage_groups
+   [0]=OS를 리사이즈하면 400 `Dbaas.ValidationError.InvalidBlockStorageRoleType`
+   (subops-full run-923a 라이브 확정과 동일 클래스). 수리: subops-full의 검증된
+   패턴 이식 — add-block-storages(role_type:DATA)→settle-poll→
+   `capture_soft bsg_data_id=$.instance_groups[0].block_storage_groups[1].id`→
+   그 DATA 그룹을 resize(size_gb 208=104×2). instance_group_id는 mysql은 미캡처라
+   capture-block-storage-group에 추가(pg는 기존 capture-instance-group에 존재).
+
+2. **eventstreams showrequest = async 202의 request_id만이 유일 경로.**
+   어떤 list/collection GET도 request_id를 노출하지 않는다(read-only es-read
+   라이프사이클 _note). es-create(202 AsyncResponse)가 `$.request_id`를
+   capture_soft하므로, **es-wait 직전에** `GET /v1/requests/{request_id}` 스텝
+   삽입 → Kafka 프로비저닝이 나중에 async-FAIL해도(2026-07-13 4연속 FAILED, PF
+   후보) 202 수락 순간 request 레코드는 존재하므로 showrequest는 실 2xx 획득.
+
+3. **cachestore set-commands = maxmemory-policy는 modifiable 아님.**
+   listcommands(GET /v1/clusters/{cluster_id}/commands) 응답
+   `{contents:[{id,name,modifiable,applied_value,description}]}`(api_docs
+   response_example). 하드코딩 `{name:maxmemory-policy,id:""}`는 modifiable이
+   아니라 400. 수리: `where_prefix modifiable=true`로 실 커맨드 id+name+
+   applied_value 캡처 → modifycommandrequest {commands:[{id,name,new_value=
+   applied_value}]}(no-op 되돌림, set-parameter-values 관용). **미검증**:
+   modifiable 필드가 문자열 "true"인지 boolean true인지(where_prefix는 startswith
+   문자열 매칭) — 콘솔 런에서 정정. 리터럴 폴백이라 무회귀.
+
+**라이브 read-only 재확인으로 인계 낙관론 정정 (여전히 블로커, 코드 수리 불가):**
+- **kms updatemanagedkeydescription/showmanagedkey**: `GET /v1/managed-kms/transit`
+  → 200 `{count:0, keys:[]}` (2026-07-13). managed key는 system-managed(create API
+  없음)이고 계정에 0개 → 실 id 확보 원천 불가. **영구 블로커**(2026-06-23 이래 불변).
+- **filestorage setaccessrule**: `object_id`에 실 VM 요구. 단독 라이프사이클
+  (storage__filestorage.json)은 VPC/VM-free라 가짜 UUID → 404
+  `VirtualServer.VirtualServerNotFound`(참조자원 부재 fail-fast, 형식/권한 오류
+  아님; `GET /v1/servers`→200 `{servers:[]}`, `/v1/virtual-servers`→403 실측).
+  **수리 (2026-07-13, 오너 지시 "VM에 dependency 걸어 테스트"):** gen-heavy-vs-netops가
+  이미 ACTIVE VM({server_id})을 상비하므로 거기에 filestorage NFS 볼륨 create +
+  setaccessrule(add/remove) optional 그룹(`fs-vm-access`) 편입 — object_id=
+  {server_id}로 실 2xx 노림. **주의: 모든 filestorage 스텝에 `service:filestorage`
+  필수** (`/v1/volumes`가 virtualserver block-volume 호스트와 경로 충돌; service
+  태그가 filestorage 호스트로 라우팅; 토큰도 `fs_volume_id`로 분리). remove로
+  규칙 되돌린 뒤 cleanup이 볼륨 삭제(잔존 규칙이 deletevolume 400 유발 가능).
+  다음 heavy 콘솔 런이 2xx 판정.
+- **cloudmonitoring show-event-policy**: `GET .../event/v2/event-policies` → 400
+  `InvalidInputValue`(resourceType/productResourceId 필수), 등록 모니터링 리소스 0.
+  이벤트 정책 생성 자체가 등록 INSTANCE 필요 → show reads의 실 id 확보 불가.
+  **블로커**(2026-09 단종 예정, 깊은 투자 금지).

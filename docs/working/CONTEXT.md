@@ -113,6 +113,30 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **HANDOFF (2026-07-13 — api-test-coverage-gzukh0 세션, 배치 ① 착수):** 인계된
+  "①배치 코드로 즉시 노려볼 4xx"를 착수. **코드 수리 4종 반영**(전부 heavy라
+  실 2xx는 다음 SCP_RUN_HEAVY 콘솔 런 판정; validate 0 err, offline 550 pass —
+  기존 실패 2건 test_console2.fold/test_docs_index는 무관·기존):
+  ① **mysql·postgresql setblockstoragesize** — create body가 OS 롤 block-storage-group
+  만 만들어 resize 시 400 InvalidBlockStorageRoleType. subops-full 검증 패턴 이식:
+  add-block-storages(DATA)→settle→bsg_data_id 재캡처→DATA 그룹 resize (scenarios.json
+  database-mysql-cluster/database-postgresql-cluster; mysql엔 instance_group_id 캡처
+  추가). ② **eventstreams showrequest** — es-create 202의 request_id를 es-wait
+  직전에 `GET /v1/requests/{request_id}`로 즉시 read (async-FAIL해도 request 레코드
+  존재 → 2xx; 유일 경로, list 미노출). ③ **cachestore set-commands** — modifiable
+  아닌 maxmemory-policy 하드코딩 제거, listcommands에서 `where_prefix modifiable=true`
+  실 커맨드 캡처→applied_value no-op 되돌림. ④ **filestorage setaccessrule**
+  (오너 지시 "VM dependency 걸어 테스트") — 단독 lifecycle은 VM 0대라 404
+  VirtualServerNotFound; **gen-heavy-vs-netops(ACTIVE VM 상비)에 filestorage NFS
+  볼륨+setaccessrule(add/remove) optional 그룹 `fs-vm-access` 편입**, object_id=
+  {server_id} 실 VM. 모든 filestorage 스텝 `service:filestorage` 필수(볼륨 경로가
+  virtualserver와 충돌), 토큰 fs_volume_id. **라이브 read-only 재확인 → 블로커 확정
+  2종**(코드 수리 불가): kms managed key `GET /v1/managed-kms/transit`→count:0(영구,
+  create API 없음) · cloudmonitoring event-policy 400+등록 리소스 0(2026-09 단종,
+  투자 금지). **미착수(사유별)**: DB patch-minor 5엔진=heavy create body 변경+C4
+  오너 컨펌 대기 · apigw/scf privatelink 5키=AUTO-approval 상태머신 라이브 런 관찰
+  트리아지 필요(블라인드 코드 불가). 상세: `knowledge/validated-facts.md` 2026-07-13
+  배치① 블록. ⚠️ knowledge/validated-facts.md:2453 고아 병합마커(`>>>>>>>`) 제거함.
 - **HANDOFF (2026-07-13 밤 — svc-coverage-improvement 세션 마감, main=`a746ea36`,
   오너 "다른 세션에서 이어서"):** run-923a→892a→543a→c373 4연속 트리아지로 서비스
   커버리지 4xx 대량 수리 완료 (상세: `knowledge/validated-facts.md` 2026-07-11~13

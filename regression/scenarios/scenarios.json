@@ -4685,9 +4685,10 @@
             200
           ],
           "capture_soft": {
-            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id",
+            "instance_group_id": "$.instance_groups[0].id"
           },
-          "_note": "COMPLETENESS-AUDIT-2026-07-08: bsg_id feeds set-block-storage-size (mysqlsetblockstoragesize); JSONPath copied verbatim from the database-postgresql-cluster twin's capture-instance-group step."
+          "_note": "COMPLETENESS-AUDIT-2026-07-08: bsg_id feeds set-block-storage-size (mysqlsetblockstoragesize); JSONPath copied verbatim from the database-postgresql-cluster twin's capture-instance-group step. 2026-07-13 (batch ①): also soft-capture instance_group_id so the mysql-bsresize group can add a DATA-role block-storage-group and resize THAT (the create body only makes an OS-role group; resizing OS 400s InvalidBlockStorageRoleType — see subops-full capture-bsg-data-id)."
         },
         {
           "name": "probe-reads",
@@ -5115,21 +5116,94 @@
           }
         },
         {
-          "name": "set-block-storage-size",
+          "name": "add-block-storages",
           "optional": true,
           "group": "mysql-bsresize",
           "method": "POST",
-          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
           "json": {
-            "size_gb": 112
+            "role_type": "DATA",
+            "size_gb": 104,
+            "volume_type": "SSD"
           },
           "expect_status": [
             200,
             201,
             202,
-            400
+            400,
+            403,
+            404,
+            409,
+            422
           ],
-          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlsetblockstoragesize. Body/expects = PG twin's resize-block-storage (112 > create's 104 GB; 400 tolerated like the twin); bsg_id soft-captured by capture-block-storage-group."
+          "_note": "REPAIR 2026-07-13 (batch ① mysqlsetblockstoragesize 2xx): the create body only provisions an OS-role block-storage-group, and mysqlsetblockstoragesize rejects an OS-role resize with 400 Dbaas.ValidationError.InvalidBlockStorageRoleType (LIVE-CONFIRMED run-923a, see subops-full). Add a DATA-role group first, then resize THAT. Ported verbatim from database__subops-full.json:add-block-storages/capture-bsg-data-id/resize-block-storage."
+        },
+        {
+          "name": "wait-after-add-block-storages",
+          "optional": true,
+          "group": "mysql-bsresize",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "settle-poll: add-block-storages is async on the instance-group; without this wait the resize races the in-flight add and 400s ExistInprogress (subops-full HB1 note)."
+        },
+        {
+          "name": "capture-bsg-data-id",
+          "optional": true,
+          "group": "mysql-bsresize",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "capture_soft": {
+            "bsg_data_id": "$.instance_groups[0].block_storage_groups[1].id"
+          },
+          "_note": "Re-read the DATA group ([1], created by add-block-storages) to feed set-block-storage-size. If add didn't succeed, {bsg_data_id} stays literal -> tolerated 404 (still records the call)."
+        },
+        {
+          "name": "set-block-storage-size",
+          "optional": true,
+          "group": "mysql-bsresize",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
+          "json": {
+            "size_gb": 208
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "_note": "COMPLETENESS-AUDIT-2026-07-08 gap mysqlsetblockstoragesize; 2026-07-13 batch ① repair: resize the DATA-role group (bsg_data_id, added above) not the OS group. size_gb 208 = 2x the DATA group's create size (104), mirroring subops-full resize-block-storage."
         },
         {
           "name": "wait-after-bsresize",
@@ -6017,20 +6091,94 @@
           }
         },
         {
-          "name": "resize-block-storage",
+          "name": "add-block-storages",
           "optional": true,
           "group": "pg-bsresize",
           "method": "POST",
-          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
           "json": {
-            "size_gb": 112
+            "role_type": "DATA",
+            "size_gb": 104,
+            "volume_type": "SSD"
           },
           "expect_status": [
             200,
             201,
             202,
-            400
-          ]
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "_note": "REPAIR 2026-07-13 (batch ① postgresqlsetblockstoragesize 2xx, twin of mysql fix): create body only makes an OS-role block-storage-group, and setblockstoragesize rejects an OS-role resize with 400 InvalidBlockStorageRoleType (LIVE run-923a, subops-full). Add a DATA-role group, resize THAT."
+        },
+        {
+          "name": "wait-after-add-block-storages",
+          "optional": true,
+          "group": "pg-bsresize",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE",
+              "FAILED",
+              "ERROR",
+              "UNKNOWN"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "settle-poll: add-block-storages is async; without this wait the resize races the in-flight add and 400s ExistInprogress."
+        },
+        {
+          "name": "capture-bsg-data-id",
+          "optional": true,
+          "group": "pg-bsresize",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "capture_soft": {
+            "bsg_data_id": "$.instance_groups[0].block_storage_groups[1].id"
+          },
+          "_note": "Re-read the DATA group ([1]) for resize-block-storage. If add didn't succeed, {bsg_data_id} stays literal -> tolerated 404."
+        },
+        {
+          "name": "resize-block-storage",
+          "optional": true,
+          "group": "pg-bsresize",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{bsg_data_id}/resize",
+          "json": {
+            "size_gb": 208
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "_note": "2026-07-13 batch ① repair: resize the DATA-role group (bsg_data_id, added above) not the OS group. size_gb 208 = 2x the DATA group's create size."
         },
         {
           "name": "wait-after-bsresize",

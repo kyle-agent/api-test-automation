@@ -288,6 +288,103 @@
           }
         },
         {
+          "name": "fs-create-volume",
+          "service": "filestorage",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "optional": true,
+          "group": "fs-vm-access",
+          "json": {
+            "name": "regrfsvm{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "fs_volume_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{fs_volume_id}",
+            "service": "filestorage"
+          },
+          "_note": "REPAIR 2026-07-13 (owner-directed: filestorage setaccessrule needs a real VM dependency): this lifecycle already provisions an ACTIVE VM ({server_id}, wait-server above), so a filestorage NFS volume created here can bind a REAL VM in its access rule — the ONLY path to a 2xx on filestoragesetaccessrule (the standalone storage__filestorage.json step 404s VirtualServerNotFound because that lifecycle is VPC/VM-free; account has 0 VMs). Volume body {name,protocol:NFS,type_name:HDD} + $.volume_id envelope are LIVE-PROVEN (storage__filestorage.json create-volume, 2026-06-24). service=filestorage is REQUIRED on every step here — the /v1/volumes path collides with virtualserver's block-volume host, so the service tag routes it to the filestorage host. Billable NFS volume, torn down via cleanup; group-isolated so a filestorage hiccup never fails the proven VM chain."
+        },
+        {
+          "name": "fs-wait-volume",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{fs_volume_id}",
+          "optional": true,
+          "group": "fs-vm-access",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "fs-set-access-rule-add",
+          "service": "filestorage",
+          "method": "PUT",
+          "path": "/v1/volumes/{fs_volume_id}/access-rules",
+          "optional": true,
+          "group": "fs-vm-access",
+          "json": {
+            "object_id": "{server_id}",
+            "object_type": "VM",
+            "action": "add"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "_note": "filestoragesetaccessrule 2xx target: object_id={server_id} is the REAL ACTIVE VM created above (object_type enum VM|BM|GPU|GPU_NODE|ENDPOINT; action add|remove — scalar body, LIVE-confirmed shape 2026-06-24). Reverted by fs-set-access-rule-remove so the volume can be torn down cleanly."
+        },
+        {
+          "name": "fs-set-access-rule-remove",
+          "service": "filestorage",
+          "method": "PUT",
+          "path": "/v1/volumes/{fs_volume_id}/access-rules",
+          "optional": true,
+          "group": "fs-vm-access",
+          "json": {
+            "object_id": "{server_id}",
+            "object_type": "VM",
+            "action": "remove"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "_note": "Revert the access rule (action:remove) before cleanup deletes the volume — a lingering rule can block deletevolume. Also exercises the remove branch of setaccessrule."
+        },
+        {
           "name": "verify-server-read-ips",
           "service": "virtualserver",
           "method": "GET",
