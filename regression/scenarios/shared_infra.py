@@ -112,24 +112,29 @@ def _needs_db_subnet() -> bool:
         return True
 
 
-def _needs_net_vpcs() -> bool:
-    """True iff this run's selection contains at least one ``{"adopt": "vpc#a"}``
-    or ``{"adopt": "vpc#b"}`` step (peering·vip-nat·fw·DC의 네트워킹 공유 VPC).
-    없으면 net-VPC 2개는 순수 낭비(슬롯 2 + ~수십 초)다. Fail-open: 판정 오류
-    → True (만들어도 무해, 약간 느릴 뿐)."""
+def _needed_net_vpc_tags() -> tuple:
+    """이 선택이 필요로 하는 네트워킹 공유 VPC 태그 — vpc#a 어댑터가 있으면 'a',
+    vpc#b 어댑터가 있으면 'b' (오너 2026-07-13 세분화). peering은 vpc#a·vpc#b를
+    둘 다 가지므로 자동으로 ('a','b'); vip-nat만이면 ('a',); dc/fw만이면 ('b',).
+    없는 것은 만들지 않아 슬롯(각 1)·프로비저닝 시간 낭비를 막는다. Fail-open:
+    판정 오류 → ('a','b') (만들어도 무해, 약간 느릴 뿐)."""
     import os
     try:
         only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
                 if x.strip()}
+        tags = set()
         for lc in engine.active_lifecycles():
             if only and lc.get("id") not in only:
                 continue
-            if any((s.get("adopt") or "") in ("vpc#a", "vpc#b")
-                   for s in lc.get("steps", [])):
-                return True
-        return False
+            for s in lc.get("steps", []):
+                ad = s.get("adopt") or ""
+                if ad == "vpc#a":
+                    tags.add("a")
+                elif ad == "vpc#b":
+                    tags.add("b")
+        return tuple(sorted(tags))
     except Exception:  # noqa: BLE001 — 스킵 최적화가 provision 실패 원인이 되면 안 됨
-        return True
+        return ("a", "b")
 
 
 def provision():
@@ -155,12 +160,12 @@ def provision():
     # 게이트가 보장(라이브 검증 2026-07-13 5/5 pass). 구식 대기가 필요하면
     # SCP_PROVISION_SUBNET_WAIT=true 로 강제.
     nowait = os.environ.get("SCP_PROVISION_SUBNET_WAIT", "").strip().lower() != "true"
-    need_net = _needs_net_vpcs()
+    net_tags = _needed_net_vpc_tags()   # ('a','b') / ('a',) / ('b',) / () — 세분화
     try:
         with contextlib.redirect_stdout(sys.stderr):
             shared_ctx, _teardown = engine.provision_shared_vpc(
                 client, cfg, need_db_subnet=need_db,
-                wait_subnets_active=not nowait, need_net_vpcs=need_net)
+                wait_subnets_active=not nowait, need_net_vpcs=net_tags)
     except Exception as exc:
         # Wave D root cause: provision_shared_vpc CREATED the VPC (slot won,
         # counts against the 5-cap) but a *post-create* step inside it raised —

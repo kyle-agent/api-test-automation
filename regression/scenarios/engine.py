@@ -1708,7 +1708,7 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
 def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None,
                          need_db_subnet: bool = True,
                          wait_subnets_active: bool = False,
-                         need_net_vpcs: bool = False):
+                         need_net_vpcs=False):
     """Create ONE VPC + ONE subnet (both ACTIVE) for the heavy/ADOPT-class
     lifecycles to ADOPT, so they don't each create their own against the 5-VPC
     cap (knowledge/vpc-scheduling-strategy.md).
@@ -1790,8 +1790,15 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     # 프로비저닝해 vip-nat(A)·fw/DC(B)가 그 안에서 테스트한다. 메인 VPC의
     # ACTIVE 폴 **앞**에서 생성을 발행해 세 VPC의 전이가 겹치게 한다.
     net_ids: dict[str, tuple[str, str]] = {}   # tag -> (vpc_id, name)
-    if need_net_vpcs:
+    # net_tags: 만들 네트워킹 공유 VPC. True → {'a','b'}(하위호환), iterable → 그 태그만,
+    # False/빈 것 → 없음 (오너 2026-07-13 세분화: net-A는 vpc#a 사용자, net-B는 vpc#b/
+    # peering 사용자 있을 때만 — peering은 둘 다 가지므로 자동으로 A·B, vip-nat만이면 A뿐).
+    _net_tags = ({"a", "b"} if need_net_vpcs is True
+                 else set(need_net_vpcs) if need_net_vpcs else set())
+    if _net_tags:
         for tag, cidr in (("a", _NET_VPC_A_CIDR), ("b", _NET_VPC_B_CIDR)):
+            if tag not in _net_tags:
+                continue
             nname = f"regrvpcn{tag}{uniq}"     # 'regrvpcna'+8hex = 17 ≤ 20 (IB-051)
             nbody = _inject_owner_tags({
                 "name": nname, "description": f"API regression shared net VPC {tag.upper()}",

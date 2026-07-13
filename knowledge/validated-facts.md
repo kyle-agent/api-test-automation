@@ -2807,3 +2807,20 @@ VPC 생성 슬롯은 희소(캡5 − 상주3 ≈ 2). self-create 라이프사이
   (a) 2단계 직렬 분리 불요: 선두 배치가 슬롯 점유창을 앞으로 압축, 초과분만 동적 대기.
 - offline: test_vpc_creator_detection_and_priority_first, test_vpc_creator_waits_and_
   retries_on_budget_skip.
+
+## net VPC 세분화 provisioning — net-A/net-B 독립 조건 (2026-07-13, 오너 지시)
+
+종전 `_needs_net_vpcs()`는 단일 bool(vpc#a OR vpc#b 아무거나 있으면 A·B 둘 다 생성).
+오너 우선순위 모델: 공유 VPC(1순위, VPC 의존 있으면 무조건) → net-A(2순위, vpc#a
+사용자 있으면) → net-B(3순위, peering/vpc#b 사용자 있으면 — peering은 vpc#a·vpc#b
+둘 다라 자동 A·B). 이후 self-create가 최우선 스케줄로 슬롯 조기 점유·반납.
+- 수리: `_needs_net_vpcs()→_needed_net_vpc_tags()`(shared_infra) — vpc#a면 'a',
+  vpc#b면 'b' 태그 집합 반환. `provision_shared_vpc(need_net_vpcs=)`가 bool|iterable
+  수용(True→{'a','b'} 하위호환, tuple→그 태그만, False/()→없음), 루프가 태그별 생성.
+- 효과: 부분 선택에서 안 쓰는 net VPC를 안 만들어 슬롯·시간 절약. 예) peering+net-B
+  사용자(dc-routing·fw) 제외 시 tags=('a',) → net-B 미생성 → 상주 3→2 → self-create
+  여유 슬롯 +1(하드캡5: 2→3, 보수캡 per_run_vpc_cap4: 1→2). 풀런은 A·B 다 필요 →
+  종전과 동일(효과 0). vip-nat만이면 ('a',), dc/fw만이면 ('b',).
+- net 상주 조기 teardown(사장님 2번째 아이디어)은 보류: 풀런은 peering이 A·B를
+  31.6분까지 잡아 self-create(≤15분 종료) 뒤엔 슬롯 수요가 없어 이득 미미 + ref-count
+  mid-run teardown 복잡도 최대. 부분선택 최적화 필요 시 레버.
