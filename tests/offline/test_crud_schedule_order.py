@@ -118,6 +118,22 @@ def test_durations_reader_merges_local_overlay(tmp_path, monkeypatch):
     assert d == {"a": 100.0, "b": 999.0, "c": 5.0}
 
 
+def test_durations_merge_takes_max_against_downward_pollution(tmp_path, monkeypatch):
+    """병합 = max (2026-07-13 run-c373): 오버레이의 하향 오염(옛 fast-fail 학습)이
+    커밋본의 실측 큰 값을 가리면 몬스터가 경량 오분류돼 런 꼬리가 된다 —
+    pg-cluster(커밋 1450s)가 오염 오버레이로 +42분 지각한 실측의 회귀 고정."""
+    import json
+    import tests.crud.conftest as cf
+
+    committed = tmp_path / "durations.json"
+    local = tmp_path / "durations.local.json"
+    committed.write_text(json.dumps({"pg": {"avg_s": 1450.0}}))
+    local.write_text(json.dumps({"pg": {"avg_s": 12.0}}))   # 오염된 작은 값
+    monkeypatch.setattr(cf, "_DUR_PATH", committed)
+    monkeypatch.setattr(cf, "_DUR_LOCAL", local)
+    assert cf._durations() == {"pg": 1450.0}
+
+
 def test_sessionfinish_folds_into_local_overlay_not_committed(tmp_path, monkeypatch):
     import json
     import tests.crud.conftest as cf

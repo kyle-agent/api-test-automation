@@ -410,11 +410,14 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
     from tools.duration_stats import CLASS_DEFAULT_S, classify_lifecycle
 
     dur: dict[str, float] = {}
-    for name in ("durations.json", "durations.local.json"):   # 오버레이 우선
+    for name in ("durations.json", "durations.local.json"):
+        # 병합 = max (2026-07-13, conftest._durations와 동일 규칙): 오버레이의
+        # 하향 오염이 LPT 랭크를 망치는 클래스 방지 — run-c373에서 pg-cluster가
+        # 경량 오분류로 +42분 지각, 홀로 런 꼬리 23분.
         p = _ROOT / "data" / "optimizer" / name
         try:
-            dur.update({k: float(v.get("avg_s") or 0.0)
-                        for k, v in _json.loads(p.read_text()).items()})
+            for k, v in _json.loads(p.read_text()).items():
+                dur[k] = max(dur.get(k, 0.0), float(v.get("avg_s") or 0.0))
         except Exception:  # noqa: BLE001 — best-effort
             continue
     lcs, _ = load_lifecycles(with_sources=True)

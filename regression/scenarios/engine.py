@@ -617,6 +617,9 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         time.sleep(5)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
+    # 429 레이트리밋 재시도는 http_client.RETRY_STATUS(+Retry-After 존중)가
+    # 전 요청 공통으로 처리한다 (run-c373 수리, 2026-07-13 — 병렬 세션이
+    # 클라이언트 레벨로 먼저 반영) — 엔진 레벨 중복 백오프는 두지 않는다.
     ros = _as_status_list(step.get("retry_on_status"))
     if ros:
         attempts = int(step.get("retries", 4))

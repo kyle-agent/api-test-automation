@@ -2388,6 +2388,7 @@ run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행�
 동일 클래스(그룹 DELETE 200이지만 IAM-gated 자식 log-stream 때문에 잔존,
 log-stream IAM 권한 필요). 스윕은 stuck으로 1회 보고 후 재시도 안 함(수렴 가드
 정상 동작). 클린업 루틴의 알려진-예외 목록에 이 2건 추가해 취급할 것.
+
 ## run-c373 (2026-07-13 큐 런, 최신 main) 판정 — 3라운드 수리 일괄 그린 + 429 클래스 발견
 
 111 passed / 7 failed / 1 skip. **실패 7 중 5건이 429**(Too Many Requests) —
@@ -2418,3 +2419,18 @@ vpc 호스트 순간 burst 스로틀로 서로 다른 5개 lifecycle이 각 1건
   time=1로 교정. 문서에는 어떤 제약도 없음 (undiscoverable-params PF 후보).
 - **gen-heavy-lb-members create-internet-gateway 400** = vs-netops와 동일
   already-associated → 같은 adopt-or-create 이식 (owned_igw_id 분리).
+
+### 스케줄/설계 관점 판정 (같은 run-c373, 신설계 첫 풀런)
+
+119종, makespan 66.3분:
+
+- **실증**: provision **19.9초**(구 4.3분, no-wait+게이트) · net-A/B 상주 +
+  peering adopt 완주(+1.6→34.1분 passed) · fw(+0.4→1.3분)·dc-routing(+2.1→4.7분)
+  B에서 passed · 핀 vip-nat/fw/hsn +0.4~0.5분 시작 · 상주 3+자체 2 = cap 5 정확.
+  vip-nat/hsn 실패는 설계 문제가 아니라 위 429 클래스 (http_client 수리로 해소).
+- **makespan 악화 원인 = pg-cluster +42.2분 지각** (커밋 durations rank 10
+  ≠ 실측 지각 → 콘솔 머신 durations.local.json의 하향 오염이 커밋본을 가림).
+  **duration 병합을 max-merge로 변경** (conftest·simulate 동일) — LPT에서
+  과대추정은 무해, 과소추정은 몬스터 꼬리. 이 수리로 다음 런 pg는 t≈0 시작,
+  꼬리 23분 제거 → **기대 makespan ~43분** (66.3-23).
+- run-c373 passed 111종 스팬 fold (rolling avg).

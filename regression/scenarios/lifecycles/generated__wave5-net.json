@@ -1831,7 +1831,8 @@
             409
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "_note": "2026-07-13: owned_igw_id(우리가 만든 경우에만 캡처)만 삭제 — adopt한 남의 IGW를 지우면 동거 패밀리가 깨진다 (HB4c 규약). 채택-only 런에서는 미해석 → optional 스킵."
         },
         {
           "name": "delete-load-balancer",
