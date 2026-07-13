@@ -24,7 +24,7 @@
 
 <!--PROGRESS-BEGIN-->
 
-**진행: 19/56 완료** — ✅7 · ⚠️10 · ❌2 · (teardown 미복귀 잔존: 0)
+**진행: 28/56 완료** — ✅14 · ⚠️12 · ❌2 · (teardown 미복귀 잔존: 0)
 
 | # | 서비스 | 폐포/LC | 라이브(passed/skip) | 4xx;5xx;fail | teardown surv;recon | 판정 |
 |---|--------|---------|---------------------|--------------|---------------------|------|
@@ -47,6 +47,15 @@
 | 17 | networking/dns | 2/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=yes | ✅OK |
 | 18 | networking/gslb | 1/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
 | 19 | networking/cdn | 1/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
+| 20 | networking/vpn | 4/3 | passed=3 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=yes | ✅OK |
+| 21 | networking/direct-connect | 2/2 | passed=2 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=yes | ⚠️ERRS |
+| 22 | security/kms | 1/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=yes | ✅OK |
+| 23 | security/secretsmanager | 2/2 | passed=2 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=yes | ✅OK |
+| 24 | security/secretvault | 1/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
+| 25 | security/certificatemanager | 2/2 | passed=2 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
+| 26 | security/configinspection | 1/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
+| 27 | management/iam | 12/8 | passed=8 | 4xx=0;5xx=2;failstep=2 | surv=1;recon=no | ⚠️ERRS |
+| 28 | management/iam-identity-center | 5/5 | passed=5 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
 
 <!--PROGRESS-END-->
 
