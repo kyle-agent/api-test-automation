@@ -2745,3 +2745,26 @@ VM이 ERROR로 생성된 사건이 이 결함의 라이브 발현.
 - offline 회귀: 577 passed(test_command_channel·test_poll_terminal_bad 갱신 —
   terminal_bad:[]는 조기탈출만 끔, 폴 미수렴은 여전히 실패). 유일 실패는 httpx 미설치
   console2 테스트(환경 이슈, 무관).
+
+## priority_order 정제 — 진짜 inter-lifecycle 의존만 demote (2026-07-13, 오너 지시)
+
+native_runner.priority_order가 `prereq` 있는 것을 전부 dependent-last로 미뤄, 긴
+soft-의존 태스크(container-ske-cluster-nodepool 34.6m)가 t=16분에야 착수 →
+makespan 50.7분(꼬리 3분 손해). 그러나 SKE의 prereq(vpc/subnet/security-group/
+keypair/filestorage-volume)는 전부 **공유-인프라/자체-생성** kind라 다른
+라이프사이클을 안 기다린다(soft). 수리: `_SHARED_INFRA_KINDS` 집합을 두고
+`_true_dependents()`가 **비-공유 kind를 가진** 라이프사이클만 골라 demote한다.
+- 활성 190개 중 진짜 inter-lifecycle 의존은 **2개뿐**: gen-cloudml-chain·
+  cloud-ml-write-coverage(둘 다 ske-cluster+container-registry = 다른 라이프사이클
+  산출물 필요). 나머지 9개 "dependent"는 전부 soft(공유-인프라만).
+- 효과(gantt_sim 실측): SKE가 t=0 착수 → makespan **50.7→47.7분**(=최장 태스크
+  gen-heavy-aimlops 47.7, 이론 하한 도달). cloudml(진짜 의존)만 후미(23.5→43.8분,
+  임계 경로 밖). 17.9× 가속.
+- gantt_sim.load()도 동일 `_true_dependents()` 재사용(러너-시뮬 일관성).
+- offline: tests/offline/test_native_runner.py에 test_priority_long_soft_dependent_
+  not_demoted 추가(긴 soft-의존 앞단, 진짜 의존만 후미).
+- **배경 결정**: 오너가 "앞단 VPC provisioning은 그대로, 이후 시나리오 배치만"을
+  제안. native_runner가 이미 그 경계(provision_shared_vpc 재사용, dispatch만 교체)라
+  스코프 일치. xdist 정적 배치도 47.7 가능하나 durations 드리프트에 취약(정적 배치는
+  런타임 재조정 불가) — 동적 pop이 구조적으로 면역이라 native 유지 + 이 정제로 낙착.
+  xdist 경로는 폴백 유지.

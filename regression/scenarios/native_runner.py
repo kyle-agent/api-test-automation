@@ -15,7 +15,9 @@ pytest와 분리돼 있으므로, 얇은 스레드풀 스케줄러로 직접 구
     되던 꼬리 붕괴 제거; 종료는 대기 0일 때만).
   * 공유 Budget — 모든 스레드가 하나의 Budget 공유 → 계정-전역 쿼터 조율
     (private-dns 3·vpc 5 초과 create가 400 나던 레이스를 skip-not-fail로).
-  * dependent 뒤로 — prereq 있는 것은 뒤에 디스패치 (provider가 도는 뒤).
+  * dependent 뒤로 — **진짜 inter-lifecycle 의존만** 뒤에 디스패치(provider가 도는
+    뒤). prereq가 공유-인프라/자체-생성 kind뿐인 soft-의존(예: SKE)은 길이대로 앞단
+    (LPT) — 긴 soft-의존을 demote하면 꼬리만 늘어난다(2026-07-13 수정).
 
 opt-in: local_run/console2가 SCP_NATIVE_RUNNER=true일 때 pytest-xdist 서브프로세스
 대신 이 러너를 호출. xdist 경로는 그대로 폴백으로 남긴다 (라이브 검증 후 기본화).
@@ -48,18 +50,40 @@ def _durations() -> dict:
     return out
 
 
-def _prereqs() -> set:
+# 공유-인프라 / 자체-생성 리소스 kind — 라이프사이클 내부에서 만들거나 미리
+# 프로비저닝된 공유 VPC/서브넷이 제공한다(= 다른 라이프사이클의 산출물이 아님).
+# 이런 kind로만 이뤄진 prereq는 inter-lifecycle 순서 제약이 없으므로 demote하면
+# 안 된다 (owner 2026-07-13: 긴 soft-의존 태스크 container-ske-cluster-nodepool
+# (34.6m)을 dependent-last로 t=16분에 미뤄 makespan 50.7분 — 실제로는 다른
+# 라이프사이클을 안 기다리는데 벌점만 먹음. 진짜 inter-lifecycle 의존만 뒤로 →
+# 47.7분(최장 태스크 바닥선)으로 수렴). gantt_sim이 같은 집합을 재사용한다.
+_SHARED_INFRA_KINDS = {"vpc", "subnet", "security-group", "keypair", "image",
+                       "server-type", "filestorage-volume", "private-dns"}
+
+
+def _prereq_map() -> dict:
     try:
         d = json.loads((_ROOT / "regression/scenarios/dependencies.json").read_text())
-        return set(d.get("prerequisites", {}))
+        return dict(d.get("prerequisites", {}))
     except Exception:  # noqa: BLE001
-        return set()
+        return {}
+
+
+def _true_dependents() -> set:
+    """다른 라이프사이클의 산출물(공유-인프라가 아닌 prereq kind)에 의존하는
+    라이프사이클 id 집합 — 이들만 LPT 뒤로 demote한다. 예: gen-cloudml-chain은
+    ske-cluster/container-registry(다른 라이프사이클 산출)를 필요로 하므로 후미;
+    container-ske-cluster-nodepool의 prereq(vpc/subnet/keypair 등)는 전부
+    공유-인프라/자체-생성이라 demote 대상이 아니다."""
+    return {lid for lid, kinds in _prereq_map().items()
+            if any(k not in _SHARED_INFRA_KINDS for k in kinds)}
 
 
 def priority_order(lifecycles: list[dict]) -> list[dict]:
-    """dependent asc, duration desc — no-dep 무거운 것 먼저, dependent 후미."""
+    """true-dependent asc, duration desc — LPT(긴 것 먼저), 진짜 inter-lifecycle
+    의존만 후미. soft-의존(공유-인프라만 필요)은 길이대로 앞단에 둔다."""
     dur = _durations()
-    prereq = _prereqs()
+    dependents = _true_dependents()
 
     def key(lc):
         d = dur.get(lc["id"], 0.0)
@@ -69,7 +93,7 @@ def priority_order(lifecycles: list[dict]) -> list[dict]:
                 d = float(CLASS_DEFAULT_S[classify_lifecycle(lc)])
             except Exception:  # noqa: BLE001
                 d = 60.0
-        return (lc["id"] in prereq, -d, lc["id"])   # dependent 뒤, 긴 것 먼저, id 타이브레이크
+        return (lc["id"] in dependents, -d, lc["id"])   # 진짜 의존 뒤, 긴 것 먼저, id 타이브레이크
 
     return sorted(lifecycles, key=key)
 

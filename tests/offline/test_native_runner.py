@@ -15,11 +15,29 @@ from regression.scenarios import native_runner as nr
 
 def test_priority_order_lpt_and_dependents_last(monkeypatch):
     monkeypatch.setattr(nr, "_durations", lambda: {"big": 1000.0, "mid": 300.0, "small": 10.0})
-    monkeypatch.setattr(nr, "_prereqs", lambda: {"dep"})
+    monkeypatch.setattr(nr, "_true_dependents", lambda: {"dep"})
     lcs = [{"id": "small"}, {"id": "dep"}, {"id": "big"}, {"id": "mid"}]
     out = [lc["id"] for lc in nr.priority_order(lcs)]
     # no-dep 무거운 것 먼저 → big, mid, small; dependent(dep)는 맨 뒤
     assert out == ["big", "mid", "small", "dep"], out
+
+
+def test_priority_long_soft_dependent_not_demoted(monkeypatch):
+    """긴 soft-의존(공유-인프라만 필요)은 LPT 앞단, 진짜 inter-lifecycle 의존만
+    후미 (owner 2026-07-13: SKE 34.6m을 dependent-last로 미루던 꼬리 3분 제거)."""
+    # ske(긴 soft-의존): prereq가 vpc/subnet뿐 → demote 안 함.
+    # cloudml(진짜 의존): ske-cluster 필요 → 후미.
+    monkeypatch.setattr(nr, "_prereq_map", lambda: {
+        "ske": ["vpc", "subnet", "keypair"],           # 전부 공유-인프라 → soft
+        "cloudml": ["ske-cluster", "container-registry"],  # 다른 라이프사이클 산출 → true
+    })
+    monkeypatch.setattr(nr, "_durations",
+                        lambda: {"ske": 2000.0, "cloudml": 1200.0, "light": 30.0})
+    lcs = [{"id": "light"}, {"id": "cloudml"}, {"id": "ske"}]
+    out = [lc["id"] for lc in nr.priority_order(lcs)]
+    # ske(긴 soft-의존)가 맨 앞(LPT), cloudml(진짜 의존)만 맨 뒤
+    assert out == ["ske", "light", "cloudml"], out
+    assert nr._true_dependents() == {"cloudml"}
 
 
 def _run_with_mocked_engine(monkeypatch, lcs, *, workers, sleep=0.02,
@@ -74,7 +92,7 @@ def _run_with_mocked_engine(monkeypatch, lcs, *, workers, sleep=0.02,
 def test_run_completes_all_and_keeps_concurrency(monkeypatch):
     """전량 완료 + 동시성 유지(꼬리 붕괴 없음 — peak가 워커수까지 참)."""
     monkeypatch.setattr(nr, "_durations", lambda: {})
-    monkeypatch.setattr(nr, "_prereqs", lambda: set())
+    monkeypatch.setattr(nr, "_true_dependents", lambda: set())
     lcs = [{"id": f"lc{i}"} for i in range(40)]
     res, peak, _ = _run_with_mocked_engine(monkeypatch, lcs, workers=8)
     assert res["by_status"] == {"passed": 40}          # 전량 완료
@@ -86,7 +104,7 @@ def test_run_shared_budget_coordinates_quota(monkeypatch):
     """공유 Budget = 계정-전역 조율: capped kind 동시 create가 캡을 절대 안 넘음
     (400 레이스 제거)."""
     monkeypatch.setattr(nr, "_durations", lambda: {})
-    monkeypatch.setattr(nr, "_prereqs", lambda: set())
+    monkeypatch.setattr(nr, "_true_dependents", lambda: set())
     # 20개가 전부 private-dns(캡3) create — 동시 실행돼도 캡 초과 0이어야
     lcs = [{"id": f"pdns{i}", "_quota": "private-dns"} for i in range(20)]
     res, peak, q400 = _run_with_mocked_engine(

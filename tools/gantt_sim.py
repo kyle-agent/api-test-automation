@@ -44,9 +44,10 @@ def _class_default(lc) -> float:
 
 def load():
     from regression.scenarios import engine
+    from regression.scenarios.native_runner import _true_dependents
     dur = _durations()
     dep = json.loads((_ROOT / "regression/scenarios/dependencies.json").read_text())
-    prereq = set(dep.get("prerequisites", {}))
+    prereq = _true_dependents()   # 러너와 동일 규칙: 진짜 inter-lifecycle 의존만
     qk = dep.get("quota_kinds", {})
     vs = dep.get("vpc_schedule", {})
     caps = {"vpc": vs.get("per_run_vpc_cap", 4), "private-dns": vs.get("private_dns_limit", 3)}
