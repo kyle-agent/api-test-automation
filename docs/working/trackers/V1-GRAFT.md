@@ -87,6 +87,29 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 - 검증: `test_residual_resources_home_kpi_d8` (owned_summary 스키마·미스캔 None·
   /local-run 리다이렉트·홈 타일 local 배지+정본 링크+미확인 유도) + 라이브 렌더 확인.
 
+## 콘솔 실행 모달 개선 (오너 지시 2026-07-13)
+
+오너 실사용 제보 2건 — 둘 다 console2(`console2/assets/console2.js`·`.css`).
+
+- **① 사전 점검(blast radius) 모달 — 요약 1급 + 세부 접힘** ("목록이 잘 보이지도
+  않고 · 세부는 접혀있고 확인하면 실행"). 120 lifecycle 표 + 과금 30개 목록이 좁은
+  스크롤 영역에서 경쟁해 표 헤더가 잘리고 확인 체크박스·실행 버튼까지 한참
+  스크롤해야 했다. 재구성(`pfRender`):
+  - **요약줄 `.pf-sum`**(1급): `N lifecycle · 생성 ~ · 삭제 ~ · ETA p50~p90 ·
+    VPC peak/여유 · ⚠️과금 N`(비과금이면 '과금 없음' 초록) — blast radius 한눈에.
+  - 서비스별 표 + 과금 라이프사이클 목록은 **`<details class="pf-det">` 기본 접힘**.
+    경고(dropped=P2C-26 선택 누락·queued)는 **접지 않음**(안전 정보).
+  - 확인 게이트 `.pf-confirm`(heavy만) + 실행 버튼은 접힘 밖 — 스크롤 없이 즉시
+    보임. 실행은 여전히 명시 체크→버튼(Hard Rule 1, 자동 실행 아님).
+- **② 실행 직후 성공 창 제거** ("이 창은 없어도 될 듯 · 필요하면 내가 알아서
+  리포트 볼게"). `postRun` 이 이미 run 화면 전환+리포트 렌더+스크롤을 하므로,
+  성공 시 중간 확인 창("✅ LIVE 실행 시작 — 리포트 보기/활동 흐름")은 그 리포트를
+  가리는 중복이었다 → 성공 시 `pfClose()` + `toast("✅ LIVE 실행 시작 — run …")`.
+  실패(409 중복 등)는 모달에 사유 유지(안전).
+- 검증: `node --check` + `pfRender` 헤드리스 하네스(요약·접힘·확인 게이트·실행버튼
+  구조 / 비과금 케이스 / 성공 시 pfClose+toast·옛 창 부재) 전부 PASS. 기존 console2
+  오프라인 테스트가 변경 문자열을 검사하지 않아 회귀 없음.
+
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 
 - **① 전역 의존 그래프 탭 제거 + 미니그래프 인스펙터** — P2C-25 결정 이행

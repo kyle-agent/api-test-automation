@@ -1841,34 +1841,45 @@ function pfRender(plan, capacity, sel, opts) {
       "<td>생성 ~" + a.creates + " · 삭제 ~" + a.deletes + "</td><td>" + eta(a) + "</td>" +
       "<td>" + (a.heavy ? '<span style="color:var(--red);font-weight:700">⚠️과금 ' + a.heavy + "</span>" : "—") + "</td></tr>";
   }).join("");
+  const nSvc = Object.keys(bySvc).length;
   const heavy = heavyIds.length > 0;
+  // 합계 ETA (병렬 makespan p50~p90 우선, 없으면 순차 합산) — 요약줄·표 tfoot 공유.
+  const etaText = (opts.pf && opts.pf.est && opts.pf.est.p50_s != null)
+    ? "~" + fmtDur(opts.pf.est.p50_s) + " ~ " + fmtDur(opts.pf.est.p90_s)
+    : (tMeasured ? "~" + fmtDur(tDur) : "미측정");
   const gates =
     '<div class="chiprow" style="margin:2px 0 8px">' +
     '<span class="chip" style="border-color:var(--red)">✔ mutations ON</span>' +
     '<span class="chip" style="border-color:var(--red)">✔ destructive ON</span>' +
     '<span class="chip" style="border-color:' + (heavy ? "var(--red)" : "var(--line)") + '">' +
     (heavy ? "✔" : "✕") + " 과금 라이프사이클 " + heavyIds.length + "</span></div>";
+  // blast radius 한눈에 — 세부(표·과금 목록)는 접고 이 요약줄을 1급으로 (오너:
+  // "목록이 잘 보이지도 않고 · 세부는 접혀있고"). 실행 직전 '무엇이 얼마나'가 한 줄.
+  const summary =
+    '<div class="pf-sum">' +
+    '<span><b>' + N_lc + '</b> lifecycle</span>' +
+    '<span>생성 <b>~' + tCreates + '</b></span>' +
+    '<span>삭제 <b>~' + tDeletes + '</b></span>' +
+    '<span>ETA <b>' + etaText + '</b></span>' +
+    '<span>VPC peak <b>' + peak + '</b> / 여유 ' + headroom + '</span>' +
+    (heavy ? '<span class="pf-sum-heavy">⚠️ 과금 <b>' + heavyIds.length + '</b></span>'
+           : '<span class="pf-sum-ok">과금 없음</span>') +
+    '</div>';
   const queueNote = peak > headroom
     ? '<p class="muted small" style="color:var(--amber)">→ VPC 여유(' + headroom + ') 초과: 즉시 실행되지 않고 <b>대기 큐</b>에 들어갑니다.</p>' : "";
   const skipped = (plan.skipped_disabled || []).length
     ? '<p class="muted small">disabled 로 건너뜀: ' + plan.skipped_disabled.map(esc).join(", ") + "</p>" : "";
   // P2C-26: 선택한 리소스가 계획에서 조용히 빠지면 반드시 보여준다 (stale 매핑/
-  // 비활성 — "3개 선택했는데 iam만 실행" 실측 구멍의 재발 방지).
+  // 비활성 — "3개 선택했는데 iam만 실행" 실측 구멍의 재발 방지). 경고는 접지 않는다.
   const dropped = (plan.dropped || []).length
     ? '<div class="note" style="border-left-color:var(--amber)"><b style="color:var(--amber)">⚠ 선택 중 ' +
       plan.dropped.length + '개 리소스가 계획에 포함되지 못했습니다:</b><br>' +
       plan.dropped.map(d => "<code>" + esc(d.node) + "</code> — " + esc(d.why)).join("<br>") + "</div>"
     : "";
-  const heavyBlock = heavy
-    ? '<div class="note" style="border-color:var(--red);border-left-color:var(--red)"><b style="color:var(--red)">과금 라이프사이클 ' + heavyIds.length + "개:</b> " +
-      heavyIds.map(id => "<code>" + esc(id) + "</code>").join(" · ") +
-      '<br><label style="display:inline-flex;gap:6px;align-items:center;margin-top:7px;cursor:pointer">' +
-      '<input type="checkbox" id="pf-heavy-ok"> <b>과금 실행임을 확인했습니다</b></label></div>'
-    : "";
-  $("pf-body").innerHTML =
-    '<p class="muted small">실제 클라우드 자원을 만들고 삭제합니다 — 게이트는 선택(의존 폐쇄집합)에서 파생됩니다.</p>' +
-    gates +
-    '<table class="tbl"><thead><tr><th>service</th><th>lifecycle</th><th>생성·삭제 예상</th><th>실측 ETA</th><th>과금</th></tr></thead>' +
+  // 세부 1 (접힘): 서비스별 표 + tfoot 합계 + ETA 설명.
+  const tableDetails =
+    '<details class="pf-det"><summary>서비스별 상세 · ' + nSvc + " 서비스</summary>" +
+    '<div class="pf-det-body"><table class="tbl"><thead><tr><th>service</th><th>lifecycle</th><th>생성·삭제 예상</th><th>실측 ETA</th><th>과금</th></tr></thead>' +
     "<tbody>" + rows + "</tbody>" +
     '<tfoot><tr class="lc-head"><td>합계</td><td>' + N_lc + "</td><td>생성 ~" + tCreates + " · 삭제 ~" + tDeletes + "</td><td>" +
     (opts.pf && opts.pf.est && opts.pf.est.p50_s != null
@@ -1877,9 +1888,19 @@ function pfRender(plan, capacity, sel, opts) {
       : (tMeasured ? "~" + fmtDur(tDur) + (tMeasured < tN ? ' <span class="muted small">(미측정 ' + (tN - tMeasured) + ")</span>" : "") : '<span class="muted">미측정</span>')) +
     "</td><td>" + (heavy ? '<span style="color:var(--red);font-weight:700">⚠️ ' + heavyIds.length + "</span>" : "—") + "</td></tr></tfoot></table>" +
     '<p class="muted small" style="margin:7px 0 0">행 ETA = 라이프사이클 실측 평균의 순차 합산 · <b>합계 ETA = 병렬 makespan 추정</b>' +
-    (opts.pf ? "" : " (견적 API 미응답 — 순차 합산 표시)") + " · " +
-    "VPC 소모(peak) <b>" + peak + "</b> vs 현재 여유 <b>" + headroom + "</b></p>" +
-    queueNote + skipped + dropped + heavyBlock;
+    (opts.pf ? "" : " (견적 API 미응답 — 순차 합산 표시)") + "</p></div></details>";
+  // 세부 2 (접힘, heavy 일 때만): 과금 라이프사이클 목록.
+  const heavyDetails = heavy
+    ? '<details class="pf-det"><summary style="color:var(--red)">과금 라이프사이클 ' + heavyIds.length + "개</summary>" +
+      '<div class="pf-det-body pf-heavy-list">' + heavyIds.map(id => "<code>" + esc(id) + "</code>").join(" · ") + "</div></details>"
+    : "";
+  // 확인 게이트 (접지 않음 — 실행 직전 명시 opt-in, Hard Rule 1). heavy 일 때만.
+  const heavyConfirm = heavy
+    ? '<label class="pf-confirm"><input type="checkbox" id="pf-heavy-ok"> <b>⚠️ 과금 실행임을 확인했습니다</b></label>'
+    : "";
+  $("pf-body").innerHTML =
+    '<p class="muted small">실제 클라우드 자원을 만들고 삭제합니다 — 게이트는 선택(의존 폐쇄집합)에서 파생됩니다.</p>' +
+    gates + summary + queueNote + skipped + dropped + tableDetails + heavyDetails + heavyConfirm;
   $("pf-foot").innerHTML =
     '<span class="muted small">취소해도 선택은 유지됩니다.</span>' +
     '<button class="btn ghost" id="pf-cancel">취소</button>' +
@@ -1897,14 +1918,12 @@ function pfRender(plan, capacity, sel, opts) {
         return;
       }
       if (opts.onLaunched) opts.onLaunched(j);
+      // 성공 확인 창 제거 (오너: "이 창은 없어도 될 듯 · 필요하면 내가 알아서
+      // 리포트 볼게"). postRun 이 이미 run 화면으로 전환·리포트를 렌더 중이므로,
+      // 모달을 닫으면 그 리포트가 바로 드러난다 — 중간 확인 창은 중복이었다.
       const queued = j && j.status === "queued";
-      $("pf-body").innerHTML =
-        "<p><b>" + (queued ? "⌛ 대기 큐에 등록됨" : "✅ LIVE 실행 시작") + "</b> — run <code>" + esc(j.id) + "</code></p>" +
-        '<p class="muted small">진행은 아래 리포트에서, 실제 자원 토폴로지는 활동 흐름에서 확인하세요.</p>';
-      $("pf-foot").innerHTML =
-        '<a class="btn ghost" href="' + esc(runtimeUrl()) + '" target="_blank">🌐 활동 흐름 (런타임 뷰)</a>' +
-        '<button class="btn" id="pf-done">리포트 보기</button>';
-      $("pf-done").onclick = pfClose;
+      pfClose();
+      toast((queued ? "⌛ 대기 큐 등록 — run " : "✅ LIVE 실행 시작 — run ") + j.id, "ok");
     });
   };
 }
