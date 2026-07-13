@@ -1649,7 +1649,7 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
 
 def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None,
                          need_db_subnet: bool = True,
-                         wait_subnets_active: bool = True,
+                         wait_subnets_active: bool = False,
                          need_net_vpcs: bool = False):
     """Create ONE VPC + ONE subnet (both ACTIVE) for the heavy/ADOPT-class
     lifecycles to ADOPT, so they don't each create their own against the 5-VPC

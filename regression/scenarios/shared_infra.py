@@ -148,11 +148,13 @@ def provision():
     import os
     shared_ctx = {}
     need_db = _needs_db_subnet()
-    # SCP_PROVISION_SUBNET_NOWAIT=true → 서브넷 create+track 후 ACTIVE 대기 없이
-    # 반환 (run-543a 실측: 백엔드가 같은 VPC 서브넷 ACTIVE 전이를 직렬화해 head
-    # 대기가 4.3분). adopt 시점의 engine._ensure_adopted_active 게이트가 ACTIVE를
-    # 보장하므로 안전. console2/local_run 경로가 켠다; CI 기본값은 종전(대기).
-    nowait = os.environ.get("SCP_PROVISION_SUBNET_NOWAIT", "").strip().lower() == "true"
+    # 기본 no-wait (2026-07-13, 오너 풀런에서 conftest 인라인 경로가 구식 대기를
+    # 타는 것 관측 후 전 경로 기본 승격): 서브넷 create+track 후 ACTIVE 대기 없이
+    # 반환 — run-543a 실측처럼 백엔드가 같은 VPC 서브넷 ACTIVE 전이를 직렬화해
+    # head 대기가 4.3분이었다. ACTIVE는 adopt 시점의 engine._ensure_adopted_active
+    # 게이트가 보장(라이브 검증 2026-07-13 5/5 pass). 구식 대기가 필요하면
+    # SCP_PROVISION_SUBNET_WAIT=true 로 강제.
+    nowait = os.environ.get("SCP_PROVISION_SUBNET_WAIT", "").strip().lower() != "true"
     need_net = _needs_net_vpcs()
     try:
         with contextlib.redirect_stdout(sys.stderr):
