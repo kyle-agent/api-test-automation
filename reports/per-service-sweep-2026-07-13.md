@@ -24,7 +24,7 @@
 
 <!--PROGRESS-BEGIN-->
 
-**진행: 12/56 완료** — ✅4 · ⚠️7 · ❌1 · (teardown 미복귀 잔존: 0)
+**진행: 15/56 완료** — ✅4 · ⚠️9 · ❌2 · (teardown 미복귀 잔존: 0)
 
 | # | 서비스 | 폐포/LC | 라이브(passed/skip) | 4xx;5xx;fail | teardown surv;recon | 판정 |
 |---|--------|---------|---------------------|--------------|---------------------|------|
@@ -40,5 +40,8 @@
 | 10 | storage/filestorage | 4/2 | passed=2 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=no | ⚠️ERRS |
 | 11 | storage/parallel-filestorage | 2/1 | passed=1 | 4xx=2;5xx=1;failstep=2 | surv=1;recon=no | ⚠️ERRS |
 | 12 | storage/backup | 13/6 | passed=6 | 4xx=2;5xx=1;failstep=2 | surv=1;recon=yes | ⚠️ERRS |
+| 13 | storage/archivestorage | 2/2 | passed=2 | 4xx=23;5xx=0;failstep=14 | surv=1;recon=no | ⚠️ERRS |
+| 14 | storage/baremetal-blockstorage | 4/2 | passed=2 | 4xx=7;5xx=0;failstep=5 | surv=1;recon=no | ⚠️ERRS |
+| 15 | database/mysql | 24/4 | - | 4xx=1;5xx=10;failstep=6 | surv=1;recon=yes | ❌TIMEOUT |
 
 <!--PROGRESS-END-->
