@@ -291,7 +291,7 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
            "SCP_ALLOW_DESTRUCTIVE": "true" if destructive else "false",
            "SCP_RUN_HEAVY": "true" if heavy else "false"}
     # 워커 캡 10 (owner 2026-07-08; console2_server._run_worker와 동일 근거)
-    _cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
+    _cap = int(os.environ.get("SCP_LOCAL_WORKERS", "30"))
     n = str(parallel or max(1, min(_cap, len(ids) or 2)))
     with open(log_path, "w", encoding="utf-8") as f:
         f.write(f"# local live run  lifecycle_ids={ids}\n"
@@ -448,7 +448,7 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
     pinned = frozenset(load_priority_first())
     items.sort(key=lambda lc: (lc["id"] in pinned, _dur(lc),
                                len(lc.get("steps") or [])), reverse=True)
-    cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
+    cap = int(os.environ.get("SCP_LOCAL_WORKERS", "30"))
     n_w = int(workers) if workers else max(1, min(cap, len(items) or 1))
     # net-VPC A/B(vpc#a/b adopt)가 선택에 있으면 상주 VPC 2개가 슬롯을 상시
     # 점유한다 — 자체생성 가용 슬롯에서 차감해야 예측이 실제와 맞는다 (2026-07-13).

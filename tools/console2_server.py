@@ -2205,7 +2205,7 @@ def _run_worker(rec: dict) -> None:
     # 워커 캡 (owner 2026-07-10 "dependency 없으면 동시 실행을 늘리면 더 병렬"):
     # 폴 대기(I/O) 위주라 로컬 비용 낮음 — env로 조절, 기본 24 (구 18).
     # 병렬 상향의 유일한 실경합(VPC 5-슬롯)은 아래 세마포어가 흡수한다.
-    _cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
+    _cap = int(os.environ.get("SCP_LOCAL_WORKERS", "30"))
     n = str(max(1, min(_cap, len(rec["lifecycle_ids"]) or 2)))
     try:
         with open(logp, "w", encoding="utf-8") as f:
