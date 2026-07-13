@@ -87,9 +87,9 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 - 검증: `test_residual_resources_home_kpi_d8` (owned_summary 스키마·미스캔 None·
   /local-run 리다이렉트·홈 타일 local 배지+정본 링크+미확인 유도) + 라이브 렌더 확인.
 
-## 콘솔 실행 화면 개선 (오너 지시 2026-07-13)
+## 콘솔 실행 화면 개선 (오너 지시 2026-07-13~14)
 
-오너 실사용 제보 3건 — 전부 console2(`console2/assets/console2.js`·`.css`).
+오너 실사용 제보 4건 — 전부 console2(`console2/assets/console2.js`·`.css`).
 
 - **① 사전 점검(blast radius) 모달 — 요약 1급 + 세부 접힘** ("목록이 잘 보이지도
   않고 · 세부는 접혀있고 확인하면 실행"). 120 lifecycle 표 + 과금 30개 목록이 좁은
@@ -118,6 +118,21 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   hover 를 막지 않고, `z-index:1` 로 스티키 레인 뒤에 숨는다.
   - 검증: `pvaHtml` 헤드리스 하네스(진행 중 존재·위치 8+190+px(600)·1분 뒤 left
     증가·종료 고정·시작 전 부재·pointer-events) 전부 PASS.
+- **④ 좌측 시나리오 = 정보 카드 + 런타임 탭 시나리오별 제외** (오너 2026-07-14:
+  "기존 mockup 처럼 왼쪽 시나리오에 정보를 더 표시하고 공간을 더 차지"·"런타임
+  계정 실측은 시나리오마다 있는 게 아니라서 각 시나리오별 탭에서는 제외").
+  - **rail 확장 + 카드화**: `.md-report` grid 230/260 → **300/340px**. `.lcitem`
+    을 1줄 압축행 → **세로 카드**(헤더=글리프+이름+🜂heavy 태그 · 서비스 라벨 ·
+    지표 배지행). 배지 = `N API · N 자원 · N created · N soft · N fail`(0 은 생략),
+    created=초록·soft=amber·fail=빨강. 값은 `groupedRun` 버킷(`createN`·`softN`·
+    `failN` 등)에 이미 계산돼 있어 추가 계산 없음. (P2C-22 "1줄 압축행+툴팁" 계약을
+    오너 지시로 대체 — 툴팁은 hover 요약으로 유지.)
+  - **런타임 탭 스코프 게이트**: `런타임(계정 실측)`은 계정 전체 뷰라 시나리오별
+    스코프에선 탭을 숨기고(집계 스코프에서만 노출), 스코프 진입 시 rt 선택 중이면
+    `detailTab`을 `res`로 리셋 (`renderDetail`).
+  - 검증: 실소스 추출 헤드리스 하네스(카드 헤더/서비스/배지·created·heavy·0값 생략 /
+    rt 탭 집계-노출·시나리오-숨김·리셋) 전부 PASS · `test_console2.py` 39/39
+    (grid·카드·rt 스코프 계약 갱신).
 
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 

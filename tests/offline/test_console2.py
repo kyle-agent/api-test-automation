@@ -671,7 +671,9 @@ def test_execution_cx_relayout_frontend_contract():
          그대로" chip and the ② copy of the 생성·검증·삭제 순서표 with the
          in-progress row highlight (.ordnow).
       3. 런타임 is an INLINE 4th detail tab embedding the EXISTING /runtime
-         page (scope=mine) — single source, popup kept but labeled 새 창."""
+         page (scope=mine) — single source, popup kept but labeled 새 창.
+         계정 실측이라 시나리오별로 있는 게 아니므로 집계 스코프에서만 노출,
+         특정 시나리오 스코프에선 숨긴다 (오너 2026-07-14)."""
     html = (ROOT / "console2" / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
     css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
@@ -687,6 +689,9 @@ def test_execution_cx_relayout_frontend_contract():
     # 3) inline runtime tab reuses the one runtime URL (no logic duplication)
     assert 'data-d="rt"' in html
     assert 'id="rt-frame"' in js
+    # 계정 실측 탭은 집계 스코프에서만 — 시나리오 스코프에선 숨김 (오너 2026-07-14)
+    assert 'rtBtn.style.display = isAggScope() ? "" : "none"' in js
+    assert 'detailTab === "rt"' in js and 'detailTab = "res"' in js  # 진입 시 자원으로 리셋
     # runtimeUrl() is the ONE place the runtime URL lives (popup, pf link, iframe)
     assert js.count('"/runtime?scope=mine"') == 1 and "function runtimeUrl()" in js
     assert "새 창" in html  # popup 유지 + 라벨
@@ -717,20 +722,26 @@ def test_execution_rail_master_detail_contract():
     assert html.index('id="report-rail"') < html.index('id="report-detail"')
     assert html.index('id="lc-picker"') > html.index('id="report-rail"')
     assert 'id="master-fold"' in html
-    # 2) 2-pane grid, full-width master, sticky rail + internal list scroll
-    assert "grid-template-columns:minmax(230px,260px) minmax(0,1fr)" in css
+    # 2) 2-pane grid, full-width master, sticky rail + internal list scroll.
+    #    (오너 2026-07-14: rail 을 넓혀 시나리오 카드에 정보를 더 노출 — 230/260 → 300/340)
+    assert "grid-template-columns:minmax(300px,340px) minmax(0,1fr)" in css
     assert ".md-master{grid-column:1/-1}" in css
     assert ".md-rail{position:sticky" in css
     lclist_rule = css.split(".lclist{", 1)[1].split("}")[0]
     assert "overflow-y:auto" in lclist_rule, "the rail LIST must scroll internally"
     assert "@media(max-width:1180px){.md-report{grid-template-columns:1fr}" in css
-    # 3) rail renderer: agg-first w/ ring, filter chips, tooltip counts,
+    # 3) rail renderer: agg-first w/ ring, filter chips, per-scenario INFO CARDS
+    #    (오너 2026-07-14: 기존 mockup 처럼 이름+서비스+지표 배지 — 구 1줄 압축행 대체),
     #    pending rows, follow-active hold, master fold persistence
     assert 'class="aggitem top' in js and 'class="ring"' in js
     agg_pos = js.index('class="aggitem top')
     assert agg_pos < js.index('<div class="lclist">'), "전체 카드가 목록 위 (rail 최상단)"
     assert "railFilter" in js and 'chip("fail"' in js and 'chip("queued"' in js
-    assert " API · " in js  # 카운트는 행 title 툴팁으로 (1줄 압축 행)
+    # 시나리오 카드: 헤더행 + 서비스 + 지표 배지(API·자원·created·soft·fail)
+    assert 'class="lcitem-h"' in js and 'class="lcsvc"' in js and 'class="lcmeta"' in js
+    assert '<span class="lcb">${b.api.length} API</span>' in js
+    assert 'lcb created' in js and 'lcb soft' in js and 'lcb fail' in js
+    assert " API · " in js  # 카운트는 title 툴팁에도 유지 (hover 요약)
     assert 'class="lcitem pend"' in js  # 대기 행 rail 통합 (구 lcqueue 대체)
     assert "lcqueue" not in js
     assert "RAIL_FOLLOW_HOLD_MS" in js and ".lcitem.now" in js

@@ -521,7 +521,7 @@ g.rg-selbox{cursor:pointer}
 /* P2C-22 (owner 2026-07-09): 2-pane — master strip(배너+①→②칩)는 전폭 1행, 그
    아래 좌 RAIL(전체 카드 + 상태 필터 + 시나리오 목록, 내부 스크롤) + 우 DETAIL.
    세로 카드 스택(96행) ↔ 하단 상세의 스크롤 왕복 제거. 시맨틱 무변경 — 배치만. */
-.md-report{display:grid;grid-template-columns:minmax(230px,260px) minmax(0,1fr);gap:14px;
+.md-report{display:grid;grid-template-columns:minmax(300px,340px) minmax(0,1fr);gap:14px;
   align-items:start;margin-bottom:8px}
 /* 유휴(런 미바인딩) = has-detail 없음 (drawReport 가 토글) — 빈 rail 거터 없이 단일 컬럼 */
 .md-report:not(.has-detail){grid-template-columns:1fr}
@@ -539,8 +539,10 @@ g.rg-selbox{cursor:pointer}
 .lcp-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px}
 .lclist{display:flex;flex-direction:column;gap:4px;overflow-y:auto;min-height:0;flex:1 1 auto;
   position:relative;padding-right:2px}
-.lcitem{display:flex;align-items:center;gap:7px;width:100%;text-align:left;background:#fff;
-  border:1px solid var(--line);border-radius:7px;padding:5px 8px;cursor:pointer}
+/* 시나리오 카드 (오너 2026-07-14: 기존 mockup 처럼 좌측에 정보를 더 노출·공간
+   확보) — 세로 스택: 헤더(글리프+이름+heavy) · 서비스 · 지표 배지 행. */
+.lcitem{display:flex;flex-direction:column;align-items:stretch;gap:4px;width:100%;text-align:left;
+  background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 9px;cursor:pointer}
 .lcitem:hover{border-color:var(--accent)}
 .lcitem.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
 /* now = now-playing 의 active lifecycle (선택(sel)과 별개 채널 — 좌 인셋 바) */
@@ -548,6 +550,7 @@ g.rg-selbox{cursor:pointer}
 /* pend = 대기 중(이벤트 0) — 클릭 불가 회색 행 (구 .lcqueue 접힌 요약을 대체) */
 .lcitem.pend{color:var(--muted);cursor:default;border-style:dashed}
 .lcitem.pend:hover{border-color:var(--line)}
+.lcitem-h{display:flex;align-items:center;gap:7px;min-width:0}
 .lcitem .st{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
   font-size:10px;font-weight:800;color:#fff;flex:0 0 auto}
 .lcitem .st.done{background:var(--green)}.lcitem .st.run{background:var(--accent)}
@@ -555,9 +558,18 @@ g.rg-selbox{cursor:pointer}
 .lcitem .st.queued{background:#fff;border:1.5px solid var(--line2);color:var(--muted)}
 .lcitem .lcname{flex:1 1 auto;min-width:0;font-weight:700;font-size:12px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
-.lcitem .pill{border:1px solid var(--line2);border-radius:10px;padding:0 5px;font-size:9.5px;font-weight:700;
-  color:#3a424b;white-space:nowrap;flex:0 0 auto}
-.lcitem .pill.fail{border-color:var(--red);color:var(--red)}
+.lcitem .lctag{flex:0 0 auto;font-size:9px;font-weight:700;border-radius:4px;padding:0 5px;line-height:1.5}
+.lcitem .lctag.heavy{background:var(--purple-bg,#efeafb);color:var(--purple)}
+/* 서비스 라벨 — 이름 아래 작은 회색 (글리프 폭만큼 들여씀) */
+.lcitem .lcsvc{font-size:10.5px;color:var(--muted);padding-left:23px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+/* 지표 배지 행 — API · 자원 · created · soft · fail (0 은 생략) */
+.lcitem .lcmeta{display:flex;flex-wrap:wrap;gap:4px;padding-left:23px}
+.lcitem .lcb{border:1px solid var(--line2);border-radius:10px;padding:0 6px;font-size:9.5px;font-weight:700;
+  color:#3a424b;white-space:nowrap;line-height:1.7}
+.lcitem .lcb.created{border-color:var(--green);color:var(--green)}
+.lcitem .lcb.soft{border-color:var(--amber);color:var(--amber)}
+.lcitem .lcb.fail{border-color:var(--red);color:var(--red)}
 
 /* 상태 필터 칩 (rail 로컬) — 전체 · 진행 · 실패 · 대기 */
 .lcfilter{display:flex;gap:4px;margin:0 0 6px;flex-wrap:wrap}

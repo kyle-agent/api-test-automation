@@ -2598,19 +2598,30 @@ function renderLcPicker() {
     const cls = lcStatusClass(b.status);
     const tip = `${id}${b.service ? " — " + b.service : ""} · ${lcStatusLabel(b.status)}`
       + ` · ${b.api.length} API · ${b.resources.length} 자원`
+      + (b.createN ? ` · ${b.createN} created` : "")
       + (b.softN ? ` · ${b.softN} soft` : "") + (b.failN ? ` · ${b.failN} fail` : "")
       + " — 상세 열기";
+    // 시나리오 카드: 이름 + 서비스 + 지표 배지 (오너 2026-07-14: 기존 mockup 처럼
+    // 좌측에 정보를 더 노출). 지표는 groupedRun 버킷에 이미 계산된 값 (0 은 생략).
+    const meta = [
+      `<span class="lcb">${b.api.length} API</span>`,
+      `<span class="lcb">${b.resources.length} 자원</span>`,
+      b.createN ? `<span class="lcb created">${b.createN} created</span>` : "",
+      b.softN ? `<span class="lcb soft">${b.softN} soft</span>` : "",
+      b.failN ? `<span class="lcb fail">${b.failN} fail</span>` : "",
+    ].filter(Boolean).join("");
     return { k: "lc:" + id, html:
       `<button class="lcitem ${detailScope === id ? "sel" : ""}${activeLc === id ? " now" : ""}" data-k="lc:${esc(id)}" data-lc="${esc(id)}" title="${esc(tip)}">
-      <span class="st ${cls}">${lcStatusGlyph(b.status)}</span>
-      <span class="lcname">${b.heavy ? "🜂 " : ""}${esc(id)}</span>
-      ${b.failN ? `<span class="pill fail">✕${b.failN}</span>` : ""}
+      <span class="lcitem-h"><span class="st ${cls}">${lcStatusGlyph(b.status)}</span>
+        <span class="lcname">${esc(id)}</span>${b.heavy ? '<span class="lctag heavy">🜂 heavy</span>' : ""}</span>
+      ${b.service ? `<span class="lcsvc">${esc(b.service)}</span>` : ""}
+      <span class="lcmeta">${meta}</span>
     </button>` };
   });
   if (railFilter === "all" || railFilter === "queued") {
     pending.forEach(id => units.push({ k: "pend:" + id, html:
       `<div class="lcitem pend" data-k="pend:${esc(id)}" title="${esc(id)} — 대기 중, 워커가 비면 순서대로 시작">
-        <span class="st queued">·</span><span class="lcname">${esc(id)}</span></div>` }));
+        <span class="lcitem-h"><span class="st queued">·</span><span class="lcname">${esc(id)}</span></span></div>` }));
   }
   if (!units.length) units.push({ k: "__empty",
     html: '<p class="muted small" data-k="__empty">라이프사이클 대기 중…</p>' });
@@ -2660,6 +2671,11 @@ function renderDetail() {
   $("md-report") && $("md-report").classList.add("has-detail");
   renderScopeBar();
   renderDetailCounts();
+  // 런타임(계정 실측)은 계정 전체 뷰라 시나리오별로 있는 게 아니다 (오너 2026-07-14):
+  // 특정 시나리오 스코프에선 이 탭을 숨기고(집계에서만 노출), rt 선택 중이었으면 자원으로.
+  const rtBtn = els('#detail-subtabs [data-d="rt"]')[0];
+  if (rtBtn) rtBtn.style.display = isAggScope() ? "" : "none";
+  if (!isAggScope() && detailTab === "rt") detailTab = "res";
   els("#detail-subtabs button").forEach(b => b.classList.toggle("on", b.dataset.d === detailTab));
   renderDetailBody();
 }
