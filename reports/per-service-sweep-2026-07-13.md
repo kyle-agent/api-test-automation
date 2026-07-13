@@ -111,3 +111,119 @@
 
 ### 최종 자원 정리 (06:57 KST 확인)
 사용자 중단 후 in-flight data-flow 자원 41건 reconcile → **owned survivors = 1**(baseline 복귀). 남은 1건은 `servicewatch /v1/log-groups`(상시 auto-created, 오늘밤 생성분 아님). **오늘밤 테스트로 생성된 자원은 전부 삭제 확인.** 실행 중 sweep 프로세스 없음.
+
+---
+
+## 자원별 실제 소요시간 누적 (audit log 기반)
+- 수집 도구: `python -m tools.audit_timing_collector collect --run-label <label>` (sweep 종료 시 자동 실행).
+- 누적 저장: `data/audit_timings.jsonl` (실행마다 append, (resource_id,action) dedupe). report용: `... report`.
+- 이번 실행(2026-07-13-per-service-sweep) 수집: 919 자원-작업 레코드.
+
+## 자원별 실제 소요시간 (audit log 누적, 919건 / runs: 2026-07-13-per-service-sweep)
+
+| action | resource_type | n | median | p90 | max |
+|--------|---------------|---|--------|-----|-----|
+| archive-config.modify | mysql | 1 | 38s | 38s | 38s |
+| archive-config.modify | mariadb | 1 | 27s | 27s | 27s |
+| archive-config.sync | mysql | 1 | 29s | 29s | 29s |
+| backup-config.modify | mariadb | 1 | 41s | 41s | 41s |
+| backup-config.modify | mysql | 1 | 41s | 41s | 41s |
+| block-storage.create | mysql | 1 | 118s | 118s | 118s |
+| block-storage.resize | mysql | 1 | 73s | 73s | 73s |
+| create | private-dns | 3 | 1096s | 1160s | 1160s |
+| create | vpc-peering | 1 | 692s | 692s | 692s |
+| create | cluster | 2 | 628s | 688s | 688s |
+| create | mysql | 1 | 555s | 555s | 555s |
+| create | mariadb | 1 | 534s | 534s | 534s |
+| create | subnet | 50 | 235s | 259s | 319s |
+| create | transit-gateway | 4 | 120s | 121s | 121s |
+| create | virtual-server | 9 | 91s | 162s | 162s |
+| create | loadbalancer | 1 | 51s | 51s | 51s |
+| create | cdn | 1 | 49s | 49s | 49s |
+| create | vpn-tunnel | 1 | 33s | 33s | 33s |
+| create | privatelink-endpoint | 1 | 27s | 27s | 27s |
+| create | privatelink-service | 1 | 25s | 25s | 25s |
+| create | snapshot | 1 | 22s | 22s | 22s |
+| create | vpc-endpoint | 1 | 22s | 22s | 22s |
+| create | internet-gateway | 7 | 19s | 23s | 23s |
+| create | nat-gateway | 2 | 16s | 17s | 17s |
+| create | private-nat | 1 | 15s | 15s | 15s |
+| create | gslb | 1 | 13s | 13s | 13s |
+| create | api | 3 | 13s | 128s | 128s |
+| create | vpn-gateway | 1 | 10s | 10s | 10s |
+| create | volume | 15 | 6s | 14s | 18s |
+| create | cloud-function | 3 | 6s | 7s | 7s |
+| create | direct-connect | 4 | 6s | 7s | 7s |
+| create | secret | 1 | 3s | 3s | 3s |
+| create | kms | 7 | 1s | 1s | 1s |
+| create | lb-listener | 1 | 1s | 1s | 1s |
+| create | certificate | 1 | 0s | 0s | 0s |
+| create | lb-health-check | 1 | 0s | 0s | 0s |
+| create | lb-server-group | 1 | 0s | 0s | 0s |
+| delete | vpc-peering | 1 | 470s | 470s | 470s |
+| delete | nodepool | 2 | 382s | 384s | 384s |
+| delete | private-dns | 3 | 254s | 256s | 256s |
+| delete | mariadb | 1 | 201s | 201s | 201s |
+| delete | mysql | 1 | 184s | 184s | 184s |
+| delete | subnet | 50 | 135s | 273s | 506s |
+| delete | privatelink-endpoint | 2 | 58s | 59s | 59s |
+| delete | privatelink-service | 1 | 58s | 58s | 58s |
+| delete | transit-gateway | 4 | 56s | 66s | 66s |
+| delete | loadbalancer | 1 | 28s | 28s | 28s |
+| delete | vpc-endpoint | 1 | 20s | 20s | 20s |
+| delete | vpn-tunnel | 1 | 18s | 18s | 18s |
+| delete | internet-gateway | 7 | 17s | 22s | 22s |
+| delete | gslb | 1 | 17s | 17s | 17s |
+| delete | nat-gateway | 2 | 13s | 13s | 13s |
+| delete | virtual-server | 9 | 12s | 26s | 26s |
+| delete | private-nat | 1 | 10s | 10s | 10s |
+| delete | direct-connect | 4 | 6s | 12s | 12s |
+| delete | lb-server-group | 1 | 5s | 5s | 5s |
+| delete | api | 1 | 4s | 4s | 4s |
+| delete | log-group | 10 | 4s | 5s | 5s |
+| delete | volume | 18 | 3s | 5s | 16s |
+| delete | policy | 4 | 2s | 2s | 2s |
+| delete | lb-listener | 1 | 2s | 2s | 2s |
+| delete | cloud-function | 3 | 2s | 3s | 3s |
+| delete | certificate | 1 | 1s | 1s | 1s |
+| delete | vpn-gateway | 1 | 1s | 1s | 1s |
+| delete | group | 3 | 0s | 1s | 1s |
+| delete | lb-health-check | 1 | 0s | 0s | 0s |
+| delete | snapshot | 1 | 0s | 0s | 0s |
+| endpoint.create | privatelink-service | 1 | 24s | 24s | 24s |
+| endpoint.delete | privatelink-service | 1 | 58s | 58s | 58s |
+| healthcheck.update | gslb | 1 | 21s | 21s | 21s |
+| interface.change | virtual-server | 3 | 9s | 10s | 10s |
+| log-event.delete-bulk | log-group | 1 | 3s | 3s | 3s |
+| maintenance.delete | mysql | 1 | 5s | 5s | 5s |
+| maintenance.delete | mariadb | 1 | 4s | 4s | 4s |
+| maintenance.modify | mysql | 1 | 6s | 6s | 6s |
+| maintenance.modify | mariadb | 1 | 4s | 4s | 4s |
+| modify | cloud-function | 2 | 25s | 45s | 45s |
+| password.update | user | 1 | 0s | 0s | 0s |
+| power_off | virtual-server | 3 | 10s | 11s | 11s |
+| power_on | virtual-server | 3 | 26s | 27s | 27s |
+| reboot | virtual-server | 3 | 22s | 23s | 23s |
+| relationship.create | volume | 1 | 2s | 2s | 2s |
+| remove-member | group | 1 | 0s | 0s | 0s |
+| resize | volume | 3 | 1s | 1s | 1s |
+| resources.status.update | gslb | 1 | 1s | 1s | 1s |
+| resources.update | gslb | 1 | 21s | 21s | 21s |
+| restart | mysql | 1 | 108s | 108s | 108s |
+| revert | volume | 1 | 3s | 3s | 3s |
+| rule.create | vpc-peering | 1 | 38s | 38s | 38s |
+| rule.delete | vpc-peering | 1 | 83s | 83s | 83s |
+| set | volume | 1 | 0s | 0s | 0s |
+| set.qos | volume | 10 | 24s | 79s | 79s |
+| stop | mysql | 1 | 173s | 173s | 173s |
+| sync | mysql | 1 | 17s | 17s | 17s |
+| transfer.create | volume | 1 | 1s | 1s | 1s |
+| update | private-dns | 1 | 13s | 13s | 13s |
+| update | vpn-tunnel | 1 | 12s | 12s | 12s |
+| update | volume | 4 | 4s | 9s | 9s |
+| update | group | 2 | 0s | 0s | 0s |
+| update | policy | 1 | 0s | 0s | 0s |
+| volume.attach | virtual-server | 3 | 36s | 79s | 79s |
+| volume.detach | virtual-server | 3 | 9s | 12s | 12s |
+| vpc-connection.create | transit-gateway | 1 | 551s | 551s | 551s |
+| vpc-connection.delete | transit-gateway | 1 | 279s | 279s | 279s |

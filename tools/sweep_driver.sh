@@ -83,4 +83,12 @@ done
 echo "" | tee -a "$LOGDIR/_driver.log"
 echo "=== FINAL full verify_clean ($(kst) KST) ===" | tee -a "$LOGDIR/_driver.log"
 FINAL=$(survivors); echo "FINAL survivors=$FINAL" | tee -a "$LOGDIR/_driver.log"
+
+# audit log에서 이 실행의 자원별 생성/삭제 소요시간을 누적 저장 (report용)
+echo "=== audit timing collect ($(kst) KST) ===" | tee -a "$LOGDIR/_driver.log"
+RUN_LABEL="$(date -u +%Y-%m-%d)-per-service-sweep"
+python -m tools.audit_timing_collector collect --run-label "$RUN_LABEL" --lookback-hours 14 \
+  >> "$LOGDIR/_audit_timing.log" 2>&1 && echo "  timing collected -> data/audit_timings.jsonl" | tee -a "$LOGDIR/_driver.log" \
+  || echo "  timing collect failed (see _audit_timing.log)" | tee -a "$LOGDIR/_driver.log"
+
 echo "sweep end $(date -u +%FT%TZ)" | tee -a "$LOGDIR/_driver.log"
