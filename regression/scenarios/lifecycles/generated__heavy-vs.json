@@ -717,6 +717,7 @@
           "method": "DELETE",
           "path": "/v1/images/{pending_image_id}",
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 6,
@@ -729,7 +730,7 @@
             404,
             409
           ],
-          "_note": "2026-07-08 25-편입(owner GO): pending 셸 teardown. 2026-07-11: import 직후 saving 상태 삭제 409 대비 사다리."
+          "_note": "2026-07-08 25-편입(owner GO): pending 셸 teardown. 2026-07-11: import 직후 saving 상태 삭제 409 대비 사다리. REPAIR 2026-07-13: 400(InvalidImageStatus 계열)도 재시도에 편입 — delete-custom-image와 동일 클래스(이미지 status 전이 중 삭제 4xx)."
         },
         {
           "name": "create-volume-attachment",
@@ -1079,10 +1080,16 @@
             202,
             204
           ],
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15,
           "destructive": true,
           "group": "custom-image",
           "optional": true,
-          "_note": "2026-07-08 owner '이건 왜 실패야?' 근본원인: 이 스텝만 custom-image 그룹 밖이라, create-custom-image 가 400(PF-27, Windows 소스 거부)으로 그룹이 죽어도 혼자 실행돼 리터럴 {custom_image_id} 로 DELETE → 404 → strict expect 가 lifecycle 전체를 실패시켰다 (E2E 20260708-010208 rc=1 + owner 런 140335 동일). 그룹 합류로 create 실패 시 스킵(유령 404 소멸), create 성공 시 strict teardown 검증 유지 — 실패하면 그룹 경고 + 등록된 cleanup/reconciler 백스톱."
+          "_note": "2026-07-08 owner '이건 왜 실패야?' 근본원인: 이 스텝만 custom-image 그룹 밖이라, create-custom-image 가 400(PF-27, Windows 소스 거부)으로 그룹이 죽어도 혼자 실행돼 리터럴 {custom_image_id} 로 DELETE → 404 → strict expect 가 lifecycle 전체를 실패시켰다 (E2E 20260708-010208 rc=1 + owner 런 140335 동일). 그룹 합류로 create 실패 시 스킵(유령 404 소멸), create 성공 시 strict teardown 검증 유지. REPAIR 2026-07-13 (owner: 이미지 안 지워짐 관측 — shared custom image 잔존): retry_on_status 없어 shared 이미지가 create/share 직후 status 전이 중(Image.InvalidImageStatus 409 / 400 계열)이면 재시도 못 하고 실패 → cleanup 백스톱(3회)도 부족하면 누수. [400,409] settle 사다리 추가(8×15s) — da22는 204 성공(코드는 정상), transient 상태 경합만 방어. 그래도 안 되면 reconciler 백스톱."
         },
         {
           "name": "delete-server-static-nat",
