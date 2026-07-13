@@ -2388,3 +2388,23 @@ run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행�
 동일 클래스(그룹 DELETE 200이지만 IAM-gated 자식 log-stream 때문에 잔존,
 log-stream IAM 권한 필요). 스윕은 stuck으로 1회 보고 후 재시도 안 함(수렴 가드
 정상 동작). 클린업 루틴의 알려진-예외 목록에 이 2건 추가해 취급할 것.
+
+## run-c373 판정 (2026-07-13, 신설계 첫 풀런) — 설계 요소 전부 실증 + 후속 수리 3건
+
+119종, makespan 66.3분, 111 passed / 7 failed / 1 skipped:
+
+- **실증**: provision **19.9초**(구 4.3분, no-wait+게이트) · net-A/B 상주 +
+  peering adopt 완주(+1.6→34.1분 passed) · fw(+0.4→1.3분)·dc-routing(+2.1→4.7분)
+  B에서 passed · 핀 vip-nat/fw/hsn +0.4~0.5분 시작 · 상주 3+자체 2 = cap 5 정확.
+- **실패 클래스 ① 429 레이트리밋 5건** (vip-nat show-subnet GET, publicip
+  create ×2, list ×2): t=0 동시 투입 확대로 게이트웨이 429가 lifecycle을 즉사
+  시킴 → **엔진 전역 429 백오프**(10~60s ×5, expect_status에 429 명시한 스텝
+  제외) 신설. vip-nat/hsn 실패는 설계 문제가 아니라 이 클래스.
+- **실패 클래스 ② lb-members IGW already-associated**: vs-netops와 동일
+  HB4c — adopt-or-create 부트스트랩 + owned_igw_id 분리 teardown 이식.
+- **makespan 악화 원인 = pg-cluster +42.2분 지각** (커밋 durations rank 10
+  ≠ 실측 지각 → 콘솔 머신 durations.local.json의 하향 오염이 커밋본을 가림).
+  **duration 병합을 max-merge로 변경** (conftest·simulate 동일) — LPT에서
+  과대추정은 무해, 과소추정은 몬스터 꼬리. 이 수리로 다음 런 pg는 t≈0 시작,
+  꼬리 23분 제거 → **기대 makespan ~43분** (66.3-23).
+- eventstreams 실패는 기지 PF 후보 재확인. run-c373 passed 111종 스팬 fold.

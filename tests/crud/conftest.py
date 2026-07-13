@@ -37,11 +37,19 @@ _DUR_LOCAL = _DUR_PATH.with_name("durations.local.json")
 
 
 def _durations() -> dict:
+    # 병합 규칙 = **max** (2026-07-13 run-c373 실측): 종전 '오버레이 우선'은
+    # 로컬 오버레이의 하향 오염(옛 fast-fail 학습 등)이 커밋본의 실측 큰 값을
+    # 가려 database-postgresql-cluster(커밋본 24분, rank 10)를 경량으로
+    # 오분류 → +42분에야 시작해 홀로 23분 런 꼬리(makespan 66.3분)가 됐다.
+    # LPT에서 과대추정은 '일찍 시작'일 뿐 무해하고 과소추정은 몬스터 꼬리를
+    # 만드므로, 두 스토어에 다 있으면 큰 값을 쓴다.
     out: dict = {}
     for p in (_DUR_PATH, _DUR_LOCAL):
         try:
             raw = json.loads(p.read_text())
-            out.update({k: float(v.get("avg_s") or 0.0) for k, v in raw.items()})
+            for k, v in raw.items():
+                val = float(v.get("avg_s") or 0.0)
+                out[k] = max(out.get(k, 0.0), val)
         except Exception:  # noqa: BLE001 — ordering is best-effort; never break collection
             continue
     return out

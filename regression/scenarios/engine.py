@@ -617,6 +617,21 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         time.sleep(5)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
+    # 전역 429 백오프 (2026-07-13 run-c373: t=0 동시 투입 확대로 게이트웨이
+    # 레이트리밋 429가 5개 lifecycle을 즉사시킴 — vip-nat show-subnet GET,
+    # publicip create ×2, list ×2 전부 429). 429는 transport blip과 같은
+    # 환경 클래스라 스텝 정의와 무관하게 항상 재시도한다. 단, expect_status에
+    # 429를 명시한 스텝(레이트리밋 자체를 검증)은 그대로 통과시킨다.
+    if resp.status == 429 and 429 not in (step.get("expect_status") or []):
+        for _b in range(1, 6):
+            _wait = min(60.0, 10.0 * _b)
+            print(f"  step '{step.get('name')}' -> 429 rate-limited; backoff "
+                  f"{_wait:.0f}s (attempt {_b}/5)")
+            time.sleep(_wait)
+            resp = client.request(step["method"], path, json=body, service=service,
+                                  params=params, headers=step.get("headers"))
+            if resp.status != 429:
+                break
     ros = _as_status_list(step.get("retry_on_status"))
     if ros:
         attempts = int(step.get("retries", 4))
