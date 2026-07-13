@@ -582,6 +582,37 @@ def test_verdict_vs_publish_time_split():
     assert common.snap_ts_short({"ts": None}) == ""
 
 
+def test_residual_resources_home_kpi_d8():
+    """D8 — 잔존 자원 홈 승격 + 단일 표면.
+
+    비용·안전 사안인 잔존 자원이 실행 화면 깊숙이 숨어 있던 것을 홈 KPI 로
+    끌어올린다. 라이브 '이 서버' owned 스캔이라 출처 배지는 local(발행 아님),
+    스캔 안 한 상태는 '미확인'(0 으로 위장 금지, empty-state 규율). 정본 표면 =
+    /testing/resources (홈은 마지막 캐시만 읽고 자동 스캔하지 않는다)."""
+    from controlplane import dashdata, resources
+
+    # owned_summary(): 스캔 전이면 scanned=False, actionable/total=None (0 아님)
+    s = resources.owned_summary()
+    assert set(s) >= {"scanned", "scanning", "actionable", "stuck",
+                      "total", "age", "when", "error"}
+    if not s["scanned"]:
+        assert s["actionable"] is None and s["total"] is None
+
+    # /runtime·/local-run 은 잔존 단일 표면으로 이어짐 (별도 표면 발명 금지)
+    assert client.get("/local-run",
+                      follow_redirects=False).headers["location"] == "/testing/resources"
+
+    # 홈 KPI: 발행 스냅샷이 있으면 잔존 타일이 KPI 행에 뜬다 (local 배지 + 정본 링크)
+    if dashdata.latest_coverage():
+        home = client.get("/").text
+        assert "잔존 자원" in home
+        assert 'href="/testing/resources"' in home
+        assert "badge badge-local" in home       # 발행 아님 — 이 서버 관측
+        # 스캔 전이면 '미확인' + 지금 확인 유도 (0 으로 위장하지 않음)
+        if not resources.owned_summary()["scanned"]:
+            assert "미확인" in home and "지금 확인" in home
+
+
 def test_v2_shell_header_and_global_search():
     """v2 접목 6a (오너 지시 2026-07-11) — v2 셸의 상단 디자인 이식.
 

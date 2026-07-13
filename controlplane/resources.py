@@ -27,6 +27,7 @@ so the generic path reconstruction is exact for every kind the engine emits.
 from __future__ import annotations
 
 import calendar
+import datetime as _dt
 import json
 import os
 import re
@@ -223,6 +224,32 @@ def _age_label(sec) -> str:
     if sec < 3600:
         return f"{sec // 60}분 전"
     return f"{sec // 3600}시간 {sec % 3600 // 60}분 전"
+
+
+def owned_summary() -> dict:
+    """홈 KPI 승격용 컴팩트 요약 (D8) — owned_state()를 읽기만 하고 스캔은
+    **트리거하지 않는다** (홈 열 때 자동 수집 금지, 마지막 캐시만 노출).
+
+    * ``scanned`` False = 아직 한 번도 스캔 안 함 → 화면은 '미확인'(0으로 위장
+      금지, empty-state 규율). ``actionable`` = 기지(stuck)를 뺀 우리가 치워야
+      할 잔존 수(=normal), ``stuck`` = 문서화된 기지 항목 수. 잔존 자원은 라이브
+      **이 서버** 관측(발행 스냅샷 아님)이라 배지는 local 이어야 한다."""
+    st = owned_state()
+    scanned = st["total"] is not None
+    when = ""
+    if st.get("ts"):
+        when = _dt.datetime.fromtimestamp(
+            st["ts"], _dt.timezone(_dt.timedelta(hours=9))).strftime("%H:%M")
+    return {
+        "scanned": scanned,
+        "scanning": bool(st.get("scanning")),
+        "actionable": len(st.get("normal") or []) if scanned else None,
+        "stuck": len(st.get("stuck_rows") or []),
+        "total": st["total"],
+        "age": _age_label(st.get("age_s")),
+        "when": when,
+        "error": st.get("error"),
+    }
 
 
 # --- single-resource delete ----------------------------------------------------

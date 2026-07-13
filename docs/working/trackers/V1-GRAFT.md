@@ -67,6 +67,26 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   지시로 v1 이름 유지).
 - 검증: tests_offline `test_v2_shell_header_and_global_search` (23/23).
 
+## D8 상세 — 잔존 자원 홈 승격 + 단일 표면 (CX-IA-DESIGN §4.3 D8)
+
+- **왜**: 잔존 자원은 비용·안전 사안인데 실행 화면 깊숙이 숨어 있었다 (CX-IA W2·D8).
+- **단일 표면 (선행 IA 페이즈에서 이미 완료 — 이 세션이 확인)**: `/testing/resources`
+  가 잔존의 정본 표면. 마지막 스캔 결과 캐시 + `POST /testing/resources/scan` "새로
+  수집" 버튼(백그라운드, 열 때 자동 수집 안 함). 구 표면은 전부 리다이렉트 —
+  `/local-run`·구 inventory → 301 `/testing/resources`. console2 는 `/runtime?scope=mine`
+  링크 + DETAIL 탭 iframe 임베드로 이 표면을 재사용(별도 스캔 경로 발명 금지).
+  (`/runtime` = 활동 토폴로지(loggingaudit×oplog)로 잔존 스캔과는 별개 관심사.)
+- **홈 승격 (이 세션의 미완분)**: 홈 KPI 행에 '잔존 자원' 타일 신설.
+  - `resources.owned_summary()` — `owned_state()` 캐시를 **읽기만** 하고 스캔은
+    트리거하지 않는다. `actionable`(기지 제외 = 우리가 치워야 할 잔존, normal 수)
+    을 헤드라인으로, `stuck`(문서화된 기지 항목)은 '+기지 N' 보조 표기.
+  - 잔존은 라이브 **이 서버** 관측이라 배지는 `local`(발행 스냅샷 아님 — 다른 5
+    타일의 published 와 구분). empty-state 규율: 미스캔은 '미확인 · 0 아님'
+    (0 으로 위장 금지) + [🔍 지금 확인 →] 로 정본 표면 유도.
+  - 색: actionable 0 이면 초록, >0 이면 빨강. '마지막 확인 HH:MM (N분 전)' 병기.
+- 검증: `test_residual_resources_home_kpi_d8` (owned_summary 스키마·미스캔 None·
+  /local-run 리다이렉트·홈 타일 local 배지+정본 링크+미확인 유도) + 라이브 렌더 확인.
+
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 
 - **① 전역 의존 그래프 탭 제거 + 미니그래프 인스펙터** — P2C-25 결정 이행
