@@ -48,10 +48,12 @@ Changed vs legacy:
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import threading
 import time
+from pathlib import Path
 
 import core
 from core.registry import is_owned, is_expired
@@ -1275,6 +1277,87 @@ def _pass_ske(c) -> int:
     return deleted
 
 
+# Ledger-reclaim: consume the durable create-manifest the ENGINE already writes
+# (reports/registry/*.jsonl, one ResourceRecord per create with a RESOLVED
+# delete_path like /v1/queues/<real-id>). registry.py's docstring long claimed
+# "the reconciler globs reports/registry/*.jsonl" but NO pass ever read it — the
+# manifest was dead weight. That gap is exactly why an ABORTED run leaks: create
+# succeeded (id captured + tracked) but the run died before its delete step, and
+# the tag/name sweep can't reclaim resources the LIST API won't return by id.
+# The exemplar is queueservice: listqueue (v1.1) returns only queue_urls (names),
+# delete needs a 32-char id, and there is NO name→id resolver — so a queue whose
+# id we didn't persist is un-reclaimable via the API (2026-07-13 오너 관측: 콘솔에
+# regrq* 5개 잔존, 스위퍼 사각지대). Reading the ledger deletes them by their
+# recorded id. (id-based DELETE /v1/queues/<id> VALIDATED live — 404 on a gone id,
+# not the 400/403 the name/account-path forms hit.)
+_REGISTRY_DIR = Path(__file__).resolve().parents[1] / "reports" / "registry"
+# Skip ledger shards younger than this — an ACTIVE run appends to its shard right
+# now, and deleting its in-flight resources would trample a concurrent run
+# (Hard Rule 4). 15 min >> any single lifecycle's create→delete gap.
+_LEDGER_MIN_AGE_S = float(os.environ.get("SCP_LEDGER_RECLAIM_MIN_AGE_S", "900"))
+
+
+def _pass_ledger_reclaim(c) -> int:
+    """Reclaim orphaned id-addressed resources from the engine's create-manifest.
+
+    For each ``reports/registry/*.jsonl`` shard older than ``_LEDGER_MIN_AGE_S``,
+    delete every recorded resource by its RESOLVED ``delete_path`` (skips records
+    with an unresolved ``{token}`` or no id). 404 = already gone (success, prune).
+    A shard whose every record is confirmed gone is removed so it isn't re-scanned.
+    The manifest holds ONLY resources WE created, so this is owner-scoped by
+    construction — no live-listing / tag match needed (that's the whole point:
+    it reclaims what listing can't surface)."""
+    try:
+        shards = sorted(_REGISTRY_DIR.glob("*.jsonl"))
+    except OSError:
+        return 0
+    now = time.time()
+    deleted = 0
+    for shard in shards:
+        try:
+            if now - shard.stat().st_mtime < _LEDGER_MIN_AGE_S:
+                continue  # active/recent run's shard — do not touch (Hard Rule 4)
+            lines = shard.read_text().splitlines()
+        except OSError:
+            continue
+        recs = []
+        for ln in lines:
+            ln = ln.strip()
+            if not ln:
+                continue
+            try:
+                recs.append(json.loads(ln))
+            except ValueError:
+                continue
+        # newest-first == children before parents (create order is parent→child)
+        all_gone = True
+        for rec in reversed(recs):
+            dp = rec.get("delete_path") or ""
+            svc = rec.get("service") or ""
+            if not dp or "{" in dp or not rec.get("resource_id"):
+                all_gone = False   # can't address it — keep the shard for audit
+                continue
+            st = _delete(c, svc, dp)
+            if st is None:
+                # dedup (already 2xx this sweep) or a transport error — treat as
+                # progress-neutral; 404 comes back as a real status below.
+                continue
+            if 200 <= st < 300:
+                deleted += 1
+                print(f"  ledger-reclaim {svc} {dp} -> {st}")
+            elif st == 404:
+                pass  # already gone — confirmed reclaimed
+            else:
+                all_gone = False
+                print(f"  ledger-reclaim {svc} {dp} -> {st} (retry next round)")
+        if all_gone:
+            try:
+                shard.unlink()  # every record gone → prune so we stop re-scanning
+            except OSError:
+                pass
+    return deleted
+
+
 def _pass_certs_queues_sgs(c) -> int:
     # 9. light, self-contained resources (no dependencies): certs, queues
     deleted = 0
@@ -1595,6 +1678,7 @@ def _pass_servicewatch(c) -> int:
 # dependency (repos→registries, secrets→KMS, nodepools→cluster); order BETWEEN
 # entries is not — they may run in any order / concurrently.
 _TAIL_PASSES = (
+    ("ledger-reclaim", _pass_ledger_reclaim),
     ("resource-groups", _pass_resource_groups),
     ("scr", _pass_scr),
     ("filestorage", _pass_filestorage),
