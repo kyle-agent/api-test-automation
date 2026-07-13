@@ -2824,3 +2824,28 @@ VPC 생성 슬롯은 희소(캡5 − 상주3 ≈ 2). self-create 라이프사이
 - net 상주 조기 teardown(사장님 2번째 아이디어)은 보류: 풀런은 peering이 A·B를
   31.6분까지 잡아 self-create(≤15분 종료) 뒤엔 슬롯 수요가 없어 이득 미미 + ref-count
   mid-run teardown 복잡도 최대. 부분선택 최적화 필요 시 레버.
+
+## 공유 TGW adopt — TGW 계정 캡 3 레이스 제거 (2026-07-13, 오너 "TGW adopt(B)")
+
+TGW는 계정 캡 3(knowledge: "max 3 Transit Gateways per account"). self-create가
+3개(vpc-transit-gateway-children·gen-private-nat·heavy-shared-networking) → 헤드룸 0,
+이전 런 잔재 1개면 4번째 create가 exceed-max. 라이브 실측(풀런): gen-private-nat이
+create-transit-gateway(REQUIRED)에서 하드폴("2 API, 0 자원").
+- **역할 분석**: TGW를 진짜 "소유"하는 건 vpc-transit-gateway-children 하나뿐(TGW+
+  자식 CRUD 주인공). gen-private-nat은 private-nat 전제조건, heavy-net은 다운스트림
+  연결 없는 순수 커버리지(children과 중복). → 뒤 둘은 공유 TGW adopt.
+- 수리(공유 VPC 패턴 재사용): engine `_ADOPT_SHARED["tgw"]="shared_tgw_id"`,
+  adopt-active 맵에 tgw($.transit_gateway.state), `provision_shared_vpc(need_tgw=)`가
+  공유 TGW 1개 생성(account-level, no-wait — 첫 adopter의 _ensure_adopted_active가
+  게이트)+teardown, `_ENV_SHARED_TGW`, shared_infra `_needs_shared_tgw()`+emit.
+  시나리오: gen-private-nat(create/delete), heavy-net(tgw-create/delete/settgw)에
+  adopt:tgw. children은 self 유지.
+- **PUT-skip 신설**: adopt 스텝의 PUT(set)도 skip(공유 자원 mutate 방지) — 종전엔
+  POST/DELETE/GET만 skip. 활성 adopt+PUT 스텝은 heavy-net settransitgateway 하나라
+  무회귀. set 커버리지는 children이 소유.
+- 효과: 동시 TGW 3→2(1 shared + 1 self children) → 캡3 헤드룸 1. 공유 TGW provision
+  실패/미트리거 시 adopter는 self-create 폴백(현행 동작=무회귀).
+- 라이브 미검증(다음 풀런 판정): 공유 TGW에 gen-private-nat이 vpc-connection 생성/
+  삭제(shared VPC↔shared TGW), teardown 시 connectionless 확인.
+- offline: tests/offline/test_shared_tgw_adopt.py (5종: 등록·감지·children-self·
+  adopt-skip(create/set/delete+시딩)·self-create 폴백).

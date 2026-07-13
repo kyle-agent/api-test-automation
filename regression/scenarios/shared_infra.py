@@ -137,6 +137,24 @@ def _needed_net_vpc_tags() -> tuple:
         return ("a", "b")
 
 
+def _needs_shared_tgw() -> bool:
+    """선택에 ``{"adopt": "tgw"}`` 스텝이 하나라도 있으면 True — 공유 TGW 1개 필요
+    (오너 2026-07-13). 없으면 공유 TGW는 순수 낭비(슬롯 1). Fail-open: 판정 오류
+    → True (만들어도 무해, 잔재는 스윕 회수)."""
+    import os
+    try:
+        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
+                if x.strip()}
+        for lc in engine.active_lifecycles():
+            if only and lc.get("id") not in only:
+                continue
+            if any((s.get("adopt") or "") == "tgw" for s in lc.get("steps", [])):
+                return True
+        return False
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def provision():
     cfg, client = _build_client()
     if not getattr(cfg, "allow_mutations", False):
@@ -161,11 +179,13 @@ def provision():
     # SCP_PROVISION_SUBNET_WAIT=true 로 강제.
     nowait = os.environ.get("SCP_PROVISION_SUBNET_WAIT", "").strip().lower() != "true"
     net_tags = _needed_net_vpc_tags()   # ('a','b') / ('a',) / ('b',) / () — 세분화
+    need_tgw = _needs_shared_tgw()       # adopt:tgw 시나리오 있으면 공유 TGW 1개
     try:
         with contextlib.redirect_stdout(sys.stderr):
             shared_ctx, _teardown = engine.provision_shared_vpc(
                 client, cfg, need_db_subnet=need_db,
-                wait_subnets_active=not nowait, need_net_vpcs=net_tags)
+                wait_subnets_active=not nowait, need_net_vpcs=net_tags,
+                need_tgw=need_tgw)
     except Exception as exc:
         # Wave D root cause: provision_shared_vpc CREATED the VPC (slot won,
         # counts against the 5-cap) but a *post-create* step inside it raised —
@@ -210,8 +230,11 @@ def provision():
         print(f"SCP_SHARED_NET_VPC_B_ID={net_b}")
         if shared_ctx.get("net_b_vpc_name"):
             print(f"SCP_SHARED_NET_VPC_B_NAME={shared_ctx['net_b_vpc_name']}")
+    tgw = shared_ctx.get("shared_tgw_id")
+    if tgw:
+        print(f"SCP_SHARED_TGW_ID={tgw}")
     _eprint(f"[shared_infra] provisioned vpc={vpc_id} subnet={subnet_id} "
-            f"db_subnet={db_subnet_id} net_a={net_a} net_b={net_b}")
+            f"db_subnet={db_subnet_id} net_a={net_a} net_b={net_b} tgw={tgw}")
     if not vpc_id:
         # ctx came back truthy but with no vpc id (should not happen) — be loud so
         # the missing $GITHUB_ENV export is diagnosable from the runner log.

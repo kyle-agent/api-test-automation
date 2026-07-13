@@ -8552,6 +8552,8 @@
           "optional": true,
           "method": "POST",
           "path": "/v1/transit-gateways",
+          "adopt": "tgw",
+          "_adopt_note": "2026-07-13 오너: 공유 TGW adopt (계정 캡 3 레이스 완화). 이 lifecycle의 TGW는 다운스트림 연결 없는 순수 커버리지(children이 TGW CRUD 소유)라 공유 1개를 재사용 — SCP_SHARED_TGW_ID 있으면 create 스킵, 없으면 self-create 폴백. settransitgateway PUT은 공유 상태 변경 방지로 optional 유지(adopt 시 공유 TGW를 건드리지 않게 skip 권장).",
           "json": {
             "name": "regrtgw{ualpha}",
             "description": "API regression shared-net",
@@ -9114,6 +9116,8 @@
           "service": "vpc",
           "method": "PUT",
           "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "adopt": "tgw",
+          "_adopt_note": "공유 TGW adopt 시 PUT skip(공유 상태 mutate 방지) — set 커버리지는 children이 소유. self-create 폴백이면 실제 PUT.",
           "group": "xcov-settransitgateway",
           "optional": true,
           "json": {
@@ -9284,6 +9288,8 @@
           "group": "tgw",
           "method": "DELETE",
           "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "adopt": "tgw",
+          "_adopt_note": "공유 TGW 유지 — adopt 시 delete skip(fixture teardown). self-create 폴백이면 실제 삭제.",
           "expect_status": [
             200,
             202,

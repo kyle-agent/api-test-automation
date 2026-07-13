@@ -79,6 +79,11 @@
       "parent": null,
       "provisioned_by": "regression.scenarios.shared_infra",
       "_comment": "네트워킹 공유 VPC B (10.141.0.0/20) — vpc-peering accepter + gen-wave5-fw(IGW 방화벽) + networking-direct-connect-routing(DC, VPC당 1 배타). IGW 소유: A=vip-nat, B=fw — 충돌 없음."
+    },
+    "tgw": {
+      "parent": null,
+      "provisioned_by": "regression.scenarios.shared_infra",
+      "_comment": "공유 TGW (오너 2026-07-13) — 계정 캡 3. vpc-transit-gateway-children만 self-create(TGW+자식 CRUD 주인공), gen-private-nat(private-nat 전제조건)·heavy-shared-networking(순수 커버리지)은 이걸 adopt → 동시 TGW 3→2."
     }
   },
   "adopt_edges": {
@@ -142,7 +147,11 @@
       "vpc"
     ],
     "gen-private-nat": [
+      "tgw",
       "vpc"
+    ],
+    "heavy-shared-networking": [
+      "tgw"
     ],
     "gen-vpc-endpoint": [
       "vpc"

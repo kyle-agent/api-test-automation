@@ -155,7 +155,8 @@ _ADOPT_SHARED = {"vpc": "shared_vpc_id", "subnet": "shared_subnet_id",
                  # A/B 분산으로 해소되고 런당 VPC 생성이 7→5회로 준다.
                  # CIDR은 peering rule 하드코딩과 일치(A=10.130/20, B=10.141/20)
                  # — 10.124 공유 VPC adopt 때의 adopt-cidr 불일치 클래스 회피.
-                 "vpc#a": "shared_net_vpc_a_id", "vpc#b": "shared_net_vpc_b_id"}
+                 "vpc#a": "shared_net_vpc_a_id", "vpc#b": "shared_net_vpc_b_id",
+                 "tgw": "shared_tgw_id"}
 # 이 프로세스가 이미 ACTIVE를 확인한 adopted id 캐시 — 게이트는 id당 1회만 폴.
 _ADOPT_ACTIVE_SEEN: set = set()
 _SHARED_VPC_CIDR = "10.124.0.0/20"
@@ -193,6 +194,12 @@ _ENV_SHARED_NET_VPC_A = "SCP_SHARED_NET_VPC_A_ID"
 _ENV_SHARED_NET_VPC_B = "SCP_SHARED_NET_VPC_B_ID"
 _ENV_SHARED_NET_VPC_A_NAME = "SCP_SHARED_NET_VPC_A_NAME"
 _ENV_SHARED_NET_VPC_B_NAME = "SCP_SHARED_NET_VPC_B_NAME"
+# 공유 TGW (adopt:tgw 대상, 오너 2026-07-13). TGW 계정 캡 3인데 self-create가 3개
+# (children·gen-private-nat·heavy-shared-networking) → 헤드룸 0, 잔재 1개면 exceed.
+# children만 TGW를 소유(CRUD 주인공)하고, 나머지 둘은 전제조건 용도라 공유 TGW를
+# adopt → 동시 TGW 3→2(1 shared + 1 self). 공유 VPC와 동일 패턴.
+_ENV_SHARED_TGW = "SCP_SHARED_TGW_ID"
+_TGW_CREATE_PATH = "/v1/transit-gateways"
 
 
 # --------------------------------------------------------------------------- #
@@ -865,7 +872,8 @@ def _ensure_adopted_active(client, kind: str, rid: str, lifecycle_id: str, *,
              "vpc#a": (_VPC_CREATE_PATH, "$.vpc.state"),
              "vpc#b": (_VPC_CREATE_PATH, "$.vpc.state"),
              "subnet": (_SUBNET_CREATE_PATH, "$.subnet.state"),
-             "subnet#db": (_SUBNET_CREATE_PATH, "$.subnet.state")}
+             "subnet#db": (_SUBNET_CREATE_PATH, "$.subnet.state"),
+             "tgw": (_TGW_CREATE_PATH, "$.transit_gateway.state")}
     if kind not in paths:
         _ADOPT_ACTIVE_SEEN.add(rid)
         return
@@ -1216,6 +1224,12 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                     if _m == "DELETE":  # retain shared resource — fixture tears it down
                         print(f"  [{lifecycle['id']}] retaining shared {_adopt} "
                               f"(skip delete '{step['name']}')")
+                        continue
+                    if _m == "PUT":  # 공유 자원을 mutate하지 않음 — 다른 adopter가
+                        # 같은 자원을 보므로 set/update는 skip (2026-07-13 공유 TGW).
+                        # 커버리지는 소유 lifecycle(예: children)이 담당.
+                        print(f"  [{lifecycle['id']}] skipping '{step['name']}' "
+                              f"(shared {_adopt} retained, not mutated)")
                         continue
                     if _m == "GET":  # e.g. wait-<x>-gone — pointless on a retained
                         # shared resource (it never 404s); skip to avoid a long poll.
@@ -1708,7 +1722,7 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
 def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None,
                          need_db_subnet: bool = True,
                          wait_subnets_active: bool = False,
-                         need_net_vpcs=False):
+                         need_net_vpcs=False, need_tgw: bool = False):
     """Create ONE VPC + ONE subnet (both ACTIVE) for the heavy/ADOPT-class
     lifecycles to ADOPT, so they don't each create their own against the 5-VPC
     cap (knowledge/vpc-scheduling-strategy.md).
@@ -1745,7 +1759,8 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         for env_key, ctx_key in ((_ENV_SHARED_NET_VPC_A, "shared_net_vpc_a_id"),
                                  (_ENV_SHARED_NET_VPC_B, "shared_net_vpc_b_id"),
                                  (_ENV_SHARED_NET_VPC_A_NAME, "net_a_vpc_name"),
-                                 (_ENV_SHARED_NET_VPC_B_NAME, "net_b_vpc_name")):
+                                 (_ENV_SHARED_NET_VPC_B_NAME, "net_b_vpc_name"),
+                                 (_ENV_SHARED_TGW, "shared_tgw_id")):
             v = os.environ.get(env_key, "").strip()
             if v:
                 ctx[ctx_key] = v
@@ -1821,6 +1836,31 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
             else:
                 print(f"  shared net VPC {tag.upper()} provision failed "
                       f"({nresp.status}); its adopters fall back / IB-049-skip.")
+    # 공유 TGW (adopt:tgw 대상, 오너 2026-07-13). 계정 캡 3 압박 완화 — children만
+    # TGW를 self-create(CRUD 주인공)하고, gen-private-nat·heavy-net은 이걸 adopt
+    # (전제조건 용도)해 동시 TGW 3→2. account-level이라 VPC 불요. ACTIVE 대기는
+    # no-wait: 첫 adopter의 _ensure_adopted_active("tgw")가 게이트(서브넷과 동일).
+    tgw_id = None
+    if need_tgw:
+        tname = f"regrtgwsh{uniq}"       # 'regrtgwsh'+8hex = 17 ≤ 20 (IB-051 name cap)
+        tbody = _inject_owner_tags({
+            "name": tname, "description": "API regression shared transit gateway",
+            "tags": [],
+        }, axis="regression")
+        tcreate = {"name": "create-shared-tgw", "method": "POST", "service": "vpc"}
+        tresp = _run_step(client, tcreate, _TGW_CREATE_PATH, tbody, "vpc", {})
+        if tresp.status in (200, 201, 202) and tresp.body:
+            tgw_id = _capture(tresp.body, "$.transit_gateway.id")
+        if tgw_id:
+            tgw_id = str(tgw_id)
+            reg.track(ResourceRecord(service="vpc",
+                                     delete_path=f"{_TGW_CREATE_PATH}/{tgw_id}",
+                                     resource_id=tgw_id, kind="transit-gateway",
+                                     parent="shared-tgw"))
+            print(f"  shared TGW created: {tgw_id}")
+        else:
+            print(f"  shared TGW provision failed ({tresp.status}); "
+                  f"its adopters fall back to self-create.")
     # poll to ACTIVE so adopters can build under it immediately. interval 5 (not
     # 10) + verbose: this wait sits on the run's CRITICAL start path and its log
     # is streamed live — heartbeat lines + a tighter residual wait (2026-07-08
@@ -1973,6 +2013,42 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
                 time.sleep(15)
             print(f"  {label} {vid} still not deleted; sweep will reclaim")
 
+        # 공유 TGW 먼저 회수 (account-level, VPC와 독립). adopter의 vpc-connection은
+        # 각 lifecycle이 지우므로 teardown 시점엔 connectionless여야 삭제 성공.
+        # EDITING/DELETING 비동기 잔재는 사다리가 흡수, 실패는 스윕이 회수.
+        if tgw_id:
+            # adopter가 vpc-connection을 붙였다 떼면 TGW가 EDITING이 된다 — EDITING
+            # TGW는 삭제 거부되므로(오너 2026-07-13 실측: regrtgw..가 Editing 잔존)
+            # ACTIVE(또는 사라짐)까지 폴한 뒤 삭제한다 (children의 wait-tgw-active 패턴).
+            _tdl = time.time() + 300
+            while time.time() < _tdl:
+                try:
+                    g = client.get(f"{_TGW_CREATE_PATH}/{tgw_id}", service="vpc")
+                    if getattr(g, "status", None) == 404:
+                        break
+                    stt = _capture(getattr(g, "body", None) or {}, "$.transit_gateway.state")
+                    if stt is None or str(stt).upper() in ("ACTIVE", "RUNNING",
+                                                           "CREATED", "AVAILABLE"):
+                        break
+                except Exception:  # noqa: BLE001 — read hiccup; proceed to delete
+                    break
+                print(f"  shared TGW {tgw_id} state={stt} — ACTIVE 대기 후 삭제")
+                time.sleep(10)
+            for attempt in range(5):
+                try:
+                    r = client.request("DELETE", f"{_TGW_CREATE_PATH}/{tgw_id}",
+                                       service="vpc")
+                    st = getattr(r, "status", None)
+                except Exception as exc:  # noqa: BLE001 — sweep backstop
+                    print(f"  shared TGW {tgw_id} delete failed ({exc}); "
+                          f"sweep will reclaim")
+                    break
+                if st in (200, 202, 204, 404):
+                    print(f"  shared TGW {tgw_id} delete -> {st}")
+                    break
+                print(f"  shared TGW {tgw_id} delete -> {st} "
+                      f"(attempt {attempt + 1}/5); retrying in 15s")
+                time.sleep(15)
         _vpc_ladder(vpc_id, "shared VPC")
         for tag, (nid, _nname) in net_ids.items():
             # A/B의 자식(vip-nat 서브넷·IGW·DC)은 각 lifecycle이 지운다 —
@@ -1988,4 +2064,6 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         ctx["shared_net_vpc_a_id"], ctx["net_a_vpc_name"] = net_ids["a"]
     if "b" in net_ids:
         ctx["shared_net_vpc_b_id"], ctx["net_b_vpc_name"] = net_ids["b"]
+    if tgw_id:
+        ctx["shared_tgw_id"] = tgw_id
     return ctx, teardown

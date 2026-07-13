@@ -357,6 +357,8 @@
           "service": "vpc",
           "method": "POST",
           "path": "/v1/transit-gateways",
+          "adopt": "tgw",
+          "_adopt_note": "2026-07-13 오너: 공유 TGW adopt (TGW 계정 캡 3 레이스 완화). TGW는 private-nat 전제조건일 뿐이라 공유 1개를 재사용 — SCP_SHARED_TGW_ID 있으면 create 스킵+transit_gateway_id 시딩, 없으면 self-create 폴백. children이 TGW CRUD를 소유. recompose 보존.",
           "json": {
             "name": "regrtgw{ualpha}",
             "description": "API regression transit gateway",
@@ -709,6 +711,8 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "adopt": "tgw",
+          "_adopt_note": "공유 TGW 유지 — adopt 시 delete 스킵(fixture가 teardown). self-create 폴백이면 실제 삭제. recompose 보존.",
           "expect_status": [
             200,
             202,
