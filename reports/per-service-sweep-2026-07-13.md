@@ -24,7 +24,7 @@
 
 <!--PROGRESS-BEGIN-->
 
-**진행: 28/56 완료** — ✅14 · ⚠️12 · ❌2 · (teardown 미복귀 잔존: 0)
+**진행: 37/56 완료** — ✅16 · ⚠️19 · ❌2 · (teardown 미복귀 잔존: 0)
 
 | # | 서비스 | 폐포/LC | 라이브(passed/skip) | 4xx;5xx;fail | teardown surv;recon | 판정 |
 |---|--------|---------|---------------------|--------------|---------------------|------|
@@ -56,6 +56,15 @@
 | 26 | security/configinspection | 1/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
 | 27 | management/iam | 12/8 | passed=8 | 4xx=0;5xx=2;failstep=2 | surv=1;recon=no | ⚠️ERRS |
 | 28 | management/iam-identity-center | 5/5 | passed=5 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
+| 29 | management/organization | 6/6 | passed=6 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
+| 30 | management/resourcemanager | 2/1 | passed=1 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=yes | ⚠️ERRS |
+| 31 | management/cloudcontrol | 2/2 | passed=2 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=yes | ⚠️ERRS |
+| 32 | management/cloudmonitoring | 4/1 | passed=1 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=no | ⚠️ERRS |
+| 33 | management/servicewatch | 8/5 | passed=5 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=yes | ⚠️ERRS |
+| 34 | management/loggingaudit | 1/1 | passed=1 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=yes | ⚠️ERRS |
+| 35 | management/network-logging | 1/1 | passed=1 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=no | ⚠️ERRS |
+| 36 | management/quota | 2/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
+| 37 | management/support | 2/1 | passed=1 | 4xx=2;5xx=0;failstep=1 | surv=1;recon=no | ⚠️ERRS |
 
 <!--PROGRESS-END-->
 
@@ -68,3 +77,34 @@
 - private-dns ×2: 백엔드 1043~1160s 생성인데 우리 폴링 ~100s 후 진행 → ~16~18분 먼저. 폴링 예산 부족.
 - subnet ×4: 백엔드 134~253s 생성인데 우리 20~62s 후 진행 → 72~201s 먼저. provisioner의 `NOT waiting ACTIVE (adopt-time gate)` 설계 여파.
 - 개선안: (a) subnet adopt-time gate가 ACTIVE까지 대기하도록, (b) private-dns 폴링 예산을 실제(~20분)에 맞춰 확대 or 의존 스텝을 optional 유지, (c) observations에 concrete resource_id 기록해 정밀 대조 가능케.
+
+---
+
+## 최종 요약 (사용자 요청으로 06:48 KST 중단 — 37/56 실행)
+
+**실행 37 · 판정**: ✅정상 16 · ⚠️부분(4xx 있으나 teardown OK) 19 · ❌timeout 2 (ske, mysql)
+**teardown**: 완료된 37개 서비스 **전부 surv=1(baseline)로 복귀 — 지속 누수 0**. (중단된 data-flow의 in-flight 자원 41건은 종료 후 reconcile로 별도 정리)
+
+### ❌/주의 서비스
+- **container/ske** ❌TIMEOUT — cluster/nodepool `upgrade-wait`(예산 3600s)가 40분 cap 초과. teardown은 reconcile로 회복.
+- **database/mysql** ❌TIMEOUT — cluster 삭제 `wait-gone` hang(로그 25분 동결) + **5xx=10**. reconcile로 42건 회복.
+- **networking/loadbalancer** ⚠️RC1 — `gen-heavy-lb-members` 실패(멤버 VM 미발견)로 되돌리기 teardown, 누수 25건 reconcile.
+
+### 미실행 (19개 — 중단 시점 이후)
+- data-analytics: **data-flow(중단)**, data-ops, eventstreams, quick-query, searchengine, vertica
+- ai-ml: cloud-ml, aimlops-platform
+- application-service: apigateway, queueservice · devops-tools: devopsservice
+- financial-management: billingplan, budget · platform: sts
+- **DB(후순위 지연분)**: mariadb, postgresql, epas, sqlserver, cachestore
+
+### 핵심 발견 (기록 — 개선은 승인 후)
+1. **DBaaS teardown hang (systematic)** — mysql·mariadb 클러스터 삭제 `wait-gone`이 무출력으로 hang → 40분 timeout. reconcile는 회복. (mysql 5xx=10 동반)
+2. **ske/데이터클러스터 upgrade-wait > per-run cap** — cluster/nodepool 업그레이드 대기 예산(3600s)이 실용적 런 타임아웃 초과 → bounded 런 완주 불가. data-flow도 ske 폐포 포함으로 동일 위험.
+3. **private-dns 매우 느림** — 백엔드 실제 create ~17~19분(audit 확인). VPC에서 private-dns가 삭제 막음(reconciler 매핑 필요), dns 서비스 28분 소요의 원인.
+4. **audit 대조 — 조기진행 6건** — subnet(adopt-time gate가 ACTIVE 대기 skip, 백엔드 2~4분 생성 중 20~60초 후 진행 ×4), private-dns(폴링 예산 ~100s vs 실제 ~19분 ×2). 나머지 36건은 정상 대기.
+5. **xcov 커버리지 프로브의 4xx 다수** — 대부분 placeholder-driven(의도된 커버리지 기록), 실결함과 구분 필요. 실결함 후보: privatelink-service IP↔subnet CIDR 400, network-logging 중복 409, mysql backup 401, LB listener ValidationError 400.
+
+### 성능 병목 (사용자 문의 답)
+- 느린 서비스의 공통점 = **공유 VPC/subnet 프로비저닝 + subnet ACTIVE 대기**(서비스 격리라 매번 반복). 빠른 서비스(18초~6분)는 이 단계가 없음.
+- 추가로 **서비스별 verify_clean(전체 계정 스캔 ~1~2분) + 누수 시 reconcile(최대 3패스)** 세금.
+- **개선안**: (a) 공유 VPC를 서비스 간 재사용해 재프로비저닝 제거, (b) DBaaS/ske teardown wait에 실질 타임아웃+진행로그, (c) subnet adopt-time gate가 ACTIVE까지 대기, (d) private-dns 폴링예산 확대 또는 optional 유지, (e) observations에 concrete resource_id 기록(정밀 대조용), (f) reconciler에 private-dns 삭제 매핑 추가.
