@@ -135,6 +135,8 @@ _VPC_CREATE_PATH = "/v1/vpcs"
 # lifecycle falls back to its own create/delete (so this can never regress CRUD).
 _ADOPT_SHARED = {"vpc": "shared_vpc_id", "subnet": "shared_subnet_id",
                  "subnet#db": "shared_db_subnet_id"}
+# 이 프로세스가 이미 ACTIVE를 확인한 adopted id 캐시 — 게이트는 id당 1회만 폴.
+_ADOPT_ACTIVE_SEEN: set = set()
 _SHARED_VPC_CIDR = "10.124.0.0/20"
 # Shared subnet carved from the first /24 of the shared VPC's /20. ADOPT-class
 # lifecycles re-home their fixed host IPs into this range (10.124.0.x) so that
@@ -784,6 +786,45 @@ class LifecycleSkip(Exception):
     """A lifecycle skipped for an environmental reason (quota / 417 / safety)."""
 
 
+def _ensure_adopted_active(client, kind: str, rid: str, lifecycle_id: str, *,
+                           timeout: float = 300.0, interval: float = 5.0) -> None:
+    """Adopted 공유 자원(vpc/subnet/subnet#db)의 ACTIVE를 프로세스당 id별 1회
+    보장한다. 이미 ACTIVE면 GET 1회, CREATING이면 ACTIVE까지 폴(≤timeout).
+    provision의 서브넷 no-wait 반환(SCP_PROVISION_SUBNET_NOWAIT)과 짝.
+
+    어떤 상황에서도 lifecycle을 죽이지 않는 soft 게이트: 상태 필드가 없거나
+    (응답 모양 미상 — 게이트 불가), GET이 실패하거나, 타임아웃이어도 통과시켜
+    이어지는 create가 실제 상태를 4xx로 표면화한다 (종전과 동일한 실패 모드)."""
+    if rid in _ADOPT_ACTIVE_SEEN:
+        return
+    paths = {"vpc": (_VPC_CREATE_PATH, "$.vpc.state"),
+             "subnet": (_SUBNET_CREATE_PATH, "$.subnet.state"),
+             "subnet#db": (_SUBNET_CREATE_PATH, "$.subnet.state")}
+    if kind not in paths:
+        _ADOPT_ACTIVE_SEEN.add(rid)
+        return
+    base, field = paths[kind]
+    ok_states = ("ACTIVE", "RUNNING", "CREATED", "AVAILABLE")
+    deadline = time.time() + timeout
+    try:
+        while True:
+            resp = client.request("GET", f"{base}/{rid}", service="vpc")
+            state = _capture(getattr(resp, "body", None) or {}, field)
+            if state is None or str(state).upper() in ok_states:
+                break
+            if time.time() >= deadline:
+                print(f"  [{lifecycle_id}] adopted {kind} {rid} still {state} "
+                      f"after {timeout:.0f}s — proceeding (next step surfaces it)")
+                break
+            print(f"  [{lifecycle_id}] adopted {kind} {rid} state={state} — "
+                  f"waiting ACTIVE")
+            time.sleep(interval)
+    except Exception as exc:  # noqa: BLE001 — soft gate, see docstring
+        print(f"  [{lifecycle_id}] adopted {kind} {rid} ACTIVE gate failed "
+              f"({exc}); proceeding — next step surfaces the real state")
+    _ADOPT_ACTIVE_SEEN.add(rid)
+
+
 def run_lifecycle(lifecycle: dict, client, cfg, *,
                   budget: _budgets.Budget | None = None,
                   resource_registry: ResourceRegistry | None = None,
@@ -1084,6 +1125,16 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 if _shared_val:
                     _m = step.get("method", "").upper()
                     if _m == "POST":  # adopt: skip the create, seed its capture vars
+                        # ACTIVE 1회 보장 게이트 (2026-07-13): provision이 서브넷
+                        # ACTIVE 대기를 생략하고 반환할 수 있으므로(런 머리 4.3분
+                        # 유휴 제거 — run-543a 실측: 같은 VPC 서브넷 2개는 동시
+                        # 생성해도 백엔드가 ACTIVE 전이를 직렬화, 128s/238s)
+                        # CREATING 상태의 id가 adopt될 수 있다. 첫 사용자가 여기서
+                        # ACTIVE까지 폴하고, 이미 ACTIVE면 GET 1회로 끝난다
+                        # (프로세스당 id별 1회 캐시). 실패해도 soft — 이어지는
+                        # create가 4xx로 표면화한다 (종전과 동일한 실패 모드).
+                        _ensure_adopted_active(client, _adopt, str(_shared_val),
+                                               lifecycle["id"])
                         for _v in step.get("capture", {}):
                             ctx[_v] = _shared_val
                         print(f"  [{lifecycle['id']}] adopting shared {_adopt}="
@@ -1570,7 +1621,8 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
 
 
 def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None,
-                         need_db_subnet: bool = True):
+                         need_db_subnet: bool = True,
+                         wait_subnets_active: bool = True):
     """Create ONE VPC + ONE subnet (both ACTIVE) for the heavy/ADOPT-class
     lifecycles to ADOPT, so they don't each create their own against the 5-VPC
     cap (knowledge/vpc-scheduling-strategy.md).
@@ -1671,17 +1723,21 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         sid = None
         if resp.status in (200, 201, 202) and resp.body:
             sid = _capture(resp.body, "$.subnet.id")
+        if sid:
+            # track는 create 직후 (wait 성공 여부와 무관) — no-wait 반환이든
+            # wait 타임아웃이든 스윕이 항상 회수할 수 있어야 한다.
+            reg.track(ResourceRecord(service="vpc",
+                                     delete_path=f"{_SUBNET_CREATE_PATH}/{sid}",
+                                     resource_id=str(sid), kind="subnet",
+                                     parent=vpc_id))
         return (str(sid) if sid else None), resp
 
-    def _subnet_wait_track(step_name: str, sid: str, cidr: str, label: str):
+    def _subnet_wait(step_name: str, sid: str, cidr: str, label: str):
         wait_step = {"name": step_name, "method": "GET", "service": "vpc",
                      "poll": {"field": "$.subnet.state",
                               "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
                               "timeout": 300, "interval": 5, "verbose": True}}
         _run_step(client, wait_step, f"{_SUBNET_CREATE_PATH}/{sid}", None, "vpc", {})
-        reg.track(ResourceRecord(service="vpc",
-                                 delete_path=f"{_SUBNET_CREATE_PATH}/{sid}",
-                                 resource_id=sid, kind="subnet", parent=vpc_id))
         print(f"  {label} provisioned: {sid} ({cidr})")
 
     subnet_id, sresp = _subnet_create(
@@ -1697,18 +1753,27 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         # 안 하고 있네"): subnet#db 를 입양하는 lifecycle 이 이 런의 선택에 없으면
         # DB-lane 서브넷은 순수 직렬 대기(~1-2분)일 뿐이다.
         print("  DB-lane shared subnet SKIPPED — selection has no subnet#db adopter")
-    if subnet_id:
-        _subnet_wait_track("wait-shared-subnet", subnet_id, _SHARED_SUBNET_CIDR,
-                           "shared subnet")
-    else:
+    if not subnet_id:
         print(f"  shared-subnet provision failed ({sresp.status}); adopters will "
               f"self-create a subnet under the shared VPC.")
-    if db_subnet_id:
-        _subnet_wait_track("wait-shared-db-subnet", db_subnet_id,
-                           _SHARED_DB_SUBNET_CIDR, "shared DB subnet")
-    elif need_db_subnet:
+    if not db_subnet_id and need_db_subnet:
         print(f"  shared-DB-subnet provision failed ({dresp.status}); DB adopters "
               f"fall back to the main shared subnet.")
+    if wait_subnets_active:
+        if subnet_id:
+            _subnet_wait("wait-shared-subnet", subnet_id, _SHARED_SUBNET_CIDR,
+                         "shared subnet")
+        if db_subnet_id:
+            _subnet_wait("wait-shared-db-subnet", db_subnet_id,
+                         _SHARED_DB_SUBNET_CIDR, "shared DB subnet")
+    elif subnet_id or db_subnet_id:
+        # no-wait 반환 (2026-07-13, run-543a 실측): 같은 VPC의 서브넷 2개는
+        # 동시 생성해도 백엔드가 ACTIVE 전이를 직렬화(128s/238s)해 head 대기
+        # 4.3분간 전 워커가 유휴였다. 여기서 CREATING인 채 id만 넘기고,
+        # 첫 adopt 시점의 _ensure_adopted_active 게이트가 ACTIVE를 보장한다
+        # (그동안 free-class·자체 VPC 생성군이 먼저 돈다).
+        print(f"  shared subnet(s) created, NOT waiting ACTIVE "
+              f"(adopt-time gate): subnet={subnet_id} db={db_subnet_id}")
 
     def teardown():
         if not cfg.allow_destructive:

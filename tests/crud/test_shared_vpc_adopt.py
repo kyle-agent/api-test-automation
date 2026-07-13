@@ -51,6 +51,8 @@ def _r(status, body):
 def _no_disk(monkeypatch):
     # keep the unit test hermetic: don't write the results store
     monkeypatch.setattr(engine, "_record_smoke", lambda *a, **k: None)
+    # adopt ACTIVE 게이트의 프로세스 캐시를 테스트 간 격리
+    engine._ADOPT_ACTIVE_SEEN.clear()
 
 
 def _heavy_lc():
@@ -83,7 +85,8 @@ def test_adopt_reuses_shared_vpc_and_skips_create_delete():
                                shared_ctx={"shared_vpc_id": "shared-9"})
     assert res["status"] == "passed", res
     # the shared VPC is neither created nor deleted by the lifecycle
-    assert client.methods_on("/v1/vpcs") == [], client.calls
+    # (adopt-time ACTIVE 게이트의 읽기 전용 GET은 허용, 2026-07-13)
+    assert set(client.methods_on("/v1/vpcs")) <= {"GET"}, client.calls
     # the subnet IS created — and under the shared vpc id
     subnet_posts = [c for c in client.calls if c == ("POST", "/v1/subnets")]
     assert subnet_posts, client.calls
@@ -156,13 +159,77 @@ def test_provision_shared_vpc_creates_subnet_and_tears_down_child_first():
 
 def test_adopt_shared_subnet_skips_subnet_create_and_delete():
     # No POST/DELETE on /v1/subnets at all — both are adopted (retained).
+    # (adopt-time ACTIVE 게이트의 읽기 전용 GET은 허용, 2026-07-13)
     client = FakeClient({})
     res = engine.run_lifecycle(
         _heavy_lc_subnet_adopt(), client, _cfg(),
         shared_ctx={"shared_vpc_id": "shared-9", "shared_subnet_id": "sub-9"})
     assert res["status"] == "passed", res
-    assert client.methods_on("/v1/vpcs") == [], client.calls
-    assert client.methods_on("/v1/subnets") == [], client.calls
+    assert set(client.methods_on("/v1/vpcs")) <= {"GET"}, client.calls
+    assert set(client.methods_on("/v1/subnets")) <= {"GET"}, client.calls
+
+
+# --------------------------------------------------------------------------- #
+# adopt-time ACTIVE 게이트 + provision 서브넷 no-wait (2026-07-13, run-543a 실측:
+# 같은 VPC의 서브넷 2개는 동시 생성해도 백엔드가 ACTIVE 전이를 직렬화 —
+# head 대기 4.3분을 첫 adopt 시점 게이트로 옮겨 런 시작 유휴를 제거)
+# --------------------------------------------------------------------------- #
+class SequencedClient(FakeClient):
+    """GET 응답을 호출 순서대로 소진하는 fake — CREATING→ACTIVE 전이 재현."""
+
+    def __init__(self, routes, get_sequence):
+        super().__init__(routes)
+        self.get_sequence = list(get_sequence)
+
+    def request(self, method, path, **kw):
+        if method.upper() == "GET" and self.get_sequence:
+            self.calls.append(("GET", path))
+            return self.get_sequence.pop(0)
+        return super().request(method, path, **kw)
+
+
+def test_adopt_gate_polls_creating_subnet_until_active(monkeypatch):
+    monkeypatch.setattr(engine.time, "sleep", lambda _s: None)
+    client = SequencedClient({}, [
+        _r(200, {"subnet": {"id": "sub-9", "state": "CREATING"}}),
+        _r(200, {"subnet": {"id": "sub-9", "state": "CREATING"}}),
+        _r(200, {"subnet": {"id": "sub-9", "state": "ACTIVE"}}),
+    ])
+    engine._ensure_adopted_active(client, "subnet", "sub-9", "test-lc")
+    gets = [c for c in client.calls if c == ("GET", "/v1/subnets/sub-9")]
+    assert len(gets) == 3, client.calls          # CREATING×2 → ACTIVE에서 종료
+    # 같은 id 재게이트는 캐시로 no-op (프로세스당 1회)
+    engine._ensure_adopted_active(client, "subnet", "sub-9", "test-lc")
+    assert len([c for c in client.calls if c[0] == "GET"]) == 3, client.calls
+
+
+def test_adopt_gate_passes_through_on_unknown_shape():
+    # 상태 필드가 없으면(응답 모양 미상) GET 1회로 통과 — lifecycle을 절대
+    # 막지 않는 soft 게이트.
+    client = FakeClient({})
+    engine._ensure_adopted_active(client, "subnet#db", "sub-x", "test-lc")
+    assert client.calls == [("GET", "/v1/subnets/sub-x")], client.calls
+
+
+def test_provision_nowait_returns_ids_without_subnet_waits():
+    client = FakeClient({
+        ("POST", "/v1/vpcs"): _r(201, {"vpc": {"id": "shared-1", "state": "ACTIVE"}}),
+        ("GET", "/v1/vpcs/"): _r(200, {"vpc": {"id": "shared-1", "state": "ACTIVE"}}),
+        ("POST", "/v1/subnets"): _r(201, {"subnet": {"id": "sub-1", "state": "CREATING"}}),
+        ("GET", "/v1/subnets/"): _r(200, {"subnet": {"id": "sub-1", "state": "CREATING"}}),
+    })
+    shared, teardown = engine.provision_shared_vpc(
+        client, _cfg(), wait_subnets_active=False)
+    # 서브넷 ACTIVE 폴 없음 (CREATING인 채 id만 반환)
+    assert not [c for c in client.calls
+                if c[0] == "GET" and c[1].startswith("/v1/subnets/")], client.calls
+    assert shared["shared_vpc_id"] == "shared-1"
+    assert shared["shared_subnet_id"] == "sub-1"
+    assert shared["shared_db_subnet_id"] == "sub-1"
+    teardown()   # 자식(subnet) 먼저 — no-wait여도 track은 create 직후라 회수됨
+    dels = [c for c in client.calls if c[0] == "DELETE"]
+    assert dels.index(("DELETE", "/v1/subnets/sub-1")) < \
+        dels.index(("DELETE", "/v1/vpcs/shared-1")), client.calls
 
 
 def test_env_ids_adopt_without_creating_and_teardown_is_noop(monkeypatch):

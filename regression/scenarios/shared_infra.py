@@ -125,12 +125,19 @@ def provision():
     # "Invalid format". So capture the engine's stdout onto STDERR and let ONLY
     # our explicit SCP_SHARED_*= lines below reach STDOUT.
     import contextlib
+    import os
     shared_ctx = {}
     need_db = _needs_db_subnet()
+    # SCP_PROVISION_SUBNET_NOWAIT=true → 서브넷 create+track 후 ACTIVE 대기 없이
+    # 반환 (run-543a 실측: 백엔드가 같은 VPC 서브넷 ACTIVE 전이를 직렬화해 head
+    # 대기가 4.3분). adopt 시점의 engine._ensure_adopted_active 게이트가 ACTIVE를
+    # 보장하므로 안전. console2/local_run 경로가 켠다; CI 기본값은 종전(대기).
+    nowait = os.environ.get("SCP_PROVISION_SUBNET_NOWAIT", "").strip().lower() == "true"
     try:
         with contextlib.redirect_stdout(sys.stderr):
             shared_ctx, _teardown = engine.provision_shared_vpc(
-                client, cfg, need_db_subnet=need_db)
+                client, cfg, need_db_subnet=need_db,
+                wait_subnets_active=not nowait)
     except Exception as exc:
         # Wave D root cause: provision_shared_vpc CREATED the VPC (slot won,
         # counts against the 5-cap) but a *post-create* step inside it raised —

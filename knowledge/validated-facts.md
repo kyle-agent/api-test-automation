@@ -2307,3 +2307,26 @@ run 20260713-102144-543a (117종, 예측 58.9분 / 실제 53.1분) 실측:
   load_priority_first()`로 같은 목록을 읽어 0차 정렬 키로 핀한다.
   회귀: tests/offline/test_crud_schedule_order.py(핀 2건) ·
   test_dag_scheduler.py::test_priority_first_pin_overrides_lpt.
+
+## 백엔드는 같은 VPC의 서브넷 ACTIVE 전이를 직렬화한다 → provision no-wait + adopt 게이트 (2026-07-13)
+
+run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행은 07-08부터 적용
+확인) ACTIVE 도달이 128s/238s로 순차 — 클라이언트 병렬화로는 못 줄이는 백엔드
+직렬화다. 종전에는 provision이 둘 다 ACTIVE까지 기다려 **런 머리 4.3분간 전
+워커 유휴**였다. 수리(오너 "2번 바로 수정" 2026-07-13):
+
+- provision은 서브넷 create+**track(생성 직후)** 후 즉시 반환 가능
+  (`engine.provision_shared_vpc(wait_subnets_active=False)`,
+  `SCP_PROVISION_SUBNET_NOWAIT=true` — console2/local_run 경로가 켬, CI 기본은
+  종전 유지). VPC ACTIVE 대기(~10s)는 유지 (서브넷 create가 필요로 함).
+- ACTIVE 보장은 **첫 adopt 시점**의 `engine._ensure_adopted_active` soft
+  게이트로 이동 (프로세스당 id별 1회, 이미 ACTIVE면 GET 1회, 필드 미상/실패/
+  타임아웃은 통과 — 이어지는 create가 4xx로 표면화). 그동안 free-class와
+  자체 VPC 생성군(priority_first 핀 포함)이 먼저 돈다 → 런 시작 유휴 제거.
+- 회귀: tests/crud/test_shared_vpc_adopt.py (게이트 폴/캐시/미상-통과 +
+  provision no-wait 4건).
+- **오너 도메인 확인 (2026-07-13): DB 클러스터 8종이 공유 DB 서브넷
+  (10.124.7.0/24) 하나를 공유해도 플랫폼상 병목 없음** — DB-lane 단일 공유
+  서브넷 설계 유지 근거.
+- durations.json에 run-543a passed 115종의 events wall span을 fold
+  (in-run 실측 — LPT 랭크 정확도 개선; vpc-peering avg 25→31분 등).

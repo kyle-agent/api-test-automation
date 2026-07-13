@@ -225,7 +225,11 @@ def provision_shared(env: dict, f) -> dict:
     f.flush()
     t0 = time.monotonic()
     _events_note(env, "provision-start",
-                 note="공유 인프라(VPC+서브넷) 준비 — ACTIVE 대기 포함, 통상 1~3분")
+                 note="공유 인프라(VPC+서브넷) 준비 — 서브넷은 no-wait(생성만 하고 "
+                      "ACTIVE는 첫 adopt 시점 게이트), 통상 ~30초")
+    # 서브넷 ACTIVE head 대기 제거 (run-543a 실측 4.3분 유휴 — 오너 2026-07-13
+    # "2번 바로 수정"): adopt 시점의 engine._ensure_adopted_active가 보장한다.
+    env = {**env, "SCP_PROVISION_SUBNET_NOWAIT": "true"}
     _, lines = _stream_cmd([sys.executable, "-m", "regression.scenarios.shared_infra",
                             "--provision"], env, f)
     shared: dict = {}
