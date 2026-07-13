@@ -1342,10 +1342,12 @@
           "destructive": true,
           "group": "lb-members-chain",
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "_note": "REPAIR 2026-07-13: member-bulk async detach가 그룹을 EDITING으로 → delete 400 InvalidState(gen-heavy-lb-members와 동일 클래스). retry_on_status에 400 추가(settle 사다리)."
         },
         {
           "name": "delete-lb-health-check",

@@ -1738,13 +1738,16 @@
         },
         {
           "name": "delete-lb-server-group",
-          "_note": "svc-opt 2026-07-11 실측: member-bulk 삭제(202 비동기)가 그룹을 EDITING으로 → 즉시 삭제가 400 InvalidState. 의미상-409-를-400으로 클래스 — settle 사다리 (domain-constraints 규약)",
+          "_note": "svc-opt 2026-07-11 실측: member-bulk 삭제(202 비동기)가 그룹을 EDITING으로 → 즉시 삭제가 400 InvalidState. 의미상-409-를-400으로 클래스 — settle 사다리 (domain-constraints 규약). REPAIR 2026-07-13: retry_on_status가 중복 정의돼(먼저 [400], 뒤에 [409]) JSON 규칙상 뒤엣것만 유효 → 400이 가려져 재시도 안 됨, da22/run에서 400 InvalidState 하드 실패(server-group 잔존). 두 블록을 [400,409] 단일로 병합(retries 40×30s 유지) — DBaaS delete-cluster와 동형, 멤버 async detach 정착 후 204.",
           "service": "loadbalancer",
           "method": "DELETE",
           "path": "/v1/lb-server-groups/{lb_server_group_id}",
-          "retry_on_status": [400],
-          "retries": 8,
-          "retry_interval": 15,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
           "expect_status": [
             200,
             202,
@@ -1752,12 +1755,7 @@
             409,
             404
           ],
-          "destructive": true,
-          "retry_on_status": [
-            409
-          ],
-          "retries": 40,
-          "retry_interval": 30
+          "destructive": true
         },
         {
           "name": "delete-lb-health-check",
