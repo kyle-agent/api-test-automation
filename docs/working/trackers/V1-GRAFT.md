@@ -89,7 +89,7 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 
 ## 콘솔 실행 화면 개선 (오너 지시 2026-07-13~14)
 
-오너 실사용 제보 5건 — 전부 console2(`console2/assets/console2.js`·`.css`).
+오너 실사용 제보 6건 — 전부 console2(`console2/assets/console2.js`·`.css`).
 
 - **① 사전 점검(blast radius) 모달 — 요약 1급 + 세부 접힘** ("목록이 잘 보이지도
   않고 · 세부는 접혀있고 확인하면 실행"). 120 lifecycle 표 + 과금 30개 목록이 좁은
@@ -153,6 +153,12 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
     재생헤드·밴드가 차트 밖으로 나가던 것 → `running` 이면 `hor=max(hor,nowRel)`.
   - 검증: 헤드리스 하네스(cleanup 판정·헤더/재생헤드/밴드·밴드 위치·반례 3종) +
     `test_cleanup_phase_indicators_frontend_contract` · test_console2 40/40.
+- **⑥ 두 타임라인 축 라벨 명시** (오너 2026-07-14: "양쪽이 다르네?"). 구성 ▸ 📊
+  예상 타임라인(행=워커 레인)과 실행 ▸ 예측 vs 실제(행=시나리오)가 **같은
+  schedule-sim**(동일 makespan·워커·슬롯)인데 행 축이 달라 다르게 보이던 혼동.
+  **데이터 불일치 아님** — 파라미터·makespan 동일 확인. 각 뷰 헤더에 축 라벨 명시:
+  예상 타임라인엔 "행=워커 레인 · 실행 화면은 같은 sim 을 시나리오축으로", 예측 vs
+  실제엔 "행=시나리오 · 워커축은 구성 ▸ 예상 타임라인". (라벨만, 로직 무변경.)
 
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 

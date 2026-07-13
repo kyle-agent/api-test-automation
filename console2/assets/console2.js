@@ -3707,6 +3707,9 @@ function renderSimModal(sim) {
        · 워커 <b>${sim.workers}</b> · VPC 슬롯 <b>${sim.vpc_slots}</b></div>
      <div class="legend sim-legend">${legend([["#2563c9", "일반 (공유 VPC)"], ["#eb6834", "VPC 자체생성 (슬롯 점유)"]])}
        <span>점선 테두리 = 미측정(클래스 기본값) · 막대 hover = 상세</span></div>
+     <p class="muted small" style="margin:2px 0 6px"><b>행 = 워커 레인</b> — 시나리오를 워커에
+       LPT 배치한 모습. 실행 화면의 <b>예측 vs 실제</b>는 <b>같은 schedule-sim</b>을
+       <b>시나리오축</b>으로 본다 (같은 makespan, 다른 관점).</p>
      ${simGanttHtml(sim)}`;
   $("pf-foot").innerHTML =
     `<span class="muted small">conftest 와 동일 규칙(실측 LPT greedy) · 미모델: IGW/NAT 1:1 대기·재시도</span>
@@ -3731,7 +3734,8 @@ function pvaEnsure() {
     d = document.createElement("details");
     d.id = "pva-panel"; d.className = "pva";
     d.innerHTML = `<summary>📊 예측 vs 실제 타임라인
-        <span class="muted small">— 고스트=예측(schedule-sim) · 채움=실측 · amber=예측 초과</span></summary>
+        <span class="muted small">— <b>행 = 시나리오</b> · 고스트=예측(schedule-sim) · 채움=실측 · amber=예측 초과
+        <span title="구성 ▸ 📊 예상 타임라인 은 같은 schedule-sim 을 워커축(워커 레인에 배치)으로 본다 — makespan 은 동일">(워커축은 구성 ▸ 예상 타임라인)</span></span></summary>
       <div id="pva-body"></div>`;
     master.appendChild(d);
     d.addEventListener("toggle", () => { if (d.open) renderPva(); });
