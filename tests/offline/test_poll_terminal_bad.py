@@ -5,7 +5,10 @@ ERROR/FAILED used to burn its FULL timeout and then silently PASS (HTTP 200 in
 ``expect_status`` — the masked-defect class). The engine now (1) ends the poll
 on the first ERROR/FAILED sighting, (2) classifies the step as FAILED with an
 explicit reason, and (3) leaves deliberate waits alone: values named in
-``until``, refire polls, and ``terminal_bad`` overrides.
+``until`` and refire polls. A ``terminal_bad: []`` override disables only the
+*early* exit (the poll keeps waiting to timeout); a poll that never reaches its
+``until`` still fails via the not-ready gate — abandoning the wait doesn't make
+the resource ready (masked-defect fix, owner 2026-07-13).
 """
 from __future__ import annotations
 
@@ -57,7 +60,12 @@ def test_until_naming_the_state_is_a_deliberate_wait(monkeypatch):
     assert res["status"] == "passed", res
 
 
-def test_terminal_bad_override_empty_disables(monkeypatch):
+def test_terminal_bad_override_empty_disables_early_exit_but_still_fails(monkeypatch):
+    """``terminal_bad: []`` disables the EARLY terminal-bad exit — the poll keeps
+    waiting to timeout instead of ending on the first ERROR sighting. But the
+    not-ready gate still fails the step: ``until`` (ACTIVE) was never reached, so
+    the resource never converged. The override silences the early-exit reason,
+    not the fact that the wait failed (masked-defect fix, owner 2026-07-13)."""
     monkeypatch.setattr(engine, "_commands", None)
     slept = []
     monkeypatch.setattr(engine.time, "sleep", lambda s: slept.append(s))
@@ -68,6 +76,6 @@ def test_terminal_bad_override_empty_disables(monkeypatch):
     client = FakeClient({("GET", "/v1/servers/"): _r(200, {"status": "ERROR"})})
     lc = _lc(poll={"field": "$.status", "until": ["ACTIVE"],
                    "timeout": 30, "interval": 1, "terminal_bad": []})
-    res = engine.run_lifecycle(lc, client, _cfg())
-    assert res["status"] == "passed", res       # legacy pass-through preserved
-    assert slept, "opt-out poll should keep waiting to timeout"
+    with pytest.raises(AssertionError, match="poll timed out"):
+        engine.run_lifecycle(lc, client, _cfg())
+    assert slept, "opt-out poll should keep waiting to timeout (no early exit)"

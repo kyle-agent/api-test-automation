@@ -1,8 +1,11 @@
 ---
-status: implemented (V1, opt-in) — pending live validation
+status: draft
 for: orchestrator
 date: 2026-07-13
 ---
+
+<!-- 진행: V1 구현 완료(opt-in), 라이브 검증 진행 중 → 통과하면 status: active로 승격 -->
+
 
 # 목적특화 스케줄러 (native_runner) — xdist 대체
 

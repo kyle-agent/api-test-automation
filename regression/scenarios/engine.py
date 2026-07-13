@@ -733,8 +733,10 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
                 except Exception as exc:  # destructive gate / transport — keep polling
                     print(f"    refire failed: {exc}")
         # Platform command channel: an operator can force a wedged wait to end
-        # NOW. Break out exactly as a poll timeout would — the engine's normal
-        # timeout handling (expect_status check on the last response) applies.
+        # NOW. Break out exactly as a poll timeout would — the post-loop
+        # not-ready gate then applies: if the last response still hasn't met the
+        # wait condition, the step fails (abandoning a wait doesn't make the
+        # resource ready). Only a poll that had already converged passes.
         if _commands is not None and _commands.should_stop_polling(lifecycle_id):
             print(f"  step '{step.get('name')}': platform command stop_polling "
                   f"— abandoning wait (handled like a poll timeout)")
@@ -762,6 +764,33 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         time.sleep(interval)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
+    # Poll loop ended without an in-loop success return — the deadline passed
+    # or an operator forced a stop. If this poll carried a real wait condition
+    # (until_status or field/until) and the LAST response does NOT satisfy it,
+    # the resource never reached the required state. Returning it silently used
+    # to let expect_status [200] pass on a still-CREATING body, so downstream
+    # steps ran on a not-ready resource (masked-defect class, sibling of the
+    # TERMINAL-BAD gate above — owner 2026-07-13: "의존 관계 앞단이 성공하지도
+    # 않았는데 뒤 스텝을 진행한다고? 수리해"). Mark it so the caller classifies
+    # FAILED. refire polls (failed-delete retry — timeout is their success)
+    # and an explicit poll.allow_timeout escape hatch are exempt.
+    if not refire and not poll.get("allow_timeout"):
+        _met = None
+        if until_status is not None:
+            _met = resp.status in until_status
+        elif field:
+            _met = (_jsonpath_get(resp.body, field) if resp.body else None) in until
+        if _met is False:
+            _last = (resp.status if until_status is not None
+                     else (_jsonpath_get(resp.body, field) if resp.body else None))
+            _want = f"status {until_status}" if until_status is not None else str(until)
+            print(f"  step '{step.get('name')}': poll timed out after ~{timeout:.0f}s "
+                  f"without reaching {_want} (last={_last}) — ending as NOT-READY "
+                  f"(caller classifies FAILED; resource never converged)")
+            try:
+                resp._poll_timed_out = _last
+            except Exception:
+                pass
     return resp
 
 
@@ -1455,6 +1484,15 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 print(f"  step '{step['name']}': state '{_tbad}' = terminal-bad "
                       f"— classifying as FAILED despite HTTP {resp.status}")
                 status_ok = False
+            # 폴이 until/until_status를 못 채우고 타임아웃했으면 2xx라도 성공이
+            # 아니다 — 자원이 요구 상태에 도달하지 못했으므로 뒤 스텝이 준비 안 된
+            # 자원 위에서 진행되면 안 된다 (terminal-bad의 자매 결함, owner 2026-07-13).
+            _ptimeout = getattr(resp, "_poll_timed_out", None)
+            if _ptimeout is not None and status_ok:
+                print(f"  step '{step['name']}': poll never reached its wait "
+                      f"condition (last={_ptimeout}) — classifying as FAILED "
+                      f"despite HTTP {resp.status}")
+                status_ok = False
             if _is_already_present:
                 print(f"  step '{step['name']}' -> {resp.status} "
                       f"already-present (idempotent on shared resource) "
@@ -1478,11 +1516,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                     group_fail_reason.setdefault(grp, reason)
                     _teardown_group(grp)
                 continue
-            assert (resp.status in expected or _is_already_present) and _tbad is None, (
+            assert ((resp.status in expected or _is_already_present)
+                    and _tbad is None and _ptimeout is None), (
                 f"[{lifecycle['id']}] step '{step['name']}' "
                 f"{step['method']} {path} -> {resp.status}, expected {expected}"
                 + (f" · polled state '{_tbad}' is TERMINAL-BAD (resource will "
                    f"never converge)" if _tbad is not None else "")
+                + (f" · poll timed out at '{_ptimeout}' without reaching its wait "
+                   f"condition (resource not ready)" if _ptimeout is not None else "")
                 + f"\n{resp.raw_text[:500]}")
 
             # v0.5 throttle: the happy path deletes its VPC via its OWN step (not

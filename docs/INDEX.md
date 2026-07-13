@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 67 docs · 25 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 68 docs · 25 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -41,6 +41,7 @@
 | [`working/plans/CX-IA-DESIGN-2026-07-09.md`](working/plans/CX-IA-DESIGN-2026-07-09.md) | all | CX·IA 디자인 안 — 제3자 UX 컨설턴트 리뷰 (2026-07-09) | 🟢 active |
 | [`working/plans/HEAVY-PREMISE-CONTRACT.md`](working/plans/HEAVY-PREMISE-CONTRACT.md) | all | HEAVY-PREMISE CONTRACT — Testing 단순화 (Model B) 공유 계약 | 🟢 active |
 | [`working/plans/IA-BUILD-CONTRACT.md`](working/plans/IA-BUILD-CONTRACT.md) | the IA-build agents (Catalog · Modeling · Reporting) + integration owner | IA build contract — "그림 하나, 여러 얼굴" parallel build |  superseded (이행 완료된 빌드 계약 — 확정 IA 빌드 완료) |
+| [`working/plans/NATIVE-SCHEDULER.md`](working/plans/NATIVE-SCHEDULER.md) | orchestrator | 목적특화 스케줄러 (native_runner) — xdist 대체 | 🟡 draft |
 | [`working/plans/PARALLEL-EXECUTION-PLAN.md`](working/plans/PARALLEL-EXECUTION-PLAN.md) | all | Parallel execution plan — staged foundations + per-VPC lanes (DRAFT) |  superseded (드래프트 설계 — 1.0 의존-DAG 스케줄러로 실현됨) |
 | [`working/plans/PLATFORM-CONVERGENCE.md`](working/plans/PLATFORM-CONVERGENCE.md) | owner + platform | 수렴 계획 — console2 → controlplane (척추 흡수) |  superseded (이행 완료된 수렴 계획 — console2가 척추에 흡수됨) |
 | [`working/plans/PLATFORM-IA-DIRECTION.md`](working/plans/PLATFORM-IA-DIRECTION.md) | owner + platform | 플랫폼 방향성 — 쉽게 정리 |  CONFIRMED (오너 확정 — 2026-06-26 · IA = Catalog · Modeling · Testing · Reporting · **2026-07-07 개정: Catalog→우측 유틸 링크, Modeling이 흡수 — §개정 참조**) |

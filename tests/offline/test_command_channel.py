@@ -235,17 +235,20 @@ def test_stop_polling_exits_wait_like_a_timeout(monkeypatch):
     # would hang the offline suite for poll.interval seconds
     monkeypatch.setattr(engine.time, "sleep",
                         lambda s: pytest.fail(f"poll loop slept ({s}s) despite stop_polling"))
+    # Real scenarios separate the create (POST, registers its cleanup) from a
+    # later settle-wait (GET + poll) — never an inline poll on the create — so
+    # the created resource is already tracked for teardown before the wait runs.
     lc = {
         "id": "cmd-poll-test", "service": "vpc", "enabled": True,
         "steps": [
             {"name": "create-vpc", "method": "POST", "path": "/v1/vpcs",
              "json": {"name": "x", "cidr": "10.99.0.0/20", "tags": []},
              "capture": {"vpc_id": "$.vpc.id"}, "expect_status": [200, 201, 202],
-             "poll": {"field": "$.vpc.state", "until": ["ACTIVE"],
-                      "timeout": 300, "interval": 10},
              "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"}},
-            {"name": "delete-vpc", "method": "DELETE", "path": "/v1/vpcs/{vpc_id}",
-             "expect_status": [200, 202, 204]},
+            {"name": "wait-vpc-active", "method": "GET", "path": "/v1/vpcs/{vpc_id}",
+             "expect_status": [200],
+             "poll": {"field": "$.vpc.state", "until": ["ACTIVE"],
+                      "timeout": 300, "interval": 10}},
         ],
     }
     client = FakeClient({
@@ -253,9 +256,12 @@ def test_stop_polling_exits_wait_like_a_timeout(monkeypatch):
         ("POST", "/v1/vpcs"): _r(201, {"vpc": {"id": "own-2", "state": "CREATING"}}),
         ("GET", "/v1/vpcs/"): _r(200, {"vpc": {"id": "own-2", "state": "CREATING"}}),
     })
-    res = engine.run_lifecycle(lc, client, _cfg())
-    # the wait ended early with the create's 201 (an expected status), so the
-    # lifecycle proceeded and finished — exactly the engine's timeout behaviour
-    assert res["status"] == "passed", res
+    # stop_polling ends the wait like a timeout, and the not-ready gate then
+    # fails the step: the VPC was still CREATING (never reached ACTIVE), so
+    # proceeding downstream would run on a not-ready resource (masked-defect
+    # fix, owner 2026-07-13). The abandoned wait is an honest failure, not a
+    # silent pass. Teardown reclaims the already-created VPC.
+    with pytest.raises(AssertionError, match="poll timed out"):
+        engine.run_lifecycle(lc, client, _cfg())
     assert stub.stop_calls == ["cmd-poll-test"]
     assert ("DELETE", "/v1/vpcs/own-2") in client.calls

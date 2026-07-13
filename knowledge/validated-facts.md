@@ -2722,3 +2722,26 @@ xdist는 CPU-bound 테스트 병렬용 범용 라이브러리라 I/O-bound 라�
   불요(동적 pop이 버퍼-갇힘 원천 제거).
 - 검증: 시뮬 + offline 3종(test_native_runner) + Budget 스레드-안전. 라이브 대기.
   설계·V2 백로그: docs/working/plans/NATIVE-SCHEDULER.md.
+
+## poll not-ready 게이트 — until 미충족 타임아웃은 스텝 실패 (2026-07-13, 오너 "수리해")
+
+`field`/`until`(또는 `until_status`)이 있는 settle-poll이 그 조건을 **못 채우고**
+타임아웃하면, 종전엔 마지막 CREATING/HTTP-200 응답을 조용히 반환 → `expect_status
+[200]`을 통과 → 뒤 스텝이 **준비 안 된 자원 위에서 진행**됐다(masked-defect 클래스,
+TERMINAL-BAD의 자매 결함). 오늘 서브넷 활성이 wait-subnet 타임아웃(180s)보다 느려
+VM이 ERROR로 생성된 사건이 이 결함의 라이브 발현.
+- 수리(regression/scenarios/engine.py): 폴 루프가 in-loop 성공 반환 없이 끝나면
+  (deadline OR operator stop_polling), 마지막 resp가 `until`/`until_status`를
+  충족했는지 확인 → 미충족이면 `resp._poll_timed_out=<last state>` 마커. 호출측이
+  `_terminal_bad`과 나란히 이 마커를 보고 `status_ok=False`로 실패 분류. assert 메시지에
+  사유 포함. **refire 폴(타임아웃이 성공)과 `poll.allow_timeout` escape hatch는 제외.**
+- 조사: 활성 시나리오 404 poll = until_status 54 + field/until(비어있지 않음) 350 +
+  refire 8. **field-without-until·allow_timeout·inline-poll-on-create = 0** →
+  실 시나리오는 create(cleanup 등록)와 wait(GET+poll)가 항상 분리라 wait 실패가
+  이미 생성된 자원을 누수시키지 않음(teardown이 회수). 게이트는 안전하게 전 404 폴에 적용.
+- stop_polling 재의미: 종전 "타임아웃처럼 처리(=조용히 통과)" → 이제 "타임아웃처럼
+  처리(=미충족이면 실패)". operator가 대기를 포기해도 자원이 준비되는 건 아니므로
+  정직한 실패. 이미 수렴한 폴만 통과.
+- offline 회귀: 577 passed(test_command_channel·test_poll_terminal_bad 갱신 —
+  terminal_bad:[]는 조기탈출만 끔, 폴 미수렴은 여전히 실패). 유일 실패는 httpx 미설치
+  console2 테스트(환경 이슈, 무관).
