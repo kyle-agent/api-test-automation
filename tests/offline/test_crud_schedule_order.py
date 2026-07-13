@@ -162,6 +162,46 @@ def test_roundrobin_blocks_preserve_membership_and_desc_within_bucket():
     assert sorted(out) == sorted(ordered) and len(out) == 8
 
 
+def _triple(lid, methods):
+    return (lid, lid, {"id": lid, "steps": [{"method": m, "path": "/x"} for m in methods]})
+
+
+def test_order_for_load_floats_readonly_to_global_pending(monkeypatch):
+    """활성 경로 (run-19a5 오너 설계): read-only(전부 GET)는 heavy 뒤 strand가
+    아니라 global pending 앞으로 → 빈 워커가 초반에 집는다. heavy는 pair-first
+    (t=0) 유지, strand는 non-read light로 채운다."""
+    monkeypatch.setattr(crud_conftest, "_has_prereq", lambda lid: False)
+    # LPT desc: heavy(POST) → non-read light(POST) → read-only(GET, 가장 가벼움)
+    triples = ([_triple(f"H{i}", ["POST", "GET"]) for i in range(3)]
+               + [_triple(f"L{i}", ["POST"]) for i in range(3)]
+               + [_triple(f"R{i}", ["GET"]) for i in range(3)])
+    out = crud_conftest._order_for_load(triples, 3)
+    assert sorted(out) == sorted(t[0] for t in triples)            # 멤버십 보존
+    assert all(out[2 * i].startswith("H") for i in range(3))       # pair-first = heavy (t=0)
+    assert all(out[2 * i + 1].startswith("L") for i in range(3))   # strand = non-read (read-only 아님)
+    ro_pos = [i for i, x in enumerate(out) if x.startswith("R")]
+    assert min(ro_pos) >= 2 * 3, f"read-only가 초반 strand에 묶임: {out}"
+
+
+def test_order_for_load_dependents_go_last(monkeypatch):
+    """dependent(prereq)는 global pending 후미 — provider가 도는 뒤에 디스패치되어
+    dequeue 시점엔 provider가 준비돼 있을 확률이 높다 (dependency 순서를 수집
+    순서에 인코딩; xdist는 dequeue 시 dependency를 못 본다)."""
+    monkeypatch.setattr(crud_conftest, "_has_prereq", lambda lid: lid.startswith("D"))
+    triples = ([_triple(f"H{i}", ["POST", "GET"]) for i in range(2)]
+               + [_triple(f"L{i}", ["POST"]) for i in range(2)]
+               + [_triple("Rno", ["GET"])]      # no-dep read-only
+               + [_triple("Dep", ["GET"])])     # 같은 read-only지만 prereq 있음
+    out = crud_conftest._order_for_load(triples, 2)
+    assert out.index("Dep") > out.index("Rno")      # dependent가 no-dep 뒤
+
+
+def test_order_for_load_noop_when_few_items():
+    tr = [("A", "A", {}), ("B", "B", {})]
+    assert crud_conftest._order_for_load(tr, 4) == ["A", "B"]
+    assert crud_conftest._order_for_load(tr, 0) == ["A", "B"]
+
+
 def test_roundrobin_blocks_noop_when_few_items_or_serial():
     assert crud_conftest._roundrobin_blocks_for_workers(["A", "B"], 0) == ["A", "B"]
     assert crud_conftest._roundrobin_blocks_for_workers(["A", "B"], 1) == ["A", "B"]

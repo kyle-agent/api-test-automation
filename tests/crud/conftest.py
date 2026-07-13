@@ -119,6 +119,65 @@ def _roundrobin_blocks_for_workers(ordered: list, n: int) -> list:
     return out
 
 
+def _is_read_only(lc: dict) -> bool:
+    """모든 스텝이 GET인 라이프사이클 = 읽기전용 커버리지 (생성 자원 0).
+    이런 건 선행자원이 없어 언제든 돌 수 있으므로, heavy 뒤에 strand시키지
+    말고 global pending 앞으로 띄워 빈 워커가 초반에 집게 한다 (오너 2026-07-13
+    run-19a5: gen-volume-type·*-reads가 heavy 뒤 페어에 묶여 30~40분에야 시작)."""
+    steps = lc.get("steps") or []
+    if not steps:
+        return False
+    return all((s.get("method") or "GET").upper() == "GET" for s in steps if s.get("path"))
+
+
+def _has_prereq(lid: str, _cache={}) -> bool:
+    """dependencies.json prerequisites에 선언된 = provider(클러스터/VM 등) 대기.
+    이런 건 provider가 도는 뒤쪽(global pending 후미)에 둬 자연 정렬한다."""
+    if not _cache:
+        p = Path(__file__).resolve().parents[2] / "regression" / "scenarios" / "dependencies.json"
+        try:
+            _cache["p"] = set(json.loads(p.read_text()).get("prerequisites", {}))
+        except Exception:  # noqa: BLE001
+            _cache["p"] = set()
+    return lid in _cache["p"]
+
+
+def _order_for_load(triples: list, n: int) -> list:
+    """--dist=load용 3-tier 순서 (2026-07-13 run-19a5, 오너 설계). 입력은
+    LPT desc 정렬된 (item, id, lc) triple. load는 dequeue 시점에 dependency를
+    못 보므로(테스트 불투명), dependency 순서를 수집 순서에 인코딩한다:
+
+      pair-first(t=0)  = heavy(provider·병목) 상위 n
+      pair-second(strand) = 가장 가벼운 non-read-only n개 (read-only는 여기 안 씀)
+      global pending 앞 = read-only(선행자원 무·언제든 실행) → 빈 워커가 초반에 집음
+      global pending 뒤 = dependent(prereq) + 나머지 → provider가 도는 뒤에 디스패치
+
+    heavy를 밀지 않으므로 makespan 무영향, read-only만 40분→초반으로 당겨진다."""
+    items = [t[0] for t in triples]
+    if n < 2 or len(triples) <= n:
+        return items
+    head = triples[:n]                                   # heavy → pair-first (t=0)
+    tail = triples[n:]
+    read_only = [t for t in tail if _is_read_only(t[2])]         # → 앞으로 띄움
+    strandable = [t for t in tail if not _is_read_only(t[2])]    # strand + 뒤
+    k = min(n, len(strandable))
+    fillers = strandable[len(strandable) - k:][::-1]      # 가장 가벼운 strandable, strand
+    strand_rest = strandable[:len(strandable) - k]
+    # dependent(prereq)는 global pending 후미로 (provider 뒤에 디스패치)
+    dep = [t for t in read_only + strand_rest if _has_prereq(t[1])]
+    early = [t for t in read_only if not _has_prereq(t[1])]      # no-dep read-only 최우선
+    late_rest = [t for t in strand_rest if not _has_prereq(t[1])]
+    out = []
+    for i, h in enumerate(head):
+        out.append(h[0])
+        if i < len(fillers):
+            out.append(fillers[i][0])
+    out += [t[0] for t in early]        # global pending 앞: no-dep read-only
+    out += [t[0] for t in late_rest]    # 그다음: no-dep 나머지 (non-read)
+    out += [t[0] for t in dep]          # 후미: dependent (provider 뒤)
+    return out
+
+
 def _worker_count(config) -> int:
     """워커 수 — run-892a 딥다이브(2026-07-11)로 잡은 무효화 버그: `-n` 실행에서
     수집·정렬은 xdist WORKER 프로세스가 하는데, xdist remote.setup_config가
@@ -183,15 +242,20 @@ def pytest_collection_modifyitems(config, items) -> None:
         # 동률 무리에 섞여 뒤로 밀렸음). 실측이 쌓이면 1차 키가 지배한다.
         return (lid in pinned, v, len(lc.get("steps") or []))
 
-    ordered = sorted((items[i] for i in slots), key=_key, reverse=True)
+    def _lc_of(it) -> dict:
+        lc = getattr(it, "callspec", None)
+        lc = lc.params.get("lifecycle") if lc else None
+        return lc if isinstance(lc, dict) else {}
+
+    ordered_items = sorted((items[i] for i in slots), key=_key, reverse=True)
+    triples = [(it, _lifecycle_id(it), _lc_of(it)) for it in ordered_items]
     # 실행 경로(local_run/console2)는 --dist=load --maxschedchunk=1 (2026-07-13
-    # run-afa8 판정): load는 글로벌 pending 풀을 유지해 빈 워커가 다음 대기를
-    # 동적으로 집는다(worksteal의 워커 shutdown→꼬리 붕괴 제거). 초기 청크는
-    # 워커당 2개(max(node_chunksize,2))이므로, [heavy,light] 페어 인터리브면
-    # 각 워커 초기 청크 = 1무거움+1가벼움 → 상위 n 몬스터 전부 offset 0(t=0)
-    # 시작, 나머지는 풀에서 리필. (--dist=worksteal로 되돌리면 라운드로빈으로
-    # 교체할 것 — dist 모드와 정렬은 한 쌍이다.)
-    ordered = _interleave_for_workers(ordered, _worker_count(config))
+    # run-afa8/19a5 판정). _order_for_load: heavy는 pair-first(t=0), read-only는
+    # global pending 앞으로 띄우고, dependent는 후미로 — load가 dequeue 시점에
+    # dependency를 못 보므로(테스트 불투명) dependency 순서를 수집 순서에 인코딩
+    # 한다. (--dist=worksteal로 되돌리면 _roundrobin_blocks_for_workers로 교체 —
+    # dist 모드와 정렬은 한 쌍이다.)
+    ordered = _order_for_load(triples, _worker_count(config))
     for slot, it in zip(slots, ordered):
         items[slot] = it
 

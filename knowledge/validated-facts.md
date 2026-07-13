@@ -2607,3 +2607,22 @@ engine `_catalog_key_for`(크레딧 경로) + validate(경고) 양쪽 반영. �
 `storage/filestorage/{setvolumereplication,deletevolumereplication,deletevolume}`로
 해석됨(단위 확인), validate 경고 6→3, offline 91 pass. 다음 heavy 콘솔 런
 (filestorage-dr alias 설정 시)이 이 세 키의 실 2xx 크레딧을 판정.
+
+## read-only/dependent 인지 순서 = _order_for_load (2026-07-13, run-19a5 오너 설계)
+
+run-19a5(load 첫 관측)에서 오너가 지적: gen-volume-type·*-reads·servicewatch 등
+**선행자원 없는 읽기전용이 30~40분에야 시작**. 원인 = interleave가 가장 가벼운 n개
+(read-only 포함)를 heavy와 페어링해 **heavy 뒤에 strand** → heavy(최대 40분)가 끝나야
+시작. worksteal→load 전환은 이걸 안 고침(둘 다 heavy 뒤 묶임).
+
+오너 모델("다 pending 넣고 dequeue 시 dependency 보고"): 이상적이나 **xdist는
+dequeue 시점에 테스트의 dependency를 못 본다**(테스트 불투명) → dependency 순서를
+**수집 순서에 인코딩**하는 게 achievable. `_order_for_load` (3-tier):
+- pair-first(t=0) = heavy(provider·병목) 상위 n
+- pair-second(strand) = 가장 가벼운 **non-read-only** n개 (read-only는 여기 안 씀)
+- global pending 앞 = **read-only(선행자원 무)** → 빈 워커가 초반에 집음
+- global pending 뒤 = **dependent(prereq)** → provider 도는 뒤에 디스패치
+
+heavy를 밀지 않아 makespan 무영향, read-only만 40분→초반으로 당겨진다(t=0은 heavy를
+밀어내야 해 makespan 리스크 → "초반"으로 안전 채택). `_is_read_only`(전부 GET)·
+`_has_prereq`(dependencies.json prerequisites)로 분류. offline 테스트 3종 신설.
