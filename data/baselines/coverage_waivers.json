@@ -1841,6 +1841,62 @@
       "reason": "REACHABILITY-ONLY (owner 2026-06-16). Parallel File Storage is gated on a provisioned PFS resource the shared account lacks; reachability (any response incl. 4xx = access confirmed) IS the definition-of-done. Stays in the C3 target as reachability-covered-when-reached, honestly distinct from verified-2xx. Modeled in knowledge/formal/resources/storage__parallel-filestorage.yaml.",
       "provenance": "docs",
       "added": "2026-06-16"
+    },
+    {
+      "key": "networking/cdn/createcdnservice",
+      "class": "unsatisfiable-flow",
+      "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
+      "provenance": "runtime",
+      "added": "2026-07-13"
+    },
+    {
+      "key": "networking/cdn/deletecdnservice",
+      "class": "unsatisfiable-flow",
+      "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
+      "provenance": "runtime",
+      "added": "2026-07-13"
+    },
+    {
+      "key": "networking/cdn/detailcdnservice",
+      "class": "unsatisfiable-flow",
+      "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
+      "provenance": "runtime",
+      "added": "2026-07-13"
+    },
+    {
+      "key": "networking/cdn/purgecdnservice",
+      "class": "unsatisfiable-flow",
+      "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
+      "provenance": "runtime",
+      "added": "2026-07-13"
+    },
+    {
+      "key": "networking/cdn/startcdnservice",
+      "class": "unsatisfiable-flow",
+      "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
+      "provenance": "runtime",
+      "added": "2026-07-13"
+    },
+    {
+      "key": "networking/cdn/stopcdnservice",
+      "class": "unsatisfiable-flow",
+      "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
+      "provenance": "runtime",
+      "added": "2026-07-13"
+    },
+    {
+      "key": "networking/cdn/updatecdnservice",
+      "class": "unsatisfiable-flow",
+      "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
+      "provenance": "runtime",
+      "added": "2026-07-13"
+    },
+    {
+      "key": "networking/cdn/updatedescriptionofcdnservice",
+      "class": "unsatisfiable-flow",
+      "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
+      "provenance": "runtime",
+      "added": "2026-07-13"
     }
   ]
 }
