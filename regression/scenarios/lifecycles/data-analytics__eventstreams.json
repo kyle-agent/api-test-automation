@@ -515,6 +515,20 @@
           "_note": "Body per CAMPAIGN-C3-100-docs-research.md §3 (docs-derived structure + carried-over topology hypothesis, see lifecycle _note). init_config_option.broker_sasl_id/zookeeper_sasl_id pattern ^[a-z]+$ 2-20 chars (api_docs eventstreamsinitconfigoptionrequest, VALIDATED via knowledge/formal/services/data-analytics__eventstreams.yaml create-cluster-required-init-config); name pattern ^[a-zA-Z]*$ (letters only, no digits) so {ualpha} (all-lowercase unique suffix) is used instead of {unique}. instance_groups is a SINGLE group of 3 ZOOKEEPER_BROKER instances (is_combined:true) — UNVERIFIED topology hypothesis, see lifecycle _note."
         },
         {
+          "name": "get-request-status",
+          "service": "eventstreams",
+          "group": "es-create",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/requests/{request_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "_note": "REPAIR 2026-07-13 (batch ① eventstreams showrequest): the async es-create 202 returns a real request_id (capture_soft above). Read it back IMMEDIATELY — before es-wait — so eventstreamsshowrequest (GET /v1/requests/{request_id}) gets a REAL 2xx even when Kafka provisioning later async-FAILs (the request record exists the moment the 202 is accepted). This is the ONLY path to a real request_id: no list/collection GET exposes it (see the read-only es-read lifecycle _note). If es-create didn't 202 (no request_id captured) the token stays literal, normalizes to catalog '*', and still records the call. Read-only, non-mutating."
+        },
+        {
           "name": "es-wait",
           "service": "eventstreams",
           "group": "es-create",

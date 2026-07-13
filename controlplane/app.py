@@ -156,6 +156,9 @@ def home(request: Request):
                    local_since_publish=local_since_publish,
                    schedules=db.list_schedules(),
                    coverage=coverage,
+                   # D8: 잔존 자원 홈 승격 — 마지막 캐시만 읽고 스캔은 트리거하지
+                   # 않는다(홈 열 때 자동 수집 금지). 잔존은 라이브 이 서버 관측.
+                   owned_kpi=resources.owned_summary(),
                    scenario_stats=_scenario_stats(),
                    catalog_count=_catalog_count(),
                    model_stats=_model_stats())

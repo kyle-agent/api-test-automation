@@ -546,6 +546,73 @@ def test_source_badges_and_empty_states():
     assert "badge badge-run" in detail and ">This run" in detail
 
 
+def test_verdict_vs_publish_time_split():
+    """v2 접목 5 — 판정 런 시각 ≠ 발행 갱신 시각 분리 병기.
+
+    배지의 ``@ts`` 는 판정 런 시각(history ts)인데, 발행본(dashboard-data)은 그
+    뒤 결과 없이 재발행돼 갱신 시각이 더 늦을 수 있다. pub_ts(발행 갱신 시각)가
+    주어지고 판정 시각과 다르면 '판정 @… · 발행 @…' 로 나눠 보여준다."""
+    from controlplane import common
+    from controlplane.app import templates
+
+    mod = templates.env.get_template("_badges.html").module
+
+    # 1) 두 시각이 다르면 분리 병기 ('@ts' 단일 표기는 쓰지 않는다)
+    split = mod.badge("published", ts="07-09 19:27", pub_ts="07-11 03:14",
+                      ident="dd:abc123")
+    assert "판정 07-09 19:27" in split
+    assert "발행 07-11 03:14" in split
+    assert "@07-09 19:27" not in split          # 단일 @ts 표기는 억제
+    assert "badge-ts2" in split                  # 발행 시각은 보조 스타일
+    assert "dd:abc123" in split                  # ident 는 그대로
+
+    # 2) 두 시각이 같으면 기존처럼 '@ts' 하나만 (노이즈 억제)
+    same = mod.badge("published", ts="07-09 19:27", pub_ts="07-09 19:27")
+    assert "@07-09 19:27" in same
+    assert "판정 " not in same and "발행 " not in same
+
+    # 3) 발행 시각을 못 구하면(pub_ts 없음) 기존 표기 유지 — 절대 깨지지 않음
+    none_pub = mod.badge("published", ts="07-09 19:27")
+    assert "@07-09 19:27" in none_pub
+    assert "발행 " not in none_pub
+
+    # 4) dd_ts_short 는 best-effort — git 접근 실패/부재에도 문자열만 반환
+    assert isinstance(common.dd_ts_short(), str)
+    # _dd_head 파서 재사용: committed 가 None 이면 빈 라벨
+    assert common.snap_ts_short({"ts": None}) == ""
+
+
+def test_residual_resources_home_kpi_d8():
+    """D8 — 잔존 자원 홈 승격 + 단일 표면.
+
+    비용·안전 사안인 잔존 자원이 실행 화면 깊숙이 숨어 있던 것을 홈 KPI 로
+    끌어올린다. 라이브 '이 서버' owned 스캔이라 출처 배지는 local(발행 아님),
+    스캔 안 한 상태는 '미확인'(0 으로 위장 금지, empty-state 규율). 정본 표면 =
+    /testing/resources (홈은 마지막 캐시만 읽고 자동 스캔하지 않는다)."""
+    from controlplane import dashdata, resources
+
+    # owned_summary(): 스캔 전이면 scanned=False, actionable/total=None (0 아님)
+    s = resources.owned_summary()
+    assert set(s) >= {"scanned", "scanning", "actionable", "stuck",
+                      "total", "age", "when", "error"}
+    if not s["scanned"]:
+        assert s["actionable"] is None and s["total"] is None
+
+    # /runtime·/local-run 은 잔존 단일 표면으로 이어짐 (별도 표면 발명 금지)
+    assert client.get("/local-run",
+                      follow_redirects=False).headers["location"] == "/testing/resources"
+
+    # 홈 KPI: 발행 스냅샷이 있으면 잔존 타일이 KPI 행에 뜬다 (local 배지 + 정본 링크)
+    if dashdata.latest_coverage():
+        home = client.get("/").text
+        assert "잔존 자원" in home
+        assert 'href="/testing/resources"' in home
+        assert "badge badge-local" in home       # 발행 아님 — 이 서버 관측
+        # 스캔 전이면 '미확인' + 지금 확인 유도 (0 으로 위장하지 않음)
+        if not resources.owned_summary()["scanned"]:
+            assert "미확인" in home and "지금 확인" in home
+
+
 def test_v2_shell_header_and_global_search():
     """v2 접목 6a (오너 지시 2026-07-11) — v2 셸의 상단 디자인 이식.
 

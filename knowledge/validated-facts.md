@@ -2520,3 +2520,90 @@ load와 더 잘 맞아 예측≈실측도 개선. **다음 풀런에서 라이�
 - 남은 큰 지렛대(백로그): 무거운 DB 하한 46분 자체 단축(provision·병렬) + durations
   과소추정(mariadb 실측 46 vs 커밋 40) 커밋본 fold + prereq-blocking 워커 점유
   (gen-cloudml-chain이 ske 대기하며 워커 잡음 → skip-when-not-ready 검토).
+## 배치 ① 4xx→2xx 수리 4종(+filestorage VM배선) + 블로커 2종 라이브 재확인 (2026-07-13, branch api-test-coverage-gzukh0)
+
+> conf: 0.5 · seen: 2026-07-13 · obs: 1 (offline+read-only-live; heavy 2xx는 다음 콘솔 런 판정)
+
+인계된 "①배치 코드로 즉시 노려볼 4xx" 중 **코드로 안전 수리 가능한 3종**을 반영
+(heavy 라이프사이클이라 실 2xx는 SCP_RUN_HEAVY 콘솔 런에서 판정):
+
+1. **DBaaS setblockstoragesize (mysql·postgresql) = OS 롤 그룹 리사이즈 금지.**
+   `database-mysql-cluster`/`database-postgresql-cluster`(scenarios.json)의 create
+   body는 block_storage_group을 **OS 롤 1개**만 만든다. bsg_id=block_storage_groups
+   [0]=OS를 리사이즈하면 400 `Dbaas.ValidationError.InvalidBlockStorageRoleType`
+   (subops-full run-923a 라이브 확정과 동일 클래스). 수리: subops-full의 검증된
+   패턴 이식 — add-block-storages(role_type:DATA)→settle-poll→
+   `capture_soft bsg_data_id=$.instance_groups[0].block_storage_groups[1].id`→
+   그 DATA 그룹을 resize(size_gb 208=104×2). instance_group_id는 mysql은 미캡처라
+   capture-block-storage-group에 추가(pg는 기존 capture-instance-group에 존재).
+
+2. **eventstreams showrequest = async 202의 request_id만이 유일 경로.**
+   어떤 list/collection GET도 request_id를 노출하지 않는다(read-only es-read
+   라이프사이클 _note). es-create(202 AsyncResponse)가 `$.request_id`를
+   capture_soft하므로, **es-wait 직전에** `GET /v1/requests/{request_id}` 스텝
+   삽입 → Kafka 프로비저닝이 나중에 async-FAIL해도(2026-07-13 4연속 FAILED, PF
+   후보) 202 수락 순간 request 레코드는 존재하므로 showrequest는 실 2xx 획득.
+
+3. **cachestore set-commands = maxmemory-policy는 modifiable 아님.**
+   listcommands(GET /v1/clusters/{cluster_id}/commands) 응답
+   `{contents:[{id,name,modifiable,applied_value,description}]}`(api_docs
+   response_example). 하드코딩 `{name:maxmemory-policy,id:""}`는 modifiable이
+   아니라 400. 수리: `where_prefix modifiable=true`로 실 커맨드 id+name+
+   applied_value 캡처 → modifycommandrequest {commands:[{id,name,new_value=
+   applied_value}]}(no-op 되돌림, set-parameter-values 관용). **미검증**:
+   modifiable 필드가 문자열 "true"인지 boolean true인지(where_prefix는 startswith
+   문자열 매칭) — 콘솔 런에서 정정. 리터럴 폴백이라 무회귀.
+
+**라이브 read-only 재확인으로 인계 낙관론 정정 (여전히 블로커, 코드 수리 불가):**
+- **kms updatemanagedkeydescription/showmanagedkey**: `GET /v1/managed-kms/transit`
+  → 200 `{count:0, keys:[]}` (2026-07-13). managed key는 system-managed(create API
+  없음)이고 계정에 0개 → 실 id 확보 원천 불가. **영구 블로커**(2026-06-23 이래 불변).
+- **filestorage setaccessrule**: `object_id`에 실 VM 요구. 단독 라이프사이클
+  (storage__filestorage.json)은 VPC/VM-free라 가짜 UUID → 404
+  `VirtualServer.VirtualServerNotFound`(참조자원 부재 fail-fast, 형식/권한 오류
+  아님; `GET /v1/servers`→200 `{servers:[]}`, `/v1/virtual-servers`→403 실측).
+  **수리 (2026-07-13, 오너 지시 "VM에 dependency 걸어 테스트"):** gen-heavy-vs-netops가
+  이미 ACTIVE VM({server_id})을 상비하므로 거기에 filestorage NFS 볼륨 create +
+  setaccessrule(add/remove) optional 그룹(`fs-vm-access`) 편입 — object_id=
+  {server_id}로 실 2xx 노림. **주의: 모든 filestorage 스텝에 `service:filestorage`
+  필수** (`/v1/volumes`가 virtualserver block-volume 호스트와 경로 충돌; service
+  태그가 filestorage 호스트로 라우팅; 토큰도 `fs_volume_id`로 분리). remove로
+  규칙 되돌린 뒤 cleanup이 볼륨 삭제(잔존 규칙이 deletevolume 400 유발 가능).
+  다음 heavy 콘솔 런이 2xx 판정.
+- **cloudmonitoring show-event-policy**: `GET .../event/v2/event-policies` → 400
+  `InvalidInputValue`(resourceType/productResourceId 필수), 등록 모니터링 리소스 0.
+  이벤트 정책 생성 자체가 등록 INSTANCE 필요 → show reads의 실 id 확보 불가.
+  **블로커**(2026-09 단종 예정, 깊은 투자 금지).
+
+## filestorage replication 400 = source-side 제약 + DR 별칭 크레딧 버그 (2026-07-13, 오너 질문)
+
+> conf: 0.7 · seen: 2026-07-13 · obs: 2 (2026-06-24/07-08/07-09 라이브 + 이 세션 코드 추적)
+
+**증상**: 대시보드에서 `setvolumereplication`(PUT /v1/replications/{replication_id})
++ `deletevolumereplication`(DELETE 동경로)이 계속 **400**.
+
+**원인 A — 제품 제약(정상 400)**: 교차리전 복제는 볼륨 2개를 만든다 —
+source(kr-west1, `purpose=original`) + DR replica(kr-east1, `purpose=replication`).
+복제 **정책 변경(set)·삭제(delete)는 source 측에서 금지** → 400
+`filestorage.BadRequest.Invalid.volume.purpose`("Check the volume purpose."). 게다가
+deletevolumereplication은 **paused 선행**을 요구. `purpose`는 VolumeCreateRequest에
+없는 서버관리 상태필드(생성 body는 name/protocol/type_name뿐)라 create 보강으로
+못 고친다 — 어느 **리전 호스트에서 부르느냐**가 본질. 실 2xx 경로(오너 절차,
+2026-07-09 end-to-end 라이브 실증): DR(복제본) 리전에서 ① set-replication-dr
+policy=paused(202) ② delete-replication-dr(202, 레코드 ~20s 내 양 리전 소멸,
+source purpose original→none) ③ snapshot 정리 ④ 양 볼륨 삭제. DR 스텝은
+`filestorage-dr` service 별칭 = `SCP_SERVICE_HOSTS='{"filestorage-dr":
+"https://filestorage.kr-east1.e.samsungsdscloud.com"}'` 런타임 설정 필요(미설정 시
+region-template 호스트가 NXDOMAIN).
+
+**원인 B — 크레딧 버그(이 세션 발견·수리)**: `_catalog_key_for`/validate는
+`(method, path, service)`로 카탈로그 키를 찾는데 카탈로그 service는 `filestorage`고
+DR 스텝은 `filestorage-dr` 별칭 → **매칭 실패 → `_ck` None → `_record_smoke` 미호출**.
+즉 DR 측이 202를 내도 카탈로그 키에 크레딧이 안 되고, 크레딧되는 건 source 측
+(항상 400 프로브)뿐 → 세 엔드포인트(set/deletevolumereplication + DR replica의
+deletevolume)가 **영구 400 고착**. **수리**: `_canon_service()` — 리전 라우팅 별칭
+`<service>-dr`을 base service로 정규화(실 SCP 서비스명에 `-dr` 없음 → 무모호).
+engine `_catalog_key_for`(크레딧 경로) + validate(경고) 양쪽 반영. 검증: 세 키가
+`storage/filestorage/{setvolumereplication,deletevolumereplication,deletevolume}`로
+해석됨(단위 확인), validate 경고 6→3, offline 91 pass. 다음 heavy 콘솔 런
+(filestorage-dr alias 설정 시)이 이 세 키의 실 2xx 크레딧을 판정.

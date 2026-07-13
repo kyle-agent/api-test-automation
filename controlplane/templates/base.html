@@ -77,6 +77,9 @@
   .badge-local{color:var(--green);border-color:#bfe5cd;background:var(--green-bg)}
   .badge-run{color:var(--purple);border-color:#ddccf3;background:var(--purple-bg)}
   .badge-stale{color:var(--amber);border-color:#f0d9a8;background:var(--amber-bg)}
+  /* 판정 런 시각 ≠ 발행 갱신 시각 분리 병기 (v2 접목 5): 발행 갱신 시각(badge-ts2)은
+     보조 정보라 살짝 흐리게 — 판정 시각(수치의 근거)이 1급으로 읽히게 한다. */
+  .badge .badge-ts2{opacity:.72;font-weight:600}
   /* 노후 발행본이면 수치 회색화 (계약 원칙 1-4) — 카드에 is-stale 부여 */
   .is-stale .v{color:var(--muted)!important}
   .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
@@ -264,6 +267,7 @@
       {% if hdr_snap %}
         {{ badge('published',
                  ts=(snap_ts_label if snap_ts_label is defined and snap_ts_label else none),
+                 pub_ts=(dd_ts_label if dd_ts_label is defined and dd_ts_label else none),
                  ident=('dd:' ~ dd_sha if dd_sha is defined and dd_sha else none),
                  stale=(snap_stale is defined and snap_stale)) }}
       {% else %}

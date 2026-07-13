@@ -207,7 +207,12 @@
           "group": "role-real",
           "optional": true,
           "destructive": true,
-          "_note": "removebulkrolepolicybindings: detaches all policy bindings from the role.",
+          "json": {
+            "policy_ids": [
+              "00000000000000000000000000000000"
+            ]
+          },
+          "_note": "removebulkrolepolicybindings: detaches all policy bindings from the role. REPAIR 2026-07-13: the DELETE had NO body -> 400 ValidationError 'Field required' (c373); the endpoint requires {policy_ids} (same body the iam-role-existing:remove-role-policy-bindings-bulk step sends for a CONFIRMED 204). Synthetic id mirrors add-role-policy-bindings above; since createrole 500s on this account (PF-20) role_id stays a placeholder so the call still 4xx's on the parent — but the body is no longer the failure.",
           "expect_status": [
             200,
             202,

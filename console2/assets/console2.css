@@ -172,6 +172,28 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .modal .mfoot{display:flex;align-items:center;gap:10px;padding:11px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
 .modal .mfoot .muted{margin-right:auto}
 
+/* pre-flight blast-radius 모달 — 요약 1급 + 세부 접힘 (오너 2026-07-13:
+   "목록이 잘 보이지도 않고 · 세부는 접혀있고 확인하면 실행"). 요약줄로 blast
+   radius 를 한눈에, 서비스별 표·과금 목록은 <details> 로 접어 확인 게이트+실행
+   버튼이 스크롤 없이 바로 보이게 한다. */
+.pf-sum{display:flex;flex-wrap:wrap;gap:5px 14px;align-items:baseline;
+  padding:9px 12px;margin:2px 0 6px;background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;font-size:12.5px}
+.pf-sum b{font-size:14px;color:var(--ink)}
+.pf-sum-heavy{color:var(--red);font-weight:700}
+.pf-sum-ok{color:var(--green);font-weight:700}
+.pf-det{border:1px solid var(--line);border-radius:8px;margin:6px 0;background:#fff}
+.pf-det>summary{cursor:pointer;padding:8px 12px;font-size:12px;font-weight:600;color:var(--muted);
+  list-style:none;display:flex;align-items:center;gap:7px}
+.pf-det>summary::-webkit-details-marker{display:none}
+.pf-det>summary::before{content:"▸";color:var(--line2);font-size:10px;flex:0 0 auto}
+.pf-det[open]>summary{color:var(--ink);border-bottom:1px solid var(--line)}
+.pf-det[open]>summary::before{content:"▾"}
+.pf-det-body{padding:6px 12px 10px;max-height:44vh;overflow:auto}
+.pf-heavy-list{font-size:11px;line-height:1.95;word-break:break-all}
+.pf-confirm{display:flex;gap:8px;align-items:center;margin:11px 0 2px;padding:10px 12px;
+  cursor:pointer;background:#fdecea;border:1px solid var(--red);border-radius:8px;font-size:13px}
+
 /* 📖 definition viewer — wider READ-ONLY reference (lifecycle · endpoints · 지식) */
 .def-modal{width:840px}
 .def-sec{margin:4px 0 15px}
@@ -859,3 +881,14 @@ g.rg-selbox{cursor:pointer}
 .pva-act{position:absolute;top:3px;height:7px;border-radius:3px;background:var(--accent);
   box-shadow:0 0 0 2px #fff}
 .pva-act.over{background:#eda100}
+/* 현재 경과 재생헤드 — 진행에 따라 움직이는 세로선 (오너 2026-07-13). 전체 높이
+   가로선; 스크롤 시 트랙과 함께 이동, 스티키 레인(z-index:2) 뒤로 숨음(z-index:1).
+   pointer-events:none 로 아래 막대 hover 를 막지 않는다. JS 오프셋(레인 190 + 패딩
+   8)은 이 규칙의 .sim-lane width·.sim-gantt padding-left 와 짝. */
+.pva-gantt{position:relative}
+.pva-now{position:absolute;top:1px;bottom:1px;width:0;z-index:1;pointer-events:none;
+  border-left:2px solid var(--red)}
+.pva-now.done{border-left-color:var(--muted);border-left-style:dashed}
+.pva-now-lbl{position:absolute;top:-1px;left:2px;font-size:9px;font-weight:700;color:#fff;
+  background:var(--red);border-radius:0 4px 4px 0;padding:0 4px;line-height:1.45;white-space:nowrap}
+.pva-now.done .pva-now-lbl{background:var(--muted)}

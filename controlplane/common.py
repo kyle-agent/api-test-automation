@@ -16,6 +16,7 @@ absolute timestamp, plus a ``snap_stale`` flag when the snapshot is older than
 from __future__ import annotations
 
 import datetime as _dt
+import os as _os
 
 from controlplane import dashdata, dispatch, triage
 from core import profiles as core_profiles
@@ -61,31 +62,58 @@ def snap_ts_short(snap: dict | None) -> str:
         "%m-%d %H:%M")
 
 
-# 발행 식별자(dd sha) 캐시 — 헤더 배지가 페이지 렌더마다 subprocess 를 돌리지
-# 않게 60s TTL (dashdata 의 fetch TTL 과 동일한 감각).
-_DD_SHA_CACHE: dict = {"ts": 0.0, "sha": None}
+# 발행 저장소(dashboard-data) HEAD 캐시 — 헤더 배지가 페이지 렌더마다 subprocess
+# 를 돌리지 않게 60s TTL (dashdata 의 fetch TTL 과 동일한 감각). sha 와 커밋 시각을
+# 한 번에 담는다 (v2 접목 5 — 판정 런 시각 ≠ 발행 갱신 시각을 병기하려면 둘 다 필요).
+_DD_HEAD_CACHE: dict = {"ts": 0.0, "sha": None, "committed": None}
+
+
+def _dd_head() -> dict:
+    """dashboard-data 브랜치 HEAD 의 ``{"sha", "committed"}`` (60s 캐시).
+
+    ``sha`` = 단축 커밋 해시 (발행 식별자). ``committed`` = 그 커밋의 committer
+    시각(``%Y-%m-%dT%H:%M:%SZ`` UTC 문자열) = **발행 저장소가 마지막으로 갱신된
+    시각**. 결과 없는 재발행이면 판정 런 시각(history ts)보다 나중일 수 있다 —
+    이 어긋남을 배지가 정직하게 병기한다 (v2 접목 5). best-effort: git 접근 실패는
+    None 으로 강등, 배지는 해당 세그먼트를 그냥 생략한다."""
+    import subprocess
+    import time as _time
+    from pathlib import Path
+    now = _time.time()
+    if now - _DD_HEAD_CACHE["ts"] < 60:
+        return _DD_HEAD_CACHE
+    root = str(Path(__file__).resolve().parent.parent)
+    sha = committed = None
+    try:
+        # %h·%cd 한 번에 — committer date 는 UTC ISO(%cd:format 지정)로 받아
+        # snap_ts_short 와 같은 파서를 재사용한다.
+        p = subprocess.run(
+            ["git", "show", "-s", "--format=%h%x00%cd",
+             "--date=format-local:%Y-%m-%dT%H:%M:%SZ", "origin/dashboard-data"],
+            capture_output=True, text=True, timeout=10,
+            cwd=root, env={**_os.environ, "TZ": "UTC"})
+        out = (p.stdout or "").strip()
+        if p.returncode == 0 and "\x00" in out:
+            sha, committed = out.split("\x00", 1)
+            sha, committed = (sha.strip() or None), (committed.strip() or None)
+    except Exception:
+        sha = committed = None
+    _DD_HEAD_CACHE.update(ts=now, sha=sha, committed=committed)
+    return _DD_HEAD_CACHE
 
 
 def dd_sha() -> str | None:
     """발행 식별자 = dashboard-data 브랜치 HEAD 단축 sha (v2 접목 — v2
     published.py._dd_sha 이식). 헤더 Published 배지의 ident 로 쓴다:
     같은 발행본을 보고 있는지 서버·사람끼리 대조하는 용도."""
-    import subprocess
-    import time as _time
-    from pathlib import Path
-    now = _time.time()
-    if now - _DD_SHA_CACHE["ts"] < 60:
-        return _DD_SHA_CACHE["sha"]
-    try:
-        p = subprocess.run(
-            ["git", "rev-parse", "--short", "origin/dashboard-data"],
-            capture_output=True, text=True, timeout=10,
-            cwd=str(Path(__file__).resolve().parent.parent))
-        sha = p.stdout.strip() or None
-    except Exception:
-        sha = None
-    _DD_SHA_CACHE.update(ts=now, sha=sha)
-    return sha
+    return _dd_head()["sha"]
+
+
+def dd_ts_short() -> str:
+    """발행 갱신 시각(dashboard-data HEAD committer date)의 짧은 KST 라벨
+    ("MM-DD HH:MM") — 판정 런 시각(``snap_ts_short``)과 **병기**해 결과 없는
+    재발행으로 벌어진 시점 차를 드러낸다 (v2 접목 5). 접근 실패는 빈 문자열."""
+    return snap_ts_short({"ts": _dd_head()["committed"]})
 
 
 def base_ctx(active: str) -> dict:
@@ -113,4 +141,5 @@ def base_ctx(active: str) -> dict:
         "snap_stale": age["stale"],
         "snap_ts_label": snap_ts_short(snap),
         "dd_sha": dd_sha(),
+        "dd_ts_label": dd_ts_short(),  # 발행 갱신 시각 (판정 런 시각과 병기 — 접목 5)
     }

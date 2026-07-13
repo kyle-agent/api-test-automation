@@ -167,7 +167,12 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/reports",
-          "_note": "listreports — docs model declares no params but a period query may be undocumented-required (apigw-api node R3 note). 400 tolerated so the run survives; if live shows 400, fix the param and tighten.",
+          "params": {
+            "stage_name": "{stage_name}",
+            "start_date": "2026-07-01",
+            "end_date": "2026-07-31"
+          },
+          "_note": "REPAIR 2026-07-13 (apigateway listreports 2xx): api_docs listreports declares THREE required query params (stage_name·start_date·end_date, all required) that were missing -> 400 'stage name should be 3~50 characters' + Field required ×2 (c373). stage_name={stage_name} is the real 'dev' stage captured by find-stage-name; start/end are a static YYYY-MM-DD window covering the run. Reports may be empty for a just-created api but the call now 2xx's (empty series). 400 kept tolerant in case the stage capture missed.",
           "expect_status": [
             200,
             400

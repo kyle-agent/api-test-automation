@@ -3,15 +3,22 @@
    v1 기존 결정(P2C-12, common.STALE_AFTER_H=48h)을 따른다 (계약의 24h와 다름 —
    결정 지점, docs/working/trackers/V1-GRAFT.md).
    'ci'는 병합 런 타임라인의 행별 출처용(계약 §2.1 "CI/이 서버") — 파랑 재사용.
-   모든 수치 카드·표의 출처 표기는 이 매크로만 사용 (별도 배지 마크업 금지). #}
-{% macro badge(source, ts=None, ident=None, stale=False) -%}
+   모든 수치 카드·표의 출처 표기는 이 매크로만 사용 (별도 배지 마크업 금지).
+
+   ts    = 판정 런 시각 (history ts) — 수치의 근거가 된 결과 런이 돈 시각.
+   pub_ts= 발행 갱신 시각 (dashboard-data HEAD 커밋 시각) — 발행본이 마지막으로
+           갱신된 시각. 결과 없는 재발행이면 판정 런 시각보다 나중일 수 있다.
+           pub_ts 가 있고 ts 와 다르면 '판정 @… · 발행 @…' 로 분리 병기한다
+           (v2 접목 5). 같거나 없으면 기존처럼 '@ts' 하나만. #}
+{% macro badge(source, ts=None, ident=None, stale=False, pub_ts=None) -%}
 {%- set names = {'published': 'Published', 'local': 'This server', 'run': 'This run', 'ci': 'CI'} -%}
 {%- set styles = {'published': 'published', 'local': 'local', 'run': 'run', 'ci': 'published'} -%}
 {%- set tips = {'published': '발행된 공식 집계 — 어느 서버에서 열어도 같은 값',
                 'local': '이 서버에서만 관측된 값 — 공식 집계와 다를 수 있음',
                 'run': '특정 실행 1건에 고정된 값 (과거형)',
                 'ci': 'GitHub Actions에서 실행된 공식 런 기록'} -%}
+{%- set split_ts = (pub_ts and ts and pub_ts != ts) -%}
 <span class="badge badge-{{ styles[source] }}{% if stale %} badge-stale{% endif %}"
-      title="{{ tips[source] }}{% if stale %} · 노후 발행본 — 화면 수치가 현재 상태와 다를 수 있습니다{% endif %}"><i
-  class="dot"></i>{{ names[source] }}{% if ts %} @{{ ts }}{% endif %}{% if ident %} · {{ ident }}{% endif %}{% if stale %} · 노후{% endif %}</span>
+      title="{{ tips[source] }}{% if split_ts %} · 판정 {{ ts }} = 이 수치를 낸 결과 런 시각 · 발행 {{ pub_ts }} = 발행본이 갱신된 시각 (결과 없이 재발행됐을 수 있음){% endif %}{% if stale %} · 노후 발행본 — 화면 수치가 현재 상태와 다를 수 있습니다{% endif %}"><i
+  class="dot"></i>{{ names[source] }}{% if split_ts %} · <span class="badge-ts" title="판정 런 시각">판정 {{ ts }}</span> · <span class="badge-ts2" title="발행 갱신 시각 — 결과 없는 재발행일 수 있음">발행 {{ pub_ts }}</span>{% elif ts %} @{{ ts }}{% endif %}{% if ident %} · {{ ident }}{% endif %}{% if stale %} · 노후{% endif %}</span>
 {%- endmacro %}

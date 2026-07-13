@@ -184,15 +184,52 @@
           "group": "param"
         },
         {
+          "name": "capture-modifiable-command",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/commands",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "commands",
+          "capture_soft": {
+            "cmd_id": {
+              "list": "$.contents",
+              "where_prefix": {
+                "modifiable": "true"
+              },
+              "get": "id"
+            },
+            "cmd_name": {
+              "list": "$.contents",
+              "where_prefix": {
+                "modifiable": "true"
+              },
+              "get": "name"
+            },
+            "cmd_value": {
+              "list": "$.contents",
+              "where_prefix": {
+                "modifiable": "true"
+              },
+              "get": "applied_value"
+            }
+          },
+          "_note": "REPAIR 2026-07-13 (batch ① cachestore set-commands 2xx): the old body hardcoded name=maxmemory-policy id='' which is NOT a modifiable command -> 400. cachestorelistcommands returns contents:[{id,name,modifiable,applied_value,...}] (api_docs response_example); soft-capture a REAL modifiable command's id+name+applied_value here (where_prefix modifiable=true — UNPROVEN whether the field serializes as string 'true' vs boolean; live run정정). set-commands below then echoes applied_value as new_value (documented no-op, reversible, mirrors set-parameter-values). Absent a live cluster the tokens stay literal -> tolerated 4xx, no regression."
+        },
+        {
           "name": "set-commands",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/commands",
           "json": {
             "commands": [
               {
-                "id": "",
-                "name": "maxmemory-policy",
-                "new_value": "allkeys-lru"
+                "id": "{cmd_id}",
+                "name": "{cmd_name}",
+                "new_value": "{cmd_value}"
               }
             ]
           },

@@ -28,7 +28,8 @@
         <b>({{ snap_age }})</b>{% endif %}</span>
       {# v2 접목 1: 판정 헤드라인의 출처 배지 (기존 '노후 스냅샷' chip 을 흡수 —
          stale 이면 배지가 노랑 + '노후' 표기) + D2 보조 칩(발행 이후 이 서버 런). #}
-      {{ badge('published', ts=(snap_ts_label if snap_ts_label is defined else none), stale=snap_is_stale) }}
+      {{ badge('published', ts=(snap_ts_label if snap_ts_label is defined else none),
+               pub_ts=(dd_ts_label if dd_ts_label is defined and dd_ts_label else none), stale=snap_is_stale) }}
       {% if local_since_publish is defined and local_since_publish %}<a class="chip s-verified"
         href="/testing/embed"
         title="발행 판정 이후 이 서버에서 완료된 로컬 런 — 공식 판정에는 아직 반영되지 않았습니다 (판정은 발행본 기준)">발행 이후 이 서버 런 {{ local_since_publish }}건 →</a>{% endif %}
@@ -66,6 +67,23 @@
       <div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
       <div class="k">신규 fail</div>
       <div class="goal" style="margin-top:8px">{{ '회귀 발생 — Triage 확인' if fail_new else '회귀 없음' }} · {{ badge('published', stale=snap_is_stale) }}</div>
+    </div>
+    {# D8: 잔존 자원 홈 승격 — 비용·안전 사안이 실행 화면 깊숙이 숨어 있던 것을
+       KPI 로 끌어올림. 라이브 '이 서버' owned 스캔(발행 스냅샷 아님 → local 배지) +
+       마지막 스캔 캐시만 표시(홈이 자동 스캔하지 않음, 스캔은 /testing/resources 에서).
+       미스캔은 '미확인'(0 위장 금지, empty-state 규율). 정본 표면 = /testing/resources. #}
+    <div class="card tile" title="잔존 자원 — 이 서버에서 실측(owned 스캔)한, 우리 소유 태그가 붙은 채 계정에 남아있는 자원. 라이브 관측(발행 스냅샷 아님). 홈은 마지막 스캔 결과 캐시만 보여주며 열 때 자동 스캔하지 않는다 — 새로 수집은 잔존 단일 표면(/testing/resources)에서.">
+      {% if owned_kpi is defined and owned_kpi and owned_kpi.scanned %}
+      <div class="v" style="color:var({{ '--red' if owned_kpi.actionable else '--green' }})">{{ owned_kpi.actionable }}</div>
+      <div class="k">잔존 자원{% if owned_kpi.stuck %} <span class="muted small">(+기지 {{ owned_kpi.stuck }})</span>{% endif %}</div>
+      <div class="goal" style="margin-top:8px">{% if owned_kpi.scanning %}확인 중…{% else %}마지막 확인 {{ owned_kpi.when }} <span class="muted small">({{ owned_kpi.age }})</span>{% endif %}
+        · <a href="/testing/resources">단일 표면 →</a> · {{ badge('local') }}</div>
+      {% else %}
+      <div class="v" style="color:var(--muted)">미확인</div>
+      <div class="k">잔존 자원</div>
+      <div class="goal" style="margin-top:8px">아직 스캔 안 함 — <b>0 아님</b> ·
+        <a href="/testing/resources">🔍 지금 확인 →</a> · {{ badge('local') }}</div>
+      {% endif %}
     </div>
   </div>
 {% else %}

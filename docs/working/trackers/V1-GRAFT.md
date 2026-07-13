@@ -20,9 +20,30 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 | 2 | 계획↔실행 연속성 (PLAN vs ACTUAL 스트립) | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
 | 3 | 종료 후 다음 행동 카드 | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
 | 4 | 실행 중 이상 감지 (지연 의심·실패 군집) | 대기 | **엔진 요청 #5(세마포어 대기 이벤트) 선행** |
-| 5 | 판정 시각 분리 표기 (발행 시각 ≠ 판정 런 시각) | 부분 | 배지 ts는 판정 런 시각(history ts) 사용 — 분리 병기는 후속 |
+| 5 | 판정 시각 분리 표기 (발행 시각 ≠ 판정 런 시각) | **완료 (2026-07-13, 이 브랜치)** | 아래 상세 — 배지가 '판정 @… · 발행 @…' 로 병기 |
 | 6 | (검토) 용어 툴팁·정의 노출 | 대기 | 오너 확인 후 |
 | 6a | v2 셸 헤더 (네비 스타일·전역 검색·헤더 Published 배지) | **완료 (2026-07-11, 오너 지시)** | 아래 상세 |
+
+## 접목 5 상세 — 판정 런 시각 ≠ 발행 갱신 시각 분리 병기
+
+- **문제**: Published 배지의 `@ts` 는 판정 런 시각(history.jsonl `ts`) 하나뿐이라,
+  발행본(dashboard-data)이 결과 없이 재발행돼 갱신 시각이 더 늦은 경우 그 어긋남이
+  화면에 드러나지 않았다 (v2 published.py 실측 교훈 — V1-GRAFT §접목 1 각주).
+- **소스 2종**: 판정 런 시각 = `common.snap_ts_short(snap)` (history ts). 발행 갱신
+  시각 = `common.dd_ts_short()` = dashboard-data HEAD **committer date**
+  (`git show -s --format=%cd --date=…` UTC → KST 짧은 라벨). dd_sha 와 같은
+  `_dd_head()` 60s 캐시에서 한 번에 조회 (subprocess 1회).
+- **배지 매크로** `_badges.html`: `pub_ts` 인자 추가. `pub_ts` 가 있고 `ts` 와
+  **다를 때만** `판정 @… · 발행 @…` 로 분리 병기(발행 시각은 `.badge-ts2` 로
+  살짝 흐리게 — 판정 시각이 1급), 같거나 없으면 기존 `@ts` 단일 표기 유지
+  (노이즈 억제). 툴팁에 두 시각의 의미 명기.
+- **호출부**: 헤더(base.html)·홈 판정 배너(home.html)·리포팅 요약(reporting.html)
+  의 Published 배지에 `pub_ts=dd_ts_label` 전달. `base_ctx` 가 `dd_ts_label` 주입.
+  타일 5장 배지는 ts 없는 출처 마커라 그대로.
+- reporting.html:173 의 fail_new "판정 런과 발행물의 시점 차이" 칩과 정합 (배지가
+  이제 그 어긋남을 시각으로 직접 보여줌).
+- 검증: `test_verdict_vs_publish_time_split` (분리/단일/부재/best-effort 4케이스) +
+  라이브 확인 (`dd_ts_short()` → '07-10 13:35', dd_sha 041884a1).
 
 ## 접목 6a 상세 — v2 셸 헤더 이식 (오너 지시 2026-07-11)
 
@@ -45,6 +66,58 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   legacy 링크(불필요) · v2 축 이름(Services/Model/Runs/Results/Tools — 오너
   지시로 v1 이름 유지).
 - 검증: tests_offline `test_v2_shell_header_and_global_search` (23/23).
+
+## D8 상세 — 잔존 자원 홈 승격 + 단일 표면 (CX-IA-DESIGN §4.3 D8)
+
+- **왜**: 잔존 자원은 비용·안전 사안인데 실행 화면 깊숙이 숨어 있었다 (CX-IA W2·D8).
+- **단일 표면 (선행 IA 페이즈에서 이미 완료 — 이 세션이 확인)**: `/testing/resources`
+  가 잔존의 정본 표면. 마지막 스캔 결과 캐시 + `POST /testing/resources/scan` "새로
+  수집" 버튼(백그라운드, 열 때 자동 수집 안 함). 구 표면은 전부 리다이렉트 —
+  `/local-run`·구 inventory → 301 `/testing/resources`. console2 는 `/runtime?scope=mine`
+  링크 + DETAIL 탭 iframe 임베드로 이 표면을 재사용(별도 스캔 경로 발명 금지).
+  (`/runtime` = 활동 토폴로지(loggingaudit×oplog)로 잔존 스캔과는 별개 관심사.)
+- **홈 승격 (이 세션의 미완분)**: 홈 KPI 행에 '잔존 자원' 타일 신설.
+  - `resources.owned_summary()` — `owned_state()` 캐시를 **읽기만** 하고 스캔은
+    트리거하지 않는다. `actionable`(기지 제외 = 우리가 치워야 할 잔존, normal 수)
+    을 헤드라인으로, `stuck`(문서화된 기지 항목)은 '+기지 N' 보조 표기.
+  - 잔존은 라이브 **이 서버** 관측이라 배지는 `local`(발행 스냅샷 아님 — 다른 5
+    타일의 published 와 구분). empty-state 규율: 미스캔은 '미확인 · 0 아님'
+    (0 으로 위장 금지) + [🔍 지금 확인 →] 로 정본 표면 유도.
+  - 색: actionable 0 이면 초록, >0 이면 빨강. '마지막 확인 HH:MM (N분 전)' 병기.
+- 검증: `test_residual_resources_home_kpi_d8` (owned_summary 스키마·미스캔 None·
+  /local-run 리다이렉트·홈 타일 local 배지+정본 링크+미확인 유도) + 라이브 렌더 확인.
+
+## 콘솔 실행 화면 개선 (오너 지시 2026-07-13)
+
+오너 실사용 제보 3건 — 전부 console2(`console2/assets/console2.js`·`.css`).
+
+- **① 사전 점검(blast radius) 모달 — 요약 1급 + 세부 접힘** ("목록이 잘 보이지도
+  않고 · 세부는 접혀있고 확인하면 실행"). 120 lifecycle 표 + 과금 30개 목록이 좁은
+  스크롤 영역에서 경쟁해 표 헤더가 잘리고 확인 체크박스·실행 버튼까지 한참
+  스크롤해야 했다. 재구성(`pfRender`):
+  - **요약줄 `.pf-sum`**(1급): `N lifecycle · 생성 ~ · 삭제 ~ · ETA p50~p90 ·
+    VPC peak/여유 · ⚠️과금 N`(비과금이면 '과금 없음' 초록) — blast radius 한눈에.
+  - 서비스별 표 + 과금 라이프사이클 목록은 **`<details class="pf-det">` 기본 접힘**.
+    경고(dropped=P2C-26 선택 누락·queued)는 **접지 않음**(안전 정보).
+  - 확인 게이트 `.pf-confirm`(heavy만) + 실행 버튼은 접힘 밖 — 스크롤 없이 즉시
+    보임. 실행은 여전히 명시 체크→버튼(Hard Rule 1, 자동 실행 아님).
+- **② 실행 직후 성공 창 제거** ("이 창은 없어도 될 듯 · 필요하면 내가 알아서
+  리포트 볼게"). `postRun` 이 이미 run 화면 전환+리포트 렌더+스크롤을 하므로,
+  성공 시 중간 확인 창("✅ LIVE 실행 시작 — 리포트 보기/활동 흐름")은 그 리포트를
+  가리는 중복이었다 → 성공 시 `pfClose()` + `toast("✅ LIVE 실행 시작 — run …")`.
+  실패(409 중복 등)는 모달에 사유 유지(안전).
+- 검증: `node --check` + `pfRender` 헤드리스 하네스(요약·접힘·확인 게이트·실행버튼
+  구조 / 비과금 케이스 / 성공 시 pfClose+toast·옛 창 부재) 전부 PASS. 기존 console2
+  오프라인 테스트가 변경 문자열을 검사하지 않아 회귀 없음.
+- **③ '예측 vs 실제 타임라인' 패널 — 현재 경과 재생헤드** ("현재 라인이 세로로
+  한 줄 있어서 움직이도록 하면 이해가 쉬울 듯"). 간트에 전체 높이 세로선(`.pva-now`)
+  을 `nowRel`(현재 경과) 위치에 그린다. `nowRel` 은 진행 중이면 `Date.now` 기반이라
+  매 폴 재렌더마다 갱신 → **별도 타이머 없이(신규 타이머 금지 원칙) 라인이 스스로
+  이동**. x = 트랙 원점 오프셋(레인 190 + 컨테이너 패딩 8) + `px(경과)`; 종료 런은
+  마지막 경과에 고정(회색 점선 + '종료 N분'). `pointer-events:none` 로 아래 막대
+  hover 를 막지 않고, `z-index:1` 로 스티키 레인 뒤에 숨는다.
+  - 검증: `pvaHtml` 헤드리스 하네스(진행 중 존재·위치 8+190+px(600)·1분 뒤 left
+    증가·종료 고정·시작 전 부재·pointer-events) 전부 PASS.
 
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 
