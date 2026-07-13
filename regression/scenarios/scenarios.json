@@ -5510,6 +5510,9 @@
               "list": "$.contents",
               "get": "name"
             }
+          },
+          "capture_soft": {
+            "db_server_type_alt": "$.contents[1].name"
           }
         },
         {
@@ -5895,6 +5898,23 @@
           }
         },
         {
+          "name": "get-cluster-parameters",
+          "optional": true,
+          "group": "pg-param",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "capture_soft": {
+            "pg_param_id": "$.contents[0].id",
+            "pg_param_value": "$.contents[0].applied_value"
+          },
+          "_note": "REPAIR 2026-07-13: feeds set-parameters below with a VERSION-MATCHED param. The old set-parameters used {param_id} captured from the generic /v1/parameters group (list-parameters), which belongs to a different major version than this cluster -> 400 'Parameter major version is invalid' (c373). postgresqllistparametervalues (GET /v1/clusters/{cluster_id}/parameters) returns THIS cluster's own params {contents:[{id,applied_value,...}]} — capture id + current value here, echo the value back (no-op) so the set is valid AND reversible. Also closes postgresqllistparametervalues coverage."
+        },
+        {
           "name": "set-parameters",
           "optional": true,
           "group": "pg-param",
@@ -5903,16 +5923,18 @@
           "json": {
             "parameters": [
               {
-                "id": "{param_id}",
-                "new_value": "200",
-                "old_value": ""
+                "id": "{pg_param_id}",
+                "new_value": "{pg_param_value}",
+                "old_value": "{pg_param_value}"
               }
             ]
           },
+          "_note": "REPAIR 2026-07-13 (postgresqlsetparametervalues 2xx): id from get-cluster-parameters (version-matched), new_value==old_value==applied_value = documented no-op (reversible; mirrors the eventstreams/subops set-parameter-values pattern). Was 400 'Parameter major version is invalid' with the generic-group param_id.",
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ]
         },
         {
@@ -6061,14 +6083,15 @@
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/resize",
           "json": {
-            "server_type_name": "{db_server_type}"
+            "server_type_name": "{db_server_type_alt}"
           },
           "expect_status": [
             200,
             201,
             202,
             400
-          ]
+          ],
+          "_note": "REPAIR 2026-07-13 (postgresqlsetservertype 2xx): the old body sent {db_server_type} = the SAME type create used -> 400 Dbaas.ValidationError 'server type is the same as the previous one' (c373). Now targets a DIFFERENT type via db_server_type_alt ($.contents[1].name, soft-captured by find-server-type) — the HB1-proven pattern from database__subops-full.json. If server-types has only one entry, db_server_type_alt stays literal -> tolerated 400."
         },
         {
           "name": "wait-after-resize",
@@ -9733,6 +9756,7 @@
             "end": "{epoch_now}",
             "metrics": [
               {
+                "dimensions": [],
                 "display_name": "Virtual Server | CPU Usage/Core[Basic]",
                 "name": "CPU Usage/Core[Basic]",
                 "namespace_name": "Virtual Server",
@@ -9744,7 +9768,7 @@
             "start": "{epoch_1h_ago}",
             "statistic_type": "AVG"
           },
-          "_note": "svc-opt 2026-07-11: 롤링 1시간 창 + 차원 제거로 개정. 400 'Invalid metrics requests'는 환경적 범주 응답 — 메트릭 카탈로그(listmetricinfos 200)가 count:0 (구동 VM 없음 → 등록된 쌍이 없어 어떤 요청도 무효). 400 기대 등록으로 optional-4xx 사다리 65s 차단; Running VM이 있는 런(compute-virtualserver 뒤)에서 2xx 재승격 대상 — cm getaccountproductlist와 동일 클래스.",
+          "_note": "svc-opt 2026-07-11: 롤링 1시간 창 + 차원 제거로 개정. || REPAIR 2026-07-13: 차원 제거가 400 'Field required'를 유발 — MetricDetailDtoV1Dot1은 dimensions가 REQUIRED 필드(api_docs, name·namespace_name과 함께)라 아예 빼면 스키마 위반. dimensions:[]로 복원(필드 존재 충족). 남은 400 'Invalid metrics requests'는 환경적 범주 — 메트릭 카탈로그(listmetricinfos 200) count:0(구동 VM 없음 → 등록된 쌍 없음). Running VM이 있는 런(compute-virtualserver 뒤)에서 2xx 재승격 대상 — cm getaccountproductlist와 동일 클래스.",
           "expect_status": [
             200,
             201,
