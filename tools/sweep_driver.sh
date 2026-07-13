@@ -55,12 +55,16 @@ for S in $SERVICES; do
   # d) teardown double-check
   SURV=$(survivors); SURV=${SURV:-ERR}
   RECON=no
-  if [ "$SURV" != "ERR" ] && [ "$SURV" -gt "$BASELINE" ] 2>/dev/null; then
-    echo "  LEAK: survivors=$SURV > baseline=$BASELINE -> reconcile ($(kst) KST)" | tee -a "$LOGDIR/_driver.log"
-    SCP_ALLOW_DESTRUCTIVE=true timeout 1200 python -m cleanup.reconciler >> "$LOG.reconcile" 2>&1
-    RECON=yes
-    SURV=$(survivors); SURV=${SURV:-ERR}
-  fi
+  # reconcile up to 3 passes while leak persists (dependency-ordered deletes may need
+  # multiple rounds: detach transit-gw / release publicip / subnet-before-vpc, etc.)
+  for pass in 1 2 3; do
+    if [ "$SURV" != "ERR" ] && [ "$SURV" -gt "$BASELINE" ] 2>/dev/null; then
+      echo "  LEAK: survivors=$SURV > baseline=$BASELINE -> reconcile pass $pass ($(kst) KST)" | tee -a "$LOGDIR/_driver.log"
+      SCP_ALLOW_DESTRUCTIVE=true timeout 1200 python -m cleanup.reconciler >> "$LOG.reconcile" 2>&1
+      RECON=yes
+      SURV=$(survivors); SURV=${SURV:-ERR}
+    fi
+  done
 
   # verdict
   if [ "$RC" = "124" ] || [ "$RC" = "137" ]; then V="❌TIMEOUT"
