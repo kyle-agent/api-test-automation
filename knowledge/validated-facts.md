@@ -2424,3 +2424,34 @@ rank 11이 +42분 지각, vs-server-actions +34.5분 — 같은 블록 앞 항�
 으로 — rank j → 버킷 j%n, 연속 블록 b의 선두가 전체 rank b가 되어 상위 n개가
 전부 다른 워커에서 t≈0 출발, 블록 내부 desc라 스틸은 경량 꼬리부터 가져간다.
 (--dist=load로 되돌리면 인터리브로 교체할 것 — dist 모드와 정렬은 한 쌍이다.)
+
+## 큐 누수 = 중단 런 + 스위퍼 사각지대 + API 설계 갭 → ledger-reclaim 패스로 근본 수리 (2026-07-13)
+
+오너 관측: 콘솔 Queue 목록에 regrq* 5개 잔존(06-20·07-12·07-13), verify_clean은 0으로 봄.
+
+**3겹 원인:**
+1. **중단 런 누수**: 큐 create(201)까지 성공→id 캡처·registry track까지 됐는데
+   run이 delete 스텝 전에 죽음(오늘 ff1c abort 등). 생성 실패가 아니라 **fail 난
+   API 호출이 없어** 리포트는 전부 정상 — "정상인데 자원이 남는" 정확한 메커니즘.
+2. **API 설계 갭 (conformance)**: listqueue(v1.1 배포본)는 `{count, queue_urls:[URL]}`
+   — 이름만 주고 **id를 안 줌**. delete/show/attributes는 전부 32자 큐ID 요구,
+   **이름→ID resolver 없음**(check-duplication은 `{result:true}`, 계정ID 조회는 404,
+   `/v1/queues/{account}/{name}` 경로는 403 권한없음). 문서의 v1.0(`queues:[{id}]`)은
+   어떤 버전 헤더로도 도달 불가. → **생성 시 id를 안 붙잡은 큐는 API로 회수 불가한
+   고아**. id 기반 `DELETE /v1/queues/{32hex}`는 정상(404 on gone, VALIDATED).
+3. **스위퍼 사각지대**: `_select(queueservice,/v1/queues)`가 queue_urls를 못 파싱해
+   항상 [] → 큐 스윕 패스 무동작(6/20 큐 생존 이유). 게다가 엔진이 create마다
+   `reports/registry/*.jsonl`에 **RESOLVED delete_path(/v1/queues/<실제id>)**를
+   영속 기록하는데 **reconciler가 이 매니페스트를 한 번도 안 읽었다**(registry.py
+   주석 "reconciler globs …"는 미구현 — 매니페스트가 dead weight).
+
+**근본 수리**: `cleanup.reconciler._pass_ledger_reclaim` — reports/registry/*.jsonl을
+소비해 기록된 delete_path(실제 id)로 삭제. 큐뿐 아니라 **모든 id-주소 자원의 중단-런
+고아**를 회수한다(listing이 못 주는 것도 매니페스트가 앎). 안전장치: mtime <
+`_LEDGER_MIN_AGE_S`(기본 900s) shard는 활성 런 것이라 건너뜀(Hard Rule 4);
+404=회수됨(prune); 409=다음 라운드 재시도(fixed-point 수렴); 모두 gone인 shard만
+파일 삭제. _TAIL_PASSES 선두 등록. 회귀: tests/offline/test_ledger_reclaim.py 6건.
+
+**기존 5개 한계**: 이 컨테이너 ledger엔 그 id가 없음(원 실행은 console2 서버 머신).
+서버 머신에서 갱신된 reconciler 실행 시 그쪽 shard가 남아있으면 회수됨; 아니면
+콘솔 "서비스 해지" 버튼이 유일 경로(콘솔 백엔드는 서버측 이름→id 해석).
