@@ -3774,7 +3774,16 @@ function pvaHtml(sim) {
         (워커 ${sim.workers} · VPC 슬롯 ${sim.vpc_slots}) · 실제 경과 <b>${
         t0 != null ? simMin(Math.max(nowRel, 0)) + "분" : "—"}</b>${running ? " · 진행 중" : ""}</div>`
     : "";
-  return `${head}<div class="sim-gantt pva-gantt">${simAxisHtml(sc)}${rows}</div>`;
+  // 현재 경과 위치 재생헤드 — 진행에 따라 스스로 움직이는 세로선 (오너 2026-07-13:
+  // "세로 한 줄이 움직이면 이해가 쉬움"). nowRel 은 진행 중이면 Date.now 기반이라
+  // 매 폴 재렌더마다 갱신 → 별도 타이머 없이(신규 타이머 금지 원칙) 라인이 움직인다.
+  // x = 트랙 원점 오프셋(레인폭 + 컨테이너 패딩) + px(경과). 종료 런은 마지막 경과에
+  // 고정(회색 점선). 라인 위 막대 hover 를 막지 않게 pointer-events:none (CSS).
+  const PVA_LANE_W = 190, PVA_PAD_L = 8;   // == .pva-gantt .sim-lane width + .sim-gantt padding-left (CSS)
+  const nowEl = (t0 != null && nowRel > 0)
+    ? `<div class="pva-now${running ? "" : " done"}" style="left:${(PVA_PAD_L + PVA_LANE_W + px(nowRel)).toFixed(1)}px"><span class="pva-now-lbl">${running ? "지금" : "종료"} ${simMin(nowRel)}분</span></div>`
+    : "";
+  return `${head}<div class="sim-gantt pva-gantt">${simAxisHtml(sc)}${rows}${nowEl}</div>`;
 }
 
 // ================= shared helpers =================

@@ -87,9 +87,9 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 - 검증: `test_residual_resources_home_kpi_d8` (owned_summary 스키마·미스캔 None·
   /local-run 리다이렉트·홈 타일 local 배지+정본 링크+미확인 유도) + 라이브 렌더 확인.
 
-## 콘솔 실행 모달 개선 (오너 지시 2026-07-13)
+## 콘솔 실행 화면 개선 (오너 지시 2026-07-13)
 
-오너 실사용 제보 2건 — 둘 다 console2(`console2/assets/console2.js`·`.css`).
+오너 실사용 제보 3건 — 전부 console2(`console2/assets/console2.js`·`.css`).
 
 - **① 사전 점검(blast radius) 모달 — 요약 1급 + 세부 접힘** ("목록이 잘 보이지도
   않고 · 세부는 접혀있고 확인하면 실행"). 120 lifecycle 표 + 과금 30개 목록이 좁은
@@ -109,6 +109,15 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 - 검증: `node --check` + `pfRender` 헤드리스 하네스(요약·접힘·확인 게이트·실행버튼
   구조 / 비과금 케이스 / 성공 시 pfClose+toast·옛 창 부재) 전부 PASS. 기존 console2
   오프라인 테스트가 변경 문자열을 검사하지 않아 회귀 없음.
+- **③ '예측 vs 실제 타임라인' 패널 — 현재 경과 재생헤드** ("현재 라인이 세로로
+  한 줄 있어서 움직이도록 하면 이해가 쉬울 듯"). 간트에 전체 높이 세로선(`.pva-now`)
+  을 `nowRel`(현재 경과) 위치에 그린다. `nowRel` 은 진행 중이면 `Date.now` 기반이라
+  매 폴 재렌더마다 갱신 → **별도 타이머 없이(신규 타이머 금지 원칙) 라인이 스스로
+  이동**. x = 트랙 원점 오프셋(레인 190 + 컨테이너 패딩 8) + `px(경과)`; 종료 런은
+  마지막 경과에 고정(회색 점선 + '종료 N분'). `pointer-events:none` 로 아래 막대
+  hover 를 막지 않고, `z-index:1` 로 스티키 레인 뒤에 숨는다.
+  - 검증: `pvaHtml` 헤드리스 하네스(진행 중 존재·위치 8+190+px(600)·1분 뒤 left
+    증가·종료 고정·시작 전 부재·pointer-events) 전부 PASS.
 
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 
