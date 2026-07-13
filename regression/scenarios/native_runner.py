@@ -167,6 +167,20 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
         _wait_shared_subnets_active(client, shared_ctx, log)
 
     budget = _budgets.Budget()          # **공유** (스레드-안전) — 계정-전역 쿼터 조율
+    # VPC 세마포어 시드 (2026-07-13, 오너: "세마포어로 하면 b가 되는 거 아냐?").
+    # 상주 VPC(공유+net-A+net-B)와 provision은 Budget 밖에서 만들어지므로, 시드가
+    # 없으면 세마포어는 캡 5가 통째로 비었다고 보고 self-create를 무제한 admit한다
+    # (상주 3 + self-create N → 5 초과 시 400). 계정 실사용을 sync하면 상주 3개(+이전
+    # 런 잔재까지 — IB-047 구멍)가 소비된 것으로 잡혀, self-create는 남은 슬롯만 쓴다.
+    # adopter 27개는 adopt-skip(engine.py:1215 continue)이라 reserve를 안 해 세마포어를
+    # 오염시키지 않음 → 순수하게 '새 VPC를 만드는' self-create만 캡에 걸린다.
+    _live_vpc = _budgets.live_count("vpc")
+    if _live_vpc is not None:
+        budget.sync("vpc", _live_vpc)
+        log(f"[native] VPC 세마포어 시드: 계정 실사용 {_live_vpc}/"
+            f"{budget.limits.get('vpc')} → self-create 여유 {budget.available('vpc')}")
+    else:
+        log("[native] VPC 실사용 조회 실패 — 세마포어 미시드(상주 미반영, 종전 동작)")
     reg = engine.ResourceRegistry()     # 공유 매니페스트
 
     lock = threading.Lock()

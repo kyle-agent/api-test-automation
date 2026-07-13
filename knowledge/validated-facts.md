@@ -2768,3 +2768,22 @@ keypair/filestorage-volume)는 전부 **공유-인프라/자체-생성** kind라
   스코프 일치. xdist 정적 배치도 47.7 가능하나 durations 드리프트에 취약(정적 배치는
   런타임 재조정 불가) — 동적 pop이 구조적으로 면역이라 native 유지 + 이 정제로 낙착.
   xdist 경로는 폴백 유지.
+
+## VPC 세마포어 시드 — 상주 VPC를 계정 실사용으로 반영 (2026-07-13, 오너: "세마포어로 b")
+
+native_runner의 공유 Budget은 이미 kind별 세마포어(reserve=atomic check-inc, vpc 캡 5).
+그러나 상주 VPC(공유 10.124/20 + net-A 10.130/20 + net-B 10.141/20, provision_shared_vpc가
+Budget 밖에서 생성)가 세마포어에 안 잡혀, 시드 없으면 세마포어가 캡 5를 통째로 비었다고
+보고 self-create를 무제한 admit → 상주 3 + self-create N이 캡 초과 시 400(IB-047 구조).
+- 수리: run() 시작에 `budget.sync("vpc", live_count("vpc"))` — 계정 실사용(상주 3개 +
+  **이전 런 잔재까지**)을 소비로 시드. self-create는 남은 슬롯(5−실사용)만 reserve,
+  초과분은 조율 skip(400 아님). live_count 조회 실패 시 미시드(종전 동작) 폴백.
+- **adopter 27개는 세마포어 무오염**: adopt:vpc POST는 engine.py:1215 `continue`로
+  create+reserve를 통째 건너뜀(확인). 순수하게 '새 VPC를 만드는' self-create만 캡에 걸림.
+- 이게 (b)=세마포어 시드이고 (a)=2단계 직렬 분리보다 얇다: 세마포어가 "여유 있으면 병렬,
+  넘치면 막음"을 동적으로 → 직렬화는 세마포어의 rigid 특수케이스. NATIVE-SCHEDULER.md
+  V2 백로그 "live quota sync"를 여기서 실현.
+- self-create 실측: heavy-shared-networking(0–15.2m)·networking-vpc-subnet(7.8–15.3m)
+  동시 2개 → 상주3+2=동시5(캡5). 시드로 6번째(잔재 포함) 400을 원천 차단.
+- offline: test_vpc_semaphore_seeded_from_live_leaves_only_residual_slots (시드 3 →
+  self-create 5개 중 2개만 admit·3개 조율 skip; 미시드는 5개 다 admit=구멍 재현).
