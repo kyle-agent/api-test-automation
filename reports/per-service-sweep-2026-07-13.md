@@ -108,3 +108,6 @@
 - 느린 서비스의 공통점 = **공유 VPC/subnet 프로비저닝 + subnet ACTIVE 대기**(서비스 격리라 매번 반복). 빠른 서비스(18초~6분)는 이 단계가 없음.
 - 추가로 **서비스별 verify_clean(전체 계정 스캔 ~1~2분) + 누수 시 reconcile(최대 3패스)** 세금.
 - **개선안**: (a) 공유 VPC를 서비스 간 재사용해 재프로비저닝 제거, (b) DBaaS/ske teardown wait에 실질 타임아웃+진행로그, (c) subnet adopt-time gate가 ACTIVE까지 대기, (d) private-dns 폴링예산 확대 또는 optional 유지, (e) observations에 concrete resource_id 기록(정밀 대조용), (f) reconciler에 private-dns 삭제 매핑 추가.
+
+### 최종 자원 정리 (06:57 KST 확인)
+사용자 중단 후 in-flight data-flow 자원 41건 reconcile → **owned survivors = 1**(baseline 복귀). 남은 1건은 `servicewatch /v1/log-groups`(상시 auto-created, 오늘밤 생성분 아님). **오늘밤 테스트로 생성된 자원은 전부 삭제 확인.** 실행 중 sweep 프로세스 없음.
