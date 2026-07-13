@@ -560,18 +560,25 @@ g.rg-selbox{cursor:pointer}
   text-overflow:ellipsis;white-space:nowrap}
 .lcitem .lctag{flex:0 0 auto;font-size:9px;font-weight:700;border-radius:4px;padding:0 5px;line-height:1.5}
 .lcitem .lctag.heavy{background:var(--purple-bg,#efeafb);color:var(--purple)}
-/* 서비스 라벨 — 이름 아래 작은 회색 (글리프 폭만큼 들여씀) */
-.lcitem .lcsvc{font-size:10.5px;color:var(--muted);padding-left:23px;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-/* 지표 배지 행 — API · 자원 · created · soft · fail (0 은 생략) */
-.lcitem .lcmeta{display:flex;flex-wrap:wrap;gap:4px;padding-left:23px}
+/* 2행: 서비스(좌) + 지표 배지(우) — 세로 압축, 배지를 오른쪽 가로로 (오너 2026-07-14).
+   글리프 폭(23px)만큼 들여써 이름 아래 정렬. */
+.lcitem-b{display:flex;align-items:center;gap:8px;min-width:0;padding-left:23px;margin-top:1px}
+.lcitem .lcsvc{flex:1 1 auto;min-width:0;font-size:10.5px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 지표 배지 — API · 자원 · created · soft · fail (0 은 생략), 우측 정렬 */
+.lcitem .lcmeta{flex:0 1 auto;display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
 .lcitem .lcb{border:1px solid var(--line2);border-radius:10px;padding:0 6px;font-size:9.5px;font-weight:700;
   color:#3a424b;white-space:nowrap;line-height:1.7}
 .lcitem .lcb.created{border-color:var(--green);color:var(--green)}
 .lcitem .lcb.soft{border-color:var(--amber);color:var(--amber)}
 .lcitem .lcb.fail{border-color:var(--red);color:var(--red)}
 
-/* 상태 필터 칩 (rail 로컬) — 전체 · 진행 · 실패 · 대기 */
+/* 시나리오 검색 (오너 2026-07-14) — 필터 칩 아래 */
+.lcsearch{width:100%;box-sizing:border-box;margin:0 0 6px;padding:4px 9px;font-size:11.5px;
+  border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+.lcsearch:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,201,.12)}
+
+/* 상태 필터 칩 (rail 로컬) — 전체 · 진행 · 완료 · 실패 · 대기 */
 .lcfilter{display:flex;gap:4px;margin:0 0 6px;flex-wrap:wrap}
 .fchip{border:1px solid var(--line);background:#fff;border-radius:12px;padding:2px 8px;
   font-size:10.5px;color:var(--muted);cursor:pointer;font-weight:600}

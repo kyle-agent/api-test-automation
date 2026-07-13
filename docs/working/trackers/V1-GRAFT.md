@@ -133,6 +133,12 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   - 검증: 실소스 추출 헤드리스 하네스(카드 헤더/서비스/배지·created·heavy·0값 생략 /
     rt 탭 집계-노출·시나리오-숨김·리셋) 전부 PASS · `test_console2.py` 39/39
     (grid·카드·rt 스코프 계약 갱신).
+  - **후속 (오너 2026-07-14, 같은 rail)**: ⓐ **완료 필터 칩** 추가(전체·진행·**완료**·
+    실패·대기 — `match`/`fc` done 절) ⓑ **시나리오 이름 검색** 입력(`#lc-search`,
+    부분일치 `hit(id)`, verify+pending 양쪽 필터, 무매치 '검색 결과 없음', 셸
+    재구축 후 값 복원 — 위임 `input`이라 재배선 불요) ⓒ **2행 레이아웃**: 세로가
+    길어지지 않게 지표 배지를 서비스와 같은 행 **오른쪽**으로(`.lcitem-b`: 서비스
+    좌 flex:1 + `.lcmeta` 우측 정렬). 검증: 헤드리스 하네스 16/16 + test_console2 39/39.
 
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 

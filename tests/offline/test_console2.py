@@ -737,11 +737,20 @@ def test_execution_rail_master_detail_contract():
     agg_pos = js.index('class="aggitem top')
     assert agg_pos < js.index('<div class="lclist">'), "전체 카드가 목록 위 (rail 최상단)"
     assert "railFilter" in js and 'chip("fail"' in js and 'chip("queued"' in js
-    # 시나리오 카드: 헤더행 + 서비스 + 지표 배지(API·자원·created·soft·fail)
-    assert 'class="lcitem-h"' in js and 'class="lcsvc"' in js and 'class="lcmeta"' in js
+    # 시나리오 카드: 2행 (헤더=이름 · 아래=서비스 좌 + 지표 배지 우) — 오너 2026-07-14:
+    # 세로 압축, 배지를 오른쪽 가로로. 완료 필터 + 이름 검색도 추가.
+    assert 'class="lcitem-h"' in js and 'class="lcitem-b"' in js
+    assert 'class="lcsvc"' in js and 'class="lcmeta"' in js
     assert '<span class="lcb">${b.api.length} API</span>' in js
     assert 'lcb created' in js and 'lcb soft' in js and 'lcb fail' in js
     assert " API · " in js  # 카운트는 title 툴팁에도 유지 (hover 요약)
+    # 완료 필터 칩 + done 카운트 + match 절
+    assert 'chip("done", "완료")' in js and "done: n.done" in js
+    assert 'railFilter === "done" && s === "done"' in js
+    # 이름 검색: 입력 박스 · 부분일치 hit · pending 도 검색 · 무매치 안내 · 값 복원
+    assert 'id="lc-search"' in js and 'const hit = id =>' in js
+    assert "match(lcs[id].status) && hit(id)" in js and "pending.filter(hit)" in js
+    assert "검색 결과 없음" in js and "si.value !== railSearch" in js
     assert 'class="lcitem pend"' in js  # 대기 행 rail 통합 (구 lcqueue 대체)
     assert "lcqueue" not in js
     assert "RAIL_FOLLOW_HOLD_MS" in js and ".lcitem.now" in js

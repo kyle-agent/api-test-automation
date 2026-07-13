@@ -401,6 +401,13 @@ function wireReportDelegation() {
       const row = ev.target.closest(".lcitem[data-lc]");
       if (row) { railUserTs = Date.now(); selectScope(row.dataset.lc); }
     });
+    // 시나리오 검색 (오너 2026-07-14) — 위임 input: 셸 재구축돼도 재배선 불요.
+    rail.addEventListener("input", ev => {
+      if (ev.target.id !== "lc-search") return;
+      railSearch = ev.target.value.trim().toLowerCase();
+      railUserTs = Date.now();          // 검색 중엔 follow-active 스크롤 유보
+      renderLcPicker();
+    });
   }
   const bar = $("scopebar");
   if (bar && !bar._wired) {
@@ -2531,7 +2538,8 @@ function lcStatusLabel(s) { return s === "done" ? "완료" : s === "running" ? "
 // 스텝 합계 — "메인은 전체") ② 상태 필터 칩 ③ 1줄 압축 행 목록(내부 스크롤;
 // API/자원/soft 카운트는 title 툴팁으로) + 대기(이벤트 0) 회색 행 통합.
 // 시맨틱 무변경: 행 클릭 = selectScope(기존), 전체 카드 = selectScope("*").
-let railFilter = "all";     // all | run | fail | queued — rail 상태 필터 (로컬 상태)
+let railFilter = "all";     // all | run | done | fail | queued — rail 상태 필터 (로컬 상태)
+let railSearch = "";        // 시나리오 이름 부분일치 검색 (소문자, 오너 2026-07-14)
 let railUserTs = 0;         // 사용자가 목록을 만진 최근 시각 — follow-active 유보
 let railProgTs = 0;         // 프로그램적 scrollTop 조정 시각 (scroll 이벤트 오인 방지)
 const RAIL_FOLLOW_HOLD_MS = 10000;
@@ -2554,8 +2562,10 @@ function renderLcPicker() {
   const failSteps = order.reduce((a, id) => a + lcs[id].failN, 0);
   const match = s => railFilter === "all"
     || (railFilter === "run" && s === "running")
+    || (railFilter === "done" && s === "done")
     || (railFilter === "fail" && s === "fail")
     || (railFilter === "queued" && s === "queued");
+  const hit = id => !railSearch || id.toLowerCase().includes(railSearch);
   // ---- 셸: run/필터가 바뀔 때만 재구축 (P2C-24 — 폴마다 innerHTML 전체 재빌드가
   // 깜빡임·클릭 유실의 원인; 클릭은 위임(wireReportDelegation)이라 재배선 불요) ----
   const shellKey = String(runId) + "|" + railFilter;
@@ -2569,7 +2579,8 @@ function renderLcPicker() {
          <span class="aggtxt"><b>🗂️ 전체 (집계)</b>
            <span class="sub"></span></span>
        </button>
-       <div class="lcfilter" id="lc-filter">${chip("all", "전체")}${chip("run", "진행")}${chip("fail", "실패")}${chip("queued", "대기")}</div>
+       <div class="lcfilter" id="lc-filter">${chip("all", "전체")}${chip("run", "진행")}${chip("done", "완료")}${chip("fail", "실패")}${chip("queued", "대기")}</div>
+       <input class="lcsearch" id="lc-search" type="search" placeholder="⌕ 시나리오 검색" autocomplete="off" spellcheck="false">
        <div class="lcp-h">시나리오 <span class="muted small">· 클릭 = 우측 상세</span></div>
        <div class="lclist"></div>`;
     const fresh = host.querySelector(".lclist");
@@ -2577,6 +2588,10 @@ function renderLcPicker() {
     fresh.addEventListener("scroll", touch, { passive: true });
     fresh.addEventListener("mouseenter", touch);
   }
+  // 검색어는 셸 재구축(필터/런 전환) 후에도 유지 — 입력값을 상태에서 복원 (포커스는
+  // 타이핑 중 셸이 재구축되지 않아 유지된다: railSearch 는 shellKey 에 없음).
+  const si = host.querySelector("#lc-search");
+  if (si && si.value !== railSearch) si.value = railSearch;
   // ---- patch: 링/카운트/하이라이트/행 — 바뀐 것만 갱신 ----
   const ring = host.querySelector(".ring");
   if (ring) {
@@ -2587,13 +2602,13 @@ function renderLcPicker() {
     `완료 ${n.done}/${total}${failSteps ? ` · <span class="failn">✕${failSteps}</span>` : ""} · ${agg.resources.length} 자원 · ${agg.api.length} API`);
   const aggBtn = host.querySelector("#agg-toggle");
   if (aggBtn) aggBtn.classList.toggle("sel", isAggScope());
-  const fc = { all: total, run: n.run, fail: n.fail, queued: n.queued };
+  const fc = { all: total, run: n.run, done: n.done, fail: n.fail, queued: n.queued };
   els("#lc-filter [data-fc]").forEach(b => {
     const v = String(fc[b.dataset.fc] || 0);
     if (b.textContent !== v) b.textContent = v;
   });
   els("#lc-filter .fchip").forEach(b => b.classList.toggle("on", b.dataset.f === railFilter));
-  const units = order.filter(id => match(lcs[id].status)).map(id => {
+  const units = order.filter(id => match(lcs[id].status) && hit(id)).map(id => {
     const b = lcs[id];
     const cls = lcStatusClass(b.status);
     const tip = `${id}${b.service ? " — " + b.service : ""} · ${lcStatusLabel(b.status)}`
@@ -2601,8 +2616,8 @@ function renderLcPicker() {
       + (b.createN ? ` · ${b.createN} created` : "")
       + (b.softN ? ` · ${b.softN} soft` : "") + (b.failN ? ` · ${b.failN} fail` : "")
       + " — 상세 열기";
-    // 시나리오 카드: 이름 + 서비스 + 지표 배지 (오너 2026-07-14: 기존 mockup 처럼
-    // 좌측에 정보를 더 노출). 지표는 groupedRun 버킷에 이미 계산된 값 (0 은 생략).
+    // 시나리오 카드: 이름 위 / 서비스+지표 배지 아래 (오너 2026-07-14: 세로가
+    // 길어지지 않게 지표를 오른쪽 가로로). 지표는 groupedRun 버킷 값 (0 은 생략).
     const meta = [
       `<span class="lcb">${b.api.length} API</span>`,
       `<span class="lcb">${b.resources.length} 자원</span>`,
@@ -2614,17 +2629,17 @@ function renderLcPicker() {
       `<button class="lcitem ${detailScope === id ? "sel" : ""}${activeLc === id ? " now" : ""}" data-k="lc:${esc(id)}" data-lc="${esc(id)}" title="${esc(tip)}">
       <span class="lcitem-h"><span class="st ${cls}">${lcStatusGlyph(b.status)}</span>
         <span class="lcname">${esc(id)}</span>${b.heavy ? '<span class="lctag heavy">🜂 heavy</span>' : ""}</span>
-      ${b.service ? `<span class="lcsvc">${esc(b.service)}</span>` : ""}
-      <span class="lcmeta">${meta}</span>
+      <span class="lcitem-b"><span class="lcsvc">${b.service ? esc(b.service) : ""}</span>
+        <span class="lcmeta">${meta}</span></span>
     </button>` };
   });
-  if (railFilter === "all" || railFilter === "queued") {
-    pending.forEach(id => units.push({ k: "pend:" + id, html:
+  if ((railFilter === "all" || railFilter === "queued")) {
+    pending.filter(hit).forEach(id => units.push({ k: "pend:" + id, html:
       `<div class="lcitem pend" data-k="pend:${esc(id)}" title="${esc(id)} — 대기 중, 워커가 비면 순서대로 시작">
         <span class="lcitem-h"><span class="st queued">·</span><span class="lcname">${esc(id)}</span></span></div>` }));
   }
   if (!units.length) units.push({ k: "__empty",
-    html: '<p class="muted small" data-k="__empty">라이프사이클 대기 중…</p>' });
+    html: `<p class="muted small" data-k="__empty">${railSearch ? "검색 결과 없음 — <b>" + esc(railSearch) + "</b>" : "라이프사이클 대기 중…"}</p>` });
   const list = host.querySelector(".lclist");
   syncUnits(list, units);
   // follow-active: 실행 중이면 now 행을 목록 뷰포트 안으로 — 단 사용자가 최근
