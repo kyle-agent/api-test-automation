@@ -1034,3 +1034,52 @@ def test_launch_suite_run_contract(monkeypatch):
     # 존재하지 않는 suite
     ok, msg = C2.launch_suite_run("no-such-suite")
     assert not ok and "없음" in msg
+
+
+# --------------------------------------------------------------------------- #
+# 전체 중단 (오너 요구 2026-07-11 "전체 시나리오 중단")
+# --------------------------------------------------------------------------- #
+def test_abort_all_empties_queue_first_and_skips_non_abortable(monkeypatch):
+    """_abort_all — 진행+대기 전체 중단의 계약.
+
+    1. 대기열을 **먼저** 비운다 (실행 중 종료가 _try_admit_queue 로 다음 대기
+       런을 자동 admit 하는 두더지잡기 방지) — 결과적으로 _QUEUE 가 빈다.
+    2. 실행 중 LIVE lifecycle 런은 abort_requested 로 표시된다.
+    3. 중단 비대상(simulate 등)은 skipped 에 사유와 함께 보고된다.
+    프론트 계약: cap-bar 의 ⏹ 전체 중단 버튼 → POST /api/abort-all."""
+    mod = _load_server()  # fresh module state (queue/reserved)
+    monkeypatch.setattr(mod, "_record_run_to_db", lambda rec: None)
+    monkeypatch.setattr(mod, "_try_admit_queue", lambda: None)
+    logp = ROOT / "reports" / "console2-runs" / "abort-all-test.log"
+    logp.parent.mkdir(parents=True, exist_ok=True)
+    recs = {
+        "aa-q1": {"id": "aa-q1", "kind": "lifecycle", "mode": "live",
+                  "status": "queued", "log": str(logp), "rc": None},
+        "aa-r1": {"id": "aa-r1", "kind": "lifecycle", "mode": "live",
+                  "status": "running", "log": str(logp), "rc": None},
+        "aa-s1": {"id": "aa-s1", "kind": "simulate", "mode": "simulate",
+                  "status": "running", "log": str(logp), "rc": None},
+        "aa-d1": {"id": "aa-d1", "kind": "lifecycle", "mode": "live",
+                  "status": "done", "log": str(logp), "rc": 0},
+    }
+    with mod._LOCK:
+        mod._RUNS.update(recs)
+    mod._QUEUE.append("aa-q1")
+    try:
+        code, payload = mod._abort_all()
+        assert code == 202
+        assert sorted(payload["aborted"]) == ["aa-q1", "aa-r1"], payload
+        assert [s["id"] for s in payload["skipped"]] == ["aa-s1"]  # 사유 보고
+        assert "aa-q1" not in mod._QUEUE                # 대기열 비움
+        assert recs["aa-q1"]["status"] == "aborted"
+        assert recs["aa-r1"]["abort_requested"] is True  # 실행 중 → 중단 요청
+        assert recs["aa-d1"].get("abort_requested") is None  # 종료 런 불간섭
+    finally:
+        with mod._LOCK:
+            for rid in recs:
+                mod._RUNS.pop(rid, None)
+        logp.unlink(missing_ok=True)
+    # 프론트 계약 — cap-bar 버튼 + 확인 모달 + API 경로
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    assert 'id="cap-abort-all"' in js and "function abortAllConfirm" in js
+    assert '"/api/abort-all"' in js and "대기열을 먼저 비웁니다" in js
