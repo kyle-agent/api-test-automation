@@ -2380,3 +2380,11 @@ run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행�
   수리가 shared_infra.teardown에만 들어가고 conftest/단독 경로의 인라인
   teardown은 빠져 있어 solo 런마다 공유 VPC가 잔존했다(재검증 런
   regrvpcsh6a5467bd 실측, 스윕으로 회수 완료). 이제 두 경로 동일.
+
+### IAM-gated 로그그룹 신규 인스턴스 2건 (2026-07-13 스윕)
+
+중단 런 ff1c의 mariadb가 자동 생성한 `/scp/mariadb/regrmhhkafhdm/alertlog`·
+`/scp/mariadb/regrmhhkafhdm/slowlog` — 기존 `/scp/ske/regrske4936128d-0325b`와
+동일 클래스(그룹 DELETE 200이지만 IAM-gated 자식 log-stream 때문에 잔존,
+log-stream IAM 권한 필요). 스윕은 stuck으로 1회 보고 후 재시도 안 함(수렴 가드
+정상 동작). 클린업 루틴의 알려진-예외 목록에 이 2건 추가해 취급할 것.
