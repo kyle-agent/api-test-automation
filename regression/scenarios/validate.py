@@ -212,6 +212,29 @@ def validate(service_filter=None):
                 if isinstance(step.get(cap_key), dict):
                     available |= set(step[cap_key])
 
+        # Success-path teardown guard (2026-07-13): the engine fires a step's
+        # `cleanup` ONLY on the FAILURE path (engine._teardown runs inside the
+        # `except`); a *successful* run tears down via explicit DELETE steps.
+        # So a create carrying a `cleanup` but with NO matching explicit DELETE
+        # step LEAKS its resource on every green run (live-observed: the FIFO
+        # queue in application-queueservice-queue + the NFS volume in
+        # gen-heavy-vs-netops, both stranded in the console). Warn so the author
+        # adds an explicit delete step (query string ignored when matching).
+        def _norm_del(p):
+            return (p or "").split("?")[0]
+        _explicit_deletes = {_norm_del(s.get("path")) for s in steps
+                             if s.get("method", "").upper() == "DELETE" and s.get("path")}
+        for s in steps:
+            cu = s.get("cleanup")
+            if (s.get("method", "").upper() == "POST" and isinstance(cu, dict)
+                    and cu.get("method", "").upper() == "DELETE"
+                    and _norm_del(cu.get("path")) not in _explicit_deletes):
+                warnings.append(
+                    f"{where} step '{s.get('name')}': create has a cleanup DELETE "
+                    f"{cu.get('path')} but NO matching explicit DELETE step — the "
+                    f"resource LEAKS on a successful run (cleanup fires only on "
+                    f"failure). Add an explicit delete step.")
+
     for w in warnings:
         print(f"WARN  {w}")
     for e in errors:
