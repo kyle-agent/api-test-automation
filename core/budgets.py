@@ -13,6 +13,8 @@ start (a scheduler can call :meth:`sync` with counts from a list call).
 """
 from __future__ import annotations
 
+import threading as _t
+
 import contextlib
 import json
 import os
@@ -48,28 +50,38 @@ def _env_limits() -> dict:
 class Budget:
     limits: dict = field(default_factory=lambda: {**DEFAULT_LIMITS, **_env_limits()})
     used: dict = field(default_factory=dict)
+    # 스레드-안전 (2026-07-13 native_runner): xdist는 워커=프로세스라 Budget 경합이
+    # 없었지만, 단일 프로세스 스레드풀 러너는 **하나의 Budget을 모든 스레드가 공유**해
+    # 계정-전역 쿼터를 조율한다 (private-dns/vpc 400 레이스 제거). reserve의
+    # check-then-increment가 원자적이어야 하므로 RLock으로 감싼다. xdist(비공유)엔
+    # 무경합이라 오버헤드 무시 가능.
+    _lock: "_t.RLock" = field(default_factory=_t.RLock, repr=False, compare=False)
 
     def sync(self, kind: str, live_count: int) -> None:
         """Set the currently-observed usage for a kind (from a real list call)."""
-        self.used[kind] = live_count
+        with self._lock:
+            self.used[kind] = live_count
 
     def available(self, kind: str) -> int:
         limit = self.limits.get(kind)
         if limit is None:
             return 1_000_000  # untracked kinds are effectively unlimited
-        return max(0, limit - self.used.get(kind, 0))
+        with self._lock:
+            return max(0, limit - self.used.get(kind, 0))
 
     def can_create(self, kind: str, n: int = 1) -> bool:
         return self.available(kind) >= n
 
     def reserve(self, kind: str, n: int = 1) -> bool:
-        if not self.can_create(kind, n):
-            return False
-        self.used[kind] = self.used.get(kind, 0) + n
-        return True
+        with self._lock:                          # check-then-increment 원자화
+            if self.available(kind) < n:
+                return False
+            self.used[kind] = self.used.get(kind, 0) + n
+            return True
 
     def release(self, kind: str, n: int = 1) -> None:
-        self.used[kind] = max(0, self.used.get(kind, 0) - n)
+        with self._lock:
+            self.used[kind] = max(0, self.used.get(kind, 0) - n)
 
 
 # ---------------------------------------------------------------------------

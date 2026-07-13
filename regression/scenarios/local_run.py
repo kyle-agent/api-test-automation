@@ -302,8 +302,14 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
         f.write("\n=== pytest === (수집 → xdist 워커 기동 — 첫 step 로그까지 보통 수십 초)\n")
         f.flush()
         pos = f.tell()
-        rc = subprocess.run(
-            [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
+        # opt-in: SCP_NATIVE_RUNNER=true면 pytest-xdist 대신 목적특화 스케줄러
+        # (regression.scenarios.native_runner) — 동적 LPT·공유 쿼터·no-shutdown.
+        # 별도 프로세스라 콘솔 kill/응답성 동일. xdist 경로는 폴백으로 유지.
+        # (2026-07-13 오너 지시; scheduler_sim: native 70분/400=0 vs xdist 90분/400=4)
+        if os.environ.get("SCP_NATIVE_RUNNER", "").strip().lower() == "true":
+            _cmd = [sys.executable, "-m", "regression.scenarios.native_runner"]
+        else:
+            _cmd = [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
              # --dist=load --maxschedchunk=1 (2026-07-13 run-afa8 판정): load는
              # 글로벌 pending 풀을 유지해 워커가 완료할 때마다 리필하고, pending이
              # 남아있는 한 워커를 죽이지 않는다 → 빈 워커가 의존성 없는 대기를
@@ -314,8 +320,10 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
              # 청크=워커당 2개라 conftest의 [heavy,light] 인터리브와 한 쌍 — 상위 n
              # 몬스터가 전부 offset 0(t=0)에서 출발. (이전 worksteal 전환은 워커수
              # 버그로 인터리브가 죽은 상태의 오판 — 그 버그는 2026-07-11 수리됨.)
-             "-n", n, "--dist=load", "--maxschedchunk=1", "-o", "addopts=", "-q"],
-            cwd=str(_ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT).returncode
+             "-n", n, "--dist=load", "--maxschedchunk=1", "-o", "addopts=", "-q"]
+        rc = subprocess.run(
+            _cmd, cwd=str(_ROOT), env={**env, **shared},
+            stdout=f, stderr=subprocess.STDOUT).returncode
         f.flush()
         try:
             with open(log_path, encoding="utf-8") as rf:

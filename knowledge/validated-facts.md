@@ -2703,3 +2703,22 @@ fs-create-volume이 cleanup-only였음 — access-rule remove 뒤 삭제). (3) *
 남은 경고 3건은 latent(create 블록: vs-image·scr-repo)/singleton(networking
 firewall-logging-storage는 "이미 존재하면 create 실패"라 계정당 1개 상한 — 누적
 아님, 삭제 시 동시런 레이스 위험이라 보류) — 케이스별 오너 리뷰 대상.
+
+## 목적특화 스케줄러 native_runner — xdist 대체 (2026-07-13, 오너 지시)
+
+xdist는 CPU-bound 테스트 병렬용 범용 라이브러리라 I/O-bound 라이프사이클(의존성·
+쿼터·async 대기)엔 미스매치 — 우리가 정렬 인코딩·strand 제거·MIN_PENDING 제안으로
+우회하던 4한계(수집순서 디스패치·MIN_PENDING 버퍼→꼬리 붕괴·쿼터 per-worker→400
+레이스·의존성 무지)의 근원. engine.run_lifecycle이 이미 pytest 분리라, 얇은 스레드풀
+스케줄러(regression/scenarios/native_runner.py)로 직접 구동:
+- 동적 LPT pop(빈 슬롯 긴 것 먼저) · 큐 빌 때만 워커 종료(꼬리 붕괴 제거) ·
+  **공유 Budget(스레드-안전 RLock)** = 계정-전역 쿼터 조율(private-dns/vpc 400
+  레이스 제거) · dependent 후미.
+- 시뮬레이션(tools/scheduler_sim, 실 durations): **native 70.1분/쿼터400=0 vs
+  xdist-load 89.9분/400=4**, 꼬리 활성워커 native 4 vs xdist 1.
+- **opt-in `SCP_NATIVE_RUNNER=true`** — local_run/console2가 pytest 대신 `python -m
+  regression.scenarios.native_runner` Popen(별도 프로세스=중단 kill 동일). xdist 폴백
+  유지, 라이브 검증 후 기본화. 정렬 해킹(_order_for_load 등)은 xdist 전용이라 native엔
+  불요(동적 pop이 버퍼-갇힘 원천 제거).
+- 검증: 시뮬 + offline 3종(test_native_runner) + Budget 스레드-안전. 라이브 대기.
+  설계·V2 백로그: docs/working/plans/NATIVE-SCHEDULER.md.

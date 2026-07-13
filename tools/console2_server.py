@@ -2236,14 +2236,16 @@ def _run_worker(rec: dict) -> None:
                 # Popen in its OWN session (process group) so the 중단 버튼 can
                 # kill the whole pytest tree (xdist workers included), not just
                 # the leader — subprocess.run gave us no handle at all.
+                # opt-in: SCP_NATIVE_RUNNER=true면 목적특화 스케줄러(native_runner)
+                # — 동적 LPT·공유 쿼터 조율·no-shutdown(꼬리 붕괴 제거). 별도 프로세스
+                # (start_new_session)라 중단 버튼으로 kill 동일. (2026-07-13 오너 지시)
+                if os.environ.get("SCP_NATIVE_RUNNER", "").strip().lower() == "true":
+                    _cmd = [sys.executable, "-m", "regression.scenarios.native_runner"]
+                else:
+                    _cmd = [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
+                     "-n", n, "--dist=load", "--maxschedchunk=1", "-o", "addopts=", "-q"]
                 proc = subprocess.Popen(
-                    [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
-                     # --dist=load --maxschedchunk=1 (2026-07-13 run-afa8): 글로벌
-                     # pending 풀 유지 → 빈 워커가 의존성 없는 대기를 즉시 집음
-                     # (worksteal의 워커 shutdown→라이트 꼬리 30~46분 지각 제거).
-                     # 초기 청크=워커당 2 → conftest [heavy,light] 인터리브와 한 쌍,
-                     # 상위 n 몬스터 offset0=t=0 시작. (local_run.live_run과 동일 변경)
-                     "-n", n, "--dist=load", "--maxschedchunk=1", "-o", "addopts=", "-q"],
+                    _cmd,
                     cwd=str(ROOT), env={**env, **shared}, stdout=f,
                     stderr=subprocess.STDOUT, start_new_session=True)
                 with _LOCK:
