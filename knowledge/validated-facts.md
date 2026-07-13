@@ -2354,3 +2354,20 @@ run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행�
   허용 여부 ② IGW 방화벽(product_type=IGW)과 DC 방화벽의 B 동거 무충돌.
 - 회귀: tests/crud/test_shared_vpc_adopt.py 5건 신규(양측 시딩/폴백/IB-049/캡처
   보존/provision A·B) · validate_dag --check 0 gaps · 오프라인 545 passed.
+
+## net-VPC A/B 라이브 첫 런 판정 — 설계 성립 확정 (2026-07-13 04:20, 5/5 passed)
+
+선택 5종(peering·vip-nat·fw·dc-routing·nvs), provision→pytest(-n5)→teardown→
+잔존 스캔 풀사이클 rc=0:
+
+- **provision 18초** (기존 4.3분): 메인+net-A+net-B 생성, no-wait 반환, DB
+  서브넷은 선택-인지로 스킵 — adopt 게이트 경로 실증.
+- **미지수 ① 판정: 피어링 걸린 VPC 안 IGW/VIP/포트 생성 허용** — vip-nat(A의
+  IGW+VIP)·fw(B의 IGW)가 peering과 같은 VPC에서 완주(각자 자원 생성→삭제),
+  peering rule 체인도 adopt-cidr 일치로 정상(DELETING 수렴 관측).
+- **미지수 ② 판정: IGW 방화벽(fw)과 DC(dc-routing)의 B 동거 무충돌** — 5/5 pass.
+- teardown: 공유 서브넷 gone-대기 후 VPC 3개 모두 204, 잔존 = 알려진 IAM-gated
+  로그그룹 1건뿐 (유효 잔존 0).
+- 유일 결함: vip-nat VIP IP 하드코딩(10.132.9.6)이 서브넷 재배치를 안 따라가
+  400 check-ip-address-overlap → vip 그룹 스킵. 10.130.9.6으로 정렬(커밋 완료),
+  단독 재검증 별도 수행.
