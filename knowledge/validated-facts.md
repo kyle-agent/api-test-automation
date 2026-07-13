@@ -2638,3 +2638,26 @@ engine `_catalog_key_for`(크레딧 경로) + validate(경고) 양쪽 반영. �
 **기존 5개 한계**: 이 컨테이너 ledger엔 그 id가 없음(원 실행은 console2 서버 머신).
 서버 머신에서 갱신된 reconciler 실행 시 그쪽 shard가 남아있으면 회수됨; 아니면
 콘솔 "서비스 해지" 버튼이 유일 경로(콘솔 백엔드는 서버측 이름→id 해석).
+
+## DBaaS 클러스터 UNKNOWN은 sync-state로만 복구 — delete 직전 재동기화 필수 (2026-07-13, 오너 관측)
+
+> conf: 0.8 · seen: 2026-07-13 · obs: 3 (run-923a/c373 라이브 + 오너 콘솔 관측)
+
+**사실**: DBaaS 클러스터(mysql/postgresql/mariadb/epas/cachestore)는 async subop
+(set-parameters·patch-minor·kernel-upgrade·resize·add-block-storages)이 202 수락
+후 비동기 실패하면 `service_state=UNKNOWN`으로 추락한다. UNKNOWN에서는 후속
+mutating op(삭제 포함)이 400 InvalidState로 거부된다. **복구 유일 수단 =
+`POST /v1/clusters/{cluster_id}/sync-state` (body {})** — 콘솔의 "synchronize"
+버튼과 동일. 라이브 실측(c373): sync-state 10회 전부 202 → 상태 `SYNCHRONIZING`
+→ RUNNING 복귀. **DELETE 재시도로는 절대 복구 안 됨**(retry_on_status 400 x20이
+있어도 상태를 안 바꾸므로 20회 전부 400) → 빌링 클러스터 잔존.
+
+**로직 규약 (delete 직전 필수)**: `pre-delete-sync-state`(POST sync-state,
+optional, 4xx 관용) → `wait-pre-delete-settle`(GET, poll until RUNNING/ACTIVE/
+AVAILABLE, give_up_status [400,404], timeout 600, terminal-bad는 엔진 기본 조기
+종료) → `delete-cluster`. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).
+mid-lifecycle sync(param 실패 직후)만으로는 부족 — 마지막 sync 이후의 subop이
+UNKNOWN을 유발하면 delete가 그대로 맞는다. 반영: database__subops-full.json 5엔진
++ scenarios.json database-mysql-cluster/database-postgresql-cluster (총 7 teardown).
+**SKE(container-ske-cluster-nodepool)는 제외** — 쿠버네티스라 /sync-state
+엔드포인트 없음(다른 상태머신).
