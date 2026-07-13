@@ -196,6 +196,25 @@ def test_order_for_load_dependents_go_last(monkeypatch):
     assert out.index("Dep") > out.index("Rno")      # dependent가 no-dep 뒤
 
 
+def test_order_for_load_pool_is_lpt_longest_first(monkeypatch):
+    """빈 슬롯엔 예상 시간 긴 놈 먼저(오너 2026-07-13): global pending은 LPT-desc라
+    non-read 미디엄이 read-only보다 앞. read-only는 strand에서 빠져 pool에 있으므로
+    여전히 창 안에 뜬다(40분 지각 아님)."""
+    monkeypatch.setattr(crud_conftest, "_has_prereq", lambda lid: False)
+    # n=2 heavy; non-read 3개 중 2개는 strand filler, 1개(M0)는 pool에 남음; read 2개
+    triples = ([_triple(f"H{i}", ["POST", "GET"]) for i in range(2)]     # heaviest
+               + [_triple(f"M{i}", ["POST"]) for i in range(3)]           # non-read 미디엄
+               + [_triple(f"R{i}", ["GET"]) for i in range(2)])           # read-only 최경량
+    out = crud_conftest._order_for_load(triples, 2)
+    pool = out[2 * 2:]                                       # global pending 영역
+    m_pos = min(i for i, x in enumerate(pool) if x.startswith("M"))
+    r_pos = min(i for i, x in enumerate(pool) if x.startswith("R"))
+    assert m_pos < r_pos, f"pool이 LPT-desc 아님(미디엄이 read 뒤): {pool}"
+    # read-only는 strand(pair-second)에 없다
+    assert not any(out[2 * i + 1].startswith("R") for i in range(2)), \
+        f"read-only가 strand에 묶임: {out}"
+
+
 def test_order_for_load_noop_when_few_items():
     tr = [("A", "A", {}), ("B", "B", {})]
     assert crud_conftest._order_for_load(tr, 4) == ["A", "B"]

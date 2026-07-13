@@ -143,38 +143,39 @@ def _has_prereq(lid: str, _cache={}) -> bool:
 
 
 def _order_for_load(triples: list, n: int) -> list:
-    """--dist=load용 3-tier 순서 (2026-07-13 run-19a5, 오너 설계). 입력은
-    LPT desc 정렬된 (item, id, lc) triple. load는 dequeue 시점에 dependency를
-    못 보므로(테스트 불투명), dependency 순서를 수집 순서에 인코딩한다:
+    """--dist=load용 순서 (2026-07-13 run-19a5·da22, 오너 설계). 입력은 LPT desc
+    정렬된 (item, id, lc) triple. load는 dequeue 시점에 dependency를 못 보므로
+    (테스트 불투명), 순서를 수집 순서에 인코딩한다:
 
-      pair-first(t=0)  = heavy(provider·병목) 상위 n
-      pair-second(strand) = 가장 가벼운 non-read-only n개 (read-only는 여기 안 씀)
-      global pending 앞 = read-only(선행자원 무·언제든 실행) → 빈 워커가 초반에 집음
-      global pending 뒤 = dependent(prereq) + 나머지 → provider가 도는 뒤에 디스패치
+      pair-first(t=0)     = heavy(provider·병목) 상위 n
+      pair-second(strand) = 가장 가벼운 non-read-only n개 (read-only·heavy는 제외)
+      global pending      = 나머지를 **LPT-desc(긴 것 먼저)** — 빈 슬롯엔 예상
+                            시간 긴 놈 먼저(오너 2026-07-13). no-dep 먼저(즉시 실행
+                            가능), dependent 후미(provider 도는 뒤). read-only는
+                            strand에서 빠져 pool에 있으므로 창 안(~수분)에 뜬다.
 
-    heavy를 밀지 않으므로 makespan 무영향, read-only만 40분→초반으로 당겨진다."""
+    heavy를 안 밀어 makespan 무영향 + LPT-pool이라 긴 미디엄이 pool에 들어와도
+    makespan을 안 늘린다. read-only 지각(19a5 17~40분)은 strand 제거로 해소."""
     items = [t[0] for t in triples]
     if n < 2 or len(triples) <= n:
         return items
     head = triples[:n]                                   # heavy → pair-first (t=0)
     tail = triples[n:]
-    read_only = [t for t in tail if _is_read_only(t[2])]         # → 앞으로 띄움
-    strandable = [t for t in tail if not _is_read_only(t[2])]    # strand + 뒤
+    strandable = [t for t in tail if not _is_read_only(t[2])]    # strand 후보(read-only 제외)
     k = min(n, len(strandable))
-    fillers = strandable[len(strandable) - k:][::-1]      # 가장 가벼운 strandable, strand
-    strand_rest = strandable[:len(strandable) - k]
-    # dependent(prereq)는 global pending 후미로 (provider 뒤에 디스패치)
-    dep = [t for t in read_only + strand_rest if _has_prereq(t[1])]
-    early = [t for t in read_only if not _has_prereq(t[1])]      # no-dep read-only 최우선
-    late_rest = [t for t in strand_rest if not _has_prereq(t[1])]
+    fillers = strandable[len(strandable) - k:][::-1]      # 가장 가벼운 non-read n개, strand
+    filler_lids = {t[1] for t in fillers}
+    # global pending = strand 안 된 나머지, LPT-desc(원 순서) 유지 → 긴 것 먼저.
+    pool = [t for t in tail if t[1] not in filler_lids]
+    pool_nodep = [t for t in pool if not _has_prereq(t[1])]   # no-dep 먼저(desc)
+    pool_dep = [t for t in pool if _has_prereq(t[1])]         # dependent 후미(desc)
     out = []
     for i, h in enumerate(head):
         out.append(h[0])
         if i < len(fillers):
             out.append(fillers[i][0])
-    out += [t[0] for t in early]        # global pending 앞: no-dep read-only
-    out += [t[0] for t in late_rest]    # 그다음: no-dep 나머지 (non-read)
-    out += [t[0] for t in dep]          # 후미: dependent (provider 뒤)
+    out += [t[0] for t in pool_nodep]
+    out += [t[0] for t in pool_dep]
     return out
 
 
