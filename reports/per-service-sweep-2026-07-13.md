@@ -24,7 +24,7 @@
 
 <!--PROGRESS-BEGIN-->
 
-**진행: 15/56 완료** — ✅4 · ⚠️9 · ❌2 · (teardown 미복귀 잔존: 0)
+**진행: 19/56 완료** — ✅7 · ⚠️10 · ❌2 · (teardown 미복귀 잔존: 0)
 
 | # | 서비스 | 폐포/LC | 라이브(passed/skip) | 4xx;5xx;fail | teardown surv;recon | 판정 |
 |---|--------|---------|---------------------|--------------|---------------------|------|
@@ -43,5 +43,19 @@
 | 13 | storage/archivestorage | 2/2 | passed=2 | 4xx=23;5xx=0;failstep=14 | surv=1;recon=no | ⚠️ERRS |
 | 14 | storage/baremetal-blockstorage | 4/2 | passed=2 | 4xx=7;5xx=0;failstep=5 | surv=1;recon=no | ⚠️ERRS |
 | 15 | database/mysql | 24/4 | - | 4xx=1;5xx=10;failstep=6 | surv=1;recon=yes | ❌TIMEOUT |
+| 16 | networking/loadbalancer | 11/5 | failed=1, passed=4 | 4xx=19;5xx=0;failstep=7 | surv=1;recon=yes | ⚠️RC1 |
+| 17 | networking/dns | 2/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=yes | ✅OK |
+| 18 | networking/gslb | 1/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
+| 19 | networking/cdn | 1/1 | passed=1 | 4xx=0;5xx=0;failstep=0 | surv=1;recon=no | ✅OK |
 
 <!--PROGRESS-END-->
+
+## audit log 대조 — 우리 GET "준비됨" 시각 vs 백엔드 실제 create/delete end (사용자 요청)
+방법: `GET /v1/logs`(loggingaudit) event_type `{자원}.create/delete/update.start/end` 실제 시각 vs `observations.jsonl` readiness GET 시각(자원타입+생성구간 매칭).
+
+**백엔드 실제 소요(오늘밤)**: create median 119s / p90 260s / **max private-dns ~1160s(19분)**, ske cluster 688s, vpc-peering 692s. delete median 20s / max subnet 506s(8분).
+
+**조기진행(우리가 백엔드 create.end보다 먼저 진행) 6건 / 정상대기 36건:**
+- private-dns ×2: 백엔드 1043~1160s 생성인데 우리 폴링 ~100s 후 진행 → ~16~18분 먼저. 폴링 예산 부족.
+- subnet ×4: 백엔드 134~253s 생성인데 우리 20~62s 후 진행 → 72~201s 먼저. provisioner의 `NOT waiting ACTIVE (adopt-time gate)` 설계 여파.
+- 개선안: (a) subnet adopt-time gate가 ACTIVE까지 대기하도록, (b) private-dns 폴링 예산을 실제(~20분)에 맞춰 확대 or 의존 스텝을 optional 유지, (c) observations에 concrete resource_id 기록해 정밀 대조 가능케.
