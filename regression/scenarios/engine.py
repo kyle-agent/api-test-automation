@@ -116,10 +116,24 @@ for _e in _CATALOG:
         ((_e.method or "").upper(), _norm_path(_e.http_path), _e.service), _e.key)
 
 
+def _canon_service(service: str | None) -> str:
+    """Normalize a region-routing service ALIAS to its catalog service name.
+    ``filestorage-dr`` (SCP_SERVICE_HOSTS -> kr-east1 host) is the SAME catalog
+    service as ``filestorage`` — the alias only re-homes the request to the DR
+    region. Without this, a DR-side 2xx (the ONLY working path for
+    set/deletevolumereplication, which 400 'Invalid.volume.purpose' from the
+    source side) records under an unknown service and is DROPPED from per-endpoint
+    coverage, pinning those endpoints at the source-side 400 forever. No real SCP
+    service name ends in ``-dr``, so this is unambiguous."""
+    svc = service or ""
+    return svc[:-3] if svc.endswith("-dr") else svc
+
+
 def _catalog_key_for(method: str, templated_path: str, service: str | None):
     """Resolve a step's (method, templated path, service) to a catalog key, or None."""
-    return _CAT_KEY_BY_MNS.get(
-        ((method or "").upper(), _norm_path(templated_path), service or ""))
+    m, p = (method or "").upper(), _norm_path(templated_path)
+    return (_CAT_KEY_BY_MNS.get((m, p, service or ""))
+            or _CAT_KEY_BY_MNS.get((m, p, _canon_service(service))))
 
 # Quota kinds whose budget must be reserved before a step's create, keyed by the
 # path it creates. Derived from dependencies.json (path -> kind) so the kernel

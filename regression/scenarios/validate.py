@@ -178,12 +178,16 @@ def validate(service_filter=None):
                 # = step.service or lifecycle service) so cross-service steps in a
                 # shared lifecycle resolve correctly.
                 step_svc = (step.get("service") or svc)
+                # Region-routing service aliases (e.g. 'filestorage-dr' -> kr-east1
+                # host) map to the base service's catalog endpoint — mirror the
+                # engine's _canon_service so DR-side write steps aren't false-flagged.
+                base_svc = step_svc[:-3] if step_svc.endswith("-dr") else step_svc
                 if method != "GET" and not step.get("adopt"):
                     key = ((method, _norm_path(step["path"]), step_svc))
-                    if key not in catalog:
+                    if key not in catalog and (method, _norm_path(step["path"]), base_svc) not in catalog:
                         warnings.append(
                             f"{sw}: {method} {step['path']} does not resolve to a "
-                            f"catalog endpoint for service '{svc}' — won't count "
+                            f"catalog endpoint for service '{step_svc}' — won't count "
                             f"toward write coverage (path typo?)")
             es = step.get("expect_status")
             if es is not None and not (isinstance(es, list)

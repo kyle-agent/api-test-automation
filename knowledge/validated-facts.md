@@ -2505,3 +2505,36 @@ rank 11이 +42분 지각, vs-server-actions +34.5분 — 같은 블록 앞 항�
   `InvalidInputValue`(resourceType/productResourceId 필수), 등록 모니터링 리소스 0.
   이벤트 정책 생성 자체가 등록 INSTANCE 필요 → show reads의 실 id 확보 불가.
   **블로커**(2026-09 단종 예정, 깊은 투자 금지).
+
+## filestorage replication 400 = source-side 제약 + DR 별칭 크레딧 버그 (2026-07-13, 오너 질문)
+
+> conf: 0.7 · seen: 2026-07-13 · obs: 2 (2026-06-24/07-08/07-09 라이브 + 이 세션 코드 추적)
+
+**증상**: 대시보드에서 `setvolumereplication`(PUT /v1/replications/{replication_id})
++ `deletevolumereplication`(DELETE 동경로)이 계속 **400**.
+
+**원인 A — 제품 제약(정상 400)**: 교차리전 복제는 볼륨 2개를 만든다 —
+source(kr-west1, `purpose=original`) + DR replica(kr-east1, `purpose=replication`).
+복제 **정책 변경(set)·삭제(delete)는 source 측에서 금지** → 400
+`filestorage.BadRequest.Invalid.volume.purpose`("Check the volume purpose."). 게다가
+deletevolumereplication은 **paused 선행**을 요구. `purpose`는 VolumeCreateRequest에
+없는 서버관리 상태필드(생성 body는 name/protocol/type_name뿐)라 create 보강으로
+못 고친다 — 어느 **리전 호스트에서 부르느냐**가 본질. 실 2xx 경로(오너 절차,
+2026-07-09 end-to-end 라이브 실증): DR(복제본) 리전에서 ① set-replication-dr
+policy=paused(202) ② delete-replication-dr(202, 레코드 ~20s 내 양 리전 소멸,
+source purpose original→none) ③ snapshot 정리 ④ 양 볼륨 삭제. DR 스텝은
+`filestorage-dr` service 별칭 = `SCP_SERVICE_HOSTS='{"filestorage-dr":
+"https://filestorage.kr-east1.e.samsungsdscloud.com"}'` 런타임 설정 필요(미설정 시
+region-template 호스트가 NXDOMAIN).
+
+**원인 B — 크레딧 버그(이 세션 발견·수리)**: `_catalog_key_for`/validate는
+`(method, path, service)`로 카탈로그 키를 찾는데 카탈로그 service는 `filestorage`고
+DR 스텝은 `filestorage-dr` 별칭 → **매칭 실패 → `_ck` None → `_record_smoke` 미호출**.
+즉 DR 측이 202를 내도 카탈로그 키에 크레딧이 안 되고, 크레딧되는 건 source 측
+(항상 400 프로브)뿐 → 세 엔드포인트(set/deletevolumereplication + DR replica의
+deletevolume)가 **영구 400 고착**. **수리**: `_canon_service()` — 리전 라우팅 별칭
+`<service>-dr`을 base service로 정규화(실 SCP 서비스명에 `-dr` 없음 → 무모호).
+engine `_catalog_key_for`(크레딧 경로) + validate(경고) 양쪽 반영. 검증: 세 키가
+`storage/filestorage/{setvolumereplication,deletevolumereplication,deletevolume}`로
+해석됨(단위 확인), validate 경고 6→3, offline 91 pass. 다음 heavy 콘솔 런
+(filestorage-dr alias 설정 시)이 이 세 키의 실 2xx 크레딧을 판정.
