@@ -40,6 +40,64 @@ def test_priority_long_soft_dependent_not_demoted(monkeypatch):
     assert nr._true_dependents() == {"cloudml"}
 
 
+def test_vpc_creator_detection_and_priority_first(monkeypatch):
+    """self-create VPC(adopt 없는 POST /vpcs)는 VPC-생성자 → 더 긴 비-생성자보다
+    앞. adopt:vpc는 생성자 아님(재사용). 오너 2026-07-13: 희소 슬롯 조기 반납."""
+    assert nr._is_vpc_creator({"steps": [{"method": "POST", "path": "/v1/vpcs"}]}) is True
+    assert nr._is_vpc_creator(
+        {"steps": [{"method": "POST", "path": "/v1/vpcs", "adopt": "vpc"}]}) is False
+    assert nr._is_vpc_creator({"steps": [{"method": "GET", "path": "/v1/vpcs"}]}) is False
+
+    monkeypatch.setattr(nr, "_durations", lambda: {"vc": 100.0, "big": 1000.0, "small": 10.0})
+    monkeypatch.setattr(nr, "_true_dependents", lambda: set())
+    lcs = [
+        {"id": "big", "steps": [{"method": "GET", "path": "/x"}]},          # 최장 비-생성자
+        {"id": "vc", "steps": [{"method": "POST", "path": "/v1/vpcs"}]},    # VPC-생성자
+        {"id": "small", "steps": []},
+    ]
+    out = [lc["id"] for lc in nr.priority_order(lcs)]
+    # vc가 big(더 길지만)보다 앞 — 슬롯 조기 점유·반납. 그다음 LPT(big>small).
+    assert out == ["vc", "big", "small"], out
+
+
+def test_vpc_creator_waits_and_retries_on_budget_skip(monkeypatch):
+    """VPC-생성자가 슬롯 부족으로 예산-skip되면 skip 기록이 아니라 대기 후 재실행
+    → 슬롯 나면 passed (오너 2026-07-13: "대기했다 실행"). 예산-skip은 create 이전이라
+    (created=0) 재실행이 멱등."""
+    import core.budgets
+    import core.config
+    import core.http_client
+    from regression.scenarios import engine
+
+    lc = {"id": "vc", "steps": [{"method": "POST", "path": "/v1/vpcs"}]}
+    monkeypatch.setattr(type(core.config.settings), "require_credentials",
+                        lambda self: None, raising=False)
+    monkeypatch.setattr(core.http_client, "ApiClient", lambda cfg: object())
+    monkeypatch.setattr(core.budgets, "live_count", lambda kind: None)
+    monkeypatch.setattr(engine, "active_lifecycles", lambda: [lc])
+    monkeypatch.setattr(engine, "provision_shared_vpc", lambda c, cfg: ({}, lambda: None))
+    monkeypatch.setattr(engine, "ResourceRegistry", lambda: object())
+    monkeypatch.setattr(nr, "_durations", lambda: {})
+    monkeypatch.setattr(nr, "_true_dependents", lambda: set())
+    monkeypatch.setattr(nr, "_VPC_WAIT_POLL", 0.01)
+    monkeypatch.setattr(nr, "_VPC_WAIT_TIMEOUT", 5.0)
+
+    calls = {"n": 0}
+
+    def fake_run(l, client, cfg, *, budget=None, resource_registry=None, shared_ctx=None):
+        calls["n"] += 1
+        if calls["n"] < 3:                     # 처음 2번은 슬롯 없음 → 예산-skip
+            return {"id": l["id"], "status": "skipped", "created": 0,
+                    "reason": f"[{l['id']}] budget 'vpc' exhausted before step 'create-vpc'",
+                    "failed_groups": []}
+        return {"id": l["id"], "status": "passed", "failed_groups": [], "created": 0}
+
+    monkeypatch.setattr(engine, "run_lifecycle", fake_run)
+    res = nr.run(["vc"], workers=1, log=lambda *a: None)
+    assert res["by_status"] == {"passed": 1}, res      # skip 아니라 대기 후 성공
+    assert calls["n"] == 3, f"대기-재시도 안 함: calls={calls['n']}"
+
+
 def _run_with_mocked_engine(monkeypatch, lcs, *, workers, sleep=0.02,
                             quota_cap=None, live_vpc=None):
     """engine을 mock해 run()을 오프라인 구동. 반환: (result, peak_conc, quota_400).

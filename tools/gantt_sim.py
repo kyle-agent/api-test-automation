@@ -44,7 +44,7 @@ def _class_default(lc) -> float:
 
 def load():
     from regression.scenarios import engine
-    from regression.scenarios.native_runner import _true_dependents
+    from regression.scenarios.native_runner import _true_dependents, _is_vpc_creator
     dur = _durations()
     dep = json.loads((_ROOT / "regression/scenarios/dependencies.json").read_text())
     prereq = _true_dependents()   # 러너와 동일 규칙: 진짜 inter-lifecycle 의존만
@@ -67,15 +67,16 @@ def load():
             if k in caps:
                 kinds.append(k)
         tasks.append({"id": lid, "dur": float(d), "dep": lid in prereq,
-                      "quota": kinds, "cat": lid.split("-")[0]})
+                      "quota": kinds, "cat": lid.split("-")[0],
+                      "vc": _is_vpc_creator(lc)})   # VPC-생성자(선두 배치 대상)
     return tasks, caps
 
 
 def simulate(tasks, caps, workers=30):
-    """native_runner 정확: priority_order = (dep asc, dur desc). 30 워커가 ready에서
-    동적 pop; capped kind는 슬롯 있어야 admit(없으면 대기=admission-wait)."""
+    """native_runner 정확: priority_order = (dep asc, VPC-생성자 먼저, dur desc).
+    30 워커가 ready에서 동적 pop; capped kind는 슬롯 있어야 admit(없으면 대기)."""
     def prio(t):
-        return (t["dep"], -t["dur"], t["id"])
+        return (t["dep"], not t.get("vc"), -t["dur"], t["id"])
     pending = sorted(tasks, key=prio)
     used = {k: 0 for k in caps}
     free_workers = list(range(workers))

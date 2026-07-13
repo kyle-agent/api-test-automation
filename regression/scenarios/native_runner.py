@@ -33,6 +33,11 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
 
+# VPC-생성자가 슬롯을 못 얻었을 때 skip 대신 대기하는 상한/폴 간격 (초). 워커 하나가
+# 이 동안 그 라이프사이클을 붙잡고 재시도한다. 슬롯은 다른 self-create가 끝나면 반납됨.
+_VPC_WAIT_TIMEOUT = float(os.environ.get("SCP_NATIVE_VPC_WAIT_TIMEOUT", "1800"))
+_VPC_WAIT_POLL = float(os.environ.get("SCP_NATIVE_VPC_WAIT_POLL", "5"))
+
 
 # ---------------------------------------------------------------------------
 # 우선순위 = LPT(긴 것 먼저) + dependent 뒤로. xdist의 strand/interleave 불요 —
@@ -79,9 +84,25 @@ def _true_dependents() -> set:
             if any(k not in _SHARED_INFRA_KINDS for k in kinds)}
 
 
+def _is_vpc_creator(lc: dict) -> bool:
+    """새 VPC를 self-create하는 라이프사이클 = adopt 없는 create-vpc(POST /vpcs)
+    스텝을 가진 것. 이들만 VPC 캡(생성 슬롯)을 점유한다(adopter는 재사용). 희소한
+    VPC 슬롯을 라이프사이클 전체 구간 동안 붙잡으므로, 슬롯이 비어 있는 t=0에
+    먼저 투입해 일찍 반납시켜야 다른 VPC-생성 시나리오가 슬롯을 못 얻어 대기하는
+    창을 최소화한다 (오너 2026-07-13: "vpc 생성하는 주황색을 먼저 배치"). xdist의
+    하드코딩 priority_first(vip-nat·vpc-subnet)를 스텝에서 파생 — 드리프트 견고."""
+    for st in lc.get("steps", []):
+        m = (st.get("method", "") or "").upper()
+        p = (st.get("path", "") or "").rstrip("/")
+        if m == "POST" and p.endswith("/vpcs") and not st.get("adopt"):
+            return True
+    return False
+
+
 def priority_order(lifecycles: list[dict]) -> list[dict]:
-    """true-dependent asc, duration desc — LPT(긴 것 먼저), 진짜 inter-lifecycle
-    의존만 후미. soft-의존(공유-인프라만 필요)은 길이대로 앞단에 둔다."""
+    """정렬 우선순위: (1) 진짜 inter-lifecycle 의존은 후미, (2) VPC-생성자는 선두
+    (희소 슬롯 조기 점유·반납), (3) 그 안에서 LPT(긴 것 먼저). VPC-생성자를 앞에
+    둬도 워커가 넉넉해(30개 ≫ 무거운 것) makespan 바닥선(최장 태스크)은 그대로."""
     dur = _durations()
     dependents = _true_dependents()
 
@@ -93,7 +114,8 @@ def priority_order(lifecycles: list[dict]) -> list[dict]:
                 d = float(CLASS_DEFAULT_S[classify_lifecycle(lc)])
             except Exception:  # noqa: BLE001
                 d = 60.0
-        return (lc["id"] in dependents, -d, lc["id"])   # 진짜 의존 뒤, 긴 것 먼저, id 타이브레이크
+        # 진짜 의존 뒤 → VPC-생성자 앞 → 긴 것 먼저 → id 타이브레이크
+        return (lc["id"] in dependents, not _is_vpc_creator(lc), -d, lc["id"])
 
     return sorted(lifecycles, key=key)
 
@@ -199,13 +221,32 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
                 started += 1
                 sidx = started
             log(f"[native] w{wid} start [{sidx}/{len(ordered)}] {lc['id']}")
-            try:
-                r = engine.run_lifecycle(lc, client, cfg, budget=budget,
-                                         resource_registry=reg, shared_ctx=shared_ctx)
-            except Exception as e:  # noqa: BLE001 — 개별 실패가 러너를 죽이면 안 됨
-                r = {"id": lc["id"], "status": "failed", "reason": repr(e),
-                     "failed_groups": [], "created": 0}
-                log(f"[native] w{wid} FAIL {lc['id']}: {e}")
+            # VPC-생성자가 슬롯 부족으로 예산-skip되면 skip이 아니라 **대기 후 재실행**
+            # (오너 2026-07-13: "대기했다 실행"). 예산-skip은 create 이전에 나므로
+            # (created=0, 토큰 반납됨) 재실행이 멱등 — 슬롯이 나면 성공한다. VPC-생성자를
+            # 앞에 배치(priority_order)해 t=0 빈 슬롯을 먼저 잡으니 이 대기는 드물게만
+            # 발동(생성자 수 > 여유 슬롯일 때). 무한 대기 방지 timeout.
+            _is_vc = _is_vpc_creator(lc)
+            _waited = 0.0
+            while True:
+                try:
+                    r = engine.run_lifecycle(lc, client, cfg, budget=budget,
+                                             resource_registry=reg, shared_ctx=shared_ctx)
+                except Exception as e:  # noqa: BLE001 — 개별 실패가 러너를 죽이면 안 됨
+                    r = {"id": lc["id"], "status": "failed", "reason": repr(e),
+                         "failed_groups": [], "created": 0}
+                    log(f"[native] w{wid} FAIL {lc['id']}: {e}")
+                    break
+                if (_is_vc and r.get("status") == "skipped"
+                        and "budget 'vpc'" in (r.get("reason") or "")
+                        and _waited < _VPC_WAIT_TIMEOUT):
+                    if _waited == 0.0:
+                        log(f"[native] w{wid} {lc['id']} VPC 슬롯 대기 중"
+                            f"(여유 {budget.available('vpc')}/{budget.limits.get('vpc')})…")
+                    time.sleep(_VPC_WAIT_POLL)
+                    _waited += _VPC_WAIT_POLL
+                    continue                    # 슬롯 날 때까지 대기 후 재실행
+                break
             with lock:
                 results.append(r)
 

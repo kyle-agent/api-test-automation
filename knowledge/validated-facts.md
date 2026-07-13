@@ -2787,3 +2787,23 @@ Budget 밖에서 생성)가 세마포어에 안 잡혀, 시드 없으면 세마�
   동시 2개 → 상주3+2=동시5(캡5). 시드로 6번째(잔재 포함) 400을 원천 차단.
 - offline: test_vpc_semaphore_seeded_from_live_leaves_only_residual_slots (시드 3 →
   self-create 5개 중 2개만 admit·3개 조율 skip; 미시드는 5개 다 admit=구멍 재현).
+
+## VPC-생성자 선두 배치 + 슬롯 대기-재실행 (2026-07-13, 오너 지시)
+
+VPC 생성 슬롯은 희소(캡5 − 상주3 ≈ 2). self-create 라이프사이클은 슬롯을 자기
+구간 전체 동안 점유하므로, 늦게 착수하면 슬롯을 늦게까지 붙잡아 다른 VPC-생성
+시나리오가 대기한다. 두 가지 반영:
+- **선두 배치**(priority_order): `_is_vpc_creator(lc)`(adopt 없는 POST /vpcs 스텝)를
+  키에 추가 — (진짜 의존 후미, **VPC-생성자 선두**, LPT). VPC-생성자가 t=0(슬롯 빔)에
+  먼저 잡고 일찍 반납 → 슬롯 가용성 최대. 실측: networking-vpc-subnet 착수 7.8→**0m**,
+  반납 15.3→**7.5m**(8분 일찍). 워커 30 ≫ 무거운 것이라 makespan 바닥선(47.7)은 불변.
+  xdist 하드코딩 priority_first(vip-nat·vpc-subnet)를 스텝에서 파생 → 드리프트 견고.
+- **대기-재실행**(worker): VPC-생성자가 슬롯 부족으로 예산-skip되면 skip 기록이 아니라
+  `_VPC_WAIT_POLL`(5s)로 대기 후 재실행(`_VPC_WAIT_TIMEOUT` 1800s 상한). 예산-skip은
+  create 이전(created=0, 토큰 반납)이라 재실행 멱등. 선두 배치로 이 대기는 생성자 수 >
+  여유 슬롯일 때만 드물게 발동. skip-not-fail → wait-then-run으로 커버리지 손실 0.
+- 설계 판단: 오너의 "세마포어로 하면 b" + "대기했다 실행"을 종합 — 공유 Budget이
+  세마포어이고, 대기는 러너 레벨 재시도 루프로(엔진 무변경·이중 세마포어 없음).
+  (a) 2단계 직렬 분리 불요: 선두 배치가 슬롯 점유창을 앞으로 압축, 초과분만 동적 대기.
+- offline: test_vpc_creator_detection_and_priority_first, test_vpc_creator_waits_and_
+  retries_on_budget_skip.
