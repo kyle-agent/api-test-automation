@@ -1853,37 +1853,66 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     def teardown():
         if not cfg.allow_destructive:
             return
-        # subnets THEN vpc (children before parent)
-        if db_subnet_id:
+        # subnets THEN vpc (children before parent). 서브넷 DELETE는 202 비동기
+        # (DELETING 30s~3min) — 곧바로 VPC DELETE를 날리면 409로 남는다. 이
+        # 클래스는 2026-07-12에 shared_infra.teardown만 고쳐졌고, 이 인라인
+        # teardown(단독/conftest 경로)은 빠져 있어 solo 런마다 공유 VPC가
+        # 잔존했다 (2026-07-13 vip-nat 재검증 런 regrvpcsh6a5467bd 실측).
+        # 동일 수리: 서브넷 gone 대기(≤240s) 후 VPC 409 사다리(5×15s).
+        issued = []
+        for sid, label in ((db_subnet_id, "shared DB subnet"),
+                           (subnet_id, "shared subnet")):
+            if not sid:
+                continue
             try:
-                client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{db_subnet_id}",
-                               service="vpc")
-                print(f"  shared DB subnet {db_subnet_id} deleted")
+                r = client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{sid}",
+                                   service="vpc")
+                st = getattr(r, "status", None)
+                if st in (200, 202, 204, 404):
+                    issued.append(sid)
+                print(f"  {label} {sid} delete -> {st}")
             except Exception as exc:
-                print(f"  shared DB subnet {db_subnet_id} delete failed ({exc}); "
+                print(f"  {label} {sid} delete failed ({exc}); "
                       f"sweep will reclaim")
-        if subnet_id:
-            try:
-                client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{subnet_id}",
-                               service="vpc")
-                print(f"  shared subnet {subnet_id} deleted")
-            except Exception as exc:
-                print(f"  shared subnet {subnet_id} delete failed ({exc}); "
-                      f"sweep will reclaim")
-        try:
-            client.request("DELETE", f"{_VPC_CREATE_PATH}/{vpc_id}", service="vpc")
-            print(f"  shared VPC {vpc_id} deleted")
-        except Exception as exc:  # best-effort; the tag-scoped sweep is the backstop
-            print(f"  shared VPC {vpc_id} delete failed ({exc}); sweep will reclaim")
+        if issued:
+            deadline = time.time() + 240
+            pending = list(issued)
+            while pending and time.time() < deadline:
+                still = []
+                for sid in pending:
+                    try:
+                        g = client.get(f"{_SUBNET_CREATE_PATH}/{sid}", service="vpc")
+                        if getattr(g, "status", None) != 404:
+                            still.append(sid)
+                    except Exception:  # noqa: BLE001 — read hiccup, retry next round
+                        pass
+                pending = still
+                if pending:
+                    time.sleep(10)
+
+        def _vpc_ladder(vid: str, label: str) -> None:
+            for attempt in range(5):
+                try:
+                    r = client.request("DELETE", f"{_VPC_CREATE_PATH}/{vid}",
+                                       service="vpc")
+                    st = getattr(r, "status", None)
+                except Exception as exc:  # noqa: BLE001 — sweep backstop
+                    print(f"  {label} {vid} delete failed ({exc}); "
+                          f"sweep will reclaim")
+                    return
+                if st in (200, 202, 204, 404):
+                    print(f"  {label} {vid} delete -> {st}")
+                    return
+                print(f"  {label} {vid} delete -> {st} "
+                      f"(attempt {attempt + 1}/5); retrying in 15s")
+                time.sleep(15)
+            print(f"  {label} {vid} still not deleted; sweep will reclaim")
+
+        _vpc_ladder(vpc_id, "shared VPC")
         for tag, (nid, _nname) in net_ids.items():
             # A/B의 자식(vip-nat 서브넷·IGW·DC)은 각 lifecycle이 지운다 —
-            # 여기서는 빈 VPC 삭제만 시도, 409(잔존 자식)는 스윕이 회수.
-            try:
-                client.request("DELETE", f"{_VPC_CREATE_PATH}/{nid}", service="vpc")
-                print(f"  shared net VPC {tag.upper()} {nid} deleted")
-            except Exception as exc:  # noqa: BLE001 — best-effort, sweep backstop
-                print(f"  shared net VPC {tag.upper()} {nid} delete failed "
-                      f"({exc}); sweep will reclaim")
+            # 비동기 소멸 잔재는 같은 사다리가 흡수, 실패는 스윕이 회수.
+            _vpc_ladder(nid, f"shared net VPC {tag.upper()}")
 
     ctx = {"shared_vpc_id": vpc_id}
     if subnet_id:

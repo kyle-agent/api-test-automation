@@ -2371,3 +2371,12 @@ run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행�
 - 유일 결함: vip-nat VIP IP 하드코딩(10.132.9.6)이 서브넷 재배치를 안 따라가
   400 check-ip-address-overlap → vip 그룹 스킵. 10.130.9.6으로 정렬(커밋 완료),
   단독 재검증 별도 수행.
+
+### 후속 판정 2건 (2026-07-13 04:35)
+
+- **vip-nat 단독 재검증(폴백 self-create 경로): 1 passed, VIP 그룹 경고 없음**
+  — 10.130.9.6 정렬로 createsubnetvip/connected-ports/static-nat-ips 체인 복구.
+- **engine 인라인 teardown에도 서브넷 gone-대기 + VPC 409 사다리 이식**: 07-12
+  수리가 shared_infra.teardown에만 들어가고 conftest/단독 경로의 인라인
+  teardown은 빠져 있어 solo 런마다 공유 VPC가 잔존했다(재검증 런
+  regrvpcsh6a5467bd 실측, 스윕으로 회수 완료). 이제 두 경로 동일.
