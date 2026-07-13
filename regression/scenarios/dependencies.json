@@ -211,6 +211,11 @@
       "gen-wave5-fw",
       "networking-direct-connect-routing"
     ],
+    "_priority_first_comment": "오너 지시 2026-07-13 (run Gantt 실측: 예측 58.9분/실제 53.1분 런에서 vpc-subnet-vip-nat가 ~28분, networking-vpc-subnet이 ~40분에야 시작해 런 꼬리를 만듦). 짧은 VPC-슬롯 소비자는 LPT(긴 것 우선) 정렬에서 뒤로 밀리는데, 그때는 슬롯이 장기 점유 중이라 대기까지 겹친다. t=0에는 공유 VPC 1개뿐이라 슬롯이 비어 있으므로 이 목록의 lifecycle을 최우선 투입해 슬롯을 먼저 쓰고 일찍 반납하게 한다. 적용 지점: tests/crud/conftest.py 수집 정렬(실행), local_run.simulate_schedule(예측 Gantt), dag_scheduler.priorities(dag 경로) — 세 곳 모두 schedule_optimizer.load_priority_first()로 이 목록을 읽는다.",
+    "priority_first": [
+      "vpc-subnet-vip-nat",
+      "networking-vpc-subnet"
+    ],
     "shared_subnet_cidr": "10.124.0.0/24",
     "fixed_ip_map": {
       "_comment": "ADOPT-class lifecycles re-home their fixed host IPs into the shared subnet (10.124.0.0/24) at DISTINCT, non-overlapping host addresses so two parallel adopters never claim the same IP in the ONE shared subnet. Reserve .1 (gateway). All these steps are optional+broad expect_status so a reject still records coverage.",

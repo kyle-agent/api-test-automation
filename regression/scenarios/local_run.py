@@ -428,7 +428,12 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
                 return s.get("adopt") != "vpc"
         return False
 
-    items.sort(key=lambda lc: (_dur(lc), len(lc.get("steps") or [])), reverse=True)
+    # 0차 키 = priority_first 핀 — 실행 경로(tests/crud/conftest.py 수집 정렬)와
+    # 동일 규칙이어야 예측 Gantt가 실제 투입 순서를 재현한다 (오너 2026-07-13).
+    from regression.scenarios.schedule_optimizer import load_priority_first
+    pinned = frozenset(load_priority_first())
+    items.sort(key=lambda lc: (lc["id"] in pinned, _dur(lc),
+                               len(lc.get("steps") or [])), reverse=True)
     cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
     n_w = int(workers) if workers else max(1, min(cap, len(items) or 1))
     n_v = max(1, int(vpc_slots))

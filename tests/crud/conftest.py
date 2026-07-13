@@ -47,6 +47,18 @@ def _durations() -> dict:
     return out
 
 
+def _priority_first() -> list:
+    """dependencies.json vpc_schedule.priority_first — 수집 정렬에서 맨 앞에
+    핀할 lifecycle id 목록. 수집 단계라 무거운 import 없이 파일을 직접 읽는다
+    (schedule_optimizer.load_priority_first와 같은 원천)."""
+    p = Path(__file__).resolve().parents[2] / "regression" / "scenarios" / "dependencies.json"
+    try:
+        return list(json.loads(p.read_text()).get("vpc_schedule", {})
+                    .get("priority_first", []))
+    except Exception:  # noqa: BLE001 — ordering is best-effort; never break collection
+        return []
+
+
 def _class_default_s(lc: dict) -> float:
     """미측정 lifecycle의 duration 기본값 — 0.0이 아니라 duration_stats의
     클래스 추정(cluster-grade≈2400s 등)을 재사용 (A3)."""
@@ -123,6 +135,7 @@ def pytest_collection_modifyitems(config, items) -> None:
     slots = [i for i, it in enumerate(items) if _lifecycle_id(it)]
     if len(slots) < 2:
         return
+    pinned = frozenset(_priority_first())
 
     def _key(it) -> tuple:
         lid = _lifecycle_id(it)
@@ -132,10 +145,14 @@ def pytest_collection_modifyitems(config, items) -> None:
         v = dur.get(lid, 0.0)
         if v <= 0.0:
             v = _class_default_s(lc)
+        # 0차 키 = priority_first 핀 (오너 2026-07-13): 짧은 VPC-슬롯 소비자
+        # (vpc-subnet-vip-nat 등)가 LPT에서 뒤로 밀리면 슬롯이 장기 점유된
+        # 시점에 도착해 대기+런 꼬리가 된다. t=0에는 슬롯이 비어 있으므로
+        # 핀 대상은 duration과 무관하게 맨 앞에 세운다.
         # 2차 키 = 스텝 수: 클래스 추정 동률(cluster-grade 2400s ×20+)로 LPT가
         # 퇴화하던 문제의 타이브레이크 (2026-07-11 run-923a 재구성 — ske/vs-full이
         # 동률 무리에 섞여 뒤로 밀렸음). 실측이 쌓이면 1차 키가 지배한다.
-        return (v, len(lc.get("steps") or []))
+        return (lid in pinned, v, len(lc.get("steps") or []))
 
     ordered = sorted((items[i] for i in slots), key=_key, reverse=True)
     ordered = _interleave_for_workers(ordered, _worker_count(config))

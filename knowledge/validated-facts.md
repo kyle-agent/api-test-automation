@@ -2249,7 +2249,7 @@ admission의 baseline/mine_live로 잡혀 다음 런의 headroom을 깎고, **�
 (≤240s) 후 VPC를 409 사다리(5×15s)로 삭제 + console2에 20s 재입장 티커
 (`_ensure_admit_ticker`, 큐 빌 때까지). 오프라인 회귀:
 tests/offline/test_shared_infra_teardown.py · test_console2.py(ticker).
-=======
+
 ## run-543a (2026-07-13 오너 풀런) 판정 — 115/119 pass, 수리 대량 확정 (2026-07-13)
 
 주의: 이 런은 **2라운드까지의 main**으로 실행됨 (3라운드 커밋 ad7b4530 이전 pull)
@@ -2285,3 +2285,25 @@ tests/offline/test_shared_infra_teardown.py · test_console2.py(ticker).
 - container-scr-registry skip = registry quota=1 환경 (기지).
 - import-image 409·update-image-member 400·switchover 404·patch Unpatchable =
   구조적 확정분 재확인 (waiver/백로그 후보 그대로).
+
+## 스케줄 실측: 짧은 VPC-슬롯 소비자가 LPT에서 런 꼬리가 된다 → priority_first 핀 (2026-07-13)
+
+run 20260713-102144-543a (117종, 예측 58.9분 / 실제 53.1분) 실측:
+
+- **provision(공유 인프라) 구간 = 256.9s(4.3분), 그동안 테스트 0개 실행.**
+  공유 서브넷 create→ACTIVE 폴 +12s~+140s(≈2.1분), 이어서 DB 서브넷
+  +148s~+250s(≈1.7분) — 두 서브넷이 **직렬** 생성이라 4.3분이 통으로
+  선행 대기다 (병렬화하면 ~2분 절약 가능; 첫 lifecycle-start +4.36분 실측).
+  서브넷 1개 create→ACTIVE는 kr-east1에서 약 2분 안팎으로 봐야 한다.
+- **networking-vpc-subnet +35.4분, vpc-subnet-vip-nat +44.2분에야 시작**
+  (vip-nat end +53.1분 = 런 makespan 그 자체). 두 시나리오는 자체 VPC를
+  만드는 짧은(400s/544s) 슬롯 소비자라 LPT(긴 것 우선)에서 뒤로 밀리는데,
+  그 시점엔 슬롯(4)이 장기 점유 중이라 대기까지 겹쳐 런 꼬리가 된다.
+  t=0에는 공유 VPC 1개뿐이라 슬롯이 비어 있으므로 **먼저 투입해 먼저
+  반납**시키는 게 옳다 (오너 지시 2026-07-13).
+- 수리: `dependencies.json vpc_schedule.priority_first`(핀 목록, 현재 위 2종)
+  → conftest 수집 정렬(실행)·local_run.simulate_schedule(예측 Gantt)·
+  dag_scheduler.priorities(dag 경로) 3곳이 `schedule_optimizer.
+  load_priority_first()`로 같은 목록을 읽어 0차 정렬 키로 핀한다.
+  회귀: tests/offline/test_crud_schedule_order.py(핀 2건) ·
+  test_dag_scheduler.py::test_priority_first_pin_overrides_lpt.

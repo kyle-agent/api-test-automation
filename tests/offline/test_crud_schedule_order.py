@@ -41,6 +41,34 @@ def test_interleave_preserves_membership():
     assert sorted(out) == sorted(ordered) and len(out) == 25
 
 
+def test_priority_first_pins_read_from_dependencies():
+    """priority_first(오너 2026-07-13)는 dependencies.json이 원천 — conftest와
+    schedule_optimizer가 같은 목록을 읽는다."""
+    from regression.scenarios.schedule_optimizer import load_priority_first
+    pins = crud_conftest._priority_first()
+    assert "vpc-subnet-vip-nat" in pins and "networking-vpc-subnet" in pins
+    assert pins == load_priority_first()
+
+
+def test_simulate_schedule_pins_priority_first_at_t0():
+    """예측 Gantt(simulate_schedule)도 핀을 t=0에 배치 — 실행 경로(conftest
+    수집 정렬)와 규칙이 갈리면 예측/실측 비교(schedule_verdict)가 무의미해진다.
+    회귀 근거: 2026-07-13 런에서 vpc-subnet-vip-nat ~28분, networking-vpc-subnet
+    ~40분 시작(LPT 후순위 + 슬롯 대기)으로 런 꼬리가 됐다."""
+    from regression.scenarios.local_run import simulate_schedule
+    # 4종 모두 self-create(VPC 슬롯 소비) — vpc-transit-gateway-children는
+    # adopt=vpc(슬롯 0)라 이 테스트에 부적합해 heavy-shared-networking 사용.
+    ids = ["vpc-peering", "heavy-shared-networking",
+           "vpc-subnet-vip-nat", "networking-vpc-subnet"]
+    sim = simulate_schedule(ids, workers=4, vpc_slots=2)
+    byid = {b["id"]: b for b in sim["bars"]}
+    assert byid["vpc-subnet-vip-nat"]["s"] == 0.0
+    assert byid["networking-vpc-subnet"]["s"] == 0.0
+    # 핀 2종이 슬롯 2개를 선점하므로 더 긴 비핀 슬롯 소비자는 그 뒤에 시작한다
+    assert byid["vpc-peering"]["s"] > 0.0
+    assert byid["heavy-shared-networking"]["s"] > 0.0
+
+
 def test_class_default_replaces_zero_for_unmeasured():
     # cluster-grade lifecycle(무거운 create 포함)은 0.0이 아니라 클래스 기본값
     lc = {"id": "postgresql-cluster-subops-full", "service": "database/postgresql",

@@ -31,7 +31,25 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 _DUR_PATH = Path(__file__).resolve().parents[2] / "data" / "optimizer" / "durations.json"
+_DEPS_PATH = Path(__file__).resolve().parent / "dependencies.json"
 _DEFAULT_S = 30.0   # assumed duration of a node we have never measured
+# 핀 노드의 priority 가산치 — 어떤 실측 duration(최장 ~46분≈2760s)보다 커서
+# 핀 노드가 항상 먼저 디스패치되되, 핀들 사이에서는 여전히 긴 것부터 나간다.
+PIN_BOOST_S = 1_000_000.0
+
+
+def load_priority_first(path: Path | None = None) -> list[str]:
+    """dependencies.json vpc_schedule.priority_first — 무조건 최우선 투입할
+    lifecycle id 목록 (오너 지시 2026-07-13: 짧은 VPC-슬롯 소비자가 LPT에서
+    뒤로 밀려 슬롯 대기 + 런 꼬리가 되는 것을 방지; t=0에는 슬롯이 비어 있다).
+    실행(conftest)·예측(simulate_schedule)·dag(priorities) 세 경로가 모두 이
+    함수로 같은 목록을 읽는다. 파일이 없거나 키가 없으면 빈 목록."""
+    p = path or _DEPS_PATH
+    try:
+        return list(json.loads(p.read_text()).get("vpc_schedule", {})
+                    .get("priority_first", []))
+    except Exception:  # noqa: BLE001 — ordering is best-effort; never break a run
+        return []
 
 
 # --------------------------------------------------------------------------- #
