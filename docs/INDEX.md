@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 69 docs · 25 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 71 docs · 26 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -15,6 +15,7 @@
 | [`PLATFORM-PLAN.md`](PLATFORM-PLAN.md) | all | SCP API Regression Test Platform — 업그레이드 계획 | 🟢 active |
 | [`RESOURCE-MODEL-PLAN.md`](RESOURCE-MODEL-PLAN.md) | all | 자원 모델 기반 시나리오 합성 (Resource Task Model) — 설계 | 🟢 active |
 | [`ROADMAP.md`](ROADMAP.md) | all | where this project is going |  superseded (ARCHITECTURE.md §Direction으로 병합 — 2026-07-04) |
+| [`TERMINOLOGY.md`](TERMINOLOGY.md) | all | 표기 가이드 — 화면 용어 정책 (D7 / 접목 6) | 🟡 draft |
 | [`agent-team.md`](agent-team.md) | all | The Agent Team — design & operating model | 🟢 active |
 | [`lessons.md`](lessons.md) | all | Lessons | 🟢 active |
 | [`quotas-and-budgets.md`](quotas-and-budgets.md) | all | Quotas and Budgets | 🟢 active |
@@ -43,6 +44,7 @@
 | [`working/plans/HEAVY-PREMISE-CONTRACT.md`](working/plans/HEAVY-PREMISE-CONTRACT.md) | all | HEAVY-PREMISE CONTRACT — Testing 단순화 (Model B) 공유 계약 | 🟢 active |
 | [`working/plans/IA-BUILD-CONTRACT.md`](working/plans/IA-BUILD-CONTRACT.md) | the IA-build agents (Catalog · Modeling · Reporting) + integration owner | IA build contract — "그림 하나, 여러 얼굴" parallel build |  superseded (이행 완료된 빌드 계약 — 확정 IA 빌드 완료) |
 | [`working/plans/NATIVE-SCHEDULER.md`](working/plans/NATIVE-SCHEDULER.md) | orchestrator | 목적특화 스케줄러 (native_runner) — xdist 대체 | 🟡 draft |
+| [`working/plans/OP-TIMINGS.md`](working/plans/OP-TIMINGS.md) | all | 오퍼레이션 타이밍 (per-API create/delete/update 실제 완료시간) | 🟢 active |
 | [`working/plans/PARALLEL-EXECUTION-PLAN.md`](working/plans/PARALLEL-EXECUTION-PLAN.md) | all | Parallel execution plan — staged foundations + per-VPC lanes (DRAFT) |  superseded (드래프트 설계 — 1.0 의존-DAG 스케줄러로 실현됨) |
 | [`working/plans/PLATFORM-CONVERGENCE.md`](working/plans/PLATFORM-CONVERGENCE.md) | owner + platform | 수렴 계획 — console2 → controlplane (척추 흡수) |  superseded (이행 완료된 수렴 계획 — console2가 척추에 흡수됨) |
 | [`working/plans/PLATFORM-IA-DIRECTION.md`](working/plans/PLATFORM-IA-DIRECTION.md) | owner + platform | 플랫폼 방향성 — 쉽게 정리 |  CONFIRMED (오너 확정 — 2026-06-26 · IA = Catalog · Modeling · Testing · Reporting · **2026-07-07 개정: Catalog→우측 유틸 링크, Modeling이 흡수 — §개정 참조**) |
