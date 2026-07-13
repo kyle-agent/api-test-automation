@@ -98,7 +98,11 @@
           "group": "cdn",
           "optional": true,
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "retry_on_status": [400, 409],
+          "retries": 6,
+          "retry_interval": 20,
+          "_note": "REPAIR 2026-07-13 (CDN 안 지워짐 관측): CDN은 async(create→deploying→ACTIVE, stop→stopping)이고 라이프사이클에 poll이 없어 stop이 아직 deploying 중인 CDN을 만나 400/409로 무효화될 수 있다. retry로 CDN이 stoppable 될 때까지 재시도 → 뒤의 delete가 stopped 상태를 만나 성공."
         },
         {
           "name": "purge-cdn",
@@ -124,7 +128,11 @@
           "group": "cdn",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409]
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [400, 409],
+          "retries": 10,
+          "retry_interval": 20,
+          "_note": "REPAIR 2026-07-13 (CDN 안 지워짐 관측 — regrefjnmoon Active 잔존): CDN이 Active/stopping 중이면 delete가 400(can't delete active)인데, expect가 400을 관용하고 retry가 없어 조용히 삼키고 넘어가 CDN 누수(계정당 20개 cap 소모). stop-cdn(async, 위에서 retry 추가)이 정착할 시간을 주며 delete를 10×20s 재시도 → stopped 되면 204. expect_status는 role 계약(networking-cdn-reads 노트: tolerant 비율로 probe role 파생) 유지 위해 그대로 두고 retry만 추가. 재시도 소진 후에도 안 되면 create-cdn cleanup/reconciler 백스톱."
         }
       ]
     },
