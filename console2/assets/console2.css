@@ -430,6 +430,9 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .nowbar.phase-test{background:#e8f0fd;border-color:#b6cdf0}
 .nowbar.phase-update{background:#fdf6e7;border-color:#e7c98f}
 .nowbar.phase-update .dot{background:var(--amber)}
+/* 클린업(teardown) 국면 — 모든 시나리오 종료 후 정리 스윕 중 (오너 2026-07-14) */
+.nowbar.phase-cleanup{background:#fdf6e7;border-color:#e7c98f}
+.nowbar.phase-cleanup .dot{background:var(--amber)}
 .nowbar.done{background:var(--panel);color:var(--muted)}
 .nowbar.done .dot{background:var(--green);animation:none}
 @keyframes nowpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
@@ -908,6 +911,16 @@ g.rg-selbox{cursor:pointer}
 .pva-now{position:absolute;top:1px;bottom:1px;width:0;z-index:1;pointer-events:none;
   border-left:2px solid var(--red)}
 .pva-now.done{border-left-color:var(--muted);border-left-style:dashed}
+.pva-now.cleanup{border-left-color:var(--amber)}
 .pva-now-lbl{position:absolute;top:-1px;left:2px;font-size:9px;font-weight:700;color:#fff;
   background:var(--red);border-radius:0 4px 4px 0;padding:0 4px;line-height:1.45;white-space:nowrap}
 .pva-now.done .pva-now-lbl{background:var(--muted)}
+.pva-now.cleanup .pva-now-lbl{background:var(--amber)}
+/* 클린업 밴드 — 마지막 lifecycle 종료 ~ 지금 (비어 보이던 teardown 구간, 오너 2026-07-14).
+   줄무늬 배경 + 점선 좌경계. z-index:0 로 재생헤드(1) 아래, pointer-events 없음. */
+.pva-cleanband{position:absolute;top:1px;bottom:1px;z-index:0;pointer-events:none;
+  border-left:1px dashed var(--amber);
+  background:repeating-linear-gradient(45deg,rgba(181,116,11,.10),rgba(181,116,11,.10) 6px,rgba(181,116,11,.03) 6px,rgba(181,116,11,.03) 12px)}
+.pva-cleanband-lbl{position:absolute;top:1px;left:5px;font-size:9px;font-weight:700;
+  color:var(--amber);white-space:nowrap}
+.pva-clean-tag{color:var(--amber);font-weight:700}

@@ -758,6 +758,39 @@ def test_execution_rail_master_detail_contract():
 
 
 # --------------------------------------------------------------------------- #
+# 클린업(teardown) 국면 표시 (오너 2026-07-14) — frontend contract
+# --------------------------------------------------------------------------- #
+def test_cleanup_phase_indicators_frontend_contract():
+    """모든 lifecycle 종료 후 run 이 아직 running 인 정리 스윕 구간을 표시한다
+    (오너 2026-07-14: "클린업 중인 게 표시 안 됨 — 라인도, 위 표시도"):
+
+      1. liveProgress: 열린 스텝 없음 + 모든 시작 lifecycle 종료 → phase=cleanup
+         "정리 중". stale lastStart fallback 을 이겨야 한다(안 그러면 '테스트 중' 고착).
+      2. now-playing 배너: phase-cleanup + teardown 메시지.
+      3. 타임라인: 헤더 '정리 중' 태그 · 재생헤드 cleanup 색·라벨 · 마지막
+         lifecycle-end~지금 사이 '정리 중' 밴드 · 차트 horizon 이 nowRel 까지 확장."""
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
+    # 1) liveProgress cleanup 판정 — fallback 을 이기는 우선순위
+    assert "const trulyActive = openList.length > 0" in js
+    assert "const cleaning = running && allLcEnded && !trulyActive" in js
+    assert 'phase = "cleanup"; phaseLabel = "정리 중"' in js
+    assert js.index("if (cleaning)") < js.index("} else if (active)"), \
+        "cleanup 은 active(=lastStart fallback) 분기보다 먼저 판정돼야 한다"
+    assert "cleanup: cleaning" in js
+    # 2) 배너: teardown 메시지 + phase-cleanup 스타일
+    assert "자원 teardown 정리 스윕 중" in js
+    assert ".nowbar.phase-cleanup{" in css
+    # 3) 타임라인: 헤더 태그 · 재생헤드 · 밴드 · horizon 확장
+    assert "pva-clean-tag" in js and ".pva-clean-tag{" in css
+    assert 'class="pva-now cleanup"' not in js  # (동적) — 클래스 토글은 아래 문자열로
+    assert 'cleanup ? " cleanup"' in js and ".pva-now.cleanup{" in css
+    assert 'class="pva-cleanband"' in js and ".pva-cleanband{" in css
+    assert "정리 중 · 자원 teardown" in js
+    assert "if (running && t0 != null) hor = Math.max(hor, nowRel)" in js
+
+
+# --------------------------------------------------------------------------- #
 # P2C-24 (2026-07-09) — 폴링 다이어트 + 무깜빡 렌더 + 진행률 + per-lifecycle 중단
 # --------------------------------------------------------------------------- #
 def test_events_view_incremental_offset(tmp_path):

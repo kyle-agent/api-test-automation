@@ -89,7 +89,7 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 
 ## 콘솔 실행 화면 개선 (오너 지시 2026-07-13~14)
 
-오너 실사용 제보 4건 — 전부 console2(`console2/assets/console2.js`·`.css`).
+오너 실사용 제보 5건 — 전부 console2(`console2/assets/console2.js`·`.css`).
 
 - **① 사전 점검(blast radius) 모달 — 요약 1급 + 세부 접힘** ("목록이 잘 보이지도
   않고 · 세부는 접혀있고 확인하면 실행"). 120 lifecycle 표 + 과금 30개 목록이 좁은
@@ -139,6 +139,20 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
     재구축 후 값 복원 — 위임 `input`이라 재배선 불요) ⓒ **2행 레이아웃**: 세로가
     길어지지 않게 지표 배지를 서비스와 같은 행 **오른쪽**으로(`.lcitem-b`: 서비스
     좌 flex:1 + `.lcmeta` 우측 정렬). 검증: 헤드리스 하네스 16/16 + test_console2 39/39.
+- **⑤ 클린업(teardown) 국면 표시** (오너 2026-07-14: "클린업 중인 게 표시 안 됨 —
+  라인도, 위 표시도"). 모든 lifecycle 종료 후 run 이 아직 running 인 정리 스윕 구간이
+  아무 데도 안 드러났다. **뿌리**: `liveProgress` 의 `active` 가 열린 스텝이 없으면
+  `lastStart` 로 폴백해 항상 non-null → 마지막 스텝이 '테스트 중'으로 굳어 보였다.
+  - **판정**: `cleaning = running && allLcEnded && !trulyActive`(열린 스텝 0 + 시작된
+    모든 lifecycle 종료). phase 체인에서 `active` 폴백보다 **먼저** 판정 → phase
+    `cleanup`·"정리 중".
+  - **표시 3면**: ⓐ now-playing 배너 `phase-cleanup`(amber) + "자원 teardown 정리
+    스윕 중" ⓑ 타임라인 헤더 '정리 중' 태그 ⓒ 재생헤드 amber + '정리 중 N분' ⓓ
+    마지막 lifecycle-end~지금 사이 **줄무늬 '정리 중' 밴드**(`.pva-cleanband`).
+  - **부수 수리**: 차트 horizon 이 모든 lifecycle 종료 시 `nowRel` 을 안 넣어
+    재생헤드·밴드가 차트 밖으로 나가던 것 → `running` 이면 `hor=max(hor,nowRel)`.
+  - 검증: 헤드리스 하네스(cleanup 판정·헤더/재생헤드/밴드·밴드 위치·반례 3종) +
+    `test_cleanup_phase_indicators_frontend_contract` · test_console2 40/40.
 
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 

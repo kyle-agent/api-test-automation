@@ -2790,6 +2790,7 @@ function liveProgress() {
   const openSteps = {};        // key -> step event still open
   let lastStart = null, lastTrack = null, lastDelete = null;
   let provStart = null, provEnd = null;   // 공유 인프라 프로비저닝 국면 (서버 narrator)
+  const startedLc = new Set(), endedLc = new Set();   // 클린업 국면 판정용
   runEvents.forEach(e => {
     if (e.kind === "step-start") { openSteps[e.lifecycle + "|" + e.step] = e; lastStart = e; }
     if (e.kind === "step-end") delete openSteps[e.lifecycle + "|" + e.step];
@@ -2797,15 +2798,29 @@ function liveProgress() {
     if (e.kind === "resource-deleted") lastDelete = e;
     if (e.kind === "provision-start") { provStart = e; provEnd = null; }
     if (e.kind === "provision-end") provEnd = e;
+    if (e.kind === "lifecycle-start" && e.lifecycle) startedLc.add(e.lifecycle);
+    if (e.kind === "lifecycle-end" && e.lifecycle) endedLc.add(e.lifecycle);
   });
+  // 클린업(teardown) 국면 = 시작된 모든 lifecycle 이 종료됐는데 run 은 아직 running
+  // — 시나리오 작업은 끝났고 run-scoped 정리 스윕(공유 VPC·잔존 자원 삭제)만 남았다.
+  // 이 구간엔 step-start 이벤트가 없어 지금까진 phaseLabel 이 비어 있었다 (오너 관측).
+  const allLcEnded = startedLc.size > 0 && [...startedLc].every(id => endedLc.has(id));
   // the active step = the most recent still-open step-start (fallback: lastStart)
   const openList = Object.values(openSteps);
+  const trulyActive = openList.length > 0;   // 실제 열린 스텝 (lastStart fallback 아님)
   const active = running ? (openList[openList.length - 1] || lastStart) : null;
+  // 클린업(teardown) 국면: 열린 스텝이 없고(=fallback lastStart 만) 시작된 모든
+  // lifecycle 이 종료됐는데 run 은 아직 running — run-scoped 정리 스윕 중. 이 판정은
+  // stale lastStart fallback 을 **이겨야** 한다 (안 그러면 마지막 스텝이 '테스트 중'
+  // 으로 굳어 보인다 — 오너 2026-07-14 관측한 바로 그 현상).
+  const cleaning = running && allLcEnded && !trulyActive;
   // 프로비저닝 중 = provision-start 후 provision-end 전이고 아직 어떤 step도 없음
   // ("실행 중 — 다음 step 대기…" 로 얼어 보이던 1~3분의 정체를 이름 붙인다).
   const provisioning = running && !active && !!provStart && !provEnd && !lastStart;
   let phase = null, phaseLabel = "";
-  if (active) {
+  if (cleaning) {
+    phase = "cleanup"; phaseLabel = "정리 중";
+  } else if (active) {
     const m = (active.method || "").toUpperCase();
     if (m === "POST") { phase = "create"; phaseLabel = "생성 중"; }
     else if (m === "DELETE") { phase = "delete"; phaseLabel = "삭제 중"; }
@@ -2816,8 +2831,9 @@ function liveProgress() {
   } else if (!running) {
     phaseLabel = "완료";
   }
-  return { running, active, phase, phaseLabel, provisioning, provStart,
-           activeLifecycle: active ? active.lifecycle : null,
+  return { running, active, phase, phaseLabel, provisioning, provStart, allLcEnded,
+           cleanup: cleaning,
+           activeLifecycle: (active && !cleaning) ? active.lifecycle : null,
            lastTrack, lastDelete };
 }
 
@@ -2946,8 +2962,10 @@ function reportR1() {
     </span>`;
   const banner = prog.running
     ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
-        <b>${esc(prog.phaseLabel)}</b> · <span class="mono">${esc(activeLc || "")}</span>
-        ${prog.active ? `<span class="muted small">${esc((prog.active.method || "") + " " + (prog.active.path || ""))}</span>` : ""}
+        <b>${esc(prog.phaseLabel || "진행 중")}</b> · ${prog.cleanup
+          ? `<span class="muted small">모든 시나리오 종료 — 자원 teardown 정리 스윕 중</span>`
+          : `<span class="mono">${esc(activeLc || "")}</span>
+        ${prog.active ? `<span class="muted small">${esc((prog.active.method || "") + " " + (prog.active.path || ""))}</span>` : ""}`}
         ${kpis}</div>`
     : `<div class="nowbar done"><span class="dot"></span><b>${runStatus === "aborted" ? "중단됨" : "완료"}</b> · 상태 ${esc(runStatus === "aborted" ? "aborted (사용자 중단 — teardown 스윕 수행)" : runStatus)} ${kpis}</div>`;
   // (re)build the shell only when missing or the run/graph-binding changed.
@@ -3756,6 +3774,11 @@ function pvaHtml(sim) {
   // 진행 중 = now 까지 자라는 막대 (폴 재렌더로 충분히 부드럽다); 종료 런의
   // 미종결(중단) lifecycle 은 마지막 이벤트 시각까지만 — 영원히 자라지 않게.
   const nowRel = t0 != null ? (running ? Date.now() / 1000 : tLast) - t0 : 0;
+  // 클린업(teardown) 국면 — liveProgress 단일 소스 (모든 lifecycle 종료 후 run 이
+  // 아직 running = 정리 스윕 중). 오너 2026-07-14: "클린업 중인 게 표시 안 됨".
+  const cleanup = liveProgress().cleanup;
+  let lastLcEnd = 0;   // 마지막 lifecycle-end 상대 위치(초) — 클린업 밴드 시작점
+  if (t0 != null) Object.values(act).forEach(a => { if (a.e != null) lastLcEnd = Math.max(lastLcEnd, a.e - t0); });
   const bars = ((sim && sim.bars) || []).slice()
     .sort((a, b) => a.s - b.s || a.e - b.e || (a.id < b.id ? -1 : 1));
   const known = new Set(bars.map(b => b.id));
@@ -3768,6 +3791,9 @@ function pvaHtml(sim) {
     const a = act[b.id];
     if (a && a.s != null && t0 != null) hor = Math.max(hor, a.e != null ? a.e - t0 : nowRel);
   });
+  // 진행 중이면 차트를 '지금'까지 넓힌다 — 모든 lifecycle 이 종료된 클린업 구간
+  // (nowRel > 마지막 lifecycle-end)에서도 재생헤드·정리 밴드가 차트 안에 들어오게.
+  if (running && t0 != null) hor = Math.max(hor, nowRel);
   const sc = simScale(Math.max(hor, 60));
   const px = s => s / 60 * sc.ppm;
   const rows = bars.map(b => {
@@ -3803,7 +3829,8 @@ function pvaHtml(sim) {
   const head = sim && sim.makespan_s != null
     ? `<div class="sim-stats small">예측 makespan <b>${simMin(sim.makespan_s)}분</b>
         (워커 ${sim.workers} · VPC 슬롯 ${sim.vpc_slots}) · 실제 경과 <b>${
-        t0 != null ? simMin(Math.max(nowRel, 0)) + "분" : "—"}</b>${running ? " · 진행 중" : ""}</div>`
+        t0 != null ? simMin(Math.max(nowRel, 0)) + "분" : "—"}</b>${
+        cleanup ? ' · <span class="pva-clean-tag">정리 중 (자원 teardown)</span>' : running ? " · 진행 중" : ""}</div>`
     : "";
   // 현재 경과 위치 재생헤드 — 진행에 따라 스스로 움직이는 세로선 (오너 2026-07-13:
   // "세로 한 줄이 움직이면 이해가 쉬움"). nowRel 은 진행 중이면 Date.now 기반이라
@@ -3812,9 +3839,14 @@ function pvaHtml(sim) {
   // 고정(회색 점선). 라인 위 막대 hover 를 막지 않게 pointer-events:none (CSS).
   const PVA_LANE_W = 190, PVA_PAD_L = 8;   // == .pva-gantt .sim-lane width + .sim-gantt padding-left (CSS)
   const nowEl = (t0 != null && nowRel > 0)
-    ? `<div class="pva-now${running ? "" : " done"}" style="left:${(PVA_PAD_L + PVA_LANE_W + px(nowRel)).toFixed(1)}px"><span class="pva-now-lbl">${running ? "지금" : "종료"} ${simMin(nowRel)}분</span></div>`
+    ? `<div class="pva-now${running ? (cleanup ? " cleanup" : "") : " done"}" style="left:${(PVA_PAD_L + PVA_LANE_W + px(nowRel)).toFixed(1)}px"><span class="pva-now-lbl">${cleanup ? "정리 중" : running ? "지금" : "종료"} ${simMin(nowRel)}분</span></div>`
     : "";
-  return `${head}<div class="sim-gantt pva-gantt">${simAxisHtml(sc)}${rows}${nowEl}</div>`;
+  // 클린업 밴드 — 마지막 lifecycle 종료(lastLcEnd)부터 지금(nowRel)까지, 시나리오
+  // 바가 없어 비어 보이던 구간을 "정리 중" 줄무늬 밴드로 채운다 (오너 2026-07-14).
+  const cleanEl = (cleanup && t0 != null && nowRel > lastLcEnd + 1)
+    ? `<div class="pva-cleanband" style="left:${(PVA_PAD_L + PVA_LANE_W + px(lastLcEnd)).toFixed(1)}px;width:${Math.max(px(nowRel - lastLcEnd), 3).toFixed(1)}px"><span class="pva-cleanband-lbl">정리 중 · 자원 teardown</span></div>`
+    : "";
+  return `${head}<div class="sim-gantt pva-gantt">${cleanEl}${simAxisHtml(sc)}${rows}${nowEl}</div>`;
 }
 
 // ================= shared helpers =================
