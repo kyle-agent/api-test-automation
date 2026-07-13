@@ -81,7 +81,7 @@ def load_yaml(path: Path) -> dict:
 def lifecycle_ids() -> set[str]:
     from regression.scenarios.loader import load_lifecycles
 
-    return {l["id"] for l in load_lifecycles()}
+    return {lc["id"] for lc in load_lifecycles()}
 
 
 def catalog_services() -> set[str]:
