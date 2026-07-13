@@ -1384,6 +1384,20 @@
             204
           ],
           "destructive": true
+        },
+        {
+          "name": "delete-fifo-queue",
+          "method": "DELETE",
+          "path": "/v1/queues/{fifo_queue_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "optional": true,
+          "destructive": true,
+          "_note": "REPAIR 2026-07-13 (FIFO 큐 누수 수리): create-fifo-queue는 cleanup(실패-안전망)만 있고 명시적 delete가 없었다. 엔진은 성공 경로에서 cleanup을 발화하지 않으므로(engine.py:1628 _finish 'passed'는 _teardown 미호출; _teardown은 except 경로 전용) FIFO 큐가 매 성공 런마다 잔존 — 콘솔 관측(afa8 id 474a16423a79…, resource-deleted 이벤트 없음). main 큐의 delete와 동형으로 명시적 삭제 추가. optional+404 관용: create 실패로 fifo_queue_id 미캡처 시 리터럴 경로 → 404."
         }
       ]
     },

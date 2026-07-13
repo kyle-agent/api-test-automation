@@ -382,7 +382,31 @@
             409,
             422
           ],
-          "_note": "Revert the access rule (action:remove) before cleanup deletes the volume — a lingering rule can block deletevolume. Also exercises the remove branch of setaccessrule."
+          "_note": "Revert the access rule (action:remove) before fs-delete-volume removes the volume — a lingering rule can block deletevolume. Also exercises the remove branch of setaccessrule."
+        },
+        {
+          "name": "fs-delete-volume",
+          "service": "filestorage",
+          "method": "DELETE",
+          "path": "/v1/volumes/{fs_volume_id}",
+          "optional": true,
+          "destructive": true,
+          "group": "fs-vm-access",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15,
+          "_note": "REPAIR 2026-07-13 (누수 수리): fs-create-volume은 cleanup(실패-안전망)만 있어 성공 경로에선 볼륨이 안 지워진다(engine.py:1628 성공 시 _teardown 미호출 — cleanup은 except 전용). 명시적 삭제를 access-rule remove 뒤에 추가. 400/409(access-rule 잔존/전이 중)는 4x15s 재시도."
         },
         {
           "name": "verify-server-read-ips",

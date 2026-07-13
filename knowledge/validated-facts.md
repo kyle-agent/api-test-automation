@@ -2679,3 +2679,27 @@ UNKNOWN을 유발하면 delete가 그대로 맞는다. 반영: database__subops-
 + scenarios.json database-mysql-cluster/database-postgresql-cluster (총 7 teardown).
 **SKE(container-ske-cluster-nodepool)는 제외** — 쿠버네티스라 /sync-state
 엔드포인트 없음(다른 상태머신).
+
+## cleanup 필드는 실패-안전망일 뿐 — 성공 경로 teardown은 명시적 DELETE 스텝이어야 (2026-07-13, 오너 큐 누수 관측)
+
+> conf: 0.9 · seen: 2026-07-13 · obs: 2 (afa8 큐/볼륨 잔존 + 코드 추적)
+
+**엔진 규약 (engine.py)**: `_teardown()`(등록된 cleanup 발화)은 **`except` 경로에서만**
+호출된다 (line 1621-1624). 성공 완주 시 `_finish(..., "passed")`(line 1628)는
+teardown을 부르지 **않는다**. 즉 **정상 런의 자원 정리는 명시적 DELETE 스텝이
+전담**하고, 스텝의 `cleanup` 필드는 라이프사이클이 중간에 실패했을 때만 도는
+안전망이다.
+
+**결함 클래스**: create 스텝(POST)이 `cleanup`(DELETE)만 갖고 **매칭되는 명시적
+DELETE 스텝이 없으면**, 그 자원은 **매 성공(green) 런마다 잔존**한다 — 리포트는
+전부 정상(실패한 API 호출 없음)이라 조용히 샌다. 라이브 실측(afa8): FIFO 큐
+`create-fifo-queue`(474a16423a79…) + gen-heavy-vs-netops의 NFS 볼륨이 콘솔에 잔존
+(resource-deleted 이벤트 없음). 반면 명시적 delete 스텝이 있는 main 큐/서버는 정상 삭제.
+
+**수리**: (1) application-queueservice-queue에 `delete-fifo-queue` 명시적 스텝 추가.
+(2) gen-heavy-vs-netops에 `fs-delete-volume` 명시적 스텝 추가(내가 이 세션에 넣은
+fs-create-volume이 cleanup-only였음 — access-rule remove 뒤 삭제). (3) **validate.py
+가드 신설**: create+cleanup인데 매칭 명시적 DELETE 없으면 WARN (쿼리스트링 무시).
+남은 경고 3건은 latent(create 블록: vs-image·scr-repo)/singleton(networking
+firewall-logging-storage는 "이미 존재하면 create 실패"라 계정당 1개 상한 — 누적
+아님, 삭제 시 동시런 레이스 위험이라 보류) — 케이스별 오너 리뷰 대상.
