@@ -1411,10 +1411,25 @@
           "group": "lb-member-bulk"
         },
         {
+          "name": "list-igw-for-lb",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways?vpc_id={vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "internet_gateway_id": "$.internet_gateways[0].id"
+          },
+          "_note": "2026-07-13 run-c373 수리: create-internet-gateway 400 already-associated (공유 VPC IGW 1개 제한, HB4c 클래스) — adopt-or-create 부트스트랩 (vpn.json/vs-netops와 동일 규약)."
+        },
+        {
           "name": "create-internet-gateway",
           "service": "vpc",
           "method": "POST",
           "path": "/v1/internet-gateways",
+          "group": "igw",
+          "optional": true,
           "json": {
             "description": "API regression suite",
             "firewall_enabled": false,
@@ -1426,16 +1441,19 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
-          "capture": {
-            "internet_gateway_id": "$.internet_gateway.id"
+          "capture_soft": {
+            "internet_gateway_id": "$.internet_gateway.id",
+            "owned_igw_id": "$.internet_gateway.id"
           },
           "cleanup": {
             "method": "DELETE",
-            "path": "/v1/internet-gateways/{internet_gateway_id}",
+            "path": "/v1/internet-gateways/{owned_igw_id}",
             "service": "vpc"
-          }
+          },
+          "_note": "2026-07-13: adopt-or-create — owned_igw_id는 자기 생성시에만 (남의 IGW 미삭제)."
         },
         {
           "name": "wait-internet-gateway",
@@ -1800,7 +1818,7 @@
           "name": "delete-internet-gateway",
           "service": "vpc",
           "method": "DELETE",
-          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "path": "/v1/internet-gateways/{owned_igw_id}",
           "expect_status": [
             200,
             202,

@@ -22,7 +22,10 @@ from .config import Settings, settings
 
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 DESTRUCTIVE = {"DELETE"}
-RETRY_STATUS = {502, 503, 504}
+RETRY_STATUS = {429, 502, 503, 504}
+# 429(Too Many Requests)는 처리 전 거부라 모든 메서드에서 재시도 안전 —
+# run-c373 실측(2026-07-13): vpc 호스트 순간 burst 스로틀로 서로 다른 5개
+# lifecycle이 각 1건씩 429를 맞고 하드 실패. Retry-After 헤더가 있으면 존중.
 
 # Process-wide count of transient gateway responses (502/503/504). A concurrency
 # controller reads the delta to back off when the backend is overloaded. Thread-safe.
@@ -155,7 +158,13 @@ class ApiClient:
             if resp.status_code in RETRY_STATUS:
                 _bump_retry_status()
                 if attempt < _max:
-                    time.sleep(backoff)
+                    _wait = backoff
+                    if resp.status_code == 429:
+                        try:
+                            _wait = max(_wait, float(resp.headers.get("Retry-After", 0)))
+                        except (TypeError, ValueError):
+                            pass
+                    time.sleep(min(_wait, 30))
                     backoff = min(backoff * 2, 16)
                     continue
             elapsed = (time.monotonic() - start) * 1000

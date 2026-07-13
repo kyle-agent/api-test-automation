@@ -2388,3 +2388,33 @@ run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행�
 동일 클래스(그룹 DELETE 200이지만 IAM-gated 자식 log-stream 때문에 잔존,
 log-stream IAM 권한 필요). 스윕은 stuck으로 1회 보고 후 재시도 안 함(수렴 가드
 정상 동작). 클린업 루틴의 알려진-예외 목록에 이 2건 추가해 취급할 것.
+## run-c373 (2026-07-13 큐 런, 최신 main) 판정 — 3라운드 수리 일괄 그린 + 429 클래스 발견
+
+111 passed / 7 failed / 1 skip. **실패 7 중 5건이 429**(Too Many Requests) —
+vpc 호스트 순간 burst 스로틀로 서로 다른 5개 lifecycle이 각 1건씩 하드 실패
+(신규 시스템 클래스). http_client `RETRY_STATUS`에 429 추가(전 메서드 재시도
+안전 — 처리 전 거부) + Retry-After 존중(상한 30s).
+
+### 이번 런으로 확정 그린 (3라운드 + 이전 수리)
+
+- **rmtags SRN/key b64**: 12스텝 전부 2xx (tags 계열 카탈로그 키 일괄 획득).
+- **cloudmonitoring**: 리스트 3키 200 (datetime+과거끝+실 productResourceId).
+  show-event-policy-* 는 계정에 이벤트 정책 0이라 리터럴 400 잔존 —
+  gen-cm-event-policy 연계(정책 생존 창에서 읽기) 후속.
+- **fifo dedup 2키 200** · **secretsmanager reveal 200** (오너 콘솔 IP가 CIDR
+  리스트에 포함 — 콤마 리스트 수리 최종 확정).
+- **IGW adopt-or-create (vs-netops)**: list→create 202→wait 200 완주.
+- peering rule·DC 체인·DB resize 그린 유지.
+
+### 확정/승격된 결함
+
+- **DB register-log-export-config 500 = 백엔드 PF 확정**: 스케줄 형식 통과
+  (InvalidScheduleData 소멸) + 실존 버킷(apitest-logsink)으로도 5엔진 전부
+  500 ContactAdminForAssistance — 우리 입력 소거 완료, SDS 문의감.
+  하류 set/export/unregister는 register 성공 전까지 도달 불가.
+- **eventstreams 프로비저닝 = 백엔드 PF 확정 (5연속)**: 구버전([1])으로도
+  es-wait terminal-bad — 버전 무관, 202 수락 후 비동기 FAILED. waiver/SDS 문의감.
+- **scf logs/metrics `time` 허용값 = {1, 3, 12}** (에러 본문 명시; 60도 거부) —
+  time=1로 교정. 문서에는 어떤 제약도 없음 (undiscoverable-params PF 후보).
+- **gen-heavy-lb-members create-internet-gateway 400** = vs-netops와 동일
+  already-associated → 같은 adopt-or-create 이식 (owned_igw_id 분리).
