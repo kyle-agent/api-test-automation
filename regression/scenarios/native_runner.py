@@ -77,6 +77,37 @@ def priority_order(lifecycles: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 러너
 # ---------------------------------------------------------------------------
+def _wait_shared_subnets_active(client, shared_ctx, log, timeout=600, interval=10):
+    """공유 서브넷 ACTIVE까지 대기 후 adopter 디스패치 (2026-07-13 라이브 검증
+    2회 재현). native 러너는 provision 직후 즉시 디스패치라, 서브넷이 CREATING인
+    채로 라이프사이클이 adopt하면 라이프사이클의 wait-subnet 타임아웃(180s)이
+    서브넷 활성(>180s)보다 짧아 VM이 준비 안 된 서브넷에 생성돼 ERROR. 콘솔/xdist
+    경로는 provision→pytest 기동 간격이 이를 흡수하지만 native엔 그 간격이 없으므로
+    러너가 명시적으로 게이트한다 (adopter는 공유 인프라 준비에 의존)."""
+    import time as _t
+    sub_ids = [shared_ctx[k] for k in ("shared_subnet_id", "shared_db_subnet_id")
+               if shared_ctx.get(k)]
+    if not sub_ids:
+        return
+    deadline = _t.time() + timeout
+    pending = set(sub_ids)
+    while pending and _t.time() < deadline:
+        for sid in list(pending):
+            try:
+                sn = client.get(f"/v1/subnets/{sid}", service="vpc").body.get("subnet", {})
+                if sn.get("state") == "ACTIVE":
+                    pending.discard(sid)
+            except Exception:  # noqa: BLE001
+                pass
+        if pending:
+            log(f"[native] 공유 서브넷 ACTIVE 대기 {len(pending)}/{len(sub_ids)}…")
+            _t.sleep(interval)
+    if pending:
+        log(f"[native] ⚠ 공유 서브넷 {len(pending)}개 ACTIVE 미달({timeout}s) — 그대로 진행")
+    else:
+        log("[native] 공유 서브넷 ACTIVE 확인 — 라이프사이클 디스패치 시작")
+
+
 def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
     """선택된 lifecycle을 스레드풀로 병렬 실행. 게이트(mutations/heavy 등)는
     engine.run_lifecycle이 cfg(env)로 강제. 반환: {results, workers, elapsed_s}."""
@@ -105,6 +136,11 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
             shared_ctx = res or {}
     except Exception as e:  # noqa: BLE001
         log(f"[native] shared VPC provision 경고: {e}")
+
+    # 공유 서브넷 ACTIVE 게이트 — adopter를 준비된 인프라에만 디스패치 (라이브
+    # 검증: 이게 없으면 서브넷 CREATING 중 adopt → wait-subnet 타임아웃 → VM ERROR).
+    if shared_ctx:
+        _wait_shared_subnets_active(client, shared_ctx, log)
 
     budget = _budgets.Budget()          # **공유** (스레드-안전) — 계정-전역 쿼터 조율
     reg = engine.ResourceRegistry()     # 공유 매니페스트
