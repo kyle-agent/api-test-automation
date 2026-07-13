@@ -701,6 +701,26 @@
           "retry_interval": 15
         },
         {
+          "name": "wait-vpc-endpoint-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "group": "vpce",
+          "optional": true,
+          "_note": "2026-07-13 오너 실측: delete-vpc-endpoint(async 202) 후 delete-subnet이 엔드포인트 소멸을 앞질러 409 → subnet(10.124.9.0/24)이 공유 VPC 안에 Active로 잔존 → 공유 VPC teardown 막음. 엔드포인트 404(소멸)까지 대기 후 subnet 삭제 (공유 subnet gone-wait 패턴). optional+group vpce라 엔드포인트 미생성/타임아웃이면 그룹만 스킵(런 non-red).",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 10
+          }
+        },
+        {
           "name": "delete-subnet",
           "service": "vpc",
           "method": "DELETE",

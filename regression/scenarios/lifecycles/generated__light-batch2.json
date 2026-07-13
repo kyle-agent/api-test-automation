@@ -244,6 +244,26 @@
           "_note": "2026-07-09: group vpce 동승 — create(optional+group) 실패 시 리터럴 {vpc_endpoint_id} DELETE가 strict 실패하는 경로 차단(등록된 cleanup은 _teardown_group이 처리). || 2026-07-09b: 400/409 사다리 8×20s — run-2b에서 CREATING 중 delete 400 invalid-deletable-state (위 read의 ACTIVE 폴과 벨트)."
         },
         {
+          "name": "wait-vpc-endpoint-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "group": "vpce",
+          "optional": true,
+          "_note": "2026-07-13 오너: delete-vpc-endpoint(async) 후 subnet 삭제가 엔드포인트 소멸을 앞지르지 않도록 404까지 대기 (vpc-endpoint 형제 lifecycle과 동일 갭 수리 — 공유 subnet gone-wait 패턴). optional+group vpce라 미생성/타임아웃은 그룹 스킵. recompose 보존.",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 10
+          }
+        },
+        {
           "name": "delete-filestorage-volume",
           "service": "filestorage",
           "method": "DELETE",
