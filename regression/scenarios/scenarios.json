@@ -5291,6 +5291,50 @@
           }
         },
         {
+          "name": "pre-delete-sync-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해."
+        },
+        {
+          "name": "wait-pre-delete-settle",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "pre-delete-sync-state 후 재확인: 삭제 가능한 RUNNING/ACTIVE 상태 정착 대기. terminal-bad(FAILED/ERROR)는 엔진 기본 조기 종료, 고착 UNKNOWN은 600s 후 통과하고 delete 사다리가 인계."
+        },
+        {
           "name": "delete-cluster",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}",
@@ -6285,6 +6329,50 @@
             "timeout": 1200,
             "interval": 30
           }
+        },
+        {
+          "name": "pre-delete-sync-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해."
+        },
+        {
+          "name": "wait-pre-delete-settle",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "pre-delete-sync-state 후 재확인: 삭제 가능한 RUNNING/ACTIVE 상태 정착 대기. terminal-bad(FAILED/ERROR)는 엔진 기본 조기 종료, 고착 UNKNOWN은 600s 후 통과하고 delete 사다리가 인계."
         },
         {
           "name": "delete-cluster",

@@ -2626,3 +2626,56 @@ dequeue 시점에 테스트의 dependency를 못 본다**(테스트 불투명) �
 heavy를 밀지 않아 makespan 무영향, read-only만 40분→초반으로 당겨진다(t=0은 heavy를
 밀어내야 해 makespan 리스크 → "초반"으로 안전 채택). `_is_read_only`(전부 GET)·
 `_has_prereq`(dependencies.json prerequisites)로 분류. offline 테스트 3종 신설.
+## 큐 누수 = 중단 런 + 스위퍼 사각지대 + API 설계 갭 → ledger-reclaim 패스로 근본 수리 (2026-07-13)
+
+오너 관측: 콘솔 Queue 목록에 regrq* 5개 잔존(06-20·07-12·07-13), verify_clean은 0으로 봄.
+
+**3겹 원인:**
+1. **중단 런 누수**: 큐 create(201)까지 성공→id 캡처·registry track까지 됐는데
+   run이 delete 스텝 전에 죽음(오늘 ff1c abort 등). 생성 실패가 아니라 **fail 난
+   API 호출이 없어** 리포트는 전부 정상 — "정상인데 자원이 남는" 정확한 메커니즘.
+2. **API 설계 갭 (conformance)**: listqueue(v1.1 배포본)는 `{count, queue_urls:[URL]}`
+   — 이름만 주고 **id를 안 줌**. delete/show/attributes는 전부 32자 큐ID 요구,
+   **이름→ID resolver 없음**(check-duplication은 `{result:true}`, 계정ID 조회는 404,
+   `/v1/queues/{account}/{name}` 경로는 403 권한없음). 문서의 v1.0(`queues:[{id}]`)은
+   어떤 버전 헤더로도 도달 불가. → **생성 시 id를 안 붙잡은 큐는 API로 회수 불가한
+   고아**. id 기반 `DELETE /v1/queues/{32hex}`는 정상(404 on gone, VALIDATED).
+3. **스위퍼 사각지대**: `_select(queueservice,/v1/queues)`가 queue_urls를 못 파싱해
+   항상 [] → 큐 스윕 패스 무동작(6/20 큐 생존 이유). 게다가 엔진이 create마다
+   `reports/registry/*.jsonl`에 **RESOLVED delete_path(/v1/queues/<실제id>)**를
+   영속 기록하는데 **reconciler가 이 매니페스트를 한 번도 안 읽었다**(registry.py
+   주석 "reconciler globs …"는 미구현 — 매니페스트가 dead weight).
+
+**근본 수리**: `cleanup.reconciler._pass_ledger_reclaim` — reports/registry/*.jsonl을
+소비해 기록된 delete_path(실제 id)로 삭제. 큐뿐 아니라 **모든 id-주소 자원의 중단-런
+고아**를 회수한다(listing이 못 주는 것도 매니페스트가 앎). 안전장치: mtime <
+`_LEDGER_MIN_AGE_S`(기본 900s) shard는 활성 런 것이라 건너뜀(Hard Rule 4);
+404=회수됨(prune); 409=다음 라운드 재시도(fixed-point 수렴); 모두 gone인 shard만
+파일 삭제. _TAIL_PASSES 선두 등록. 회귀: tests/offline/test_ledger_reclaim.py 6건.
+
+**기존 5개 한계**: 이 컨테이너 ledger엔 그 id가 없음(원 실행은 console2 서버 머신).
+서버 머신에서 갱신된 reconciler 실행 시 그쪽 shard가 남아있으면 회수됨; 아니면
+콘솔 "서비스 해지" 버튼이 유일 경로(콘솔 백엔드는 서버측 이름→id 해석).
+
+## DBaaS 클러스터 UNKNOWN은 sync-state로만 복구 — delete 직전 재동기화 필수 (2026-07-13, 오너 관측)
+
+> conf: 0.8 · seen: 2026-07-13 · obs: 3 (run-923a/c373 라이브 + 오너 콘솔 관측)
+
+**사실**: DBaaS 클러스터(mysql/postgresql/mariadb/epas/cachestore)는 async subop
+(set-parameters·patch-minor·kernel-upgrade·resize·add-block-storages)이 202 수락
+후 비동기 실패하면 `service_state=UNKNOWN`으로 추락한다. UNKNOWN에서는 후속
+mutating op(삭제 포함)이 400 InvalidState로 거부된다. **복구 유일 수단 =
+`POST /v1/clusters/{cluster_id}/sync-state` (body {})** — 콘솔의 "synchronize"
+버튼과 동일. 라이브 실측(c373): sync-state 10회 전부 202 → 상태 `SYNCHRONIZING`
+→ RUNNING 복귀. **DELETE 재시도로는 절대 복구 안 됨**(retry_on_status 400 x20이
+있어도 상태를 안 바꾸므로 20회 전부 400) → 빌링 클러스터 잔존.
+
+**로직 규약 (delete 직전 필수)**: `pre-delete-sync-state`(POST sync-state,
+optional, 4xx 관용) → `wait-pre-delete-settle`(GET, poll until RUNNING/ACTIVE/
+AVAILABLE, give_up_status [400,404], timeout 600, terminal-bad는 엔진 기본 조기
+종료) → `delete-cluster`. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).
+mid-lifecycle sync(param 실패 직후)만으로는 부족 — 마지막 sync 이후의 subop이
+UNKNOWN을 유발하면 delete가 그대로 맞는다. 반영: database__subops-full.json 5엔진
++ scenarios.json database-mysql-cluster/database-postgresql-cluster (총 7 teardown).
+**SKE(container-ske-cluster-nodepool)는 제외** — 쿠버네티스라 /sync-state
+엔드포인트 없음(다른 상태머신).
