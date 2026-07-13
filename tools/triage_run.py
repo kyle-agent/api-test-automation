@@ -10,9 +10,12 @@ artifacts, so this bucket is the source of truth.
 
 Usage::
 
-    python -m tools.triage_run                      # latest run: 4xx triage + summary
+    python -m tools.triage_run                      # latest run: ACTIONABLE 4xx + summary
     python -m tools.triage_run 20260713-145320-c373 # a specific run-id
     python -m tools.triage_run --list               # list recent runs (newest first)
+    python -m tools.triage_run --show-waived         # also show waived-key 4xx (hidden by
+                                                     #   default — they are accepted C2-only
+                                                     #   non-goals, e.g. baremetal/archivestorage)
     python -m tools.triage_run --keys KEYFILE        # also report status for catalog
                                                      #   keys listed in KEYFILE (or a
                                                      #   comma list via --keys=a,b)
@@ -21,7 +24,11 @@ Usage::
                                                      #   4xx->2xx (improved) or 2xx->4xx
                                                      #   (regressed)
 
-Read-only over the bucket; never calls the live API or touches safety gates.
+By default a 4xx step whose catalog key is in data/baselines/coverage_waivers.json
+is SUPPRESSED from the actionable list (shown only as a count) — otherwise the ~60
+waived billing-prohibitive/reachability keys (baremetal-blockstorage, archivestorage,
+…) drown the handful of real, fixable defects. Read-only over the bucket; never
+calls the live API or touches safety gates.
 """
 from __future__ import annotations
 
@@ -31,6 +38,7 @@ import json
 import re
 import sys
 from collections import defaultdict
+from pathlib import Path
 
 try:
     import boto3  # noqa: F401
@@ -38,6 +46,23 @@ except ImportError:  # pragma: no cover
     boto3 = None
 
 from core.oplog import _cfg
+
+try:
+    from regression.scenarios.engine import _catalog_key_for
+except Exception:  # pragma: no cover — keep triage usable even if engine import fails
+    _catalog_key_for = lambda *a, **k: None  # noqa: E731
+
+
+def _waived_keys() -> set:
+    p = Path(__file__).resolve().parents[1] / "data" / "baselines" / "coverage_waivers.json"
+    try:
+        return {w["key"] for w in json.load(open(p)).get("waivers", [])}
+    except Exception:
+        return set()
+
+
+def _step_catalog_key(e: dict):
+    return _catalog_key_for(e.get("method"), e.get("path") or "", e.get("service"))
 
 
 def _client():
@@ -92,13 +117,17 @@ def _failures(evts):
             if isinstance(e.get("status"), int) and e["status"] >= 400]
 
 
-def triage(evts) -> None:
+def triage(evts, show_waived=False) -> None:
     le = [e for e in evts if e.get("kind") == "lifecycle-end"]
     passed = [e for e in le if e.get("status") == "passed"]
     failed = [e for e in le if e.get("status") != "passed"]
     fails = _failures(evts)
+    waived = _waived_keys()
+    waived_fails = [e for e in fails if _step_catalog_key(e) in waived]
+    actionable = fails if show_waived else [e for e in fails if e not in waived_fails]
     print(f"lifecycles: {len(le)}  ({len(passed)} passed / {len(failed)} not-passed)")
-    print(f"step 4xx/5xx: {len(fails)} across {len({e['lifecycle'] for e in fails})} lifecycles\n")
+    print(f"step 4xx/5xx: {len(fails)} total · {len(waived_fails)} waived (hidden) · "
+          f"{len(actionable)} actionable across {len({e['lifecycle'] for e in actionable})} lifecycles\n")
 
     if failed:
         print("== NOT-PASSED lifecycles ==")
@@ -108,15 +137,17 @@ def triage(evts) -> None:
         print()
 
     by_lc = defaultdict(list)
-    for e in fails:
+    for e in actionable:
         by_lc[e["lifecycle"]].append(e)
-    print("== 4xx/5xx steps by lifecycle ==")
+    label = "ALL" if show_waived else "ACTIONABLE (waived keys hidden — see --show-waived)"
+    print(f"== {label} 4xx/5xx steps by lifecycle ==")
     for lc in sorted(by_lc):
         print(f"  [{lc}]")
         for e in by_lc[lc]:
             code = _err_code(e.get("resp_snippet") or "")
             opt = "" if e.get("optional") else "  !REQUIRED"
-            print(f"    {e['status']} {e['method']:6} {e.get('path'):50} {e['step']:28} {code}{opt}")
+            wv = "  [WAIVED]" if _step_catalog_key(e) in waived else ""
+            print(f"    {e['status']} {e['method']:6} {e.get('path'):50} {e['step']:28} {code}{opt}{wv}")
 
 
 def report_keys(evts, keys) -> None:
@@ -180,6 +211,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Triage a run's oplog event log.")
     ap.add_argument("run_id", nargs="?", help="run-id (default: newest)")
     ap.add_argument("--list", action="store_true", help="list recent runs and exit")
+    ap.add_argument("--show-waived", action="store_true",
+                    help="include waived-key 4xx (hidden by default)")
     ap.add_argument("--keys", help="comma list, or a file of catalog keys / path substrings")
     ap.add_argument("--diff", metavar="BASELINE_RUN_ID",
                     help="compare against a baseline run: which endpoints flipped")
@@ -197,7 +230,7 @@ def main(argv=None) -> int:
     run_id = args.run_id or runs[0][2]
     print(f"# triage {run_id}\n")
     evts = _load_events(s3, bucket, run_id)
-    triage(evts)
+    triage(evts, show_waived=args.show_waived)
 
     if args.keys:
         import os
