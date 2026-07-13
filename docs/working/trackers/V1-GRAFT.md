@@ -20,9 +20,30 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 | 2 | 계획↔실행 연속성 (PLAN vs ACTUAL 스트립) | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
 | 3 | 종료 후 다음 행동 카드 | **완료 (2026-07-11, 이 브랜치)** | 아래 상세 |
 | 4 | 실행 중 이상 감지 (지연 의심·실패 군집) | 대기 | **엔진 요청 #5(세마포어 대기 이벤트) 선행** |
-| 5 | 판정 시각 분리 표기 (발행 시각 ≠ 판정 런 시각) | 부분 | 배지 ts는 판정 런 시각(history ts) 사용 — 분리 병기는 후속 |
+| 5 | 판정 시각 분리 표기 (발행 시각 ≠ 판정 런 시각) | **완료 (2026-07-13, 이 브랜치)** | 아래 상세 — 배지가 '판정 @… · 발행 @…' 로 병기 |
 | 6 | (검토) 용어 툴팁·정의 노출 | 대기 | 오너 확인 후 |
 | 6a | v2 셸 헤더 (네비 스타일·전역 검색·헤더 Published 배지) | **완료 (2026-07-11, 오너 지시)** | 아래 상세 |
+
+## 접목 5 상세 — 판정 런 시각 ≠ 발행 갱신 시각 분리 병기
+
+- **문제**: Published 배지의 `@ts` 는 판정 런 시각(history.jsonl `ts`) 하나뿐이라,
+  발행본(dashboard-data)이 결과 없이 재발행돼 갱신 시각이 더 늦은 경우 그 어긋남이
+  화면에 드러나지 않았다 (v2 published.py 실측 교훈 — V1-GRAFT §접목 1 각주).
+- **소스 2종**: 판정 런 시각 = `common.snap_ts_short(snap)` (history ts). 발행 갱신
+  시각 = `common.dd_ts_short()` = dashboard-data HEAD **committer date**
+  (`git show -s --format=%cd --date=…` UTC → KST 짧은 라벨). dd_sha 와 같은
+  `_dd_head()` 60s 캐시에서 한 번에 조회 (subprocess 1회).
+- **배지 매크로** `_badges.html`: `pub_ts` 인자 추가. `pub_ts` 가 있고 `ts` 와
+  **다를 때만** `판정 @… · 발행 @…` 로 분리 병기(발행 시각은 `.badge-ts2` 로
+  살짝 흐리게 — 판정 시각이 1급), 같거나 없으면 기존 `@ts` 단일 표기 유지
+  (노이즈 억제). 툴팁에 두 시각의 의미 명기.
+- **호출부**: 헤더(base.html)·홈 판정 배너(home.html)·리포팅 요약(reporting.html)
+  의 Published 배지에 `pub_ts=dd_ts_label` 전달. `base_ctx` 가 `dd_ts_label` 주입.
+  타일 5장 배지는 ts 없는 출처 마커라 그대로.
+- reporting.html:173 의 fail_new "판정 런과 발행물의 시점 차이" 칩과 정합 (배지가
+  이제 그 어긋남을 시각으로 직접 보여줌).
+- 검증: `test_verdict_vs_publish_time_split` (분리/단일/부재/best-effort 4케이스) +
+  라이브 확인 (`dd_ts_short()` → '07-10 13:35', dd_sha 041884a1).
 
 ## 접목 6a 상세 — v2 셸 헤더 이식 (오너 지시 2026-07-11)
 

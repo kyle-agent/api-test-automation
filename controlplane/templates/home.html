@@ -28,7 +28,8 @@
         <b>({{ snap_age }})</b>{% endif %}</span>
       {# v2 접목 1: 판정 헤드라인의 출처 배지 (기존 '노후 스냅샷' chip 을 흡수 —
          stale 이면 배지가 노랑 + '노후' 표기) + D2 보조 칩(발행 이후 이 서버 런). #}
-      {{ badge('published', ts=(snap_ts_label if snap_ts_label is defined else none), stale=snap_is_stale) }}
+      {{ badge('published', ts=(snap_ts_label if snap_ts_label is defined else none),
+               pub_ts=(dd_ts_label if dd_ts_label is defined and dd_ts_label else none), stale=snap_is_stale) }}
       {% if local_since_publish is defined and local_since_publish %}<a class="chip s-verified"
         href="/testing/embed"
         title="발행 판정 이후 이 서버에서 완료된 로컬 런 — 공식 판정에는 아직 반영되지 않았습니다 (판정은 발행본 기준)">발행 이후 이 서버 런 {{ local_since_publish }}건 →</a>{% endif %}

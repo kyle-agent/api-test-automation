@@ -20,6 +20,7 @@
       known-red {{ coverage.get('fail_known') or 0 }}
       (sha {{ coverage.get('sha','') }})
       {{ badge('published', ts=(snap_ts_label if snap_ts_label is defined else none),
+               pub_ts=(dd_ts_label if dd_ts_label is defined and dd_ts_label else none),
                stale=(snap_stale is defined and snap_stale)) }}
     </div>
   </div>

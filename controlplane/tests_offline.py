@@ -546,6 +546,42 @@ def test_source_badges_and_empty_states():
     assert "badge badge-run" in detail and ">This run" in detail
 
 
+def test_verdict_vs_publish_time_split():
+    """v2 접목 5 — 판정 런 시각 ≠ 발행 갱신 시각 분리 병기.
+
+    배지의 ``@ts`` 는 판정 런 시각(history ts)인데, 발행본(dashboard-data)은 그
+    뒤 결과 없이 재발행돼 갱신 시각이 더 늦을 수 있다. pub_ts(발행 갱신 시각)가
+    주어지고 판정 시각과 다르면 '판정 @… · 발행 @…' 로 나눠 보여준다."""
+    from controlplane import common
+    from controlplane.app import templates
+
+    mod = templates.env.get_template("_badges.html").module
+
+    # 1) 두 시각이 다르면 분리 병기 ('@ts' 단일 표기는 쓰지 않는다)
+    split = mod.badge("published", ts="07-09 19:27", pub_ts="07-11 03:14",
+                      ident="dd:abc123")
+    assert "판정 07-09 19:27" in split
+    assert "발행 07-11 03:14" in split
+    assert "@07-09 19:27" not in split          # 단일 @ts 표기는 억제
+    assert "badge-ts2" in split                  # 발행 시각은 보조 스타일
+    assert "dd:abc123" in split                  # ident 는 그대로
+
+    # 2) 두 시각이 같으면 기존처럼 '@ts' 하나만 (노이즈 억제)
+    same = mod.badge("published", ts="07-09 19:27", pub_ts="07-09 19:27")
+    assert "@07-09 19:27" in same
+    assert "판정 " not in same and "발행 " not in same
+
+    # 3) 발행 시각을 못 구하면(pub_ts 없음) 기존 표기 유지 — 절대 깨지지 않음
+    none_pub = mod.badge("published", ts="07-09 19:27")
+    assert "@07-09 19:27" in none_pub
+    assert "발행 " not in none_pub
+
+    # 4) dd_ts_short 는 best-effort — git 접근 실패/부재에도 문자열만 반환
+    assert isinstance(common.dd_ts_short(), str)
+    # _dd_head 파서 재사용: committed 가 None 이면 빈 라벨
+    assert common.snap_ts_short({"ts": None}) == ""
+
+
 def test_v2_shell_header_and_global_search():
     """v2 접목 6a (오너 지시 2026-07-11) — v2 셸의 상단 디자인 이식.
 
