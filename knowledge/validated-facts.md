@@ -2249,7 +2249,7 @@ admission의 baseline/mine_live로 잡혀 다음 런의 headroom을 깎고, **�
 (≤240s) 후 VPC를 409 사다리(5×15s)로 삭제 + console2에 20s 재입장 티커
 (`_ensure_admit_ticker`, 큐 빌 때까지). 오프라인 회귀:
 tests/offline/test_shared_infra_teardown.py · test_console2.py(ticker).
-=======
+
 ## run-543a (2026-07-13 오너 풀런) 판정 — 115/119 pass, 수리 대량 확정 (2026-07-13)
 
 주의: 이 런은 **2라운드까지의 main**으로 실행됨 (3라운드 커밋 ad7b4530 이전 pull)
@@ -2285,3 +2285,98 @@ tests/offline/test_shared_infra_teardown.py · test_console2.py(ticker).
 - container-scr-registry skip = registry quota=1 환경 (기지).
 - import-image 409·update-image-member 400·switchover 404·patch Unpatchable =
   구조적 확정분 재확인 (waiver/백로그 후보 그대로).
+
+## 스케줄 실측: 짧은 VPC-슬롯 소비자가 LPT에서 런 꼬리가 된다 → priority_first 핀 (2026-07-13)
+
+run 20260713-102144-543a (117종, 예측 58.9분 / 실제 53.1분) 실측:
+
+- **provision(공유 인프라) 구간 = 256.9s(4.3분), 그동안 테스트 0개 실행.**
+  공유 서브넷 create→ACTIVE 폴 +12s~+140s(≈2.1분), 이어서 DB 서브넷
+  +148s~+250s(≈1.7분) — 두 서브넷이 **직렬** 생성이라 4.3분이 통으로
+  선행 대기다 (병렬화하면 ~2분 절약 가능; 첫 lifecycle-start +4.36분 실측).
+  서브넷 1개 create→ACTIVE는 kr-east1에서 약 2분 안팎으로 봐야 한다.
+- **networking-vpc-subnet +35.4분, vpc-subnet-vip-nat +44.2분에야 시작**
+  (vip-nat end +53.1분 = 런 makespan 그 자체). 두 시나리오는 자체 VPC를
+  만드는 짧은(400s/544s) 슬롯 소비자라 LPT(긴 것 우선)에서 뒤로 밀리는데,
+  그 시점엔 슬롯(4)이 장기 점유 중이라 대기까지 겹쳐 런 꼬리가 된다.
+  t=0에는 공유 VPC 1개뿐이라 슬롯이 비어 있으므로 **먼저 투입해 먼저
+  반납**시키는 게 옳다 (오너 지시 2026-07-13).
+- 수리: `dependencies.json vpc_schedule.priority_first`(핀 목록, 현재 위 2종)
+  → conftest 수집 정렬(실행)·local_run.simulate_schedule(예측 Gantt)·
+  dag_scheduler.priorities(dag 경로) 3곳이 `schedule_optimizer.
+  load_priority_first()`로 같은 목록을 읽어 0차 정렬 키로 핀한다.
+  회귀: tests/offline/test_crud_schedule_order.py(핀 2건) ·
+  test_dag_scheduler.py::test_priority_first_pin_overrides_lpt.
+
+## 백엔드는 같은 VPC의 서브넷 ACTIVE 전이를 직렬화한다 → provision no-wait + adopt 게이트 (2026-07-13)
+
+run-543a 실측: 서브넷 2건을 **동시에 생성**해도(create 선발행은 07-08부터 적용
+확인) ACTIVE 도달이 128s/238s로 순차 — 클라이언트 병렬화로는 못 줄이는 백엔드
+직렬화다. 종전에는 provision이 둘 다 ACTIVE까지 기다려 **런 머리 4.3분간 전
+워커 유휴**였다. 수리(오너 "2번 바로 수정" 2026-07-13):
+
+- provision은 서브넷 create+**track(생성 직후)** 후 즉시 반환 가능
+  (`engine.provision_shared_vpc(wait_subnets_active=False)`,
+  `SCP_PROVISION_SUBNET_NOWAIT=true` — console2/local_run 경로가 켬, CI 기본은
+  종전 유지). VPC ACTIVE 대기(~10s)는 유지 (서브넷 create가 필요로 함).
+- ACTIVE 보장은 **첫 adopt 시점**의 `engine._ensure_adopted_active` soft
+  게이트로 이동 (프로세스당 id별 1회, 이미 ACTIVE면 GET 1회, 필드 미상/실패/
+  타임아웃은 통과 — 이어지는 create가 4xx로 표면화). 그동안 free-class와
+  자체 VPC 생성군(priority_first 핀 포함)이 먼저 돈다 → 런 시작 유휴 제거.
+- 회귀: tests/crud/test_shared_vpc_adopt.py (게이트 폴/캐시/미상-통과 +
+  provision no-wait 4건).
+- **오너 도메인 확인 (2026-07-13): DB 클러스터 8종이 공유 DB 서브넷
+  (10.124.7.0/24) 하나를 공유해도 플랫폼상 병목 없음** — DB-lane 단일 공유
+  서브넷 설계 유지 근거.
+- durations.json에 run-543a passed 115종의 events wall span을 fold
+  (in-run 실측 — LPT 랭크 정확도 개선; vpc-peering avg 25→31분 등).
+
+## net-VPC A/B 설계 — peering의 두 VPC를 상주 공유해 IGW/DC 배타를 분산 (2026-07-13, 오너 설계)
+
+"peering용 VPC 2개를 각각의 VPC 내부 IGW 등 테스트에도 쓰자"(오너)를 전면 구현:
+
+- provision이 **net-A(10.130.0.0/20)·net-B(10.141.0.0/20)** 를 메인 공유 VPC와
+  함께 상주 생성 (adopt 토큰 `vpc#a`/`vpc#b`, 선택-인지 스킵, no-wait+게이트 적용,
+  env `SCP_SHARED_NET_VPC_{A,B}_ID`/`_NAME`).
+- **A**: vpc-peering requester + vpc-subnet-vip-nat(서브넷 10.130.9.0/24, A의
+  유일한 IGW 소유자). **B**: peering accepter + gen-wave5-fw(IGW 방화벽, B의
+  유일한 IGW) + networking-direct-connect-routing(B의 유일한 DC).
+- 성립 근거: ① peering rule CIDR 하드코딩(10.130.x)이 A의 CIDR과 일치하므로
+  2026-07-11의 adopt-cidr 불일치 클래스가 성립 안 함 ② IGW(VPC당 1)·DC(VPC당 1)
+  배타가 A/B 분산으로 해소 ③ peering(31분)의 시간 그림자 안에 vip-nat 9분·
+  fw 1.6분·DC 체인이 다 들어감. **런당 VPC 생성 7→5회**, 상주 3 + 슬롯 cap-3.
+- 세부 수리: peering account_id 소프트 캡처를 wait-vpc-b(GET)로 복제(adopt 시
+  create 응답이 없음); fw 방화벽 조회를 `vpc_name={net_b_vpc_name}`로 파라미터화
+  (adopt=shared_ctx 시딩, 폴백=create 응답 $.vpc.name 캡처 — 엔진이 adopt 캡처
+  시딩 시 기존 ctx 값을 보존하도록 수정); IB-049 스킵 가드를 base-kind(vpc*)로
+  일반화 (A/B는 CIDR 고정이라 동시 self-create는 즉시 overlap 400).
+- **라이브 미검증 2건 (다음 풀런 판정)**: ① 피어링 걸린 VPC 안 IGW/VIP/DC 생성
+  허용 여부 ② IGW 방화벽(product_type=IGW)과 DC 방화벽의 B 동거 무충돌.
+- 회귀: tests/crud/test_shared_vpc_adopt.py 5건 신규(양측 시딩/폴백/IB-049/캡처
+  보존/provision A·B) · validate_dag --check 0 gaps · 오프라인 545 passed.
+
+## net-VPC A/B 라이브 첫 런 판정 — 설계 성립 확정 (2026-07-13 04:20, 5/5 passed)
+
+선택 5종(peering·vip-nat·fw·dc-routing·nvs), provision→pytest(-n5)→teardown→
+잔존 스캔 풀사이클 rc=0:
+
+- **provision 18초** (기존 4.3분): 메인+net-A+net-B 생성, no-wait 반환, DB
+  서브넷은 선택-인지로 스킵 — adopt 게이트 경로 실증.
+- **미지수 ① 판정: 피어링 걸린 VPC 안 IGW/VIP/포트 생성 허용** — vip-nat(A의
+  IGW+VIP)·fw(B의 IGW)가 peering과 같은 VPC에서 완주(각자 자원 생성→삭제),
+  peering rule 체인도 adopt-cidr 일치로 정상(DELETING 수렴 관측).
+- **미지수 ② 판정: IGW 방화벽(fw)과 DC(dc-routing)의 B 동거 무충돌** — 5/5 pass.
+- teardown: 공유 서브넷 gone-대기 후 VPC 3개 모두 204, 잔존 = 알려진 IAM-gated
+  로그그룹 1건뿐 (유효 잔존 0).
+- 유일 결함: vip-nat VIP IP 하드코딩(10.132.9.6)이 서브넷 재배치를 안 따라가
+  400 check-ip-address-overlap → vip 그룹 스킵. 10.130.9.6으로 정렬(커밋 완료),
+  단독 재검증 별도 수행.
+
+### 후속 판정 2건 (2026-07-13 04:35)
+
+- **vip-nat 단독 재검증(폴백 self-create 경로): 1 passed, VIP 그룹 경고 없음**
+  — 10.130.9.6 정렬로 createsubnetvip/connected-ports/static-nat-ips 체인 복구.
+- **engine 인라인 teardown에도 서브넷 gone-대기 + VPC 409 사다리 이식**: 07-12
+  수리가 shared_infra.teardown에만 들어가고 conftest/단독 경로의 인라인
+  teardown은 빠져 있어 solo 런마다 공유 VPC가 잔존했다(재검증 런
+  regrvpcsh6a5467bd 실측, 스윕으로 회수 완료). 이제 두 경로 동일.

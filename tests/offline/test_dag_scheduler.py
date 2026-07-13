@@ -124,6 +124,30 @@ def test_longest_duration_selfcreator_dispatched_first():
         f"not longest-first: {order} (alphabetical would be aaa,mmm,zzz)")
 
 
+def test_priority_first_pin_overrides_lpt(monkeypatch):
+    """priority_first 핀(오너 2026-07-13): 짧은 슬롯 소비자도 핀이면 LPT를 이기고
+    가장 먼저 디스패치된다 — 뒤로 밀려 슬롯 대기 + 런 꼬리가 되던 실측의 회귀 고정.
+    핀이 아닌 노드들끼리는 여전히 longest-first."""
+    from regression.scenarios import schedule_optimizer
+    monkeypatch.setattr(schedule_optimizer, "load_priority_first",
+                        lambda *_a, **_k: ["aaa-short"])
+    sc = {"aaa-short": ["vpc"], "zzz-long": ["vpc"], "mmm-mid": ["vpc"]}
+    plan = _plan(self_creators=sc, vpc_cap=2)        # budget == 1 -> fully serial
+    durations = {"zzz-long": {"avg_s": 100.0, "n": 1},
+                 "mmm-mid": {"avg_s": 50.0, "n": 1},
+                 "aaa-short": {"avg_s": 10.0, "n": 1}}
+    order, lock = [], threading.Lock()
+
+    def ex(lid):
+        with lock:
+            order.append(lid)
+        return LifecycleOutcome(lid, "passed")
+
+    dag_scheduler.run_dynamic(plan, ex, max_workers=4, durations=durations)
+    assert order == ["aaa-short", "zzz-long", "mmm-mid"], (
+        f"pinned short node must dispatch first: {order}")
+
+
 def test_no_barrier_freed_slot_dispatches_next_immediately():
     """A freed slot must launch the next self-creator WITHOUT waiting for a wave to
     drain. budget 2, 4 equal-length self-creators: with a barrier the 3rd/4th would

@@ -51,6 +51,8 @@ def _r(status, body):
 def _no_disk(monkeypatch):
     # keep the unit test hermetic: don't write the results store
     monkeypatch.setattr(engine, "_record_smoke", lambda *a, **k: None)
+    # adopt ACTIVE 게이트의 프로세스 캐시를 테스트 간 격리
+    engine._ADOPT_ACTIVE_SEEN.clear()
 
 
 def _heavy_lc():
@@ -83,7 +85,8 @@ def test_adopt_reuses_shared_vpc_and_skips_create_delete():
                                shared_ctx={"shared_vpc_id": "shared-9"})
     assert res["status"] == "passed", res
     # the shared VPC is neither created nor deleted by the lifecycle
-    assert client.methods_on("/v1/vpcs") == [], client.calls
+    # (adopt-time ACTIVE 게이트의 읽기 전용 GET은 허용, 2026-07-13)
+    assert set(client.methods_on("/v1/vpcs")) <= {"GET"}, client.calls
     # the subnet IS created — and under the shared vpc id
     subnet_posts = [c for c in client.calls if c == ("POST", "/v1/subnets")]
     assert subnet_posts, client.calls
@@ -156,13 +159,178 @@ def test_provision_shared_vpc_creates_subnet_and_tears_down_child_first():
 
 def test_adopt_shared_subnet_skips_subnet_create_and_delete():
     # No POST/DELETE on /v1/subnets at all — both are adopted (retained).
+    # (adopt-time ACTIVE 게이트의 읽기 전용 GET은 허용, 2026-07-13)
     client = FakeClient({})
     res = engine.run_lifecycle(
         _heavy_lc_subnet_adopt(), client, _cfg(),
         shared_ctx={"shared_vpc_id": "shared-9", "shared_subnet_id": "sub-9"})
     assert res["status"] == "passed", res
-    assert client.methods_on("/v1/vpcs") == [], client.calls
-    assert client.methods_on("/v1/subnets") == [], client.calls
+    assert set(client.methods_on("/v1/vpcs")) <= {"GET"}, client.calls
+    assert set(client.methods_on("/v1/subnets")) <= {"GET"}, client.calls
+
+
+# --------------------------------------------------------------------------- #
+# adopt-time ACTIVE 게이트 + provision 서브넷 no-wait (2026-07-13, run-543a 실측:
+# 같은 VPC의 서브넷 2개는 동시 생성해도 백엔드가 ACTIVE 전이를 직렬화 —
+# head 대기 4.3분을 첫 adopt 시점 게이트로 옮겨 런 시작 유휴를 제거)
+# --------------------------------------------------------------------------- #
+class SequencedClient(FakeClient):
+    """GET 응답을 호출 순서대로 소진하는 fake — CREATING→ACTIVE 전이 재현."""
+
+    def __init__(self, routes, get_sequence):
+        super().__init__(routes)
+        self.get_sequence = list(get_sequence)
+
+    def request(self, method, path, **kw):
+        if method.upper() == "GET" and self.get_sequence:
+            self.calls.append(("GET", path))
+            return self.get_sequence.pop(0)
+        return super().request(method, path, **kw)
+
+
+def test_adopt_gate_polls_creating_subnet_until_active(monkeypatch):
+    monkeypatch.setattr(engine.time, "sleep", lambda _s: None)
+    client = SequencedClient({}, [
+        _r(200, {"subnet": {"id": "sub-9", "state": "CREATING"}}),
+        _r(200, {"subnet": {"id": "sub-9", "state": "CREATING"}}),
+        _r(200, {"subnet": {"id": "sub-9", "state": "ACTIVE"}}),
+    ])
+    engine._ensure_adopted_active(client, "subnet", "sub-9", "test-lc")
+    gets = [c for c in client.calls if c == ("GET", "/v1/subnets/sub-9")]
+    assert len(gets) == 3, client.calls          # CREATING×2 → ACTIVE에서 종료
+    # 같은 id 재게이트는 캐시로 no-op (프로세스당 1회)
+    engine._ensure_adopted_active(client, "subnet", "sub-9", "test-lc")
+    assert len([c for c in client.calls if c[0] == "GET"]) == 3, client.calls
+
+
+def test_adopt_gate_passes_through_on_unknown_shape():
+    # 상태 필드가 없으면(응답 모양 미상) GET 1회로 통과 — lifecycle을 절대
+    # 막지 않는 soft 게이트.
+    client = FakeClient({})
+    engine._ensure_adopted_active(client, "subnet#db", "sub-x", "test-lc")
+    assert client.calls == [("GET", "/v1/subnets/sub-x")], client.calls
+
+
+def test_provision_nowait_returns_ids_without_subnet_waits():
+    client = FakeClient({
+        ("POST", "/v1/vpcs"): _r(201, {"vpc": {"id": "shared-1", "state": "ACTIVE"}}),
+        ("GET", "/v1/vpcs/"): _r(200, {"vpc": {"id": "shared-1", "state": "ACTIVE"}}),
+        ("POST", "/v1/subnets"): _r(201, {"subnet": {"id": "sub-1", "state": "CREATING"}}),
+        ("GET", "/v1/subnets/"): _r(200, {"subnet": {"id": "sub-1", "state": "CREATING"}}),
+    })
+    shared, teardown = engine.provision_shared_vpc(
+        client, _cfg(), wait_subnets_active=False)
+    # 서브넷 ACTIVE 폴 없음 (CREATING인 채 id만 반환)
+    assert not [c for c in client.calls
+                if c[0] == "GET" and c[1].startswith("/v1/subnets/")], client.calls
+    assert shared["shared_vpc_id"] == "shared-1"
+    assert shared["shared_subnet_id"] == "sub-1"
+    assert shared["shared_db_subnet_id"] == "sub-1"
+    teardown()   # 자식(subnet) 먼저 — no-wait여도 track은 create 직후라 회수됨
+    dels = [c for c in client.calls if c[0] == "DELETE"]
+    assert dels.index(("DELETE", "/v1/subnets/sub-1")) < \
+        dels.index(("DELETE", "/v1/vpcs/shared-1")), client.calls
+
+
+# --------------------------------------------------------------------------- #
+# net-VPC A/B (오너 설계 2026-07-13): peering의 두 VPC를 상주 프로비저닝하고
+# vip-nat(A)·fw/DC(B)가 adopt — vpc#a/vpc#b 토큰, IGW·DC 배타의 A/B 분산.
+# --------------------------------------------------------------------------- #
+def _peering_lc():
+    """peering 모양의 최소 lifecycle: A/B 두 VPC를 adopt, 각각 다른 캡처 변수."""
+    return {
+        "id": "test-peering", "service": "vpc", "heavy": True, "enabled": True,
+        "steps": [
+            {"name": "create-vpc", "method": "POST", "path": "/v1/vpcs",
+             "adopt": "vpc#a", "json": {"name": "a", "cidr": "10.130.0.0/20", "tags": []},
+             "capture": {"vpc_id": "$.vpc.id"}, "expect_status": [200, 201, 202]},
+            {"name": "create-vpc-b", "method": "POST", "path": "/v1/vpcs",
+             "adopt": "vpc#b", "json": {"name": "b", "cidr": "10.141.0.0/20", "tags": []},
+             "capture": {"vpc_id_b": "$.vpc.id"}, "expect_status": [200, 201, 202]},
+            {"name": "use-both", "method": "GET",
+             "path": "/v1/vpc-peerings?req={vpc_id}&app={vpc_id_b}",
+             "expect_status": [200]},
+            {"name": "delete-vpc-b", "method": "DELETE", "path": "/v1/vpcs/{vpc_id_b}",
+             "adopt": "vpc#b", "destructive": True, "expect_status": [200, 202, 204]},
+            {"name": "delete-vpc", "method": "DELETE", "path": "/v1/vpcs/{vpc_id}",
+             "adopt": "vpc#a", "destructive": True, "expect_status": [200, 202, 204]},
+        ],
+    }
+
+
+def test_net_vpc_adopt_seeds_both_ids_and_skips_creates_deletes():
+    client = FakeClient({})
+    res = engine.run_lifecycle(
+        _peering_lc(), client, _cfg(),
+        shared_ctx={"shared_net_vpc_a_id": "net-a-1", "shared_net_vpc_b_id": "net-b-1"})
+    assert res["status"] == "passed", res
+    assert not [c for c in client.calls if c[0] in ("POST", "DELETE")
+                and c[1].startswith("/v1/vpcs")], client.calls
+    # 두 캡처 변수가 각자의 공유 id로 시딩됐다 (use-both 경로에 치환됨)
+    assert ("GET", "/v1/vpc-peerings?req=net-a-1&app=net-b-1") in client.calls, client.calls
+
+
+def test_net_vpc_fallback_self_creates_without_shared_ids():
+    client = FakeClient({
+        ("POST", "/v1/vpcs"): _r(201, {"vpc": {"id": "own-a"}}),
+    })
+    res = engine.run_lifecycle(_peering_lc(), client, _cfg(), shared_ctx={})
+    assert res["status"] == "passed", res
+    assert len([c for c in client.calls if c == ("POST", "/v1/vpcs")]) == 2, client.calls
+
+
+def test_net_vpc_adopt_xdist_without_id_skips_not_self_creates(monkeypatch):
+    """IB-049 일반화: vpc#a adopt가 공유 id 없이 xdist 워커에서 돌면 self-create
+    레이스 대신 환경 스킵 — A/B는 CIDR 고정이라 동시 self-create는 즉시 overlap."""
+    monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw3")
+    client = FakeClient({})
+    res = engine.run_lifecycle(_peering_lc(), client, _cfg(), shared_ctx={})
+    assert res["status"] == "skipped", res
+    assert ("POST", "/v1/vpcs") not in client.calls, client.calls
+
+
+def test_adopt_preserves_preseeded_capture_var():
+    """gen-wave5-fw의 vpc_name 조회: shared_ctx가 시딩한 net_b_vpc_name을 adopt
+    캡처 시딩이 공유 ID로 덮어쓰면 안 된다."""
+    lc = {
+        "id": "test-fw", "service": "vpc", "enabled": True,
+        "steps": [
+            {"name": "create-vpc", "method": "POST", "path": "/v1/vpcs",
+             "adopt": "vpc#b", "json": {"name": "x", "cidr": "10.141.0.0/20", "tags": []},
+             "capture": {"vpc_id": "$.vpc.id", "net_b_vpc_name": "$.vpc.name"},
+             "expect_status": [200, 201, 202]},
+            {"name": "find-fw", "method": "GET",
+             "path": "/v1/firewalls?vpc_name={net_b_vpc_name}&product_type=IGW",
+             "expect_status": [200]},
+        ],
+    }
+    client = FakeClient({})
+    res = engine.run_lifecycle(
+        lc, client, _cfg(),
+        shared_ctx={"shared_net_vpc_b_id": "net-b-1", "net_b_vpc_name": "regrvpcnb77"})
+    assert res["status"] == "passed", res
+    assert ("GET", "/v1/firewalls?vpc_name=regrvpcnb77&product_type=IGW") in client.calls, \
+        client.calls
+
+
+def test_provision_need_net_vpcs_creates_a_and_b():
+    client = FakeClient({
+        ("POST", "/v1/vpcs"): _r(201, {"vpc": {"id": "v-1", "state": "ACTIVE"}}),
+        ("GET", "/v1/vpcs/"): _r(200, {"vpc": {"id": "v-1", "state": "ACTIVE"}}),
+        ("POST", "/v1/subnets"): _r(201, {"subnet": {"id": "sub-1", "state": "ACTIVE"}}),
+        ("GET", "/v1/subnets/"): _r(200, {"subnet": {"id": "sub-1", "state": "ACTIVE"}}),
+    })
+    shared, teardown = engine.provision_shared_vpc(client, _cfg(), need_net_vpcs=True)
+    # 메인 + A + B = POST /v1/vpcs 3회
+    assert len([c for c in client.calls if c == ("POST", "/v1/vpcs")]) == 3, client.calls
+    assert shared.get("shared_net_vpc_a_id") == "v-1"
+    assert shared.get("shared_net_vpc_b_id") == "v-1"
+    assert shared.get("net_a_vpc_name", "").startswith("regrvpcna")
+    assert shared.get("net_b_vpc_name", "").startswith("regrvpcnb")
+    teardown()
+    # A/B도 teardown 대상 (fake는 id가 전부 v-1이라 삭제 3회)
+    assert len([c for c in client.calls
+                if c[0] == "DELETE" and c[1].startswith("/v1/vpcs/")]) == 3, client.calls
 
 
 def test_env_ids_adopt_without_creating_and_teardown_is_noop(monkeypatch):

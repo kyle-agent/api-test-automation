@@ -134,7 +134,16 @@ _VPC_CREATE_PATH = "/v1/vpcs"
 # id is absent (no fixture / mutations off) an adopt step is a NO-OP and the
 # lifecycle falls back to its own create/delete (so this can never regress CRUD).
 _ADOPT_SHARED = {"vpc": "shared_vpc_id", "subnet": "shared_subnet_id",
-                 "subnet#db": "shared_db_subnet_id"}
+                 "subnet#db": "shared_db_subnet_id",
+                 # 네트워킹 공유 VPC 2개 (오너 설계 2026-07-13): peering의 두
+                 # VPC를 A/B로 상주 프로비저닝하고 vip-nat(A)·fw/DC(B)가 그
+                 # 안에서 IGW·DC 등을 테스트 — IGW(VPC당 1)·DC(VPC당 1) 배타가
+                 # A/B 분산으로 해소되고 런당 VPC 생성이 7→5회로 준다.
+                 # CIDR은 peering rule 하드코딩과 일치(A=10.130/20, B=10.141/20)
+                 # — 10.124 공유 VPC adopt 때의 adopt-cidr 불일치 클래스 회피.
+                 "vpc#a": "shared_net_vpc_a_id", "vpc#b": "shared_net_vpc_b_id"}
+# 이 프로세스가 이미 ACTIVE를 확인한 adopted id 캐시 — 게이트는 id당 1회만 폴.
+_ADOPT_ACTIVE_SEEN: set = set()
 _SHARED_VPC_CIDR = "10.124.0.0/20"
 # Shared subnet carved from the first /24 of the shared VPC's /20. ADOPT-class
 # lifecycles re-home their fixed host IPs into this range (10.124.0.x) so that
@@ -150,6 +159,11 @@ _SHARED_SUBNET_CIDR = "10.124.0.0/24"
 # New fixed host IPs inside the SHARED subnet(.0/24) go in dependencies.json
 # fixed_ip_map (.5/.6 pls, .7/.8 apigw-pls, .20 vpce, .30/.31 lb).
 _SHARED_DB_SUBNET_CIDR = "10.124.7.0/24"
+# 네트워킹 공유 VPC A/B — vpc-peering의 rule CIDR 하드코딩과 일치해야 한다
+# (knowledge/validated-facts.md 2026-07-11: requester rule cidr은 requester VPC
+# CIDR의 진부분집합만 202). A에는 vip-nat 서브넷 10.130.9.0/24가 들어간다.
+_NET_VPC_A_CIDR = "10.130.0.0/20"
+_NET_VPC_B_CIDR = "10.141.0.0/20"
 _SUBNET_CREATE_PATH = "/v1/subnets"
 # Env keys for cross-process (xdist) adoption of an already-live shared VPC/subnet
 # provisioned once by regression.scenarios.shared_infra --provision.
@@ -159,6 +173,12 @@ _ENV_SHARED_SUBNET = "SCP_SHARED_SUBNET_ID"
 # pass, so the DB lifecycles get their OWN shared subnet (lane isolation) while
 # VM/SKE/networking adopters stay on the main shared subnet (fixed IPs intact).
 _ENV_SHARED_DB_SUBNET = "SCP_SHARED_DB_SUBNET_ID"
+# 네트워킹 공유 VPC A/B (vpc#a/vpc#b adopt 대상). *_NAME은 gen-wave5-fw의
+# 방화벽 조회(vpc_name= 쿼리)용 — id만으로는 IGW 방화벽을 못 찾는다.
+_ENV_SHARED_NET_VPC_A = "SCP_SHARED_NET_VPC_A_ID"
+_ENV_SHARED_NET_VPC_B = "SCP_SHARED_NET_VPC_B_ID"
+_ENV_SHARED_NET_VPC_A_NAME = "SCP_SHARED_NET_VPC_A_NAME"
+_ENV_SHARED_NET_VPC_B_NAME = "SCP_SHARED_NET_VPC_B_NAME"
 
 
 # --------------------------------------------------------------------------- #
@@ -784,6 +804,47 @@ class LifecycleSkip(Exception):
     """A lifecycle skipped for an environmental reason (quota / 417 / safety)."""
 
 
+def _ensure_adopted_active(client, kind: str, rid: str, lifecycle_id: str, *,
+                           timeout: float = 300.0, interval: float = 5.0) -> None:
+    """Adopted 공유 자원(vpc/subnet/subnet#db)의 ACTIVE를 프로세스당 id별 1회
+    보장한다. 이미 ACTIVE면 GET 1회, CREATING이면 ACTIVE까지 폴(≤timeout).
+    provision의 서브넷 no-wait 반환(SCP_PROVISION_SUBNET_NOWAIT)과 짝.
+
+    어떤 상황에서도 lifecycle을 죽이지 않는 soft 게이트: 상태 필드가 없거나
+    (응답 모양 미상 — 게이트 불가), GET이 실패하거나, 타임아웃이어도 통과시켜
+    이어지는 create가 실제 상태를 4xx로 표면화한다 (종전과 동일한 실패 모드)."""
+    if rid in _ADOPT_ACTIVE_SEEN:
+        return
+    paths = {"vpc": (_VPC_CREATE_PATH, "$.vpc.state"),
+             "vpc#a": (_VPC_CREATE_PATH, "$.vpc.state"),
+             "vpc#b": (_VPC_CREATE_PATH, "$.vpc.state"),
+             "subnet": (_SUBNET_CREATE_PATH, "$.subnet.state"),
+             "subnet#db": (_SUBNET_CREATE_PATH, "$.subnet.state")}
+    if kind not in paths:
+        _ADOPT_ACTIVE_SEEN.add(rid)
+        return
+    base, field = paths[kind]
+    ok_states = ("ACTIVE", "RUNNING", "CREATED", "AVAILABLE")
+    deadline = time.time() + timeout
+    try:
+        while True:
+            resp = client.request("GET", f"{base}/{rid}", service="vpc")
+            state = _capture(getattr(resp, "body", None) or {}, field)
+            if state is None or str(state).upper() in ok_states:
+                break
+            if time.time() >= deadline:
+                print(f"  [{lifecycle_id}] adopted {kind} {rid} still {state} "
+                      f"after {timeout:.0f}s — proceeding (next step surfaces it)")
+                break
+            print(f"  [{lifecycle_id}] adopted {kind} {rid} state={state} — "
+                  f"waiting ACTIVE")
+            time.sleep(interval)
+    except Exception as exc:  # noqa: BLE001 — soft gate, see docstring
+        print(f"  [{lifecycle_id}] adopted {kind} {rid} ACTIVE gate failed "
+              f"({exc}); proceeding — next step surfaces the real state")
+    _ADOPT_ACTIVE_SEEN.add(rid)
+
+
 def run_lifecycle(lifecycle: dict, client, cfg, *,
                   budget: _budgets.Budget | None = None,
                   resource_registry: ResourceRegistry | None = None,
@@ -1071,7 +1132,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # STRICTLY on the xdist worker env var so the single-process
                 # fallback (test_no_shared_vpc_falls_back_to_self_create) keeps
                 # self-creating exactly as before.
-                if (not _shared_val and _adopt == "vpc"
+                # base kind로 판정 — vpc#a/vpc#b(네트워킹 공유 VPC)도 같은
+                # 다중워커 self-create 레이스 클래스다 (게다가 A/B는 CIDR이
+                # 고정이라 동시 self-create는 즉시 overlap 400).
+                if (not _shared_val and _adopt.split("#", 1)[0] == "vpc"
                         and step.get("method", "").upper() == "POST"
                         and os.environ.get("PYTEST_XDIST_WORKER")):
                     _teardown()
@@ -1084,8 +1148,22 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 if _shared_val:
                     _m = step.get("method", "").upper()
                     if _m == "POST":  # adopt: skip the create, seed its capture vars
+                        # ACTIVE 1회 보장 게이트 (2026-07-13): provision이 서브넷
+                        # ACTIVE 대기를 생략하고 반환할 수 있으므로(런 머리 4.3분
+                        # 유휴 제거 — run-543a 실측: 같은 VPC 서브넷 2개는 동시
+                        # 생성해도 백엔드가 ACTIVE 전이를 직렬화, 128s/238s)
+                        # CREATING 상태의 id가 adopt될 수 있다. 첫 사용자가 여기서
+                        # ACTIVE까지 폴하고, 이미 ACTIVE면 GET 1회로 끝난다
+                        # (프로세스당 id별 1회 캐시). 실패해도 soft — 이어지는
+                        # create가 4xx로 표면화한다 (종전과 동일한 실패 모드).
+                        _ensure_adopted_active(client, _adopt, str(_shared_val),
+                                               lifecycle["id"])
                         for _v in step.get("capture", {}):
-                            ctx[_v] = _shared_val
+                            # 이미 ctx에 있는 캡처 변수는 보존 — shared_ctx가
+                            # 시딩한 부가 정보(예: net_b_vpc_name)를 공유 ID로
+                            # 덮어쓰면 안 된다 (gen-wave5-fw의 vpc_name 조회).
+                            if _v not in ctx:
+                                ctx[_v] = _shared_val
                         print(f"  [{lifecycle['id']}] adopting shared {_adopt}="
                               f"{_shared_val} (skip create '{step['name']}')")
                         continue
@@ -1570,7 +1648,9 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
 
 
 def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None,
-                         need_db_subnet: bool = True):
+                         need_db_subnet: bool = True,
+                         wait_subnets_active: bool = False,
+                         need_net_vpcs: bool = False):
     """Create ONE VPC + ONE subnet (both ACTIVE) for the heavy/ADOPT-class
     lifecycles to ADOPT, so they don't each create their own against the 5-VPC
     cap (knowledge/vpc-scheduling-strategy.md).
@@ -1604,9 +1684,19 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         env_db_sub = os.environ.get(_ENV_SHARED_DB_SUBNET, "").strip()
         if env_db_sub:
             ctx["shared_db_subnet_id"] = env_db_sub
+        for env_key, ctx_key in ((_ENV_SHARED_NET_VPC_A, "shared_net_vpc_a_id"),
+                                 (_ENV_SHARED_NET_VPC_B, "shared_net_vpc_b_id"),
+                                 (_ENV_SHARED_NET_VPC_A_NAME, "net_a_vpc_name"),
+                                 (_ENV_SHARED_NET_VPC_B_NAME, "net_b_vpc_name")):
+            v = os.environ.get(env_key, "").strip()
+            if v:
+                ctx[ctx_key] = v
         print(f"  adopting pre-provisioned shared VPC={env_vpc}"
               f"{' subnet=' + env_sub if env_sub else ''}"
-              f"{' db-subnet=' + env_db_sub if env_db_sub else ''} (env)")
+              f"{' db-subnet=' + env_db_sub if env_db_sub else ''}"
+              f"{' net-a=' + ctx['shared_net_vpc_a_id'] if ctx.get('shared_net_vpc_a_id') else ''}"
+              f"{' net-b=' + ctx['shared_net_vpc_b_id'] if ctx.get('shared_net_vpc_b_id') else ''}"
+              f" (env)")
         return ctx, (lambda: None)
 
     if not cfg.allow_mutations:
@@ -1637,6 +1727,35 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     if not vpc_id:
         return noop
     vpc_id = str(vpc_id)
+
+    # 네트워킹 공유 VPC A/B (오너 설계 2026-07-13): peering의 두 VPC를 상주
+    # 프로비저닝해 vip-nat(A)·fw/DC(B)가 그 안에서 테스트한다. 메인 VPC의
+    # ACTIVE 폴 **앞**에서 생성을 발행해 세 VPC의 전이가 겹치게 한다.
+    net_ids: dict[str, tuple[str, str]] = {}   # tag -> (vpc_id, name)
+    if need_net_vpcs:
+        for tag, cidr in (("a", _NET_VPC_A_CIDR), ("b", _NET_VPC_B_CIDR)):
+            nname = f"regrvpcn{tag}{uniq}"     # 'regrvpcna'+8hex = 17 ≤ 20 (IB-051)
+            nbody = _inject_owner_tags({
+                "name": nname, "description": f"API regression shared net VPC {tag.upper()}",
+                "cidr": cidr, "tags": [],
+            }, axis="regression")
+            ncreate = {"name": f"create-shared-net-vpc-{tag}", "method": "POST",
+                       "service": "vpc"}
+            nresp = _run_step(client, ncreate, _VPC_CREATE_PATH, nbody, "vpc", {})
+            nid = None
+            if nresp.status in (200, 201, 202) and nresp.body:
+                nid = _capture(nresp.body, "$.vpc.id")
+            if nid:
+                nid = str(nid)
+                reg.track(ResourceRecord(service="vpc",
+                                         delete_path=f"{_VPC_CREATE_PATH}/{nid}",
+                                         resource_id=nid, kind="vpc",
+                                         parent="shared-net"))
+                net_ids[tag] = (nid, nname)
+                print(f"  shared net VPC {tag.upper()} created: {nid} ({cidr})")
+            else:
+                print(f"  shared net VPC {tag.upper()} provision failed "
+                      f"({nresp.status}); its adopters fall back / IB-049-skip.")
     # poll to ACTIVE so adopters can build under it immediately. interval 5 (not
     # 10) + verbose: this wait sits on the run's CRITICAL start path and its log
     # is streamed live — heartbeat lines + a tighter residual wait (2026-07-08
@@ -1671,17 +1790,21 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         sid = None
         if resp.status in (200, 201, 202) and resp.body:
             sid = _capture(resp.body, "$.subnet.id")
+        if sid:
+            # track는 create 직후 (wait 성공 여부와 무관) — no-wait 반환이든
+            # wait 타임아웃이든 스윕이 항상 회수할 수 있어야 한다.
+            reg.track(ResourceRecord(service="vpc",
+                                     delete_path=f"{_SUBNET_CREATE_PATH}/{sid}",
+                                     resource_id=str(sid), kind="subnet",
+                                     parent=vpc_id))
         return (str(sid) if sid else None), resp
 
-    def _subnet_wait_track(step_name: str, sid: str, cidr: str, label: str):
+    def _subnet_wait(step_name: str, sid: str, cidr: str, label: str):
         wait_step = {"name": step_name, "method": "GET", "service": "vpc",
                      "poll": {"field": "$.subnet.state",
                               "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
                               "timeout": 300, "interval": 5, "verbose": True}}
         _run_step(client, wait_step, f"{_SUBNET_CREATE_PATH}/{sid}", None, "vpc", {})
-        reg.track(ResourceRecord(service="vpc",
-                                 delete_path=f"{_SUBNET_CREATE_PATH}/{sid}",
-                                 resource_id=sid, kind="subnet", parent=vpc_id))
         print(f"  {label} provisioned: {sid} ({cidr})")
 
     subnet_id, sresp = _subnet_create(
@@ -1697,48 +1820,107 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         # 안 하고 있네"): subnet#db 를 입양하는 lifecycle 이 이 런의 선택에 없으면
         # DB-lane 서브넷은 순수 직렬 대기(~1-2분)일 뿐이다.
         print("  DB-lane shared subnet SKIPPED — selection has no subnet#db adopter")
-    if subnet_id:
-        _subnet_wait_track("wait-shared-subnet", subnet_id, _SHARED_SUBNET_CIDR,
-                           "shared subnet")
-    else:
+    if not subnet_id:
         print(f"  shared-subnet provision failed ({sresp.status}); adopters will "
               f"self-create a subnet under the shared VPC.")
-    if db_subnet_id:
-        _subnet_wait_track("wait-shared-db-subnet", db_subnet_id,
-                           _SHARED_DB_SUBNET_CIDR, "shared DB subnet")
-    elif need_db_subnet:
+    if not db_subnet_id and need_db_subnet:
         print(f"  shared-DB-subnet provision failed ({dresp.status}); DB adopters "
               f"fall back to the main shared subnet.")
+    if wait_subnets_active:
+        if subnet_id:
+            _subnet_wait("wait-shared-subnet", subnet_id, _SHARED_SUBNET_CIDR,
+                         "shared subnet")
+        if db_subnet_id:
+            _subnet_wait("wait-shared-db-subnet", db_subnet_id,
+                         _SHARED_DB_SUBNET_CIDR, "shared DB subnet")
+        for tag, (nid, _nname) in net_ids.items():
+            nwait = {"name": f"wait-shared-net-vpc-{tag}", "method": "GET",
+                     "service": "vpc",
+                     "poll": {"field": "$.vpc.state",
+                              "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
+                              "timeout": 300, "interval": 5, "verbose": True}}
+            _run_step(client, nwait, f"{_VPC_CREATE_PATH}/{nid}", None, "vpc", {})
+            print(f"  shared net VPC {tag.upper()} provisioned: {nid}")
+    elif subnet_id or db_subnet_id:
+        # no-wait 반환 (2026-07-13, run-543a 실측): 같은 VPC의 서브넷 2개는
+        # 동시 생성해도 백엔드가 ACTIVE 전이를 직렬화(128s/238s)해 head 대기
+        # 4.3분간 전 워커가 유휴였다. 여기서 CREATING인 채 id만 넘기고,
+        # 첫 adopt 시점의 _ensure_adopted_active 게이트가 ACTIVE를 보장한다
+        # (그동안 free-class·자체 VPC 생성군이 먼저 돈다).
+        print(f"  shared subnet(s) created, NOT waiting ACTIVE "
+              f"(adopt-time gate): subnet={subnet_id} db={db_subnet_id}")
 
     def teardown():
         if not cfg.allow_destructive:
             return
-        # subnets THEN vpc (children before parent)
-        if db_subnet_id:
+        # subnets THEN vpc (children before parent). 서브넷 DELETE는 202 비동기
+        # (DELETING 30s~3min) — 곧바로 VPC DELETE를 날리면 409로 남는다. 이
+        # 클래스는 2026-07-12에 shared_infra.teardown만 고쳐졌고, 이 인라인
+        # teardown(단독/conftest 경로)은 빠져 있어 solo 런마다 공유 VPC가
+        # 잔존했다 (2026-07-13 vip-nat 재검증 런 regrvpcsh6a5467bd 실측).
+        # 동일 수리: 서브넷 gone 대기(≤240s) 후 VPC 409 사다리(5×15s).
+        issued = []
+        for sid, label in ((db_subnet_id, "shared DB subnet"),
+                           (subnet_id, "shared subnet")):
+            if not sid:
+                continue
             try:
-                client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{db_subnet_id}",
-                               service="vpc")
-                print(f"  shared DB subnet {db_subnet_id} deleted")
+                r = client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{sid}",
+                                   service="vpc")
+                st = getattr(r, "status", None)
+                if st in (200, 202, 204, 404):
+                    issued.append(sid)
+                print(f"  {label} {sid} delete -> {st}")
             except Exception as exc:
-                print(f"  shared DB subnet {db_subnet_id} delete failed ({exc}); "
+                print(f"  {label} {sid} delete failed ({exc}); "
                       f"sweep will reclaim")
-        if subnet_id:
-            try:
-                client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{subnet_id}",
-                               service="vpc")
-                print(f"  shared subnet {subnet_id} deleted")
-            except Exception as exc:
-                print(f"  shared subnet {subnet_id} delete failed ({exc}); "
-                      f"sweep will reclaim")
-        try:
-            client.request("DELETE", f"{_VPC_CREATE_PATH}/{vpc_id}", service="vpc")
-            print(f"  shared VPC {vpc_id} deleted")
-        except Exception as exc:  # best-effort; the tag-scoped sweep is the backstop
-            print(f"  shared VPC {vpc_id} delete failed ({exc}); sweep will reclaim")
+        if issued:
+            deadline = time.time() + 240
+            pending = list(issued)
+            while pending and time.time() < deadline:
+                still = []
+                for sid in pending:
+                    try:
+                        g = client.get(f"{_SUBNET_CREATE_PATH}/{sid}", service="vpc")
+                        if getattr(g, "status", None) != 404:
+                            still.append(sid)
+                    except Exception:  # noqa: BLE001 — read hiccup, retry next round
+                        pass
+                pending = still
+                if pending:
+                    time.sleep(10)
+
+        def _vpc_ladder(vid: str, label: str) -> None:
+            for attempt in range(5):
+                try:
+                    r = client.request("DELETE", f"{_VPC_CREATE_PATH}/{vid}",
+                                       service="vpc")
+                    st = getattr(r, "status", None)
+                except Exception as exc:  # noqa: BLE001 — sweep backstop
+                    print(f"  {label} {vid} delete failed ({exc}); "
+                          f"sweep will reclaim")
+                    return
+                if st in (200, 202, 204, 404):
+                    print(f"  {label} {vid} delete -> {st}")
+                    return
+                print(f"  {label} {vid} delete -> {st} "
+                      f"(attempt {attempt + 1}/5); retrying in 15s")
+                time.sleep(15)
+            print(f"  {label} {vid} still not deleted; sweep will reclaim")
+
+        _vpc_ladder(vpc_id, "shared VPC")
+        for tag, (nid, _nname) in net_ids.items():
+            # A/B의 자식(vip-nat 서브넷·IGW·DC)은 각 lifecycle이 지운다 —
+            # 비동기 소멸 잔재는 같은 사다리가 흡수, 실패는 스윕이 회수.
+            _vpc_ladder(nid, f"shared net VPC {tag.upper()}")
 
     ctx = {"shared_vpc_id": vpc_id}
     if subnet_id:
         ctx["shared_subnet_id"] = subnet_id
     if db_subnet_id:
         ctx["shared_db_subnet_id"] = db_subnet_id
+    if "a" in net_ids:
+        ctx["shared_net_vpc_a_id"], ctx["net_a_vpc_name"] = net_ids["a"]
+    if "b" in net_ids:
+        ctx["shared_net_vpc_b_id"], ctx["net_b_vpc_name"] = net_ids["b"]
     return ctx, teardown

@@ -194,7 +194,11 @@ def plan(leaf_set=None, deps=None, lifecycles=None, vpc_cap=None) -> Plan:
             # slot, so it runs fully parallel in its own 'free' wave.
             free.append(lid)
 
-    shared_vpc_count = _SHARED_VPC_COUNT if _VPC_KIND in expanded else 0
+    # 상주 공유 VPC 수 = base kind가 'vpc'인 루트의 수: 메인 공유 VPC('vpc') +
+    # 네트워킹 공유 VPC('vpc#a'/'vpc#b', 2026-07-13). 셋 다 쓰이면 3이 슬롯에서
+    # 상시 차감된다 (budget = cap - shared).
+    shared_vpc_count = sum(1 for r in expanded
+                           if r.split("#", 1)[0] == _VPC_KIND)
 
     p = Plan(
         leaf_set=leaves,

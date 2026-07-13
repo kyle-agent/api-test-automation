@@ -64,7 +64,16 @@ def priorities(plan: dag_planner.Plan, durations: dict | None = None,
     # `requires` is a CALLABLE node -> its prerequisite nodes. No lifecycle->
     # lifecycle edges today, so the graph is empty and tail-length collapses to
     # each node's own duration (longest-job-first).
-    return schedule_optimizer.tail_lengths(nodes, lambda _n: (), durations, default)
+    tails = schedule_optimizer.tail_lengths(nodes, lambda _n: (), durations, default)
+    # priority_first 핀(오너 2026-07-13): 짧은 VPC-슬롯 소비자가 LPT에서 뒤로
+    # 밀려 슬롯 대기 + 런 꼬리가 되는 것을 방지 — 어떤 실측 tail보다 큰 가산치로
+    # 항상 먼저 디스패치된다 (핀들 사이 상대 순서는 tail이 결정). 부작용 주의:
+    # run_dynamic의 heavy_stagger는 prio >= threshold로 heavy를 판별하므로 핀
+    # 노드는 항상 stagger 대상이 된다 (현재 핀 2종은 400/544s로 어차피 heavy).
+    for lid in schedule_optimizer.load_priority_first():
+        if lid in tails:
+            tails[lid] += schedule_optimizer.PIN_BOOST_S
+    return tails
 
 
 # --------------------------------------------------------------------------- #

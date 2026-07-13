@@ -210,7 +210,9 @@ def selection_needs_shared_vpc(lifecycle_ids: Sequence[str]) -> bool:
     for lc in lcs:
         if lc["id"] in want:
             for s in lc.get("steps", []):
-                if s.get("adopt") == "vpc":
+                # vpc / vpc#a / vpc#b 전부 provision 필요 (net-VPC A/B는
+                # provision이 공유 VPC와 함께 만든다, 2026-07-13)
+                if (s.get("adopt") or "").split("#", 1)[0] == "vpc":
                     return True
     return False
 
@@ -225,7 +227,11 @@ def provision_shared(env: dict, f) -> dict:
     f.flush()
     t0 = time.monotonic()
     _events_note(env, "provision-start",
-                 note="공유 인프라(VPC+서브넷) 준비 — ACTIVE 대기 포함, 통상 1~3분")
+                 note="공유 인프라(VPC+서브넷) 준비 — 서브넷은 no-wait(생성만 하고 "
+                      "ACTIVE는 첫 adopt 시점 게이트), 통상 ~30초")
+    # 서브넷 ACTIVE head 대기 제거 (run-543a 실측 4.3분 유휴 — 오너 2026-07-13
+    # "2번 바로 수정"): adopt 시점의 engine._ensure_adopted_active가 보장한다.
+    env = {**env, "SCP_PROVISION_SUBNET_NOWAIT": "true"}
     _, lines = _stream_cmd([sys.executable, "-m", "regression.scenarios.shared_infra",
                             "--provision"], env, f)
     shared: dict = {}
@@ -425,13 +431,24 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
         for s in lc.get("steps", []):
             if (s.get("method") == "POST"
                     and (s.get("path") or "").rstrip("/").endswith("/vpcs")):
-                return s.get("adopt") != "vpc"
+                # vpc#a/vpc#b adopt(net-VPC 상주 공유)도 슬롯 비소비 (2026-07-13)
+                if (s.get("adopt") or "").split("#", 1)[0] != "vpc":
+                    return True
         return False
 
-    items.sort(key=lambda lc: (_dur(lc), len(lc.get("steps") or [])), reverse=True)
+    # 0차 키 = priority_first 핀 — 실행 경로(tests/crud/conftest.py 수집 정렬)와
+    # 동일 규칙이어야 예측 Gantt가 실제 투입 순서를 재현한다 (오너 2026-07-13).
+    from regression.scenarios.schedule_optimizer import load_priority_first
+    pinned = frozenset(load_priority_first())
+    items.sort(key=lambda lc: (lc["id"] in pinned, _dur(lc),
+                               len(lc.get("steps") or [])), reverse=True)
     cap = int(os.environ.get("SCP_LOCAL_WORKERS", "24"))
     n_w = int(workers) if workers else max(1, min(cap, len(items) or 1))
-    n_v = max(1, int(vpc_slots))
+    # net-VPC A/B(vpc#a/b adopt)가 선택에 있으면 상주 VPC 2개가 슬롯을 상시
+    # 점유한다 — 자체생성 가용 슬롯에서 차감해야 예측이 실제와 맞는다 (2026-07-13).
+    net_standing = 2 if any((s.get("adopt") or "") in ("vpc#a", "vpc#b")
+                            for lc in items for s in lc.get("steps", [])) else 0
+    n_v = max(1, int(vpc_slots) - net_standing)
     wfree = [0.0] * n_w
     vfree = [0.0] * n_v
     bars = []

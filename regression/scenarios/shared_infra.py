@@ -112,6 +112,26 @@ def _needs_db_subnet() -> bool:
         return True
 
 
+def _needs_net_vpcs() -> bool:
+    """True iff this run's selection contains at least one ``{"adopt": "vpc#a"}``
+    or ``{"adopt": "vpc#b"}`` step (peering·vip-nat·fw·DC의 네트워킹 공유 VPC).
+    없으면 net-VPC 2개는 순수 낭비(슬롯 2 + ~수십 초)다. Fail-open: 판정 오류
+    → True (만들어도 무해, 약간 느릴 뿐)."""
+    import os
+    try:
+        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
+                if x.strip()}
+        for lc in engine.active_lifecycles():
+            if only and lc.get("id") not in only:
+                continue
+            if any((s.get("adopt") or "") in ("vpc#a", "vpc#b")
+                   for s in lc.get("steps", [])):
+                return True
+        return False
+    except Exception:  # noqa: BLE001 — 스킵 최적화가 provision 실패 원인이 되면 안 됨
+        return True
+
+
 def provision():
     cfg, client = _build_client()
     if not getattr(cfg, "allow_mutations", False):
@@ -125,12 +145,22 @@ def provision():
     # "Invalid format". So capture the engine's stdout onto STDERR and let ONLY
     # our explicit SCP_SHARED_*= lines below reach STDOUT.
     import contextlib
+    import os
     shared_ctx = {}
     need_db = _needs_db_subnet()
+    # 기본 no-wait (2026-07-13, 오너 풀런에서 conftest 인라인 경로가 구식 대기를
+    # 타는 것 관측 후 전 경로 기본 승격): 서브넷 create+track 후 ACTIVE 대기 없이
+    # 반환 — run-543a 실측처럼 백엔드가 같은 VPC 서브넷 ACTIVE 전이를 직렬화해
+    # head 대기가 4.3분이었다. ACTIVE는 adopt 시점의 engine._ensure_adopted_active
+    # 게이트가 보장(라이브 검증 2026-07-13 5/5 pass). 구식 대기가 필요하면
+    # SCP_PROVISION_SUBNET_WAIT=true 로 강제.
+    nowait = os.environ.get("SCP_PROVISION_SUBNET_WAIT", "").strip().lower() != "true"
+    need_net = _needs_net_vpcs()
     try:
         with contextlib.redirect_stdout(sys.stderr):
             shared_ctx, _teardown = engine.provision_shared_vpc(
-                client, cfg, need_db_subnet=need_db)
+                client, cfg, need_db_subnet=need_db,
+                wait_subnets_active=not nowait, need_net_vpcs=need_net)
     except Exception as exc:
         # Wave D root cause: provision_shared_vpc CREATED the VPC (slot won,
         # counts against the 5-cap) but a *post-create* step inside it raised —
@@ -165,8 +195,18 @@ def provision():
         print(f"SCP_SHARED_SUBNET_ID={subnet_id}")
     if db_subnet_id:
         print(f"SCP_SHARED_DB_SUBNET_ID={db_subnet_id}")
+    net_a = shared_ctx.get("shared_net_vpc_a_id")
+    net_b = shared_ctx.get("shared_net_vpc_b_id")
+    if net_a:
+        print(f"SCP_SHARED_NET_VPC_A_ID={net_a}")
+        if shared_ctx.get("net_a_vpc_name"):
+            print(f"SCP_SHARED_NET_VPC_A_NAME={shared_ctx['net_a_vpc_name']}")
+    if net_b:
+        print(f"SCP_SHARED_NET_VPC_B_ID={net_b}")
+        if shared_ctx.get("net_b_vpc_name"):
+            print(f"SCP_SHARED_NET_VPC_B_NAME={shared_ctx['net_b_vpc_name']}")
     _eprint(f"[shared_infra] provisioned vpc={vpc_id} subnet={subnet_id} "
-            f"db_subnet={db_subnet_id}")
+            f"db_subnet={db_subnet_id} net_a={net_a} net_b={net_b}")
     if not vpc_id:
         # ctx came back truthy but with no vpc id (should not happen) — be loud so
         # the missing $GITHUB_ENV export is diagnosable from the runner log.
@@ -185,7 +225,9 @@ def teardown():
     vpc_id = os.environ.get(engine._ENV_SHARED_VPC, "").strip()
     subnet_id = os.environ.get(engine._ENV_SHARED_SUBNET, "").strip()
     db_subnet_id = os.environ.get(engine._ENV_SHARED_DB_SUBNET, "").strip()
-    if not vpc_id and not subnet_id and not db_subnet_id:
+    net_a_id = os.environ.get(engine._ENV_SHARED_NET_VPC_A, "").strip()
+    net_b_id = os.environ.get(engine._ENV_SHARED_NET_VPC_B, "").strip()
+    if not any((vpc_id, subnet_id, db_subnet_id, net_a_id, net_b_id)):
         _eprint("[shared_infra] no SCP_SHARED_VPC_ID / SCP_SHARED_SUBNET_ID set — "
                 "nothing to tear down.")
         return 0
@@ -229,25 +271,35 @@ def teardown():
             if pending:
                 _eprint(f"[shared_infra] waiting subnet(s) gone: {pending}")
                 time.sleep(10)
-    if vpc_id:
+    def _vpc_delete_ladder(vid: str, label: str) -> None:
+        """VPC 삭제 + 409 사다리 (5×15s) — 자식의 비동기 소멸(DELETING 30s~3min)
+        을 흡수한다. 실패는 스윕이 회수."""
         for attempt in range(5):
             try:
-                r = client.request("DELETE", f"{engine._VPC_CREATE_PATH}/{vpc_id}",
+                r = client.request("DELETE", f"{engine._VPC_CREATE_PATH}/{vid}",
                                    service="vpc")
                 st = getattr(r, "status", None)
             except Exception as exc:
-                _eprint(f"[shared_infra] shared VPC {vpc_id} delete failed ({exc}); "
+                _eprint(f"[shared_infra] {label} {vid} delete failed ({exc}); "
                         f"sweep will reclaim")
-                break
+                return
             if st in (200, 202, 204, 404):
-                _eprint(f"[shared_infra] shared VPC {vpc_id} delete -> {st}")
-                break
-            _eprint(f"[shared_infra] shared VPC {vpc_id} delete -> {st} "
+                _eprint(f"[shared_infra] {label} {vid} delete -> {st}")
+                return
+            _eprint(f"[shared_infra] {label} {vid} delete -> {st} "
                     f"(attempt {attempt + 1}/5); retrying in 15s")
             time.sleep(15)
-        else:
-            _eprint(f"[shared_infra] shared VPC {vpc_id} still not deleted; "
-                    f"sweep will reclaim")
+        _eprint(f"[shared_infra] {label} {vid} still not deleted; "
+                f"sweep will reclaim")
+
+    if vpc_id:
+        _vpc_delete_ladder(vpc_id, "shared VPC")
+    # net-VPC A/B: 자식(vip-nat 서브넷·IGW·DC)은 lifecycle이 지웠고, 비동기
+    # 소멸 잔재는 사다리가 흡수한다.
+    if net_a_id:
+        _vpc_delete_ladder(net_a_id, "shared net VPC A")
+    if net_b_id:
+        _vpc_delete_ladder(net_b_id, "shared net VPC B")
     return 0
 
 
