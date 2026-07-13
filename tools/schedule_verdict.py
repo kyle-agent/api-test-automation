@@ -200,6 +200,23 @@ def classify(lid: str, lc: dict | None) -> str:
 # 판정
 # ---------------------------------------------------------------------------
 
+def monster_start_verdict(rows: list[dict], w: int, late_thresh_s: float = 300.0):
+    """판정 C의 순수 계산 — 예측 첫 배치(pred_rank 상위 w개, t≈0에 떠야 할
+    무거운 것들)가 **실제로 언제 떴나**. worksteal 라운드로빈 수리에선 몬스터가
+    경량 뒤 offset 1에서 시작 → 시작 rank는 밀려 겹침율이 낮게 나오지만 시작
+    시각은 이르다. makespan을 정하는 건 rank가 아니라 이 시각이다.
+
+    반환: (top_pred, max_start_s, med_start_s, late[>thresh]).
+    """
+    import statistics
+    top_pred = sorted(rows, key=lambda r: r["pred_rank"])[:w]
+    starts = [r["act_s"] for r in top_pred]
+    if not starts:
+        return [], 0.0, 0.0, []
+    late = [r for r in top_pred if r["act_s"] > late_thresh_s]
+    return top_pred, max(starts), statistics.median(starts), late
+
+
 def verdict(events: list[dict], workers: int | None = None,
             vpc_slots: int = 4, top: int = 25, out=print) -> dict:
     starts = extract_starts(events)
@@ -243,26 +260,49 @@ def verdict(events: list[dict], workers: int | None = None,
         if lags:
             lag_by_class[cls] = round(statistics.median(lags), 1)
 
+    # 판정 C — 시간 기반 (겹침율의 함정 보정, 2026-07-13). 상세: 헬퍼 docstring.
+    top_pred, max_monster_start_s, med_monster_start_s, late_monsters = \
+        monster_start_verdict(rows, w)
+
     out(f"run lifecycles={len(ids)} workers(추정 피크)={w} vpc_slots={vpc_slots} "
         f"sim_makespan={round(sim['makespan_s']/60,1)}분")
     out(f"\n[판정 A] 첫 배치(워커 {w}개) 겹침율: {overlap:.0%} "
-        f"(높음=정렬 적용됨, 낮음=정렬 미적용 의심)")
+        f"(rank 기반 — worksteal 라운드로빈에선 낮게 나오는 게 정상, 판정 C를 볼 것)")
     out(f"[판정 B] 분류별 시작 지연 중앙값(실제-예측): {lag_by_class} "
         f"(db/vpc-self만 크게 양수=레인·슬롯 대기, 전 분류 고름=정렬 문제)")
+    out(f"[판정 C] 예측 첫 배치 몬스터 실제 시작(시간 기반): "
+        f"최대 {max_monster_start_s/60:.1f}분 · 중앙 {med_monster_start_s/60:.1f}분 · "
+        f">5분 지각 {len(late_monsters)}/{len(top_pred)}개 "
+        f"(작을수록 수리 실효 — makespan 결정 신호)")
+    if late_monsters:
+        out("   지각 몬스터: " + ", ".join(
+            f"{r['id'][:32]}(+{r['act_s']/60:.0f}분)" for r in late_monsters[:6]))
     out(f"\n예측 상위 {top}개의 예측/실제 순위·시작(분):")
     out(f"{'lifecycle':44} {'cls':8} {'p.rk':>4} {'a.rk':>4} {'p.분':>6} {'a.분':>6} {'지연분':>6}")
     for r in sorted(rows, key=lambda r: r["pred_rank"])[:top]:
         out(f"{r['id'][:44]:44} {r['class']:8} {r['pred_rank']:4d} {r['act_rank']:4d} "
             f"{r['pred_s']/60:6.1f} {r['act_s']/60:6.1f} {r['lag_s']/60:6.1f}")
 
-    hint = ("레인/슬롯 대기 우세" if overlap >= 0.6 and
-            max(lag_by_class.get("db", 0), lag_by_class.get("vpc-self", 0))
-            > 2 * abs(lag_by_class.get("etc", 0) or 1)
-            else "정렬 미적용 우세" if overlap < 0.4
-            else "혼합/추가 조사 필요")
-    out(f"\n>>> 힌트: {hint} (겹침율 {overlap:.0%}, 지연 {lag_by_class})")
+    # 힌트 — 시간 기반(판정 C)을 1차 신호로: 몬스터가 실제로 일찍 떴으면
+    # 겹침율이 낮아도 수리는 실효다 (worksteal 라운드로빈의 정상 양상).
+    if max_monster_start_s <= 300 and not late_monsters:
+        hint = "정렬 실효(시간 기반) — 몬스터 조기 시작, 겹침율은 rank 기반이라 무시"
+    elif late_monsters:
+        hint = (f"몬스터 {len(late_monsters)}개 지각(>5분) — 수리 미실효/부분실효: "
+                "durations 오염(max-merge) 또는 정렬 미적용 재점검")
+    else:
+        hint = ("레인/슬롯 대기 우세" if overlap >= 0.6 and
+                max(lag_by_class.get("db", 0), lag_by_class.get("vpc-self", 0))
+                > 2 * abs(lag_by_class.get("etc", 0) or 1)
+                else "정렬 미적용 우세" if overlap < 0.4
+                else "혼합/추가 조사 필요")
+    out(f"\n>>> 힌트: {hint}")
+    out(f"    (겹침율 {overlap:.0%} · 몬스터 최대시작 {max_monster_start_s/60:.1f}분 · "
+        f"지연 {lag_by_class})")
     return {"ok": True, "overlap": overlap, "lag_by_class": lag_by_class,
             "rows": rows, "hint": hint, "workers": w,
+            "max_monster_start_s": max_monster_start_s,
+            "late_monsters": len(late_monsters),
             "sim_makespan_s": sim["makespan_s"]}
 
 

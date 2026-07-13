@@ -41,16 +41,74 @@ def test_interleave_preserves_membership():
     assert sorted(out) == sorted(ordered) and len(out) == 25
 
 
-def test_roundrobin_blocks_top_n_lead_each_block():
-    """worksteal(연속 블록 선분배)용 순서 (run-c373 실측 수리): 블록 b의 첫
-    항목이 전체 rank b — 상위 n개 몬스터가 전부 서로 다른 워커에서 t≈0 출발."""
+def _xdist_worksteal_blocks(collection_order: list, n: int) -> list[list]:
+    """xdist ≥3.2 worksteal 초기 분배의 **정확한** 재현 (버전 3.8 검증).
+
+    WorkStealingScheduling.schedule()은 pending=range(N)(수집 순서)로 놓고
+    check_schedule()이 유휴 워커에게 `num_send = len(pending) // nodes_remaining`
+    만큼 **연속 프리픽스**로 나눠준다 → 워커 i의 블록은 수집 순서의 연속 조각이고
+    블록 크기는 균등하지 않다 (N=119,n=24 → [4,5,5,…]). 이 비균등이 라운드로빈
+    버킷 경계와 어긋나는 지점이 검증 대상이므로, 균등 가정이 아니라 실제 분배
+    알고리즘을 그대로 흉내 낸다."""
+    pending = list(collection_order)
+    blocks = []
+    for i in range(n):
+        num = len(pending) // (n - i)
+        blocks.append(pending[:num])
+        del pending[:num]
+    return blocks
+
+
+def _monster_offsets(order: list, weights: dict, n: int, top: int) -> list[int]:
+    """order를 실제 worksteal로 분배했을 때, 상위 top개 몬스터가 자기 워커
+    블록 안에서 몇 번째(offset)에 오는지. 0=블록 선두(즉시 시작)."""
+    blocks = _xdist_worksteal_blocks(order, n)
+    pos = {item: off for blk in blocks for off, item in enumerate(blk)}
+    monsters = sorted(weights, key=lambda k: weights[k], reverse=True)[:top]
+    return [pos[m] for m in monsters]
+
+
+def test_roundrobin_spreads_monsters_across_worker_blocks():
+    """worksteal 수리의 **실효** 속성 (run-c373): 상위 몬스터들이 서로 다른 워커
+    블록으로 흩어져, 각 몬스터가 자기 블록에서 경량 항목 뒤에만 온다 (offset ≤ 1) —
+    순수 내림차순은 최상위 몬스터들을 같은 블록에 직렬화(offset이 n까지)한다.
+
+    이전 회귀 테스트는 블록 경계를 0,3,6(균등)으로 가정했으나 실제 worksteal은
+    8/3을 0,2,5로 쪼갠다 → 그 단언은 실제 분배와 무관했다. 여기서는 실제 분배
+    알고리즘(_xdist_worksteal_blocks)으로 검증한다."""
+    N, n = 119, 24
+    ordered = [f"lc{i}" for i in range(N)]   # lc0=가장 무거움 … lc118=가장 가벼움
+    weights = {f"lc{i}": N - i for i in range(N)}
+
+    rr = crud_conftest._roundrobin_blocks_for_workers(ordered, n)
+    desc = list(ordered)
+
+    rr_off = _monster_offsets(rr, weights, n, top=n)
+    desc_off = _monster_offsets(desc, weights, n, top=n)
+
+    # 라운드로빈: 어떤 몬스터도 블록에서 다른 몬스터 뒤에 직렬화되지 않는다.
+    # offset ≤ 1 이고, offset 1인 몬스터의 앞 항목은 반드시 더 가벼운 항목이다.
+    assert max(rr_off) <= 1, f"라운드로빈 몬스터 offset이 1 초과: {rr_off}"
+    blocks = _xdist_worksteal_blocks(rr, n)
+    pos = {it: (b, o) for b, blk in enumerate(blocks) for o, it in enumerate(blk)}
+    for m in sorted(weights, key=lambda k: weights[k], reverse=True)[:n]:
+        b, o = pos[m]
+        if o == 1:
+            predecessor = blocks[b][0]
+            assert weights[predecessor] < weights[m], (
+                f"{m} 앞 항목 {predecessor}가 더 무겁다 — 몬스터 직렬화")
+
+    # 순수 내림차순은 최상위들을 같은 블록에 직렬화 → offset이 훨씬 크다.
+    assert max(desc_off) >= 3, (
+        f"내림차순이 직렬화를 재현해야 회귀 대비가 유효: {desc_off}")
+
+
+def test_roundrobin_blocks_preserve_membership_and_desc_within_bucket():
+    """멤버십 보존 + 각 버킷(=라운드로빈 그룹) 내부는 desc — 유휴 워커의 스틸이
+    꼬리(경량)부터 가져간다."""
     ordered = list("ABCDEFGH")   # A=가장 무거움 … H=가장 가벼움
     out = crud_conftest._roundrobin_blocks_for_workers(ordered, 3)
-    # 버킷: [A,D,G] [B,E,H] [C,F] → 연접
-    assert out == ["A", "D", "G", "B", "E", "H", "C", "F"]
-    # 연속 블록(worksteal 선분배 단위)의 선두들 = 최상위 3개
-    assert [out[0], out[3], out[6]] == ["A", "B", "C"]
-    # 블록 내부는 desc — 유휴 워커의 스틸이 꼬리(경량)부터 가져간다
+    assert out == ["A", "D", "G", "B", "E", "H", "C", "F"]  # 버킷 [A,D,G][B,E,H][C,F] 연접
     assert sorted(out) == sorted(ordered) and len(out) == 8
 
 

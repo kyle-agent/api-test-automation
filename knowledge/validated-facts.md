@@ -2450,4 +2450,36 @@ rank 11이 +42분 지각, vs-server-actions +34.5분 — 같은 블록 앞 항�
 으로 — rank j → 버킷 j%n, 연속 블록 b의 선두가 전체 rank b가 되어 상위 n개가
 전부 다른 워커에서 t≈0 출발, 블록 내부 desc라 스틸은 경량 꼬리부터 가져간다.
 (--dist=load로 되돌리면 인터리브로 교체할 것 — dist 모드와 정렬은 한 쌍이다.)
->>>>>>> claude/resource-cleanup-optimization-1qpre9
+
+## run-c373 "이상함" 정밀 재판정 — 진범은 durations 오염, 정렬은 보조 (2026-07-13)
+
+오너가 "예측 vs 실제" 패널에서 이상 지적 → schedule_verdict를 c373에 재실행하고
+xdist 3.8 worksteal 소스를 실측 검증. 정정된 인과:
+
+- **66.3분 makespan의 실제 원인 = 딱 2개 몬스터의 지각**, 전반적 정렬 무효화가
+  아니다. 판정 C(시간 기반, 신설): 예측 첫 배치 24개 중 **>5분 지각 2개뿐**
+  (`database-postgresql-cluster` +42분, `vs-server-actions-verify` +35분),
+  **중앙값 0.9분** — 나머지 22개는 이미 조기 시작했다. pg-cluster가 41.8분에 떠서
+  ~24분 돌면 66분 = makespan 정의. 겹침율 21%(판정 A)는 rank 기반이라 낮게 나온
+  것이고 실제 지각과는 별개다.
+- **진범 = durations 하향 오염(마스킹).** pg-cluster 커밋본 durations는 1448s
+  (heavy, rank~11)인데 c373 런타임엔 콘솔 머신 `durations.local.json`의 오염된
+  낮은 값(fast-fail 학습 12s)이 커밋본을 가려 **경량으로 오분류 → 꼬리로 디스패치**.
+  1차 수리 = **max-merge**(읽기 = max(커밋본, 오버레이)) — 오버레이가 커밋본을
+  하향으로 못 가린다. `rm durations.local.json`보다 견고(오너 수동 삭제 불요).
+- **worksteal 라운드로빈은 보조 수리(진짜-heavy 직렬화 방지).** xdist 3.8
+  `WorkStealingScheduling.schedule()`은 pending=range(N)(수집 순서)로 놓고
+  `check_schedule`이 `num_send = len(pending)//nodes_remaining` 연속 프리픽스로
+  분배 → 워커 블록은 연속 조각이고 **크기 비균등**(N=119,n=24 → [4,5,5,…]).
+  실측 검증(시뮬레이션): 라운드로빈 순서 하에서 **상위 24 몬스터 offset ≤ 1**
+  (rank 0만 블록 선두, 1~23은 경량 항목 1개 뒤 = offset 1, 시각 ~1분).
+  순수 내림차순은 블록0=[rank0,1,2,3] 직렬(offset 최대 4) = 42분 꼬리의 형상.
+  블록 크기 비균등 때문에 offset 0 완전정렬은 아니지만(경량 1개 뒤), makespan
+  영향 무시 가능 — 완전정렬은 xdist 분배 알고리즘에 커플링되므로 채택 안 함.
+- **다음 런 판정 기준(정본)**: 겹침율(rank)이 아니라 **판정 C의 몬스터 최대
+  시작 시각** + makespan. 수리 실효 = 첫 배치 몬스터 >5분 지각 0개 & makespan
+  ~40–43분 (최장 = `postgresql-cluster-subops-full` 2346s ≈ 39분이 하한을 정함).
+- 회귀 고정: 이전 `test_roundrobin_blocks_top_n_lead_each_block`은 블록 경계를
+  0,3,6(균등)으로 잘못 가정(실제 worksteal 8/3 = 0,2,5) → 실제 분배를 흉내 내
+  "몬스터는 경량 뒤에만"을 단언하도록 교체. schedule_verdict에 판정 C 헬퍼
+  `monster_start_verdict` + offline 테스트 신설.
