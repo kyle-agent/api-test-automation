@@ -1805,6 +1805,30 @@ def _abort_run(rid: str) -> tuple[int, dict]:
                           "provision 단계 — pytest 시작 전에 중단됩니다.")}
 
 
+def _abort_all() -> tuple[int, dict]:
+    """전체 중단 (오너 요구 2026-07-11 "전체 시나리오 중단") — 진행 중 + 대기
+    중인 실행을 한 번에 중단한다.
+
+    순서가 계약이다: **대기열을 먼저 비운 뒤** 실행 중을 죽인다 — 반대 순서면
+    실행 중 런의 종료가 ``_try_admit_queue`` 로 다음 대기 런을 자동 admit 해
+    두더지잡기가 된다. 중단 비대상 종류(simulate/스캔/클린업 — 짧은 읽기·정리
+    작업, ``_abort_run`` 409)는 건너뛰고 사유와 함께 정직하게 보고한다."""
+    with _LOCK:
+        targets = [(r["id"], r.get("status")) for r in _RUNS.values()
+                   if r.get("status") in ("queued", "running")]
+    targets.sort(key=lambda t: (0 if t[1] == "queued" else 1, t[0]))
+    aborted, skipped = [], []
+    for rid, _st in targets:
+        code, payload = _abort_run(rid)
+        if code in (200, 202):
+            aborted.append(rid)
+        else:
+            skipped.append({"id": rid, "reason": payload.get("error", "?")})
+    return 202, {"aborted": aborted, "skipped": skipped,
+                 "note": ("대기열은 비워졌고, 실행 중이던 런은 pytest 종료 후 "
+                          "teardown 스윕까지 수행한 뒤 '중단됨'으로 기록됩니다.")}
+
+
 # --------------------------------------------------------------------------- #
 # cross-run VPC admission + wait queue
 # --------------------------------------------------------------------------- #

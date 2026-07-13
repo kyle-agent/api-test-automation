@@ -372,6 +372,14 @@ def api_cleanup() -> JSONResponse:
     return _json(c2._rec_view(c2._start("cleanup", c2._cleanup_worker)), 202)
 
 
+@router.post("/api/abort-all")
+def api_abort_all() -> JSONResponse:
+    """전체 중단 (오너 요구 2026-07-11) — 진행 중 + 대기 전체. 엔진 반쪽은
+    c2._abort_all (대기열 먼저 비움 — 자동 재admit 두더지잡기 방지)."""
+    code, payload = c2._abort_all()
+    return _json(payload, code)
+
+
 @router.post("/api/runs/{rid}/abort")
 def api_run_abort(rid: str) -> JSONResponse:
     """로컬 run 중단 (2026-07-04): kill the pytest process tree → teardown 스윕

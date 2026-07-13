@@ -1500,8 +1500,47 @@ function drawCapBar() {
       · 여유 <b title="cap − 기존 − max(예약, 보유) — 즉시 ADMIT 가능한 슬롯">${headroom}</b></span>
     ${running.length ? `<span class="cap-grp-in"><span class="cap-lbl">진행중</span>${runChips}</span>` : ""}
     ${queued.length ? `<span class="cap-grp-in"><span class="cap-lbl">대기</span>${queChips}</span>` : ""}
+    ${(running.length + queued.length) ? `<button class="minibtn red" id="cap-abort-all"
+        style="margin-left:auto"
+        title="진행 중 + 대기 전체 중단 — 대기열을 먼저 비우고, 실행 중인 LIVE는 pytest 종료 + teardown 스윕 (확인 모달)">⏹ 전체 중단</button>` : ""}
   </div>`;
   els("#cap-bar .capchip[data-runid]").forEach(b => b.onclick = () => loadRunIntoReport(b.dataset.runid));
+  const aa = $("cap-abort-all");
+  if (aa) aa.onclick = () => abortAllConfirm(running.length, queued.length);
+}
+
+// ---- 전체 중단 (오너 요구 2026-07-11 "전체 시나리오 중단") -------------------
+// abortConfirm(단일 런)의 전체판 — POST /api/abort-all. 서버가 대기열을 먼저
+// 비우고(자동 재admit 두더지잡기 방지) 실행 중을 죽인다. 파괴적 동작이라
+// pre-flight 모달 셸로 무엇이 일어나는지 명시한다.
+function abortAllConfirm(nRun, nQue) {
+  pfOpen(`⏹ 전체 중단 — 진행 ${nRun} · 대기 ${nQue}`);
+  $("pf-body").innerHTML =
+    '<p><b style="color:var(--red)">진행 중과 대기 중인 실행을 모두 중단합니다.</b></p>' +
+    '<ul class="muted small" style="margin:6px 0 0;padding-left:18px">' +
+    "<li><b>대기열을 먼저 비웁니다</b> (시작 전 취소 — 자동 재개 없음).</li>" +
+    "<li>실행 중인 LIVE는 pytest 프로세스 트리를 종료하고 공유 VPC teardown + run-scoped 정리 스윕을 수행합니다.</li>" +
+    "<li>각 run 은 <b>중단됨(aborted)</b> 으로 기록·미러되고, 종료 후 재스캔(+0·+5m·+15m)이 잔존을 감시합니다.</li>" +
+    "<li>스캔·시뮬레이션 등 짧은 읽기 작업은 중단 대상이 아니라 건너뜁니다 (결과에 표시).</li></ul>";
+  $("pf-foot").innerHTML =
+    '<button class="btn ghost" id="pf-aa-cancel">취소</button>' +
+    '<button class="btn warn" id="pf-aa-go">⏹ 전체 중단 실행</button>';
+  $("pf-aa-cancel").onclick = pfClose;
+  $("pf-aa-go").onclick = () => {
+    $("pf-aa-go").disabled = true;
+    $("pf-aa-go").textContent = "중단 요청 중…";
+    fetch("/api/abort-all", { method: "POST" })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        pfClose();
+        if (!ok || j.error) { toast("전체 중단 실패: " + (j.error || "?"), "fail"); return; }
+        const n = (j.aborted || []).length, sk = (j.skipped || []).length;
+        toast(`전체 중단 요청됨 — ${n}건 중단${sk ? ` · ${sk}건 건너뜀(중단 비대상)` : ""}`,
+              n ? "ok" : "fail");
+        startCapPoll(true);
+        if (runId) pollEvents();
+      }).catch(e => { pfClose(); toast("전체 중단 요청 실패: " + e.message, "fail"); });
+  };
 }
 
 // load a run (by id) into the master→detail report — shared by the cap-bar chips
