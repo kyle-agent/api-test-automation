@@ -1408,6 +1408,10 @@ def _record_run_to_db(rec: dict) -> None:
             "local-" + rec["id"],
             status=("aborted" if rec.get("status") == "aborted"
                     else "done" if rec.get("rc") == 0 else "failed"),
+            # 스케줄 발사(launch_suite_run)는 suite/trigger 를 rec 에 실어 보낸다
+            # — 실행 기록에서 "무엇이 왜 돌았는지"가 suite 이름으로 보이게.
+            suite=rec.get("suite") or "console2",
+            trigger=rec.get("trigger") or "local",
             requested_at=_iso_utc(rec.get("started")),
             finished_at=_iso_utc(rec.get("ended")),
             detail=detail)
@@ -1930,6 +1934,65 @@ def _spawn_run(rec: dict, worker) -> None:
         finally:
             _on_run_finish(rec["id"])
     threading.Thread(target=_run, daemon=True).start()
+
+
+def launch_suite_run(suite_id: str, trigger: str = "schedule") -> tuple[bool, str]:
+    """suite 를 **이 서버의 LIVE 런**으로 발사 — 스케줄 발화 경로 (D5 후속 결정,
+    오너 승인 2026-07-11: "스케줄은 GHA 가 아니라 콘솔 엔진 로컬 런으로").
+
+    안전 규칙 (Hard Rule 1 정합):
+      * heavy(과금) suite 는 거부 — 무인 실행은 명시적 pre-flight opt-in 이
+        아니다. heavy lifecycle 은 선택 해석 결과에서도 항상 제외한다
+        (suite full 의 라벨 그대로: "all light CRUD, no heavy").
+      * 동시 LIVE 가드는 /api/run 과 동일 — 진행 중이면 이번 발화는 건너뛴다
+        (다음 cron 주기에 재시도). 스캔/재스캔 판정 오염 방지.
+      * admission 큐·run 기록·이벤트·DB 미러 전부 기존 로컬 런과 동일 경로.
+
+    반환 (ok, msg) — 실패 메시지는 스케줄러가 failed 런 행으로 남긴다.
+    conformance 게이트는 CI 개념이라 로컬 발사에서는 무시한다(주석 명시).
+    """
+    from core import suites as _s
+    raw = next((s for s in _s.list_suites() if s.get("id") == suite_id), None)
+    if not raw:
+        return False, f"suite {suite_id!r} 없음 (suites/*.yaml)"
+    view = _suite_view(raw, builtin=suite_id in _BUILTIN_SUITES)
+    if view["gates"].get("heavy"):
+        return False, (f"suite {suite_id!r} 는 heavy(과금) — 스케줄 무인 실행 금지. "
+                       "heavy 는 콘솔 pre-flight 에서 수동 opt-in 하세요.")
+    scope = view.get("scope") or {}
+    sel: dict = {}
+    for k in ("lifecycle_ids", "node_ids", "services", "categories"):
+        if scope.get(k):
+            sel[k] = list(scope[k])
+    # CI-coarse 필터(STR_KEYS)가 scope 에 문자열로 떠 있을 수 있다
+    if isinstance(scope.get("category"), str) and scope["category"]:
+        sel.setdefault("categories", []).append(scope["category"])
+    if isinstance(scope.get("service"), str) and scope["service"]:
+        sel.setdefault("services", []).append(scope["service"])
+    if sel:
+        ids = _resolve_lifecycle_ids(sel)
+    else:
+        # scope 없는 suite(full 등) = 전체: enabled & role=verify (heavy-premise
+        # 계약 §2 의 scope 확장 규칙과 동일 — 프로브는 CI 스윕 전용)
+        from regression.scenarios.loader import load_lifecycles
+        ids = sorted(l["id"] for l in load_lifecycles()
+                     if l.get("enabled") and l.get("role", "verify") == "verify")
+    m = _model()["lifecycles"]
+    ids = [lid for lid in ids if not (m.get(lid) or {}).get("heavy")]
+    if not ids:
+        return False, f"suite {suite_id!r} 선택 해석 결과 실행할 lifecycle 이 없음"
+    act = _active_live_run()
+    if act:
+        return False, (f"이미 진행/대기 중인 LIVE 실행 (run {act['id']}) — "
+                       "이번 발화는 건너뜀 (다음 주기 재시도)")
+    rec = _new_rec("lifecycle", mode="live", lifecycle_ids=ids, heavy=False,
+                   mutations=bool(view["gates"].get("mutations", True)),
+                   destructive=bool(view["gates"].get("destructive", True)))
+    rec["suite"], rec["trigger"] = suite_id, trigger      # DB 미러가 그대로 씀
+    rec["peak_vpcs"], rec["queued"] = _run_peak_vpcs(ids), False
+    _admit_or_queue(rec, _run_worker)
+    return True, (f"이 서버 LIVE 런 발사 — run {rec['id']} "
+                  f"({len(ids)} lifecycles, suite {suite_id})")
 
 
 def _admit_or_queue(rec: dict, worker) -> dict:

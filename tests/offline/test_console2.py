@@ -985,3 +985,52 @@ def test_queued_run_admitted_by_ticker_when_capacity_frees(monkeypatch):
     assert rec["status"] == "running"
     assert started == ["r1"]
     assert not mod._QUEUE
+
+# --------------------------------------------------------------------------- #
+# 스케줄 → 이 서버 LIVE 런 (D5 후속 결정, 오너 승인 2026-07-11)
+# --------------------------------------------------------------------------- #
+def test_launch_suite_run_contract(monkeypatch):
+    """launch_suite_run — 스케줄 발화의 로컬 실행 계약.
+
+    1. heavy(과금) suite 는 거부 — 무인 실행은 pre-flight opt-in 이 아니다.
+    2. scope 없는 suite(full) = 전체 enabled·role=verify, heavy lifecycle 제외.
+    3. rec 는 mode=live·heavy=False·suite/trigger 를 싣고 admission 으로 간다
+       (실제 pytest 발사는 테스트에서 가로챈다).
+    4. 진행 중 LIVE 가 있으면 건너뛴다 (다음 주기 재시도)."""
+    captured = {}
+
+    def fake_admit(rec, worker):
+        captured["rec"] = rec
+        return rec
+
+    monkeypatch.setattr(C2, "_admit_or_queue", fake_admit)
+    monkeypatch.setattr(C2, "_active_live_run", lambda exclude=None: None)
+    # 1) heavy suite 거부
+    ok, msg = C2.launch_suite_run("full-heavy")
+    assert not ok and "heavy" in msg and "captured" not in captured
+    # 2·3) full → 전체 light 해석 + 게이트
+    ok, msg = C2.launch_suite_run("full", trigger="schedule:test")
+    assert ok, msg
+    rec = captured["rec"]
+    try:
+        assert rec["mode"] == "live" and rec["heavy"] is False
+        assert rec["mutations"] is True and rec["destructive"] is True
+        assert rec["suite"] == "full" and rec["trigger"] == "schedule:test"
+        ids = rec["lifecycle_ids"]
+        assert len(ids) > 50, f"전체 해석이 너무 작음: {len(ids)}"
+        m = C2._model()["lifecycles"]
+        assert all(not (m.get(lid) or {}).get("heavy") for lid in ids), \
+            "heavy lifecycle 이 무인 실행 선택에 포함됨"
+        assert rec["id"] in C2._RUNS
+    finally:
+        with C2._LOCK:
+            C2._RUNS.pop(rec["id"], None)
+        Path(rec["events"]).unlink(missing_ok=True)
+    # 4) LIVE 진행 중이면 건너뜀
+    monkeypatch.setattr(C2, "_active_live_run",
+                        lambda exclude=None: {"id": "busy-1"})
+    ok, msg = C2.launch_suite_run("full")
+    assert not ok and "건너뜀" in msg
+    # 존재하지 않는 suite
+    ok, msg = C2.launch_suite_run("no-such-suite")
+    assert not ok and "없음" in msg

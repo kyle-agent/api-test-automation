@@ -715,6 +715,60 @@ def test_coverage_map_removed_and_runs_timeline_merged():
     assert page.count("badge badge-") >= 2     # 행별 출처 배지
 
 
+def test_scheduler_fires_local_suite_run_and_heavy_schedule_blocked():
+    """스케줄 → 이 서버 LIVE 런 배선 (D5 후속 결정, 오너 승인 2026-07-11).
+
+    1. tick(): due 스케줄이 GHA 디스패치가 아니라 launch_suite_run(로컬 LIVE)을
+       부른다 — trigger 에 schedule:id 를 싣는다. 성공 시 run 행은 엔진 DB
+       미러 몫이라 여기서 이중 기록하지 않는다.
+    2. 발화 실패(heavy 거부·LIVE 중복 등)는 failed 런 행으로 기록 — 화면에서
+       보인다.
+    3. POST /schedules 는 heavy(과금) suite 등록을 400 으로 차단 (Hard Rule 1
+       — heavy 는 pre-flight 수동 opt-in)."""
+    from controlplane import scheduler
+    from tools import console2_server as c2
+
+    calls = []
+    real = c2.launch_suite_run
+    c2.launch_suite_run = (lambda suite, trigger="":
+                           (calls.append((suite, trigger)), (True, "launched"))[1])
+    sid = db.add_schedule("* * * * *", "full", note="wire-test")
+    try:
+        with db.connect() as con:
+            con.execute("UPDATE schedules SET last_fired='2026-01-01T00:00:00Z'"
+                        " WHERE id=?", (sid,))
+        fired = scheduler.tick()
+        assert sid in fired and calls, (fired, calls)
+        assert calls[0] == ("full", f"schedule:{sid}")
+        # 성공 발화는 여기서 run 행을 만들지 않는다 (엔진 미러 몫)
+        assert not [r for r in db.list_runs(20)
+                    if (r["trigger"] or "") == f"schedule:{sid}"]
+        # 실패 발화 → failed 런 행 (사유 포함)
+        c2.launch_suite_run = lambda suite, trigger="": (False, "heavy 거부(테스트)")
+        with db.connect() as con:
+            con.execute("UPDATE schedules SET last_fired='2026-01-01T00:00:00Z'"
+                        " WHERE id=?", (sid,))
+        scheduler.tick()
+        rows = [dict(r) for r in db.list_runs(20)
+                if (r["trigger"] or "") == f"schedule:{sid}"]
+        assert rows and rows[0]["status"] == "failed", rows
+        assert "heavy" in (rows[0]["detail"] or "")
+    finally:
+        c2.launch_suite_run = real
+        db.delete_schedule(sid)
+    # 3) heavy suite 등록 차단 + 정상 suite 는 통과
+    r = client.post("/schedules", data={"cron": "0 2 * * *", "suite": "full-heavy"})
+    assert r.status_code == 400
+    r2 = client.post("/schedules", data={"cron": "0 2 * * *", "suite": "full"})
+    assert r2.status_code == 200
+    for srow in db.list_schedules():
+        if srow["suite"] == "full" and srow["cron"] == "0 2 * * *":
+            db.delete_schedule(srow["id"])
+    # 화면 문구 — 실행 경로 정직화
+    page = client.get("/testing").text
+    assert "이" in page and "서버(콘솔 엔진)에서 LIVE 실행" in page
+
+
 # --- runner -----------------------------------------------------------------------
 
 TESTS = [
@@ -744,6 +798,7 @@ TESTS = [
     test_modeling_improvements_batch,
     test_triage_new_fail_detail_and_known_list,
     test_coverage_map_removed_and_runs_timeline_merged,
+    test_scheduler_fires_local_suite_run_and_heavy_schedule_blocked,
 ]
 
 

@@ -160,6 +160,25 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
 - 검증: `test_large_run_render_diet_frontend_contract` (36/36) + Playwright
   실측 (필터 20ms · 전체 표시 1,334행 32ms · 라이브 롱태스크 0).
 
+## 스케줄 = 이 서버 LIVE 런 (D5 미결 해소 — 오너 승인 2026-07-11 "진행해")
+
+- **결정**: v2 D5가 미결로 남긴 "스케줄 방식"을 확정 — GHA workflow_dispatch
+  (오너: "실제로 사용 안 함") 대신 **controlplane 자체 스케줄러가 콘솔 엔진
+  로컬 LIVE 런을 발사**. 신설 `tools.console2_server.launch_suite_run()`:
+  suite 해석(request 게이트 + scope, scope 없으면 전체 enabled·role=verify),
+  admission 큐·동시 LIVE 가드·run 기록/미러 전부 기존 로컬 런 경로 재사용.
+- **안전 규칙**: heavy(과금) suite 는 등록(400)과 발화 양쪽에서 거부 —
+  무인 실행은 pre-flight opt-in 이 아니다 (Hard Rule 1). heavy lifecycle 은
+  선택 해석에서도 항상 제외. LIVE 진행 중이면 그 발화는 건너뜀(다음 주기).
+  발화 실패는 failed 런 행으로 기록(사유 포함) — 조용히 사라지지 않음.
+- **한계 (UI 문구로 명시)**: 서버 프로세스가 켜져 있어야 동작 · profile 은
+  로컬 실행에서 무시(서버 .env 기준) · 발행 파이프라인(CI)은 별개 —
+  스케줄 런 결과의 공식 반영은 기존 fold/CI 경로 그대로.
+- 사용법: `/testing` 하단 스케줄 섹션 — 예: cron `0 20 * * *`(UTC = KST 05:00)
+  + suite `full` = 매일 새벽 전체(비과금) 회귀.
+- 검증: `test_launch_suite_run_contract`(37/37) +
+  `test_scheduler_fires_local_suite_run_and_heavy_schedule_blocked`(27/27).
+
 ## 결정 지점 (오너가 뒤집을 수 있게 기록)
 
 1. **노후 기준 48h 유지** — v2 계약은 24h, v1은 기존 P2C-12 결정(공용

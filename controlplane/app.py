@@ -575,6 +575,15 @@ def add_schedule(cron: str = Form(...), suite: str = Form(...),
     from croniter import croniter
     if not croniter.is_valid(cron):
         raise HTTPException(400, f"invalid cron expression: {cron!r}")
+    # 스케줄 = 이 서버 LIVE 무인 실행 (D5 후속, 2026-07-11) — heavy(과금) suite 는
+    # 등록 단계에서 차단 (Hard Rule 1: heavy 는 pre-flight 수동 opt-in).
+    # 발화 시점에도 launch_suite_run 이 이중으로 거부한다 (yaml 이 바뀌어도 안전).
+    from core import suites as core_suites
+    s = next((x for x in core_suites.list_suites() if x.get("id") == suite), None)
+    if s and (s.get("request") or {}).get("heavy"):
+        raise HTTPException(400, (
+            f"suite {suite!r} 는 heavy(과금) — 스케줄 무인 실행이 금지됩니다. "
+            "heavy 는 Testing 콘솔의 pre-flight 에서 수동으로 실행하세요."))
     db.add_schedule(cron, suite, profile, note)
     return RedirectResponse("/testing", status_code=303)
 
