@@ -88,10 +88,17 @@ def reap_run_leftovers(events_path: str | Path, log=print) -> int:
     for it in leftovers:
         by_col.setdefault(_collection(it["path"] or ""), []).append(it)
     issued = 0
-    for col in _ORDER + sorted(set(by_col) - set(_ORDER)):
-        # 같은 컬렉션 안에서는 더 깊은 경로(자식)를 먼저 — run-892a 실증:
-        # direct-connects 버킷에서 DC 본체가 자식 routing-rule보다 먼저
-        # 시도돼 409로 남았고, 그 DC가 공유 VPC를 스윕 내내 409로 잡았다.
+    order = _ORDER + sorted(set(by_col) - set(_ORDER))
+    for col_i, col in enumerate(order):
+        # 버킷 배리어 수집: 이 버킷에서 2xx로 발행된 delete들의 (client,
+        # service, bare-path). 종전에는 아이템마다 r._wait_gone(기본 150s
+        # 블로킹)을 직렬로 돌아 잔존 N개에 최대 N×150s가 들었다 — 같은
+        # 버킷의 delete는 전부 발행한 뒤 공유 배리어 1회로 대기한다
+        # (reconciler._wait_all_gone 재사용; 서버측에서 동시에 드레인되므로
+        # wall-time ≈ 가장 느린 아이템 1개). 자식→부모 의존 순서는 그대로:
+        # 배리어는 종전 per-item wait와 동일하게 "이 버킷 발행 후, 다음
+        # 버킷(부모) 시작 전"에 선다.
+        pending_waits: list[tuple] = []   # (cli, svc, bare)
         for it in sorted(by_col.get(col, []),
                          key=lambda x: (x.get("path") or "").count("/"),
                          reverse=True):
@@ -136,6 +143,17 @@ def reap_run_leftovers(events_path: str | Path, log=print) -> int:
             log(f"  reap [{it['lifecycle']}] {path} -> {st}")
             if 200 <= (st or 0) < 300:
                 issued += 1
-                r._wait_gone(cli, svc, bare)
+                pending_waits.append((cli, svc, bare))
+        # 버킷 배리어: 다음 버킷들에 아이템이 남아 있을 때만 — 그들(부모)의
+        # delete가 이 버킷(자식)의 소멸에 의존할 수 있어서다. leaf 꼬리(뒤에
+        # 처리할 버킷이 없음)는 기다릴 부모가 없으므로 배리어를 스킵한다.
+        if pending_waits and any(by_col.get(c) for c in order[col_i + 1:]):
+            groups: dict[int, list] = {}
+            clis: dict[int, object] = {}
+            for cli, svc, bare in pending_waits:
+                clis[id(cli)] = cli
+                groups.setdefault(id(cli), []).append((svc, bare))
+            for key, pairs in groups.items():
+                r._wait_all_gone(clis[key], pairs)
     log(f"  run-scoped reap: {issued}건 삭제 발행 ({len(leftovers)}건 후보)")
     return issued

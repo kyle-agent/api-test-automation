@@ -64,6 +64,7 @@ def test_reap_orders_children_before_vpc_and_uses_409_hint(tmp_path, monkeypatch
     })
     monkeypatch.setattr(rs.core, "ApiClient", lambda *a, **k: cli)
     monkeypatch.setattr(rs.r, "_wait_gone", lambda *a, **k: True)
+    monkeypatch.setattr(rs.r, "_wait_all_gone", lambda *a, **k: True)
     monkeypatch.setattr(rs.time, "sleep", lambda s: None)
     issued = rs.reap_run_leftovers(p, log=lambda m: None)
     deletes = [c for c in cli.calls if c[0] == "DELETE"]
@@ -86,6 +87,7 @@ def test_reap_runs_fs_replication_procedure_for_volumes(tmp_path, monkeypatch):
     monkeypatch.setattr(rs.r, "_reap_filestorage_snapshots",
                         lambda c, vid: called.append(("snap", vid)))
     monkeypatch.setattr(rs.r, "_wait_gone", lambda *a, **k: True)
+    monkeypatch.setattr(rs.r, "_wait_all_gone", lambda *a, **k: True)
     monkeypatch.setattr(rs.time, "sleep", lambda s: None)
     rs.reap_run_leftovers(p, log=lambda m: None)
     assert ("rep", "6ed3a8be") in called and ("snap", "6ed3a8be") in called
@@ -107,6 +109,7 @@ def test_reap_forces_gates_on_even_when_host_env_is_gated_off(tmp_path, monkeypa
     monkeypatch.setattr(rs.core, "ApiClient",
                         lambda cfg, *a, **k: cfgs.append(cfg) or cli)
     monkeypatch.setattr(rs.r, "_wait_gone", lambda *a, **k: True)
+    monkeypatch.setattr(rs.r, "_wait_all_gone", lambda *a, **k: True)
     monkeypatch.setattr(rs.time, "sleep", lambda s: None)
     issued = rs.reap_run_leftovers(p, log=lambda m: None)
     assert issued == 1

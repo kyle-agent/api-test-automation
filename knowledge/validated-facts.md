@@ -2963,3 +2963,22 @@ lb-members는 그 wait가 미해석 id로 실패.
 스펙변경 패널 자동 표시 ④ 런 후 `spec.change_report`가 변경/기존 버킷 분리
 판정. 2026-07-14 기준 드리프트 0 (6/5 커밋본 == 라이브, 1372/1372) — 저녁 변경
 diff의 old는 커밋된 카탈로그 그대로 사용.
+
+## 자원정리 wall-time 최적화 (2026-07-14, 오너 "별도 agent로 자원정리 시간 단축")
+
+테스트 ~50분 + 정리 15~80분이던 프로파일의 4개 병목 수리 (별도 에이전트 구현,
+의미 보존 검증 후 통합):
+1. **engine 공유 teardown 병렬화**: 직렬 사다리(서브넷→TGW→IGW→VPC×3, 최악 ~15분)
+   → 독립 체인 4개([main: 서브넷→IGW→VPC]·[tgw]·[net-a]·[net-b]) 병렬. wall ≈ 최장
+   체인 1개. 체인 내부 자식→부모 순서·409 간격 유지.
+2. **run_scoped reap 버킷 배리어**: per-item `_wait_gone`(≤150s) 직렬 → 버킷당
+   `_wait_all_gone` 1회 + leaf 꼬리 배리어 스킵. 잔존 N개: N×150s → 버킷수×150s 이하.
+3. **_leftover_report pick-기반**: full dry-scan(scan_owned, 수 분) → 마지막 라운드
+   `_select` 픽(_LAST_PICKED, _STATE_LOCK 하 기록) 요약(LIST 0회). 리포트 경로는
+   전부 genuine=0 라운드 뒤라 픽=생존자. 픽 비면 scan_owned 폴백.
+4. **grant-inprog backoff**: 고정 30s → 30→60→120s(SCP_SWEEP_INPROGRESS_SLEEP_MAX_S,
+   genuine 진행 시 리셋) — drain 대기 중 재나열 라운드 수 절감.
+- 소유권 게이트·2026-07-03 TGW grant·leaf-drain 종료 정책·자식→부모 순서 전부
+  불변 (tests/offline/test_cleanup_walltime.py 12종이 잠금; 전체 오프라인 620 pass).
+- 미구현 제안(콘솔 영역): run-end 스윕 수행 시 +0 재스캔 스킵 또는 reconciler가
+  사이드카(last_sweep_leftovers.json)를 쓰고 +0이 신선하면 소비.

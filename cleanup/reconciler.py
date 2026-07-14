@@ -210,6 +210,19 @@ def _list_all(client, service, path):
 # SCP_SWEEP_NO_CONVERGE=true to force a full re-list every round.
 _CONVERGED: set = set()
 
+# 마지막 관측 스냅샷 (pick-기반 leftover report, 2026-07-14 wall-time 최적화).
+# ``_select``가 패스마다 자신이 고른 deletable 아이템의 (id, name)을
+# (service, path)별로 덮어쓴다. ``_leftover_report``는 스윕 종료 시 이 관측을
+# 요약해 full dry-scan(``verify_clean.scan_owned`` — 전 컬렉션 ~30개 재나열,
+# 수 분)을 대체한다: 리포트는 genuine=0으로 끝난 마지막 라운드의 픽이므로
+# "방금 스윕이 지우지 못하고 남긴 것" 그 자체다. converged로 스킵된 패스는
+# 마지막으로 실제 나열했던 관측을 유지한다 (그 사이 변할 수 있는 건
+# pending-deletion 아이템의 자연 소멸뿐 — 리포트는 advisory). 소유권 판정은
+# 건드리지 않는다: 여기 담기는 것은 이미 _is_deletable 게이트를 통과한
+# 아이템의 기록뿐이다. 픽 정보가 비어 있으면 _leftover_report가 기존
+# scan_owned로 폴백한다.
+_LAST_PICKED: dict = {}   # (service, path) -> [(item_id, name), ...]
+
 
 def _converge_enabled() -> bool:
     return os.environ.get("SCP_SWEEP_NO_CONVERGE", "").lower() != "true"
@@ -225,6 +238,7 @@ def _reset_campaign_state() -> None:
     _DELETE_ISSUED.clear()
     _STUCK.clear()
     _REGION_CLIENTS.clear()
+    _LAST_PICKED.clear()
     _PROGRESS_THIS_ROUND[0] = 0
     _INPROGRESS_THIS_ROUND[0] = 0
 
@@ -302,6 +316,16 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
                 continue
             still.append(it)
         picked = still
+    # 마지막 관측 기록 (pick-기반 leftover report): 이 패스가 이번에 고른
+    # deletable 아이템을 (service, path)별로 덮어쓴다 — 소유권 게이트
+    # (_is_deletable) 통과 후의 기록일 뿐, 선택/삭제 로직에는 영향 없음.
+    # converged 스킵으로 이 함수가 일찍 반환한 패스는 갱신되지 않아 마지막
+    # 실제 관측이 유지된다. 스레드 규약: _TAIL_PASSES/dbaas 병렬 패스는
+    # 서로 다른 (service, path) 키만 만지지만(_STATE_LOCK 모듈 주석의
+    # keyspace invariant), dict 갱신은 규약대로 락을 잡는다.
+    with _STATE_LOCK:
+        _LAST_PICKED[(service, path)] = [
+            (_item_id(it), _name_of(it)) for it in picked]
     if listed:
         print(f"  {path}: {len(listed)} listed / {len(picked)} deletable")
         if skipped:
@@ -2217,16 +2241,40 @@ def _owned_vpcs_present(client) -> int:
 def _leftover_report(client) -> None:
     """The "이슈로 남은 자원 리포트" (owner 2026-07-14): when the sweep STOPS with
     resources still present — an async-deleting leaf mid-drain, or a genuinely
-    stuck item — enumerate them READ-ONLY (LIST only, no delete) so console2 or
-    a human sees exactly what is left instead of the sweep ending silently. The
-    next run's end-sweep (or a manual FORCE cleanup) converges them.
+    stuck item — report exactly what is left instead of the sweep ending
+    silently. The next run's end-sweep (or a manual FORCE cleanup) converges
+    them.
 
-    Reuses the deleteless dry-scan console2 already consumes
-    (``verify_clean.scan_owned``); it snapshots+restores the reconciler's
-    campaign state, so it leaves no footprint. Best-effort: a scan failure never
+    Wall-time 최적화 (2026-07-14): 종전에는 여기서 ``verify_clean.scan_owned``
+    full dry-scan(전 컬렉션 ~30개 재나열, 수 분)을 다시 돌았다. 스윕이 방금
+    돈 라운드의 ``_select`` 픽(``_LAST_PICKED``)이 곧 생존자다 — 리포트가
+    호출되는 모든 경로는 genuine=0으로 끝난 라운드 뒤이므로, 그 라운드에
+    픽되고도 genuinely-gone(2xx/404) 하지 못한 아이템들이다. 그 관측을
+    새 LIST 0회로 요약한다. 픽 정보가 비어 있으면(예: 외부에서 캠페인 상태가
+    초기화됐거나, 생존자가 _select를 안 타는 bespoke 패스에만 있는 경우)
+    기존 read-only dry-scan으로 폴백한다. Best-effort: a scan failure never
     fails the sweep or the run."""
+    from collections import Counter
+    with _STATE_LOCK:
+        observed = {k: list(v) for k, v in _LAST_PICKED.items() if v}
+    if observed:
+        survivors = [{"service": svc, "path": path, "id": iid, "name": name}
+                     for (svc, path), items in sorted(observed.items())
+                     for iid, name in items]
+        by_svc = Counter(o["service"] for o in survivors)
+        print(f"--- leftover report: {len(survivors)} owned resource(s) STILL "
+              f"present — draining/stuck, REPORTED not waited on "
+              f"(next end-sweep converges them; source: this sweep's own "
+              f"last-round observations, 0 extra LIST) ---")
+        for svc, n in by_svc.most_common():
+            paths = Counter(o["path"] for o in survivors if o["service"] == svc)
+            print(f"  {svc:18} {n:3}  ({dict(paths)})")
+        for o in survivors[:40]:
+            print(f"    {o['service']} {o['path']}: {o['name'] or o['id']}")
+        return
+    # 폴백: 픽 정보 없음 — 기존 deleteless dry-scan (verify_clean.scan_owned;
+    # snapshots+restores the reconciler's campaign state, no footprint).
     try:
-        from collections import Counter
         from cleanup.verify_clean import scan_owned
         survivors = scan_owned(client=client)
     except Exception as exc:  # noqa: BLE001 — report is advisory, never fatal
@@ -2269,6 +2317,7 @@ def main() -> int:
     rounds = int(os.environ.get("SCP_SWEEP_ROUNDS", "8" if nowait else "5"))
     round_sleep = int(os.environ.get("SCP_SWEEP_ROUND_SLEEP_S", "12"))
     report_leftovers = False
+    inprog_grants = 0   # consecutive grant-inprog rounds (drives the backoff)
     for rnd in range(1, rounds + 1):
         print(f"--- sweep round {rnd} ---", flush=True)
         _PROGRESS_THIS_ROUND[0] = 0          # reset genuine-teardown counter
@@ -2293,6 +2342,8 @@ def main() -> int:
         # 409-blocked dependents need the next round; grant it (still bounded
         # by the SCP_SWEEP_ROUNDS cap).
         verdict = _round_verdict(genuine, reported, inprog)
+        if verdict == "continue":
+            inprog_grants = 0   # real progress — reset the in-progress backoff
         if verdict == "stop":
             if reported:
                 print(f"no genuinely-removed resource this round "
@@ -2321,7 +2372,18 @@ def main() -> int:
                       f"re-run the sweep once they settle.")
                 report_leftovers = True
                 break
-            pause = int(os.environ.get("SCP_SWEEP_INPROGRESS_SLEEP_S", "30"))
+            # 라운드 간 backoff (2026-07-14 wall-time 튜닝): async-deleting
+            # 아이템의 실제 소멸은 보통 수십초~분 단위라 고정 30s는 너무 짧아
+            # "아직 DELETING" 라운드(전 컬렉션 재나열 아님이라도 LIST 비용)만
+            # 늘렸다. 연속 grant-inprog마다 30→60→120s로 늘리고 상한은
+            # SCP_SWEEP_INPROGRESS_SLEEP_MAX_S(기본 120)로 캡. genuine 진행이
+            # 있는 라운드가 나오면 리셋. 의미 보존: 라운드를 부여하는 조건
+            # (grant-inprog — 소유 VPC 잔존 시 계속 부여, 2026-07-03 TGW
+            # 인시던트 보호)은 그대로고, 라운드 사이 대기 길이만 바뀐다.
+            base = int(os.environ.get("SCP_SWEEP_INPROGRESS_SLEEP_S", "30"))
+            cap = int(os.environ.get("SCP_SWEEP_INPROGRESS_SLEEP_MAX_S", "120"))
+            pause = min(base * (2 ** inprog_grants), max(base, cap))
+            inprog_grants += 1
             print(f"{inprog} owned resource(s) mid-async-deletion (or deferred "
                   f"behind one) — granting another round after {pause}s")
             time.sleep(pause)

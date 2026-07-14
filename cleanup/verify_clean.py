@@ -30,16 +30,17 @@ def _snapshot_campaign_state() -> tuple:
     stuck/issued sets, round counters) so a scan can run on a CLEAN slate and
     put everything back afterwards."""
     return (set(r._CONVERGED), set(r._DELETED_THIS_SWEEP),
-            set(r._DELETE_ISSUED), dict(r._STUCK),
+            set(r._DELETE_ISSUED), dict(r._STUCK), dict(r._LAST_PICKED),
             r._PROGRESS_THIS_ROUND[0], r._INPROGRESS_THIS_ROUND[0])
 
 
 def _restore_campaign_state(snap: tuple) -> None:
-    conv, deleted, issued, stuck, prog, inprog = snap
+    conv, deleted, issued, stuck, picked, prog, inprog = snap
     r._CONVERGED.clear();          r._CONVERGED.update(conv)            # noqa: E702
     r._DELETED_THIS_SWEEP.clear(); r._DELETED_THIS_SWEEP.update(deleted)  # noqa: E702
     r._DELETE_ISSUED.clear();      r._DELETE_ISSUED.update(issued)      # noqa: E702
     r._STUCK.clear();              r._STUCK.update(stuck)               # noqa: E702
+    r._LAST_PICKED.clear();        r._LAST_PICKED.update(picked)        # noqa: E702
     r._PROGRESS_THIS_ROUND[0] = prog
     r._INPROGRESS_THIS_ROUND[0] = inprog
 
