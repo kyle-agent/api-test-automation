@@ -24,11 +24,17 @@ Usage::
                                                      #   4xx->2xx (improved) or 2xx->4xx
                                                      #   (regressed)
 
-By default a 4xx step whose catalog key is in data/baselines/coverage_waivers.json
-is SUPPRESSED from the actionable list (shown only as a count) — otherwise the ~60
-waived billing-prohibitive/reachability keys (baremetal-blockstorage, archivestorage,
-…) drown the handful of real, fixable defects. Read-only over the bucket; never
-calls the live API or touches safety gates.
+Two classes of non-2xx are SUPPRESSED from the actionable list (shown only as
+counts) so the handful of real, fixable defects aren't drowned:
+  * DECLARED-EXPECTED — the step's own scenario declares this status acceptable
+    (``expect_status`` / ``poll.until_status``). A ``wait-*-gone`` GET declares
+    ``until_status:[404]`` (404 == confirmed-gone == the step PASSED), and a
+    coverage-only write declares a broad ``expect_status`` to record the endpoint
+    was reached without hard-failing. These are intended terminals, not defects.
+  * WAIVED — the catalog key is in data/baselines/coverage_waivers.json (the ~60
+    billing-prohibitive/reachability keys: baremetal-blockstorage, archivestorage,
+    CDN, …).
+Read-only over the bucket; never calls the live API or touches safety gates.
 """
 from __future__ import annotations
 
@@ -63,6 +69,45 @@ def _waived_keys() -> set:
 
 def _step_catalog_key(e: dict):
     return _catalog_key_for(e.get("method"), e.get("path") or "", e.get("service"))
+
+
+def _as_list(v):
+    if v is None:
+        return []
+    return list(v) if isinstance(v, (list, tuple, set)) else [v]
+
+
+def _declared_expectations() -> dict:
+    """(lifecycle_id, step_name) -> set of declared-acceptable statuses.
+
+    A step's non-2xx that matches its OWN ``expect_status`` or ``poll.until_status``
+    is an INTENDED terminal, not a defect: a ``wait-*-gone`` GET declares
+    ``until_status:[404]`` (404 == "resource confirmed gone" == success), and a
+    coverage-only write declares a broad ``expect_status`` (e.g. [200,400,403,404])
+    to record the endpoint was reached without hard-failing. Triage suppresses
+    those so only UNDECLARED 4xx/5xx (the real, unexplained defects) surface.
+    Built by reading the lifecycle JSONs the run executed — works on every
+    existing run with no engine change / re-run."""
+    scen = Path(__file__).resolve().parents[1] / "regression" / "scenarios"
+    # BOTH sources of runtime lifecycles: the per-service files under lifecycles/
+    # AND the declarative CRUD lifecycles in scenarios.json (e.g.
+    # database-mysql-cluster, compute-virtualserver-full) — their runtime id is
+    # the group `id`, so index both or their gone-waits leak through as false 4xx.
+    files = list((scen / "lifecycles").glob("*.json")) + [scen / "scenarios.json"]
+    idx: dict = {}
+    for f in files:
+        try:
+            d = json.load(open(f))
+        except Exception:
+            continue
+        for g in (d.get("lifecycles") or d.get("groups") or []):
+            gid = g.get("id") or g.get("name")
+            for s in g.get("steps", []):
+                exp = set(_as_list(s.get("expect_status")))
+                exp |= set(_as_list((s.get("poll") or {}).get("until_status")))
+                if exp:
+                    idx[(gid, s.get("name"))] = exp
+    return idx
 
 
 def _client():
@@ -117,16 +162,32 @@ def _failures(evts):
             if isinstance(e.get("status"), int) and e["status"] >= 400]
 
 
+def _is_declared(e, declared) -> bool:
+    """True if this step-end's non-2xx was DECLARED acceptable by its scenario
+    (expect_status / poll.until_status) — an intended terminal, not a defect."""
+    return e.get("status") in declared.get((e.get("lifecycle"), e.get("step")), ())
+
+
 def triage(evts, show_waived=False) -> None:
     le = [e for e in evts if e.get("kind") == "lifecycle-end"]
     passed = [e for e in le if e.get("status") == "passed"]
     failed = [e for e in le if e.get("status") != "passed"]
     fails = _failures(evts)
     waived = _waived_keys()
-    waived_fails = [e for e in fails if _step_catalog_key(e) in waived]
-    actionable = fails if show_waived else [e for e in fails if e not in waived_fails]
+    declared = _declared_expectations()
+    # An intended terminal (e.g. wait-*-gone until_status:[404]) is a PASS, not a
+    # 4xx to triage — hide it the same way waived keys are hidden.
+    declared_fails = [e for e in fails if _is_declared(e, declared)]
+    waived_fails = [e for e in fails
+                    if e not in declared_fails and _step_catalog_key(e) in waived]
+    if show_waived:
+        actionable = fails
+    else:
+        actionable = [e for e in fails
+                      if e not in declared_fails and e not in waived_fails]
     print(f"lifecycles: {len(le)}  ({len(passed)} passed / {len(failed)} not-passed)")
-    print(f"step 4xx/5xx: {len(fails)} total · {len(waived_fails)} waived (hidden) · "
+    print(f"step 4xx/5xx: {len(fails)} total · {len(declared_fails)} declared-expected (hidden) · "
+          f"{len(waived_fails)} waived (hidden) · "
           f"{len(actionable)} actionable across {len({e['lifecycle'] for e in actionable})} lifecycles\n")
 
     if failed:
