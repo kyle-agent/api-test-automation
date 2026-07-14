@@ -160,6 +160,17 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   예상 타임라인엔 "행=워커 레인 · 실행 화면은 같은 sim 을 시나리오축으로", 예측 vs
   실제엔 "행=시나리오 · 워커축은 구성 ▸ 예상 타임라인". (라벨만, 로직 무변경.)
 
+## 대시보드 정비 (오너 지시 2026-07-14)
+
+- **서비스별 Platform 링크 제거** ("대시보드에 platform 링크들이 모든 서비스마다
+  있는데 없애줘"). `dashboard/build.py` 에서 서비스마다 붙던 `🧩 Platform →`
+  딥링크 2종을 제거: ⓐ 인덱스 서비스 카드의 `catLink()`(→`svc-cat-link`) ⓑ 서비스
+  상세 페이지 breadcrumb 의 `catlink`. 관련 CSS(`.svc-cat-link`·`.crumb .catlink`)도
+  삭제. **전역 헤더의 단일 `🧩 Platform 실행 콘솔 →` 링크는 유지**(서비스별 아님).
+  로컬 빌드 검증: index/service 페이지에서 링크 0건 · 전역 1건. **발행 반영은 다음
+  대시보드 publish(api-test.yml CI) 부터** — 로컬 빌드는 결과 저장소가 없어 수치가
+  비므로 dashboard-data 에 직접 푸시하지 않는다(진짜 커버리지 덮어씀 방지).
+
 ## 모델링 화면 개선 ①~⑤ (오너 승인 2026-07-11 "모두 반영해")
 
 - **① 전역 의존 그래프 탭 제거 + 미니그래프 인스펙터** — P2C-25 결정 이행
