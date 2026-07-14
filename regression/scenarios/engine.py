@@ -781,7 +781,20 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     # 않았는데 뒤 스텝을 진행한다고? 수리해"). Mark it so the caller classifies
     # FAILED. refire polls (failed-delete retry — timeout is their success)
     # and an explicit poll.allow_timeout escape hatch are exempt.
-    if not refire and not poll.get("allow_timeout"):
+    # 제외 두 가지 (오너 2026-07-14):
+    # (a) 타임아웃 시점 마지막 응답이 429/5xx(rate-limit·일시 전송오류)면 상태를 '못
+    #     읽은' 것(unknown)이지 not-ready 확정이 아니다 — heavy-net wait-subnet 지속
+    #     429가 자원 멀쩡한데 실패로 잡힌 케이스. http_client가 429를 이미 재시도하므로
+    #     여기 도달 = 지속 429. 진짜 not-ready(2xx인데 CREATING)는 그대로 확정.
+    # (b) gone-poll(until_status에 404 = 자원 소멸 대기)은 teardown 정리라, 캡 안에
+    #     안 사라져도(예: mariadb ~90분 drain > 900s 캡) 실패로 볼 게 아니라 sweep/
+    #     cleanup 백스톱에 맡긴다. masked-defect(다운스트림이 준비 안 된 자원 위 진행)
+    #     는 create-side wait(field/until·non-404 until_status)에만 해당 — 그 351개는
+    #     게이트 유지.
+    _transient = resp.status == 429 or 500 <= resp.status < 600
+    _is_gone_poll = until_status is not None and 404 in until_status
+    if (not refire and not poll.get("allow_timeout")
+            and not _transient and not _is_gone_poll):
         _met = None
         if until_status is not None:
             _met = resp.status in until_status

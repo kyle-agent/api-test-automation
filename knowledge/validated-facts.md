@@ -2865,3 +2865,18 @@ create-transit-gateway(REQUIRED)에서 하드폴("2 API, 0 자원").
 - adopter는 delete가 adopt-skip돼 반납 지점에 안 옴 → reserved["vpc"]=0, 무영향.
 - offline: test_selfcreate_vpc_releases_budget_on_happy_delete(반납 후 used["vpc"]==0),
   test_vpc_semaphore_seeded_from_residents_leaves_only_residual_slots(상주 시드).
+
+## poll not-ready 게이트 — gone-poll·transient 제외 (2026-07-14, 오너 실측)
+
+masked-defect 게이트(poll 미수렴 → 스텝 실패)가 과잉 발동한 두 케이스:
+1. **gone-poll**(until_status에 404 = 자원 소멸 대기, 55개): teardown 정리라 캡 안에
+   안 사라져도(mariadb ~90분 drain > 900s 캡) 실패가 아니라 sweep/cleanup 백스톱.
+   → until_status에 404 있으면 게이트 제외. masked-defect(다운스트림이 준비 안 된
+   자원 위 진행)는 create-side wait(field/until·non-404 until_status, 351개)에만 유효.
+2. **transient 429/5xx**: 타임아웃 시점 마지막 응답이 429/5xx면 상태를 '못 읽은'
+   unknown이지 not-ready 확정이 아님 → 마킹 제외(heavy-net wait-subnet 지속 429가
+   자원 멀쩡한데 'never converged'로 오분류). http_client가 429 이미 재시도하므로
+   여기 도달 = 지속. (단 429는 expect_status 밖이면 스텝은 여전히 실패 — 사유만
+   정직하게. 근본 완화는 동시성/rate-limit 튜닝.)
+- offline: test_gone_poll_timeout_does_not_fail_step, test_transient_429_at_
+  timeout_not_classified_not_ready.

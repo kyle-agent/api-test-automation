@@ -60,6 +60,42 @@ def test_until_naming_the_state_is_a_deliberate_wait(monkeypatch):
     assert res["status"] == "passed", res
 
 
+def test_gone_poll_timeout_does_not_fail_step(monkeypatch):
+    """gone-poll(until_status 404 = 자원 소멸 대기)은 teardown 정리라, 캡 안에 안
+    사라져도(느린 삭제) not-ready로 실패시키지 않는다 — sweep/cleanup 백스톱
+    (오너 2026-07-14: mariadb ~90분 drain > 900s 캡, wait-cluster-gone 오해). masked-
+    defect 게이트는 create-side wait에만."""
+    monkeypatch.setattr(engine, "_commands", None)
+    monkeypatch.setattr(engine.time, "sleep", lambda s: None)
+    fake_now = [0.0]
+    monkeypatch.setattr(engine.time, "monotonic",
+                        lambda: fake_now.__setitem__(0, fake_now[0] + 5) or fake_now[0])
+    # 자원이 안 사라짐(200 계속) — gone-poll은 404를 기다리다 타임아웃
+    client = FakeClient({("GET", "/v1/servers/"): _r(200, {"status": "DELETING"})})
+    lc = _lc(name="wait-server-gone", expect_status=[200, 404],
+             poll={"until_status": [404], "timeout": 30, "interval": 1})
+    res = engine.run_lifecycle(lc, client, _cfg())
+    assert res["status"] == "passed", res       # 타임아웃해도 실패 아님(200 in expect)
+
+
+def test_transient_429_at_timeout_not_classified_not_ready(monkeypatch):
+    """폴 타임아웃 시점 마지막 응답이 429면 not-ready로 확정하지 않는다(상태를 못
+    읽은 unknown) — 종전엔 field 미충족으로 실패 사유가 'resource never converged'로
+    오분류(오너 2026-07-14 heavy-net wait-subnet 429)."""
+    monkeypatch.setattr(engine, "_commands", None)
+    monkeypatch.setattr(engine.time, "sleep", lambda s: None)
+    fake_now = [0.0]
+    monkeypatch.setattr(engine.time, "monotonic",
+                        lambda: fake_now.__setitem__(0, fake_now[0] + 5) or fake_now[0])
+    client = FakeClient({("GET", "/v1/servers/"): _r(429, {})})   # 지속 rate-limit
+    lc = _lc(expect_status=[200], poll={"field": "$.status", "until": ["ACTIVE"],
+                                        "timeout": 30, "interval": 1})
+    with pytest.raises(AssertionError) as ei:
+        engine.run_lifecycle(lc, client, _cfg())
+    # 실패는 하되(429는 expect[200] 밖) 사유가 not-ready(poll timed out)가 아님
+    assert "poll timed out" not in str(ei.value) and "never converged" not in str(ei.value)
+
+
 def test_terminal_bad_override_empty_disables_early_exit_but_still_fails(monkeypatch):
     """``terminal_bad: []`` disables the EARLY terminal-bad exit — the poll keeps
     waiting to timeout instead of ending on the first ERROR sighting. But the
