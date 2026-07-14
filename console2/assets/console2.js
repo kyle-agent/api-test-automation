@@ -3814,8 +3814,8 @@ function pvaEnsure() {
     d = document.createElement("details");
     d.id = "pva-panel"; d.className = "pva";
     d.innerHTML = `<summary>📊 예측 vs 실제 타임라인
-        <span class="muted small">— <b>행 = 시나리오</b> · 고스트=예측(schedule-sim) · 채움=실측 · amber=예측 초과
-        <span title="구성 ▸ 📊 예상 타임라인 은 같은 schedule-sim 을 워커축(워커 레인에 배치)으로 본다 — makespan 은 동일">(워커축은 구성 ▸ 예상 타임라인)</span></span></summary>
+        <span class="muted small">— <b>행 = 시나리오(예측 시작순 · 동시 시작은 긴 것부터)</b> · 고스트=예측(schedule-sim) · 채움=실측 · amber=예측 초과
+        <span title="행 순서 = 시뮬(워커 배치)과 같은 그림: 예측 시작 시각 오름차순, 같은 시작(t=0 첫 웨이브)은 duration 내림차순(LPT 배치순). 워커축 전체는 구성 ▸ 📊 예상 타임라인 — makespan 동일">(워커축은 구성 ▸ 예상 타임라인)</span></span></summary>
       <div id="pva-body"></div>`;
     master.appendChild(d);
     d.addEventListener("toggle", () => { if (d.open) renderPva(); });
@@ -3863,8 +3863,11 @@ function pvaHtml(sim) {
   const cleanup = liveProgress().cleanup;
   let lastLcEnd = 0;   // 마지막 lifecycle-end 상대 위치(초) — 클린업 밴드 시작점
   if (t0 != null) Object.values(act).forEach(a => { if (a.e != null) lastLcEnd = Math.max(lastLcEnd, a.e - t0); });
+  // 행 순서 = 시뮬(워커 배치)과 같은 그림 (오너 2026-07-14): 예측 시작 시각 오름차순,
+  // 같은 시작(주로 t=0 첫 웨이브)은 **긴 것부터**(duration 내림차순 = LPT 배치순 —
+  // 시뮬 w00 이 가장 긴 것). 그 다음 웨이브는 시작 시각순.
   const bars = ((sim && sim.bars) || []).slice()
-    .sort((a, b) => a.s - b.s || a.e - b.e || (a.id < b.id ? -1 : 1));
+    .sort((a, b) => a.s - b.s || (b.e - b.s) - (a.e - a.s) || (a.id < b.id ? -1 : 1));
   const known = new Set(bars.map(b => b.id));
   // 예측에 없는 실측 lifecycle(합성 등) 도 행으로 — 고스트 없이 실측만.
   Object.keys(act).sort().forEach(id => { if (!known.has(id)) bars.push({ id, s: null, e: null, vpc: false }); });
