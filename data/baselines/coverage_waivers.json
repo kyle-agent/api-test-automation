@@ -1897,6 +1897,244 @@
       "reason": "CDN teardown이 신뢰 불가 — 라이브 실측 delete가 STOPPING 전이 중 404(자원 미노출), stop async라 STOPPING 3분+ 고착(regrefjnmoon), 계정당 20개 cap 소모 누수. 오너 결정 2026-07-13: CDN 쓰기 커버리지 포기, networking-cdn-service 라이프사이클 disabled. listcdnservice(읽기)는 유지.",
       "provenance": "runtime",
       "added": "2026-07-13"
+    },
+    {
+      "key": "data-analytics/data-flow/createdataflow",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/createdataflowserviceconsole",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/dataflowservicevalidateresourcescreation",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/dataflowservicevalidateresourcesupdate",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/deletedataflow",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/deletedataflowserviceconsole",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/getdataflow",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/getdataflowcheckduplication",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/getdataflowimages",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/getdataflowlistconsole",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/getdataflowservicecheckduplication",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/getdataflowserviceconsole",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/getdataflowservicelistconsole",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/getdataflowservicesubversions",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/ingresscluster",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/updatedataflow",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-flow/updatedataflowserviceconsole",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/checkduplicationcontroller",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/checkduplicationcontrollerv1",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/createdataops",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/createdataopsservice",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/deletedataopsservice",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/deletedataopsv1",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getdataopsdetail",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getdataopsimageversionv1",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getdataopslistconsole",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getdataopsservice",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getdataopsservicelistconsole",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getdataopsservicevalidateresourcescreation",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getdataopsservicevalidateresourcesupdate",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getdataopssubversion",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/getingresscontrollerlistv1",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/updatedataopsservice",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
+    },
+    {
+      "key": "data-analytics/data-ops/updatedataopsv1",
+      "class": "entitlement",
+      "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
+      "provenance": "runtime",
+      "added": "2026-07-14"
     }
   ]
 }

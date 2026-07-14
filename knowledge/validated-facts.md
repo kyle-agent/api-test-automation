@@ -2905,3 +2905,14 @@ subnet 포트를 진작 반납한 **late 내부 drain leaf**(subnet/VPC 이미 �
 - offline: test_owned_vpcs_present_counts_owned_only, test_owned_vpc_probe_failure_
   assumes_present, test_main_leaf_drain_stops_and_reports_when_no_vpc,
   test_main_keeps_granting_while_a_vpc_is_present.
+
+## C3 커버리지가 81.7%에서 정체된 이유 + 레버 (2026-07-14)
+
+**C3는 누적(cumulative) 지표** — 런이 C3를 올리려면 "한 번도 verified 안 된 엔드포인트에 최초 2xx"가 필요. 같은 스위트 재실행은 이미-verified만 재확인하므로 C3 불변(run 20260714-142501-5387: 유니크 921 touch / 775 verified, 전부 기존 누적 집합 → 신규 0 → 81.7 고정).
+
+**남은 갭(~230)은 대부분 "이 계정에선 설계상 2xx 불가"**, 미테스트가 아님:
+- **entitlement**: data-flow(17)+data-ops(17)=34개가 `PRODUCT-AI-ANALYTICS-USER-0001`(계정 미권한) → class=entitlement waive. **denom에서 빠짐**(C3 81.69→83.96%).
+- **backup 삭제 비대칭**: DBaaS `setbackup`/create는 2xx인데 `unsetbackup`/`removebackuphistories`(DELETE `/backups`, PUT `/backup-histories`)만 **전 엔진 동일하게 401 `Dbaas.Unauthorized.AuthNFailed`**. AuthN(인증) 실패라 플랫폼-가드 vs 토큰누락 버그 사이 모호 → **추정 waive 금지, 오너 확인/조사 필요**.
+- **backend 500** `ContactAdminForAssistance`(set-parameters·log-export-configs·quick-query): SDS 백엔드 결함 → known_issues baseline.
+
+**C3 계산 규약**(dashboard/build.py): `c3_denom = total - excl_waived`. EXCLUDED 클래스(blast-radius|entitlement|unsatisfiable-flow|billing-prohibitive|owner-exclusion)만 denom에서 제외. reachability 클래스는 denom 유지 + 도달 시 numerator 가산. → 정당한 미권한/라이선스-게이트 엔드포인트를 올바른 class로 waive하는 것이 C3의 실질 레버(넘버레이터 2xx 수리와 함께).
