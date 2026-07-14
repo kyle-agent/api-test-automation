@@ -192,6 +192,50 @@ def print_diff(report: dict, *, verbose: bool = False) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Change-mark persistence — "변경분 표시"의 단일 출처 (owner 2026-07-14)
+# ---------------------------------------------------------------------------
+# A spec change lands, the diff is computed ONCE, and every consumer (dashboard
+# badge, post-run change report, humans) reads the SAME committed file instead
+# of each re-deriving the diff. Compact by design: the dashboard only needs
+# key -> added|changed marks; the report/humans get sigs + changed fields.
+
+MARK_PATH = Path(__file__).resolve().parent.parent / "data" / "spec_diff_latest.json"
+
+
+def mark_payload(report: dict, *, old_label: str, new_label: str) -> dict:
+    """Compact, consumer-facing shape of a ``diff_catalog`` report."""
+    import time
+    return {
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "old": old_label,
+        "new": new_label,
+        "summary": report["summary"],
+        # key -> mark, the dashboard's O(1) badge lookup
+        "marks": {
+            **{e["key"]: "added" for e in report["added"]},
+            **{c["key"]: "changed" for c in report["changed"]},
+        },
+        "added": [{"key": e["key"], "sig": e["sig"]} for e in report["added"]],
+        "removed": [{"key": e["key"], "sig": e["sig"]} for e in report["removed"]],
+        "changed": [{"key": c["key"], "sig_old": c["sig_old"],
+                     "sig_new": c["sig_new"], "fields": c["fields"]}
+                    for c in report["changed"]],
+    }
+
+
+def write_marks(report: dict, *, old_label: str, new_label: str,
+                path: str | Path = MARK_PATH) -> Path:
+    """Persist the compact diff to ``data/spec_diff_latest.json`` (committed)."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(mark_payload(report, old_label=old_label,
+                                         new_label=new_label),
+                            indent=2, ensure_ascii=False) + "\n",
+                 encoding="utf-8")
+    return p
+
+
+# ---------------------------------------------------------------------------
 # __main__
 # ---------------------------------------------------------------------------
 
@@ -212,6 +256,11 @@ def main(argv: list[str] | None = None) -> int:
         "-v", "--verbose", action="store_true",
         help="show per-field details for changed endpoints",
     )
+    ap.add_argument(
+        "--mark", nargs="?", const=str(MARK_PATH), default=None, metavar="PATH",
+        help="persist the compact diff to PATH (default data/spec_diff_latest.json)"
+             " — the dashboard badge + spec.change_report read this file",
+    )
     args = ap.parse_args(argv)
 
     try:
@@ -224,6 +273,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:
         print_diff(report, verbose=args.verbose)
+
+    if args.mark:
+        out = write_marks(report, old_label=str(args.old),
+                          new_label=str(args.new), path=args.mark)
+        print(f"\nmarks -> {out}")
 
     s = report["summary"]
     has_changes = s["added"] or s["removed"] or s["changed"]

@@ -706,6 +706,9 @@ def render_service_page(s, meta):
                 else "var(--green)")
 
     conf = (meta.get("conf") or {}).get("by_endpoint", {})
+    # 스펙 변경 마크 (key -> added|changed) — NEW/UPD 배지 (owner 2026-07-14)
+    chg_marks = (meta.get("spec_diff") or {}).get("marks") or {}
+    chg_when = (meta.get("spec_diff") or {}).get("generated_at") or ""
     rows, n_def_items, n_red, def_count = [], 0, 0, Counter()
     n_failed = 0
     for method, path, title, covered, st, el, verd, src, ev_run in s["rows"]:
@@ -725,7 +728,11 @@ def render_service_page(s, meta):
         n_failed += (verd == "failed")
         rows.append({"m": method, "p": path, "api": title or "", "c": c,
                      "s": st, "t": round(el / 1000, 1) if el is not None else None,
-                     "src": src, "d": items, "ev": ev_run or None})
+                     "src": src, "d": items, "ev": ev_run or None,
+                     # 스펙 변경 배지: added|changed (미변경은 키 자체를 생략해
+                     # ROWSJSON 크기를 안 늘림). chw = 배지 툴팁용 diff 시각.
+                     **({"chg": chg_marks[key], "chw": chg_when}
+                        if key in chg_marks else {})})
 
     # ---- untestable service: reachability-only framing ------------------
     if s.get("untestable"):
@@ -929,6 +936,10 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 .ms.slow{color:var(--red);font-weight:700}
 .probe{font-size:10.5px;color:var(--faint);margin-left:6px}
 .prev{font-size:10px;color:var(--faint);margin-left:5px}
+.chgbadge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;
+  padding:1px 6px;border-radius:9px;margin-left:6px;vertical-align:1px}
+.chgbadge.added{background:#dafbe1;color:#116329;border:1px solid #aceebb}
+.chgbadge.changed{background:#fff1c2;color:#7a5901;border:1px solid #f0d879}
 .ok{color:var(--green);font-size:12px}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 .foot{margin-top:22px;font-size:11.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:12px}
@@ -1073,7 +1084,9 @@ function rowHTML(r){
   return '<tr class="cov-'+r.c+'">'
     +'<td class="cbar"></td>'
     +'<td><span class="mb '+r.m+'">'+r.m+'</span></td>'
-    +'<td class="path"><code>'+esc(r.p)+'</code></td>'
+    +'<td class="path"><code>'+esc(r.p)+'</code>'
+    +(r.chg?'<span class="chgbadge '+r.chg+'" title="스펙 변경분 (diff @ '+esc(r.chw||'')+')">'+(r.chg==='added'?'NEW':'UPD')+'</span>':'')
+    +'</td>'
     +'<td class="api">'+esc(r.api)+'</td>'
     +'<td><span class="cov '+r.c+'">'+covSym+'</span></td>'
     +'<td>'+st+ms+probe+prev+'</td>'
@@ -1236,6 +1249,37 @@ def render(d, hist, meta, services):
         f'<div class="cp">{c["pct"]}% <span class="frac">{c["cov"]}/{c["tot"]}</span></div></div>'
         for c in cats)
 
+    # ---- spec change panel (owner 2026-07-14 "변경된 api는 update로 표시") ----
+    # data/spec_diff_latest.json 이 있으면 인덱스 상단에 변경 요약 패널을 붙인다.
+    # 상세(NEW/UPD 배지)는 서비스 페이지 행에서 확인.
+    sd = meta.get("spec_diff") or {}
+    sds = sd.get("summary") or {}
+    if sds and (sds.get("added") or sds.get("changed") or sds.get("removed")):
+        _sd_rows = "".join(
+            f'<tr><td><span class="chgbadge added">NEW</span></td>'
+            f'<td><code>{html.escape(e["key"])}</code> '
+            f'<span class="scope">{html.escape(e.get("sig", ""))}</span></td></tr>'
+            for e in (sd.get("added") or [])[:8]) + "".join(
+            f'<tr><td><span class="chgbadge changed">UPD</span></td>'
+            f'<td><code>{html.escape(c["key"])}</code> '
+            f'<span class="scope">{html.escape(", ".join(c.get("fields", {})))}'
+            f'</span></td></tr>'
+            for c in (sd.get("changed") or [])[:8])
+        _sd_more = max(0, (sds.get("added", 0) + sds.get("changed", 0)) - 16)
+        specdiff = f'''<h2>스펙 변경 <span class="hint">diff @ {html.escape(str(sd.get("generated_at") or ""))} · 서비스 페이지 행의 NEW/UPD 배지로 상세 확인</span></h2>
+  <div class="card di">
+    <div class="di-stat">
+      <div><span class="din green">{sds.get("added", 0)}</span>추가<small>NEW 엔드포인트</small></div>
+      <div><span class="din amber">{sds.get("changed", 0)}</span>변경<small>method/path/버전</small></div>
+      <div><span class="din red">{sds.get("removed", 0)}</span>제거<small>retire 대상</small></div>
+      <div class="ditot">기준 {sds.get("total_old", 0)} → {sds.get("total_new", 0)} API</div>
+    </div>
+    <table class="di-tbl"><tbody>{_sd_rows}</tbody></table>
+    {f'<p class="dinote">… 외 {_sd_more}개 (서비스 페이지에서 배지로 확인)</p>' if _sd_more else ''}
+  </div>'''
+    else:
+        specdiff = ""
+
     # ---- design integrity ----
     conf = meta.get("conf", {}) or {}
     cs = conf.get("summary", {})
@@ -1291,7 +1335,7 @@ def render(d, hist, meta, services):
         "@@RUNTYPE@@": str(meta["run_type"]), "@@PILL@@": pill,
         "@@ACTION@@": action, "@@CARDS@@": cards, "@@LADDER@@": ladder,
         "@@NCALLS@@": str(called), "@@DISTBAR@@": distbar, "@@DISTLEG@@": distleg,
-        "@@CATROWS@@": catrows, "@@DI@@": di,
+        "@@CATROWS@@": catrows, "@@DI@@": specdiff + di,
         "@@SVCJSON@@": svc_json, "@@CRUDJSON@@": crud_json,
         "@@CRUDFAIL@@": str(n_fail),
         "@@KNROWS@@": knrows, "@@RUNS@@": str(len(hist)),
@@ -1415,6 +1459,10 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
 .di-stat .ditot{margin-left:auto;font-weight:700;color:var(--text)}
 .dinote{font-size:12px;color:var(--muted);margin:11px 0 13px}
 .di-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.chgbadge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;
+  padding:1px 6px;border-radius:9px;vertical-align:1px}
+.chgbadge.added{background:#dafbe1;color:#116329;border:1px solid #aceebb}
+.chgbadge.changed{background:#fff1c2;color:#7a5901;border:1px solid #f0d879}
 .di-tbl th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:6px 10px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
 .di-tbl td{padding:8px 10px;border-bottom:1px solid #eef1f3;vertical-align:top}
 .di-tbl tr:last-child td{border-bottom:0}
@@ -1824,12 +1872,26 @@ def build(
                                           prior_status=prior_status, sha=sha,
                                           durable_evidence=durable_evidence)
 
+    # 스펙 변경 마커 (owner 2026-07-14 "대쉬보드에 변경된 api는 update로 표시"):
+    # spec.diff --mark 가 영속화한 data/spec_diff_latest.json 을 읽어 per-endpoint
+    # NEW/UPD 배지 + 인덱스 변경 패널의 원천으로 쓴다. 파일이 없으면(변경 diff가
+    # 아직 없음) 대시보드는 종전과 동일하게 렌더된다.
+    spec_diff = {}
+    _sd_path = os.path.join(os.path.dirname(os.path.abspath(catalog)),
+                            "spec_diff_latest.json")
+    if os.path.exists(_sd_path):
+        try:
+            spec_diff = json.load(open(_sd_path))
+        except (ValueError, OSError):
+            spec_diff = {}
+
     meta = {
         "branch": branch,
         "when": time.strftime("%Y-%m-%d %H:%M KST",
                               time.gmtime(time.time() + 9 * 3600)),
         "run_type": run_type,
         "conf": conf,
+        "spec_diff": spec_diff,
     }
 
     htm = render(d, hist, meta, services)
