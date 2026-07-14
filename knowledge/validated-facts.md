@@ -2849,3 +2849,19 @@ create-transit-gateway(REQUIRED)에서 하드폴("2 API, 0 자원").
   삭제(shared VPC↔shared TGW), teardown 시 connectionless 확인.
 - offline: tests/offline/test_shared_tgw_adopt.py (5종: 등록·감지·children-self·
   adopt-skip(create/set/delete+시딩)·self-create 폴백).
+
+## VPC 세마포어 예약 leak 수리 — 시드+반납 (2026-07-14, 오너 실측 "예약 안 풀림")
+
+풀런 teardown에서 자원을 다 지웠는데도 "VPC 예약 5·여유 0"이 안 풀리는 관측 → 두 버그:
+1. **해피패스 반납 누락**(engine.py): self-create VPC가 자기 delete-vpc 스텝(해피패스)
+   에서 cross-process sem(_release_vpc_for_path)만 반납하고 **in-process budget은 반납
+   안 함** → created→deleted된 VPC가 런 내내 예약을 붙잡음(native 러너의 공유 budget).
+   수리: 그 지점에서 `_vpc_id_of(path) and reserved["vpc"]>0`이면 `budget.release("vpc")`.
+2. **시드 과다**(native_runner): 시드를 raw `live_count`로 했는데, sync는 baseline을
+   통째로 세팅+절대 반납 안 해서 **이전 런 잔재까지 시드하면 여유 0에 영구 고정** →
+   self-create가 런 내내 막힘. 수리: **상주 개수**(shared_ctx의 shared_vpc+net-A+net-B,
+   결정론)로 시드. 잔재는 시드 흡수(슬롯 영구 점유)가 아니라 pre-run 스윕 대상; 진짜
+   캡 초과는 create 400 → skip-not-fail(종전 동작).
+- adopter는 delete가 adopt-skip돼 반납 지점에 안 옴 → reserved["vpc"]=0, 무영향.
+- offline: test_selfcreate_vpc_releases_budget_on_happy_delete(반납 후 used["vpc"]==0),
+  test_vpc_semaphore_seeded_from_residents_leaves_only_residual_slots(상주 시드).

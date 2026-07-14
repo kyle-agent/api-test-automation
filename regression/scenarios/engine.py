@@ -1544,6 +1544,15 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # teardown), so free the cross-process slot here too — otherwise a
             # created-then-deleted VPC would leak its slot for the whole run.
             _release_vpc_for_path(path)
+            # …그리고 IN-PROCESS budget도 반납. 종전엔 cross-process sem만 풀어서,
+            # native 러너의 공유 budget은 self-create VPC를 created→deleted 후에도
+            # 예약을 런 내내 붙잡았다(오너 2026-07-14 실측: 자원 다 지웠는데 "예약
+            # 5·여유 0" 안 풀림 → 이후 self-create가 슬롯을 못 얻음). VPC 자체 삭제가
+            # 성공하면 그 lifecycle이 잡은 vpc 예약 1개를 반납한다. adopter는 delete가
+            # adopt-skip돼 여기 안 오므로 reserved["vpc"]=0 → 무영향.
+            if _vpc_id_of(path) and reserved.get("vpc", 0) > 0:
+                budget.release("vpc")
+                reserved["vpc"] = max(0, reserved.get("vpc", 0) - 1)
 
             for var, expr in step.get("capture", {}).items():
                 val = _capture(resp.body, expr)

@@ -99,9 +99,9 @@ def test_vpc_creator_waits_and_retries_on_budget_skip(monkeypatch):
 
 
 def _run_with_mocked_engine(monkeypatch, lcs, *, workers, sleep=0.02,
-                            quota_cap=None, live_vpc=None):
+                            quota_cap=None, residents=0):
     """engine을 mock해 run()을 오프라인 구동. 반환: (result, peak_conc, quota_400).
-    live_vpc: run()의 VPC 세마포어 시드용 계정 실사용(None=조회 실패=미시드)."""
+    residents: 시드용 상주 VPC 개수(shared_ctx에 resident 키를 그만큼 심는다)."""
     import core.config
     import core.http_client
     import core.budgets
@@ -110,10 +110,11 @@ def _run_with_mocked_engine(monkeypatch, lcs, *, workers, sleep=0.02,
     monkeypatch.setattr(type(core.config.settings), "require_credentials",
                         lambda self: None, raising=False)
     monkeypatch.setattr(core.http_client, "ApiClient", lambda cfg: object())
-    # live_count는 네트워크 LIST — 오프라인은 주입값(기본 None=미시드)으로 대체
-    monkeypatch.setattr(core.budgets, "live_count", lambda kind: live_vpc)
     monkeypatch.setattr(engine, "active_lifecycles", lambda: lcs)
-    monkeypatch.setattr(engine, "provision_shared_vpc", lambda c, cfg: ({}, lambda: None))
+    # 세마포어 시드는 shared_ctx의 상주 키 개수로 정해진다 (raw live_count 아님)
+    _rkeys = ["shared_vpc_id", "shared_net_vpc_a_id", "shared_net_vpc_b_id"]
+    _sctx = {k: f"r{i}" for i, k in enumerate(_rkeys[:residents])}
+    monkeypatch.setattr(engine, "provision_shared_vpc", lambda c, cfg: (_sctx, lambda: None))
     monkeypatch.setattr(engine, "ResourceRegistry", lambda: object())
 
     conc = {"cur": 0, "peak": 0}
@@ -177,21 +178,48 @@ def test_run_shared_budget_coordinates_quota(monkeypatch):
     assert res["results"], "결과 없음"
 
 
-def test_vpc_semaphore_seeded_from_live_leaves_only_residual_slots(monkeypatch):
-    """VPC 세마포어를 계정 실사용으로 시드(오너 지시 b) — 상주 3개가 이미 소비된
-    것으로 잡혀 self-create는 남은 슬롯(캡5-3=2)만 쓴다. 3번째 self-create는 reserve
-    실패로 조율된 skip(400 아님). 시드가 없으면 세마포어가 캡을 통째로 비었다고 봐
-    상주+self-create가 캡을 넘을 수 있던 구멍을 닫는다."""
+def test_vpc_semaphore_seeded_from_residents_leaves_only_residual_slots(monkeypatch):
+    """VPC 세마포어를 **상주 개수**(shared_ctx 결정론)로 시드 — 상주 3개가 소비된
+    것으로 잡혀 self-create는 남은 슬롯(캡5-3=2)만 쓴다. 3번째+는 reserve 실패로
+    조율 skip(400 아님). 상주 0이면 미시드(종전 캡 미보호)."""
     monkeypatch.setattr(nr, "_durations", lambda: {})
     monkeypatch.setattr(nr, "_true_dependents", lambda: set())
     # self-create 5개(전부 vpc 소비). 캡5·상주3 시드 → 동시 2개만 admit, 나머지 skip.
     lcs = [{"id": f"selfvpc{i}", "_quota": "vpc"} for i in range(5)]
     res, peak, skipped = _run_with_mocked_engine(
-        monkeypatch, lcs, workers=5, quota_cap={"vpc": 5}, live_vpc=3)
+        monkeypatch, lcs, workers=5, quota_cap={"vpc": 5}, residents=3)
     # 상주 3 시드 + 동시 self-create 점유 ≤ 2 → 계정 동시 VPC가 캡 5를 절대 안 넘음.
     assert peak <= 5, f"워커 동시성 peak={peak}"
     assert skipped >= 3, f"캡 넘는 self-create가 조율 skip돼야: skipped={skipped}"
-    # 시드 없으면(종전) 5개 전부 admit → 상주 3 + 5 = 8로 캡 초과했을 것.
+    # 상주 0(미시드) → 5개 전부 admit(잔재를 시드로 흡수하지 않음 — 스윕/skip-not-fail).
     res2, _, skipped2 = _run_with_mocked_engine(
-        monkeypatch, lcs, workers=5, quota_cap={"vpc": 5}, live_vpc=None)
-    assert skipped2 == 0, f"미시드는 5개 다 admit(캡 미보호): skipped={skipped2}"
+        monkeypatch, lcs, workers=5, quota_cap={"vpc": 5}, residents=0)
+    assert skipped2 == 0, f"미시드는 5개 다 admit: skipped={skipped2}"
+
+
+def test_selfcreate_vpc_releases_budget_on_happy_delete(monkeypatch):
+    """self-create VPC가 자기 delete-vpc(해피패스)에서 in-process budget을 반납한다
+    (오너 2026-07-14 실측: 종전엔 cross-process sem만 반납해 예약이 런 내내 leak →
+    자원 다 지웠는데 '예약 안 풀림'). create=reserve(+1), 해피 delete=release(-1)→0."""
+    import core.budgets
+    from regression.scenarios import engine
+    from tests.offline.test_command_channel import FakeClient, _cfg, _r
+
+    monkeypatch.setattr(engine, "_commands", None)
+    monkeypatch.setattr(engine.time, "sleep", lambda s: None)
+    budget = core.budgets.Budget()
+    lc = {"id": "selfvpc", "service": "vpc", "enabled": True, "steps": [
+        {"name": "create-vpc", "method": "POST", "path": "/v1/vpcs",
+         "json": {"name": "x", "cidr": "10.9.0.0/20", "tags": []},
+         "capture": {"vpc_id": "$.vpc.id"}, "expect_status": [200, 201, 202],
+         "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"}},
+        {"name": "delete-vpc", "method": "DELETE", "path": "/v1/vpcs/{vpc_id}",
+         "expect_status": [200, 202, 204]},
+    ]}
+    client = FakeClient({
+        ("POST", "/v1/vpcs"): _r(201, {"vpc": {"id": "own-1", "state": "ACTIVE"}}),
+        ("DELETE", "/v1/vpcs/"): _r(202, {}),
+    })
+    res = engine.run_lifecycle(lc, client, _cfg(), budget=budget)
+    assert res["status"] == "passed", res
+    assert budget.used.get("vpc", 0) == 0, f"예약 leak(반납 안 됨): used={budget.used}"
