@@ -112,18 +112,28 @@ def enrich(entry: dict) -> dict:
     return entry
 
 
-def build_catalog() -> int:
+def build_catalog(*, fresh: bool = False) -> int:
     """Main entry point: discover + enrich all endpoints, write catalog JSON.
+
+    ``fresh=True`` — 캐시 전면 무시(재수집): 기존 카탈로그 항목 재사용도, 인덱스
+    캐시도 쓰지 않는다. 기본(resumable) 모드는 method+path가 이미 있는 항목을
+    재수집하지 않으므로 **기존 엔드포인트의 '변경'을 감지하지 못한다** — 스펙
+    변경 diff(예: 배포 직후 spec.diff --mark)를 뜨려면 반드시 --fresh 로 수집
+    (오너 2026-07-14 저녁 API 변경 대비 실측: resumable 재실행은 1372개 전부
+    cache-hit라 no-op였다).
 
     Returns the process exit code (0 = success).
     """
     CATALOG.parent.mkdir(parents=True, exist_ok=True)
     existing: dict[str, dict] = {}
-    if CATALOG.exists():
+    if CATALOG.exists() and not fresh:
         for e in json.loads(CATALOG.read_text()):
             existing[e["key"]] = e
+    if fresh and INDEX_CACHE.exists():
+        INDEX_CACHE.unlink()   # 인덱스도 재수집 (신규/제거 엔드포인트 감지)
 
-    print("fetching index ...", flush=True)
+    print(f"fetching index ...{' (fresh: cache bypassed)' if fresh else ''}",
+          flush=True)
     found = discover_endpoints(get_index_html())
     print(f"discovered {len(found)} endpoints; {len(existing)} already in catalog", flush=True)
 
@@ -155,8 +165,14 @@ def build_catalog() -> int:
     return 0
 
 
-def main() -> int:
-    return build_catalog()
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--fresh", action="store_true",
+                    help="캐시 전면 무시 재수집 — 기존 엔드포인트의 변경 감지용 "
+                         "(스펙 변경 diff 전 필수; 기본 모드는 cache-hit로 no-op)")
+    args = ap.parse_args(argv)
+    return build_catalog(fresh=args.fresh)
 
 
 if __name__ == "__main__":

@@ -2952,3 +2952,14 @@ lb-members는 그 wait가 미해석 id로 실패.
 **엔진 규약 변경**: 종전엔 refire가 설정되면 terminal-bad(ERROR/FAILED) fast-exit이 통째로 꺼졌음 → 이제 **refire.when이 직접 처리하는 상태만** terminal-bad에서 제외 (refire on UNKNOWN이어도 ERROR/FAILED는 여전히 즉시 실패). heavy-shared-dbaas의 wait 폴은 cid 토큰이 엔진별({maria_cid}/{epas_cid}/{cache_cid})이므로 refire path도 동일 토큰을 써야 함 — {cluster_id} 하드코딩 금지.
 
 **후속 해소(같은 날, 오너 "설계가 이상한데" 지적)**: '실패 상태를 until(성공)로 수용'하는 안티패턴을 전수 스윕 — 총 125곳 발견. DBaaS subops-full 102 + eventstreams 12 + mysql/pg wait-after-add-block-storages 2 = **116곳을 정석으로 교체**(until에서 ERROR/FAILED/UNKNOWN 제거 + refire UNKNOWN→sync-state 부착; ERROR/FAILED는 엔진 기본 terminal_bad가 fast-exit → optional 그룹 스킵으로 종전과 동일한 격리, 단 정직하게 실패로 기록). VS volume revert의 error 수용 1곳은 sync류 복구 API가 없어 terminal_bad로 교체. **잔여 11곳(재검토 대상)**: networking tgw/direct-connect/vpc-endpoint(7)는 until의 DELETED가 "공유자원이 스윕으로 소멸"이라는 별개 의미라 보존, gslb는 4개 중 3개(active/after-health-check/after-resources)를 terminal_bad로 전환 완료; **wait-gslb-deletable의 ERROR-in-until은 의도적 보존** — GSLB DELETE는 ACTIVE|ERROR 두 상태에서 허용되므로 이 폴은 실패 위장이 아니라 '삭제 가능 종착 게이트'다(LIVE 검증 2026-06-23 lifecycle note).
+
+## 카탈로그 수집 모드 — 변경 감지는 --fresh 필수 (2026-07-14 실측)
+
+`spec.extract_catalog` 기본(resumable) 모드는 method+http_path 보유 항목을
+재수집하지 않는다(재개용 cache-hit) → **기존 엔드포인트의 변경을 감지 못 함**
+(실측: 1372개 전부 cache-hit no-op). 스펙 변경 diff 절차: ① `--fresh`로 전량
+재수집(인덱스 캐시도 폐기) ② `spec.diff <직전커밋본> data/api_catalog.json
+--mark` → data/spec_diff_latest.json(marks) ③ 대시보드 NEW/UPD 배지 + 인덱스
+스펙변경 패널 자동 표시 ④ 런 후 `spec.change_report`가 변경/기존 버킷 분리
+판정. 2026-07-14 기준 드리프트 0 (6/5 커밋본 == 라이브, 1372/1372) — 저녁 변경
+diff의 old는 커밋된 카탈로그 그대로 사용.
