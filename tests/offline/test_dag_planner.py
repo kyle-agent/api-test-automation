@@ -201,13 +201,16 @@ def test_integration_full_enabled_plan():
     lcs = validate_dag._load_lifecycles()
     p = dag_planner.plan(deps=deps, lifecycles=lcs)
 
-    # closure over ALL enabled covers the six real shared roots (vpc#a/vpc#b =
-    # 네트워킹 공유 VPC A/B, tgw = 공유 TGW, 오너 설계 2026-07-13). 불변식은
-    # parent-before-child: vpc가 subnet/subnet#db보다 앞. tgw는 자식이 없어 순서
-    # 무관(먼저 정렬돼도 무해 — 실 provision은 provision_shared_vpc 자체 순서).
+    # closure over ALL enabled covers the seven real shared roots (vpc#a/vpc#b =
+    # 네트워킹 공유 VPC A/B, tgw = 공유 TGW, igw = 공유 IGW 오너 2026-07-14).
+    # 불변식은 parent-before-child: vpc가 subnet/subnet#db/igw보다 앞. tgw는
+    # 자식이 없어 순서 무관(먼저 정렬돼도 무해 — 실 provision은 provision_shared_vpc
+    # 자체 순서: VPC ACTIVE 직후 IGW).
     assert p.shared_roots.index("vpc") < p.shared_roots.index("subnet")
     assert p.shared_roots.index("vpc") < p.shared_roots.index("subnet#db")
-    assert set(p.shared_roots) == {"vpc", "subnet", "subnet#db", "vpc#a", "vpc#b", "tgw"}
+    assert p.shared_roots.index("vpc") < p.shared_roots.index("igw")
+    assert set(p.shared_roots) == {"vpc", "subnet", "subnet#db", "vpc#a",
+                                   "vpc#b", "tgw", "igw"}
 
     # real cap from dependencies.json — 상주 공유 VPC 3개(메인+A+B)가 슬롯에서
     # 상시 차감된다.

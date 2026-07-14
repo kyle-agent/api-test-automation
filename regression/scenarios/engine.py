@@ -156,7 +156,15 @@ _ADOPT_SHARED = {"vpc": "shared_vpc_id", "subnet": "shared_subnet_id",
                  # CIDR은 peering rule 하드코딩과 일치(A=10.130/20, B=10.141/20)
                  # — 10.124 공유 VPC adopt 때의 adopt-cidr 불일치 클래스 회피.
                  "vpc#a": "shared_net_vpc_a_id", "vpc#b": "shared_net_vpc_b_id",
-                 "tgw": "shared_tgw_id"}
+                 "tgw": "shared_tgw_id",
+                 # 공유 IGW (adopt:igw 대상, 오너 2026-07-14). IGW는 VPC당 1개
+                 # 배타 — 메인 공유 VPC를 여러 adopt:vpc lifecycle이 나눠 쓰므로
+                 # 각자 create-igw를 하면 2번째부터 400 already-associated (gen-
+                 # heavy-lb-members 실패). 공유 VPC에 IGW 1개를 상주시키고 lb-
+                 # members·vs-netops·pilot-net-basics·vpn-gateway가 adopt → skip.
+                 # IGW create/PUT/delete 커버리지는 net-VPC A/B의 IGW 소유자(vip-
+                 # nat=A·fw=B)가 유지한다. TGW adopt와 동일 패턴.
+                 "igw": "shared_igw_id"}
 # 이 프로세스가 이미 ACTIVE를 확인한 adopted id 캐시 — 게이트는 id당 1회만 폴.
 _ADOPT_ACTIVE_SEEN: set = set()
 _SHARED_VPC_CIDR = "10.124.0.0/20"
@@ -200,6 +208,10 @@ _ENV_SHARED_NET_VPC_B_NAME = "SCP_SHARED_NET_VPC_B_NAME"
 # adopt → 동시 TGW 3→2(1 shared + 1 self). 공유 VPC와 동일 패턴.
 _ENV_SHARED_TGW = "SCP_SHARED_TGW_ID"
 _TGW_CREATE_PATH = "/v1/transit-gateways"
+# 공유 IGW (adopt:igw 대상, 오너 2026-07-14). 메인 공유 VPC에 IGW 1개를 상주시켜
+# adopt:vpc lifecycle들이 채택 → VPC당 1 배타 충돌(400 already-associated) 해소.
+_ENV_SHARED_IGW = "SCP_SHARED_IGW_ID"
+_IGW_CREATE_PATH = "/v1/internet-gateways"
 
 
 # --------------------------------------------------------------------------- #
@@ -886,7 +898,8 @@ def _ensure_adopted_active(client, kind: str, rid: str, lifecycle_id: str, *,
              "vpc#b": (_VPC_CREATE_PATH, "$.vpc.state"),
              "subnet": (_SUBNET_CREATE_PATH, "$.subnet.state"),
              "subnet#db": (_SUBNET_CREATE_PATH, "$.subnet.state"),
-             "tgw": (_TGW_CREATE_PATH, "$.transit_gateway.state")}
+             "tgw": (_TGW_CREATE_PATH, "$.transit_gateway.state"),
+             "igw": (_IGW_CREATE_PATH, "$.internet_gateway.state")}
     if kind not in paths:
         _ADOPT_ACTIVE_SEEN.add(rid)
         return
@@ -1225,12 +1238,19 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                         # create가 4xx로 표면화한다 (종전과 동일한 실패 모드).
                         _ensure_adopted_active(client, _adopt, str(_shared_val),
                                                lifecycle["id"])
-                        for _v in step.get("capture", {}):
-                            # 이미 ctx에 있는 캡처 변수는 보존 — shared_ctx가
-                            # 시딩한 부가 정보(예: net_b_vpc_name)를 공유 ID로
-                            # 덮어쓰면 안 된다 (gen-wave5-fw의 vpc_name 조회).
-                            if _v not in ctx:
-                                ctx[_v] = _shared_val
+                        # 캡처 변수를 공유 id로 시딩하되 소스 JSONPath가 자원의
+                        # 자기 id(`.id`)를 가리키는 것만 — 공유 id는 자원 id이지
+                        # account_id/name 같은 하위필드가 아니다. capture_soft도
+                        # 포함(IGW create는 400 관용이라 id를 capture_soft로 잡음:
+                        # internet_gateway_id/owned_igw_id=$.internet_gateway.id).
+                        # `.id` 필터가 vpc-peering의 account_id(=$.vpc.account_id)와
+                        # gen-wave5-fw의 net_b_vpc_name(=$.vpc.name)을 올바로 제외.
+                        for _capkey in ("capture", "capture_soft"):
+                            for _v, _src in (step.get(_capkey) or {}).items():
+                                # 이미 ctx에 있는 캡처 변수는 보존 — shared_ctx가
+                                # 시딩한 부가 정보를 공유 ID로 덮어쓰면 안 된다.
+                                if _v not in ctx and str(_src).endswith(".id"):
+                                    ctx[_v] = _shared_val
                         print(f"  [{lifecycle['id']}] adopting shared {_adopt}="
                               f"{_shared_val} (skip create '{step['name']}')")
                         continue
@@ -1744,7 +1764,8 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
 def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None,
                          need_db_subnet: bool = True,
                          wait_subnets_active: bool = False,
-                         need_net_vpcs=False, need_tgw: bool = False):
+                         need_net_vpcs=False, need_tgw: bool = False,
+                         need_igw: bool = False):
     """Create ONE VPC + ONE subnet (both ACTIVE) for the heavy/ADOPT-class
     lifecycles to ADOPT, so they don't each create their own against the 5-VPC
     cap (knowledge/vpc-scheduling-strategy.md).
@@ -1782,7 +1803,8 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
                                  (_ENV_SHARED_NET_VPC_B, "shared_net_vpc_b_id"),
                                  (_ENV_SHARED_NET_VPC_A_NAME, "net_a_vpc_name"),
                                  (_ENV_SHARED_NET_VPC_B_NAME, "net_b_vpc_name"),
-                                 (_ENV_SHARED_TGW, "shared_tgw_id")):
+                                 (_ENV_SHARED_TGW, "shared_tgw_id"),
+                                 (_ENV_SHARED_IGW, "shared_igw_id")):
             v = os.environ.get(env_key, "").strip()
             if v:
                 ctx[ctx_key] = v
@@ -1896,6 +1918,34 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
                              delete_path=f"{_VPC_CREATE_PATH}/{vpc_id}",
                              resource_id=vpc_id, kind="vpc", parent="shared"))
     print(f"  shared VPC provisioned: {vpc_id} ({_SHARED_VPC_CIDR})")
+
+    # 공유 IGW (adopt:igw 대상, 오너 2026-07-14). IGW는 VPC당 1개 배타라, 메인
+    # 공유 VPC를 나눠 쓰는 adopt:vpc lifecycle들이 각자 create-igw하면 2번째부터
+    # 400 already-associated. 여기서 IGW 1개를 상주시키고 그들이 adopt→skip한다.
+    # VPC가 ACTIVE여야 attach 가능하므로 위 wait-shared-vpc 직후에 발행. ACTIVE
+    # 대기는 no-wait — 첫 adopter의 _ensure_adopted_active("igw")가 게이트한다
+    # (서브넷/TGW와 동일). body는 시나리오 create-internet-gateway와 동일 형태.
+    igw_id = None
+    if need_igw:
+        ibody = _inject_owner_tags({
+            "description": "API regression shared internet gateway",
+            "firewall_enabled": False, "firewall_loggable": False,
+            "type": "IGW", "vpc_id": vpc_id, "tags": [],
+        }, axis="regression")
+        icreate = {"name": "create-shared-igw", "method": "POST", "service": "vpc"}
+        iresp = _run_step(client, icreate, _IGW_CREATE_PATH, ibody, "vpc", {})
+        if iresp.status in (200, 201, 202) and iresp.body:
+            igw_id = _capture(iresp.body, "$.internet_gateway.id")
+        if igw_id:
+            igw_id = str(igw_id)
+            reg.track(ResourceRecord(service="vpc",
+                                     delete_path=f"{_IGW_CREATE_PATH}/{igw_id}",
+                                     resource_id=igw_id, kind="internet-gateway",
+                                     parent=vpc_id))
+            print(f"  shared IGW created: {igw_id} (vpc {vpc_id})")
+        else:
+            print(f"  shared IGW provision failed ({iresp.status}); its adopters "
+                  f"fall back to find-or-create.")
 
     # 2)+3) shared SUBNETs under the shared VPC — the general one (mirrors a
     #    create-subnet step body: name/description/cidr/type=GENERAL/vpc_id/tags,
@@ -2071,6 +2121,25 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
                 print(f"  shared TGW {tgw_id} delete -> {st} "
                       f"(attempt {attempt + 1}/5); retrying in 15s")
                 time.sleep(15)
+        # 공유 IGW는 메인 공유 VPC의 자식 — VPC보다 먼저 삭제해야 VPC DELETE가
+        # 409(IGW attached)로 안 남는다. adopter들은 IGW를 detach/삭제하지 않고
+        # adopt만 하므로 teardown 시점엔 detach 가능. 409 사다리로 흡수, 실패는 스윕.
+        if igw_id:
+            for attempt in range(5):
+                try:
+                    r = client.request("DELETE", f"{_IGW_CREATE_PATH}/{igw_id}",
+                                       service="vpc")
+                    st = getattr(r, "status", None)
+                except Exception as exc:  # noqa: BLE001 — sweep backstop
+                    print(f"  shared IGW {igw_id} delete failed ({exc}); "
+                          f"sweep will reclaim")
+                    break
+                if st in (200, 202, 204, 404):
+                    print(f"  shared IGW {igw_id} delete -> {st}")
+                    break
+                print(f"  shared IGW {igw_id} delete -> {st} "
+                      f"(attempt {attempt + 1}/5); retrying in 15s")
+                time.sleep(15)
         _vpc_ladder(vpc_id, "shared VPC")
         for tag, (nid, _nname) in net_ids.items():
             # A/B의 자식(vip-nat 서브넷·IGW·DC)은 각 lifecycle이 지운다 —
@@ -2088,4 +2157,6 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         ctx["shared_net_vpc_b_id"], ctx["net_b_vpc_name"] = net_ids["b"]
     if tgw_id:
         ctx["shared_tgw_id"] = tgw_id
+    if igw_id:
+        ctx["shared_igw_id"] = igw_id
     return ctx, teardown

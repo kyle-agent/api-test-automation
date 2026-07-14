@@ -84,6 +84,11 @@
       "parent": null,
       "provisioned_by": "regression.scenarios.shared_infra",
       "_comment": "공유 TGW (오너 2026-07-13) — 계정 캡 3. vpc-transit-gateway-children만 self-create(TGW+자식 CRUD 주인공), gen-private-nat(private-nat 전제조건)·heavy-shared-networking(순수 커버리지)은 이걸 adopt → 동시 TGW 3→2."
+    },
+    "igw": {
+      "parent": "vpc",
+      "provisioned_by": "regression.scenarios.shared_infra",
+      "_comment": "공유 IGW (오너 2026-07-14) — IGW는 VPC당 1개 배타. 메인 공유 VPC(parent:vpc)에 IGW 1개를 상주시켜 gen-heavy-lb-members·gen-heavy-vs-netops·networking-vpn-gateway-tunnel·gen-pilot-net-basics가 adopt → 각자 create-igw 시 2번째부터 400 already-associated 실패(gen-heavy-lb-members) 해소. IGW create/PUT/delete 커버리지는 net-VPC IGW 소유자(vpc-subnet-vip-nat=A·gen-wave5-fw=B)가 유지."
     }
   },
   "adopt_edges": {
@@ -132,11 +137,13 @@
     ],
     "gen-heavy-lb-members": [
       "subnet",
-      "vpc"
+      "vpc",
+      "igw"
     ],
     "gen-heavy-vs-netops": [
       "subnet",
-      "vpc"
+      "vpc",
+      "igw"
     ],
     "gen-lb-members-light": [
       "subnet",
@@ -144,7 +151,8 @@
     ],
     "gen-pilot-net-basics": [
       "subnet",
-      "vpc"
+      "vpc",
+      "igw"
     ],
     "gen-private-nat": [
       "tgw",
@@ -176,7 +184,8 @@
       "vpc"
     ],
     "networking-vpn-gateway-tunnel": [
-      "vpc"
+      "vpc",
+      "igw"
     ],
     "postgresql-cluster-subops-full": [
       "subnet#db",

@@ -2916,3 +2916,30 @@ subnet 포트를 진작 반납한 **late 내부 drain leaf**(subnet/VPC 이미 �
 - **backend 500** `ContactAdminForAssistance`(set-parameters·log-export-configs·quick-query): SDS 백엔드 결함 → known_issues baseline.
 
 **C3 계산 규약**(dashboard/build.py): `c3_denom = total - excl_waived`. EXCLUDED 클래스(blast-radius|entitlement|unsatisfiable-flow|billing-prohibitive|owner-exclusion)만 denom에서 제외. reachability 클래스는 denom 유지 + 도달 시 numerator 가산. → 정당한 미권한/라이선스-게이트 엔드포인트를 올바른 class로 waive하는 것이 C3의 실질 레버(넘버레이터 2xx 수리와 함께).
+
+## 공유 IGW adopt (2026-07-14, 오너 "igw 지금 반영")
+
+IGW는 VPC당 1개 배타(HB4c 기확정). 메인 공유 VPC(adopt:vpc)를 여러 lifecycle이
+나눠 쓰므로 각자 create-igw하면 2번째부터 400 already-associated → gen-heavy-lb-
+members가 wait-internet-gateway(expect[200], give_up 없음)에서 hard FAIL. 종전엔
+find-or-tolerate 우회(create 400 관용 + find + owned_igw_id만 삭제)로 버텼으나
+lb-members는 그 wait가 미해석 id로 실패.
+
+**반영(TGW adopt와 동일 패턴)**:
+- 공유 IGW 1개를 provision_shared_vpc(need_igw)가 메인 공유 VPC ACTIVE 직후 그
+  VPC에 attach 생성(no-wait, 첫 adopter의 _ensure_adopted_active("igw")가 게이트).
+  teardown은 IGW를 VPC보다 먼저 삭제(attached면 VPC DELETE 409).
+- adopt:vpc 4개 사용자(gen-heavy-lb-members·gen-heavy-vs-netops·networking-vpn-
+  gateway-tunnel·gen-pilot-net-basics)의 create-igw(POST)·set-igw(PUT)·delete-igw
+  스텝에 adopt:"igw" → skip+id 시딩 / no-mutate / retain.
+- IGW create/PUT/delete **커버리지는 net-VPC IGW 소유자**(vpc-subnet-vip-nat=A·
+  gen-wave5-fw=B)가 유지 — 그들은 자기 net-VPC에 IGW를 self-create(배타 충돌 없음).
+- 엔진 adopt 시딩 확장: IGW create는 400 관용이라 id를 **capture_soft**로 잡는다
+  (internet_gateway_id/owned_igw_id=$.internet_gateway.id). adopt POST-skip 시딩이
+  capture+capture_soft 둘 다, **소스 JSONPath가 `.id`로 끝나는 것만** 시드 →
+  vpc-peering의 account_id(=$.vpc.account_id)·gen-wave5-fw의 net_b_vpc_name
+  (=$.vpc.name)을 올바로 제외(자원 id가 아닌 하위필드 오염 방지).
+- dependencies.json: shared_roots.igw(parent:vpc) + adopt_edges에 igw(4개 사용자).
+  DAG 검증 통과(igw<-4). igw는 VPC 슬롯 미소비(shared_vpc_count 여전히 3=메인+A+B).
+- offline: tests/offline/test_shared_igw_adopt.py(7종 — adopt skip/seed·capture_soft
+  .id 필터·self-create 폴백·provision+teardown 순서).

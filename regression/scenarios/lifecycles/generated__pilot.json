@@ -253,6 +253,7 @@
         },
         {
           "name": "create-internet-gateway",
+          "adopt": "igw",
           "service": "vpc",
           "method": "POST",
           "path": "/v1/internet-gateways",
@@ -336,6 +337,7 @@
         },
         {
           "name": "verify-internet-gateway-set",
+          "adopt": "igw",
           "service": "vpc",
           "method": "PUT",
           "path": "/v1/internet-gateways/{internet_gateway_id}",
@@ -440,6 +442,7 @@
         },
         {
           "name": "delete-internet-gateway",
+          "adopt": "igw",
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/internet-gateways/{internet_gateway_id}",

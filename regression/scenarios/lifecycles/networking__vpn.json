@@ -76,6 +76,7 @@
         },
         {
           "name": "create-igw-for-vpn",
+          "adopt": "igw",
           "service": "vpc",
           "method": "POST",
           "path": "/v1/internet-gateways",
@@ -106,6 +107,7 @@
         },
         {
           "name": "set-igw-for-vpn",
+          "adopt": "igw",
           "service": "vpc",
           "method": "PUT",
           "path": "/v1/internet-gateways/{igw_id}",
@@ -267,6 +269,7 @@
         },
         {
           "name": "delete-igw-for-vpn",
+          "adopt": "igw",
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/internet-gateways/{owned_igw_id}",
