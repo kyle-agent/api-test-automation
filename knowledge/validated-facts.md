@@ -2943,3 +2943,12 @@ lb-members는 그 wait가 미해석 id로 실패.
   DAG 검증 통과(igw<-4). igw는 VPC 슬롯 미소비(shared_vpc_count 여전히 3=메인+A+B).
 - offline: tests/offline/test_shared_igw_adopt.py(7종 — adopt skip/seed·capture_soft
   .id 필터·self-create 폴백·provision+teardown 순서).
+## DBaaS UNKNOWN 상태 — settle 폴 자동복구 (refire→sync-state, 2026-07-14)
+
+**증상**: start/restart/설정변경 후 `wait-*` settle 폴 중 클러스터 `service_state`가 UNKNOWN으로 떨어지면 until(RUNNING/ACTIVE/AVAILABLE)에 영원히 안 걸려 폴이 타임아웃(관측: database-mysql-cluster wait-started 38회차/20분 공회전)까지 공회전 → lifecycle 실패.
+
+**수리**: 콘솔의 synchronize 절차(= `POST /v1/clusters/{cluster_id}/sync-state`, no body, 202→SYNCHRONIZING→RUNNING, LIVE 검증 run-923a/c373)를 폴에 이식 — DBaaS cluster settle 폴 43개(scenarios.json 28: mysql 13·pg 12·heavy-shared-dbaas 3 / subops-full 15: 5엔진)에 `poll.refire {field:$.service_state, when:[UNKNOWN], POST .../sync-state, max:2}` 부착. pre-delete-sync-state(삭제 직전)와 짝을 이루는 mid-lifecycle 복구.
+
+**엔진 규약 변경**: 종전엔 refire가 설정되면 terminal-bad(ERROR/FAILED) fast-exit이 통째로 꺼졌음 → 이제 **refire.when이 직접 처리하는 상태만** terminal-bad에서 제외 (refire on UNKNOWN이어도 ERROR/FAILED는 여전히 즉시 실패). heavy-shared-dbaas의 wait 폴은 cid 토큰이 엔진별({maria_cid}/{epas_cid}/{cache_cid})이므로 refire path도 동일 토큰을 써야 함 — {cluster_id} 하드코딩 금지.
+
+**주의(미해결)**: `wait-after-add-block-storages`는 until에 UNKNOWN/FAILED/ERROR를 포함해 "실패 상태도 통과"시키는 기존 설계라 refire 미부착 — 별도 재검토 대상.

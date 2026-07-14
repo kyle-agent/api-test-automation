@@ -725,12 +725,17 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
             # VM이 ERROR로 전이했는데 wait 폴이 20분 한도까지 공회전). until이
             # 못 잡은 ERROR/FAILED는 절대 수렴하지 않으니 즉시 폴을 끝내고
             # 응답에 마커를 남긴다 — 호출측이 스텝을 실패로 분류한다.
-            # until에 명시된 값(의도적 대기)과 refire 폴(failed-delete 상태를
-            # 보고 재발사하는 설계)은 건드리지 않는다. per-poll override:
-            # poll.terminal_bad (예: [] = 끔, ["UNKNOWN"] = 확장).
+            # until에 명시된 값(의도적 대기)과, refire가 직접 처리하는 상태
+            # (refire.when — failed-delete 재발사, UNKNOWN→sync-state 복구)는
+            # 건드리지 않는다. refire가 있어도 refire.when 밖의 ERROR/FAILED는
+            # 여전히 fast-exit — 종전엔 refire 설정만으로 terminal-bad 전체가
+            # 꺼져 ERROR 클러스터를 타임아웃까지 공회전할 수 있었다.
+            # per-poll override: poll.terminal_bad (예: [] = 끔, ["UNKNOWN"] = 확장).
             _bad = poll.get("terminal_bad")
             _bad = {"ERROR", "FAILED"} if _bad is None else set(map(str, _bad))
-            if (not refire and isinstance(val, str) and val in _bad):
+            _refire_handles = set((refire or {}).get("when") or [])
+            if (isinstance(val, str) and val in _bad
+                    and val not in _refire_handles):
                 print(f"  step '{step.get('name')}': polled state '{val}' is "
                       f"TERMINAL-BAD — ending poll early (never converges)")
                 try:

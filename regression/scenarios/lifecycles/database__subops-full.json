@@ -222,7 +222,16 @@
               "AVAILABLE"
             ],
             "timeout": 2400,
-            "interval": 30
+            "interval": 30,
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           }
         },
         {
@@ -384,7 +393,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param",
           "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
@@ -1087,7 +1105,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "_note": "pre-delete-sync-state 후 재확인: 삭제 가능한 RUNNING/ACTIVE 상태로 정착 대기. terminal-bad(FAILED/ERROR)는 엔진 기본으로 조기 종료, 고착 UNKNOWN은 600s 후 통과하고 delete 사다리가 인계. 그 뒤 delete가 깨끗이 진행."
         },
@@ -1428,7 +1455,16 @@
               "AVAILABLE"
             ],
             "timeout": 2400,
-            "interval": 30
+            "interval": 30,
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           }
         },
         {
@@ -1880,7 +1916,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param",
           "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
@@ -2870,7 +2915,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "_note": "pre-delete-sync-state 후 재확인: 삭제 가능한 RUNNING/ACTIVE 상태로 정착 대기. terminal-bad(FAILED/ERROR)는 엔진 기본으로 조기 종료, 고착 UNKNOWN은 600s 후 통과하고 delete 사다리가 인계. 그 뒤 delete가 깨끗이 진행.",
           "group": "epas"
@@ -3215,7 +3269,16 @@
               "AVAILABLE"
             ],
             "timeout": 2400,
-            "interval": 30
+            "interval": 30,
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           }
         },
         {
@@ -3646,7 +3709,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param",
           "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
@@ -4590,7 +4662,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "_note": "pre-delete-sync-state 후 재확인: 삭제 가능한 RUNNING/ACTIVE 상태로 정착 대기. terminal-bad(FAILED/ERROR)는 엔진 기본으로 조기 종료, 고착 UNKNOWN은 600s 후 통과하고 delete 사다리가 인계. 그 뒤 delete가 깨끗이 진행.",
           "group": "mariadb"
@@ -4935,7 +5016,16 @@
               "AVAILABLE"
             ],
             "timeout": 2400,
-            "interval": 30
+            "interval": 30,
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           }
         },
         {
@@ -5347,7 +5437,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param",
           "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
@@ -5960,7 +6059,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "_note": "pre-delete-sync-state 후 재확인: 삭제 가능한 RUNNING/ACTIVE 상태로 정착 대기. terminal-bad(FAILED/ERROR)는 엔진 기본으로 조기 종료, 고착 UNKNOWN은 600s 후 통과하고 delete 사다리가 인계. 그 뒤 delete가 깨끗이 진행.",
           "group": "cachestore"
@@ -6300,7 +6408,16 @@
               "AVAILABLE"
             ],
             "timeout": 2400,
-            "interval": 30
+            "interval": 30,
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           }
         },
         {
@@ -6713,7 +6830,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param",
           "_note": "2026-07-11: 복구 대기 — UNKNOWN을 until에 넣지 않아 과도기 UNKNOWN을 기다려 통과(고착 UNKNOWN은 600s 상한 후 진행, terminal-bad ERROR/FAILED는 엔진 기본이 조기 종료)."
@@ -7738,7 +7864,16 @@
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "_note": "pre-delete-sync-state 후 재확인: 삭제 가능한 RUNNING/ACTIVE 상태로 정착 대기. terminal-bad(FAILED/ERROR)는 엔진 기본으로 조기 종료, 고착 UNKNOWN은 600s 후 통과하고 delete 사다리가 인계. 그 뒤 delete가 깨끗이 진행."
         },
