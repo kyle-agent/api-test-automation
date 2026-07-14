@@ -635,17 +635,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-instances",
           "_note": "settle-poll after add-instances — group aligned with the preceding mutating step's own group (es-instances) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -691,17 +697,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-parameters",
           "_note": "settle-poll after set-parameter-values — group aligned with the preceding mutating step's own group (es-parameters) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -738,17 +750,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-parameters",
           "_note": "settle-poll after sync-parameters — group aligned with the preceding mutating step's own group (es-parameters) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -789,17 +807,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-sg-rules",
           "_note": "settle-poll after set-security-group-rules — group aligned with the preceding mutating step's own group (es-sg-rules) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -842,17 +866,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-maintenance",
           "_note": "settle-poll after set-maintenance — group aligned with the preceding mutating step's own group (es-maintenance) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -890,17 +920,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-maintenance",
           "_note": "settle-poll after unset-maintenance — group aligned with the preceding mutating step's own group (es-maintenance) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -937,17 +973,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-power",
           "_note": "settle-poll after sync-cluster-state — group aligned with the preceding mutating step's own group (es-power) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -985,17 +1027,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-power",
           "_note": "settle-poll after restart-cluster — group aligned with the preceding mutating step's own group (es-power) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -1034,17 +1082,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-patch",
           "_note": "settle-poll after patch-minor-version — group aligned with the preceding mutating step's own group (es-patch) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -1085,17 +1139,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-resize",
           "_note": "settle-poll after set-server-type — group aligned with the preceding mutating step's own group (es-resize) so a failure there correctly group-skips this wait too (engine.py group-skip matches on exact group name). Mirrors the wait-after-<op> pattern in database__subops-full.json."
@@ -1155,17 +1215,23 @@
               "STOPPED",
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-stop-start",
           "_note": "settle-poll copied verbatim from the postgresql wait-after-stop-cluster twin (STOPPED listed first): settles the async stop before start fires, mirroring the wait-after-<op> pattern used by every subop group in this lifecycle."
@@ -1203,17 +1269,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "es-stop-start",
           "_note": "settle-poll copied verbatim from the postgresql wait-after-start-cluster twin: ensures the cluster settles back to RUNNING before es-delete fires."

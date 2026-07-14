@@ -338,17 +338,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -439,17 +445,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -497,17 +509,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -569,17 +587,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -619,17 +643,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -666,17 +696,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -718,17 +754,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "sg-rules"
         },
@@ -765,17 +807,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "ha"
         },
@@ -812,17 +860,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "ha"
         },
@@ -864,17 +918,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup-hist"
         },
@@ -915,17 +975,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -962,17 +1028,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -1028,17 +1100,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "resize",
           "_note": "settle-poll copied verbatim from the postgresql twin (HB1 repair 2026-07-04): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without this wait the next call races the in-flight resize and gets 400 Dbaas.ValidationError.ExistInprogress."
@@ -1596,17 +1674,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "maint"
         },
@@ -1643,17 +1727,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "maint"
         },
@@ -1694,17 +1784,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -1757,17 +1853,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -1806,17 +1908,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -1861,17 +1969,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -1962,17 +2076,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -2012,17 +2132,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "archive"
         },
@@ -2058,17 +2184,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "archive"
         },
@@ -2116,17 +2248,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "archive"
         },
@@ -2165,17 +2303,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "audit"
         },
@@ -2223,17 +2367,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -2295,17 +2445,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -2341,17 +2497,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -2388,17 +2550,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -2440,17 +2608,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "sg-rules"
         },
@@ -2486,17 +2660,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -2533,17 +2713,23 @@
               "STOPPED",
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -2579,17 +2765,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -2625,17 +2817,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -2676,17 +2874,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -2722,17 +2926,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -2771,17 +2981,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "resize",
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
@@ -2823,17 +3039,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "resize",
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
@@ -3389,17 +3611,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "maint"
         },
@@ -3436,17 +3664,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "maint"
         },
@@ -3487,17 +3721,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -3550,17 +3790,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -3599,17 +3845,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -3654,17 +3906,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -3755,17 +4013,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -3805,17 +4069,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "archive"
         },
@@ -3851,17 +4121,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "archive"
         },
@@ -3911,17 +4187,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "audit"
         },
@@ -3969,17 +4251,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -4041,17 +4329,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -4087,17 +4381,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -4134,17 +4434,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -4186,17 +4492,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "sg-rules"
         },
@@ -4232,17 +4544,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -4279,17 +4597,23 @@
               "STOPPED",
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -4325,17 +4649,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -4371,17 +4701,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -4422,17 +4758,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -4468,17 +4810,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -4518,17 +4866,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "resize",
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
@@ -4570,17 +4924,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "resize",
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
@@ -5118,17 +5478,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "maint"
         },
@@ -5165,17 +5531,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "maint"
         },
@@ -5215,17 +5587,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -5278,17 +5656,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -5327,17 +5711,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -5382,17 +5772,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -5483,17 +5879,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -5538,17 +5940,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "commands"
         },
@@ -5584,17 +5992,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "commands"
         },
@@ -5636,17 +6050,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "sg-rules"
         },
@@ -5682,17 +6102,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -5729,17 +6155,23 @@
               "STOPPED",
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -5775,17 +6207,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -5821,17 +6259,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -5867,17 +6311,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "ha"
         },
@@ -5917,17 +6367,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -5967,17 +6423,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "resize",
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
@@ -6521,17 +6983,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "maint"
         },
@@ -6568,17 +7036,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "maint"
         },
@@ -6619,17 +7093,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -6671,17 +7151,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -6720,17 +7206,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "backup"
         },
@@ -6775,17 +7267,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -6876,17 +7374,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "param"
         },
@@ -6926,17 +7430,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "archive"
         },
@@ -6972,17 +7482,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "archive"
         },
@@ -7019,17 +7535,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "archive"
         },
@@ -7068,17 +7590,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "audit"
         },
@@ -7126,17 +7654,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -7198,17 +7732,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -7244,17 +7784,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -7291,17 +7837,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "log-export"
         },
@@ -7343,17 +7895,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "sg-rules"
         },
@@ -7389,17 +7947,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -7436,17 +8000,23 @@
               "STOPPED",
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -7482,17 +8052,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -7528,17 +8104,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "lifecycle"
         },
@@ -7574,17 +8156,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "ha"
         },
@@ -7625,17 +8213,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -7671,17 +8265,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "patch"
         },
@@ -7721,17 +8321,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "resize",
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."
@@ -7773,17 +8379,23 @@
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
             "give_up_status": [
               400,
               404
-            ]
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
           },
           "group": "resize",
           "_note": "settle-poll added 2026-07-04 (HB1 repair): resize-instance-group / add-block-storages are async subops on the SAME instance-group; without a wait here the next resize call (resize-block-storage) races the in-flight one and gets 400 Dbaas.ValidationError.ExistInprogress (observed HB1 run 2026-07-04, mariadb-cluster-subops-full:resize-block-storage / mariadbsetblockstoragesize). Mirrors the wait-after-<op> pattern already used by every other subop group in this file."

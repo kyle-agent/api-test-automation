@@ -2951,4 +2951,4 @@ lb-members는 그 wait가 미해석 id로 실패.
 
 **엔진 규약 변경**: 종전엔 refire가 설정되면 terminal-bad(ERROR/FAILED) fast-exit이 통째로 꺼졌음 → 이제 **refire.when이 직접 처리하는 상태만** terminal-bad에서 제외 (refire on UNKNOWN이어도 ERROR/FAILED는 여전히 즉시 실패). heavy-shared-dbaas의 wait 폴은 cid 토큰이 엔진별({maria_cid}/{epas_cid}/{cache_cid})이므로 refire path도 동일 토큰을 써야 함 — {cluster_id} 하드코딩 금지.
 
-**주의(미해결)**: `wait-after-add-block-storages`는 until에 UNKNOWN/FAILED/ERROR를 포함해 "실패 상태도 통과"시키는 기존 설계라 refire 미부착 — 별도 재검토 대상.
+**후속 해소(같은 날, 오너 "설계가 이상한데" 지적)**: '실패 상태를 until(성공)로 수용'하는 안티패턴을 전수 스윕 — 총 125곳 발견. DBaaS subops-full 102 + eventstreams 12 + mysql/pg wait-after-add-block-storages 2 = **116곳을 정석으로 교체**(until에서 ERROR/FAILED/UNKNOWN 제거 + refire UNKNOWN→sync-state 부착; ERROR/FAILED는 엔진 기본 terminal_bad가 fast-exit → optional 그룹 스킵으로 종전과 동일한 격리, 단 정직하게 실패로 기록). VS volume revert의 error 수용 1곳은 sync류 복구 API가 없어 terminal_bad로 교체. **잔여 11곳(재검토 대상)**: networking tgw/direct-connect/vpc-endpoint(7)는 until의 DELETED가 "공유자원이 스윕으로 소멸"이라는 별개 의미라 보존, gslb(4)는 ERROR 수용 — 복구 API 부재, terminal_bad 전환 후보.

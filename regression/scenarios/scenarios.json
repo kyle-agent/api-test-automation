@@ -1734,11 +1734,12 @@
           "expect_status": [200],
           "poll": {
             "field": "$.state",
-            "until": ["available", "AVAILABLE", "error", "ERROR"],
+            "until": ["available", "AVAILABLE"],
+            "terminal_bad": ["error", "ERROR"],
             "timeout": 300,
             "interval": 10
           },
-          "_note": "2026-07-11: revert 202 비동기 — 볼륨이 reverting 동안 후속 transfer/delete가 409를 맞지 않도록 settle (error 종착도 수용해 공회전 방지)."
+          "_note": "2026-07-11: revert 202 비동기 — 볼륨이 reverting 동안 후속 transfer/delete가 409를 맞지 않도록 settle. 2026-07-14: error 종착은 until(성공 위장)이 아닌 terminal_bad로 — 공회전 방지는 동일, 실패는 실패로 기록(오너 지적: 실패 상태를 통과로 넣는 설계 금지)."
         },
         {
           "name": "probe-reads",
@@ -5228,13 +5229,17 @@
           ],
           "poll": {
             "field": "$.service_state",
+            "refire": {
+              "field": "$.service_state",
+              "when": ["UNKNOWN"],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
@@ -6354,13 +6359,17 @@
           ],
           "poll": {
             "field": "$.service_state",
+            "refire": {
+              "field": "$.service_state",
+              "when": ["UNKNOWN"],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
             "until": [
               "RUNNING",
               "ACTIVE",
-              "AVAILABLE",
-              "FAILED",
-              "ERROR",
-              "UNKNOWN"
+              "AVAILABLE"
             ],
             "timeout": 900,
             "interval": 20,
