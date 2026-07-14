@@ -237,6 +237,27 @@ def api_fold_evidence(rid: str) -> JSONResponse:
                   "truncated": len(missing) > _FOLD_PREVIEW_LIMIT})
 
 
+@router.get("/api/runs/{rid}/op-timings")
+def api_run_op_timings(rid: str) -> JSONResponse:
+    """이 런의 op별 실측 타이밍 — ``tools.op_timings.derive`` 를 이 런의 events.jsonl
+    에 적용: ``api_ms``(호출 왕복) + ``settle_s``(async 정착 poll) + ``total_s``.
+    엔진 변경 없이 기존 모든 런에 동작. 레코드 = service·step·catalog_key·kind·
+    api_ms·settle_s·total_s·status (``total_s`` 내림차순). kind 분류는
+    ``op_timings._classify``. **렌더(콘솔 탭)는 console2 소관 — 여긴 백엔드 API 만**
+    (op-timings 핸드오프 명시). 크로스런 p50/p90 은 발행 ``dashboard/op_timings.html``."""
+    with c2._LOCK:
+        rec = c2._RUNS.get(rid)
+    if not rec:
+        return _json({"error": "no such run"}, 404)
+    try:
+        from tools import op_timings
+        records = op_timings.derive(c2._read_events(rec["events"]))
+    except Exception as exc:                                # noqa: BLE001
+        return _json({"error": f"op-timings failed: {exc}"}, 500)
+    records.sort(key=lambda r: -(r.get("total_s") or 0))
+    return _json({"id": rid, "records": records, "count": len(records)})
+
+
 @router.get("/api/runtime", response_class=HTMLResponse)
 @router.get("/runtime", response_class=HTMLResponse)
 def api_runtime(hours: float = 1.0, scope: str = "mine",

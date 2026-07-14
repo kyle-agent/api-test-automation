@@ -2866,6 +2866,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"id": rid, **_run_graph(rec)})
             except Exception as exc:  # noqa: BLE001
                 return self._json(500, {"error": f"run graph failed: {exc}"})
+        if p.startswith("/api/runs/") and p.endswith("/op-timings"):
+            # 이 런 op별 실측 타이밍 (op_timings.derive over events.jsonl):
+            # api_ms + settle_s(async 정착) + total_s. 백엔드만 — 렌더는 console2 소관.
+            rid = p[len("/api/runs/"):-len("/op-timings")]
+            with _LOCK:
+                rec = _RUNS.get(rid)
+            if not rec:
+                return self._json(404, {"error": "no such run"})
+            try:
+                from tools import op_timings
+                records = op_timings.derive(_read_events(rec["events"]))
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"op-timings failed: {exc}"})
+            records.sort(key=lambda r: -(r.get("total_s") or 0))
+            return self._json(200, {"id": rid, "records": records, "count": len(records)})
         if p.startswith("/api/runs/"):
             rid = p.rsplit("/", 1)[-1]
             with _LOCK:

@@ -613,6 +613,53 @@ def test_residual_resources_home_kpi_d8():
             assert "미확인" in home and "지금 확인" in home
 
 
+def test_run_op_timings_api():
+    """op-timings 핸드오프 — GET /api/runs/<id>/op-timings 백엔드 API.
+
+    tools.op_timings.derive 를 이 런 events.jsonl 에 적용: api_ms(호출 왕복) +
+    settle_s(async 정착 GET poll) + total_s (내림차순). 렌더(콘솔 탭)는 console2
+    소관 — 여긴 백엔드 API 만."""
+    from tools import console2_server as c2
+    evp = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
+                                      encoding="utf-8")
+    for ln in [
+        {"kind": "step-start", "lifecycle": "lc1", "step": "create-cluster", "ts": 1000.0},
+        {"kind": "step-end", "lifecycle": "lc1", "step": "create-cluster", "method": "POST",
+         "path": "/v1/clusters", "service": "mysql", "status": 202, "elapsed_ms": 3500, "ts": 1003.5},
+        {"kind": "step-start", "lifecycle": "lc1", "step": "wait-cluster-active", "ts": 1003.5},
+        {"kind": "step-end", "lifecycle": "lc1", "step": "wait-cluster-active", "method": "GET",
+         "path": "/v1/clusters/x", "service": "mysql", "status": 200, "elapsed_ms": 800, "ts": 1063.5},
+        {"kind": "step-start", "lifecycle": "lc1", "step": "delete-cluster", "ts": 1064.0},
+        {"kind": "step-end", "lifecycle": "lc1", "step": "delete-cluster", "method": "DELETE",
+         "path": "/v1/clusters/x", "service": "mysql", "status": 204, "elapsed_ms": 500, "ts": 1064.5},
+    ]:
+        evp.write(json.dumps(ln) + "\n")
+    evp.close()
+    with c2._LOCK:
+        c2._RUNS["op-timings-test"] = {"id": "op-timings-test", "status": "done",
+                                       "events": evp.name, "lifecycle_ids": ["lc1"]}
+    try:
+        r = client.get("/api/runs/op-timings-test/op-timings")
+        assert r.status_code == 200, r.status_code
+        j = r.json()
+        assert j["id"] == "op-timings-test"
+        assert j["count"] == 2                         # wait/settle GET 은 op 아님
+        totals = [x["total_s"] for x in j["records"]]
+        assert totals == sorted(totals, reverse=True)  # total_s 내림차순
+        recs = {x["step"]: x for x in j["records"]}
+        cc = recs["create-cluster"]                    # api 3.5s + async settle 60s
+        assert cc["api_ms"] == 3500 and cc["settle_s"] == 60.0 and cc["total_s"] == 63.5
+        assert cc["kind"] == "create" and cc["status"] == 202 and cc["service"] == "mysql"
+        assert "catalog_key" in cc
+        dd = recs["delete-cluster"]                     # 동기 — settle 없음
+        assert dd["settle_s"] is None and dd["kind"] == "delete"
+        assert client.get("/api/runs/nope-xyz/op-timings").status_code == 404
+    finally:
+        with c2._LOCK:
+            c2._RUNS.pop("op-timings-test", None)
+        os.unlink(evp.name)
+
+
 def test_v2_shell_header_and_global_search():
     """v2 접목 6a (오너 지시 2026-07-11) — v2 셸의 상단 디자인 이식.
 
