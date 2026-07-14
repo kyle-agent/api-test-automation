@@ -2178,6 +2178,72 @@ def _round_verdict(genuine: int, reported: int, inprog: int) -> str:
     return "stop"
 
 
+def _owned_vpcs_present(client) -> int:
+    """Read-only count of the owned VPCs the sweep still WANTS gone.
+
+    The reconciler's PRIMARY goal is a clear account VPC cap (5). Once this
+    hits zero, no owned network-critical resource remains, and any still-
+    draining LEAF — a dbaas cluster in LATE internal drain whose subnet/VPC is
+    already gone (mariadb ~90min; its subnet port was released long before the
+    cluster fully vanishes), or an orphan transit-gateway — BLOCKS nothing: it
+    disappears on its own and belongs in a REPORT, not in another 90-minute
+    wait (owner 2026-07-14: "vpc 모두 삭제되고 부산물 정리되면 끝내는게 맞고 ..
+    이슈로 남은 자원 리포트").
+
+    Uses the same ``_is_deletable`` gate the sweep deletes by, so a LIVE
+    OTHER-run VPC (owner-tagged but unexpired, not this run) is NOT counted —
+    the sweep could not delete it anyway, and holding OUR run's end open for
+    it would be wrong. Reads via ``_list_all`` (not ``_select``) so the
+    convergence cache never hides a VPC from this probe. A list FAILURE
+    (exception or non-2xx) returns 1 (assume present) so a transient error
+    keeps the SAFE legacy behaviour (grant another round) instead of declaring
+    the cap clear prematurely — ``_list_all`` swallows errors to ``[]``, which
+    would look like "cap clear", so the LIST is issued directly here to tell a
+    genuine empty from a failed list."""
+    try:
+        r = client.get("/v1/vpcs", service="vpc")
+    except Exception as exc:  # noqa: BLE001 — never wedge the round loop
+        print(f"  owned-vpc probe failed ({exc}) — assuming present (safe)")
+        return 1
+    if not getattr(r, "ok", False):
+        print(f"  owned-vpc probe: /v1/vpcs -> {getattr(r, 'status', None)} "
+              f"— assuming present (safe)")
+        return 1
+    vpcs = [it for it in _items(r.body) if isinstance(it, dict)]
+    return sum(1 for v in vpcs
+               if _is_deletable(v, name_prefixes=_VPC_NAME_PREFIXES))
+
+
+def _leftover_report(client) -> None:
+    """The "이슈로 남은 자원 리포트" (owner 2026-07-14): when the sweep STOPS with
+    resources still present — an async-deleting leaf mid-drain, or a genuinely
+    stuck item — enumerate them READ-ONLY (LIST only, no delete) so console2 or
+    a human sees exactly what is left instead of the sweep ending silently. The
+    next run's end-sweep (or a manual FORCE cleanup) converges them.
+
+    Reuses the deleteless dry-scan console2 already consumes
+    (``verify_clean.scan_owned``); it snapshots+restores the reconciler's
+    campaign state, so it leaves no footprint. Best-effort: a scan failure never
+    fails the sweep or the run."""
+    try:
+        from collections import Counter
+        from cleanup.verify_clean import scan_owned
+        survivors = scan_owned(client=client)
+    except Exception as exc:  # noqa: BLE001 — report is advisory, never fatal
+        print(f"  leftover-report scan failed (ignored): {exc}")
+        return
+    if not survivors:
+        print("--- leftover report: 0 owned resources remain ✅ ---")
+        return
+    by_svc = Counter(o["service"] for o in survivors)
+    print(f"--- leftover report: {len(survivors)} owned resource(s) STILL "
+          f"present — draining/stuck, REPORTED not waited on "
+          f"(next end-sweep converges them) ---")
+    for svc, n in by_svc.most_common():
+        paths = Counter(o["path"] for o in survivors if o["service"] == svc)
+        print(f"  {svc:18} {n:3}  ({dict(paths)})")
+
+
 def main() -> int:
     """Entry point for the account-wide reconciler sweep.
 
@@ -2202,6 +2268,7 @@ def main() -> int:
     nowait = os.environ.get("SCP_SWEEP_NOWAIT", "").lower() == "true"
     rounds = int(os.environ.get("SCP_SWEEP_ROUNDS", "8" if nowait else "5"))
     round_sleep = int(os.environ.get("SCP_SWEEP_ROUND_SLEEP_S", "12"))
+    report_leftovers = False
     for rnd in range(1, rounds + 1):
         print(f"--- sweep round {rnd} ---", flush=True)
         _PROGRESS_THIS_ROUND[0] = 0          # reset genuine-teardown counter
@@ -2230,12 +2297,29 @@ def main() -> int:
             if reported:
                 print(f"no genuinely-removed resource this round "
                       f"(reported={reported}); converged — stopping.")
+                report_leftovers = True   # deceptive re-list = survivors remain
             break
         if verdict == "grant-inprog":
+            # Terminal policy (owner 2026-07-14): the sweep's PRIMARY goal is a
+            # clear account VPC cap. Once no owned VPC remains, an async-
+            # deleting LEAF (a dbaas cluster in late internal drain whose
+            # subnet/VPC is already gone — mariadb ~90min; an orphan TGW) blocks
+            # nothing and must NOT buy the remaining full rounds waiting for a
+            # ~90-min drain. Stop and REPORT it as a leftover ("vpc 모두 삭제되고
+            # 부산물 정리되면 끝내는게 맞고 .. 이슈로 남은 자원 리포트"). A still-
+            # present owned VPC keeps the grant — there the in-progress item may
+            # BE what 409-blocks the VPC (2026-07-03 TGW-mid-deletion incident).
+            if _owned_vpcs_present(client) == 0:
+                print(f"{inprog} owned resource(s) still draining, but no owned "
+                      f"VPC remains — a leaf drain blocks nothing; stopping and "
+                      f"reporting (they vanish on their own).")
+                report_leftovers = True
+                break
             if rnd == rounds:
                 print(f"{inprog} owned resource(s) still mid-async-deletion at "
                       f"the round cap ({rounds}) — reporting, not forcing; "
                       f"re-run the sweep once they settle.")
+                report_leftovers = True
                 break
             pause = int(os.environ.get("SCP_SWEEP_INPROGRESS_SLEEP_S", "30"))
             print(f"{inprog} owned resource(s) mid-async-deletion (or deferred "
@@ -2247,6 +2331,11 @@ def main() -> int:
         # pass retries their now-unblocked dependents.
         if nowait and rnd < rounds:
             time.sleep(round_sleep)
+    # 이슈로 남은 자원 리포트 (owner 2026-07-14): the sweep stopped with
+    # resources still present — a leaf mid-drain (VPC cap already clear) or a
+    # deceptive re-list — so enumerate what survives instead of ending silently.
+    if report_leftovers or _STUCK:
+        _leftover_report(client)
     if _STUCK:
         print(f"--- {len(_STUCK)} owned item(s) could not be deleted "
               f"(reported, not forced) ---")

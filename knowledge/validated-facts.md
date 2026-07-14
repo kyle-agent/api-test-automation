@@ -2880,3 +2880,28 @@ masked-defect 게이트(poll 미수렴 → 스텝 실패)가 과잉 발동한 �
    정직하게. 근본 완화는 동시성/rate-limit 튜닝.)
 - offline: test_gone_poll_timeout_does_not_fail_step, test_transient_429_at_
   timeout_not_classified_not_ready.
+
+## reconciler 종료 정책 — VPC 캡 클리어 후 leaf drain은 리포트, 안 기다림 (2026-07-14, 오너 지시)
+
+각 라이프사이클이 자기 자원을 teardown하는데도 run-end account 스윕이 필요한 이유:
+(1) 중간 실패 라이프사이클의 부분-잔여, (2) 비동기 삭제 미확정(drain lag),
+(3) 공유 인프라(shared VPC/subnet/net-A/B/TGW)는 per-test가 안 지움, (4) 부산물/고아
+(log group·launch-config·server-group·keypair·snapshot), (5) owner-tag 최종 안전망.
+→ 정상 런이면 스윕이 지울 게 거의 없어야 정상.
+
+**80분 스윕의 정체**: mariadb 클러스터(~90분 late-drain)가 매 라운드 `DELETING`으로
+잡혀 genuine=0/inprog≥1 → `grant-inprog`가 8라운드를 다 소모. 그러나 그 클러스터는
+subnet 포트를 진작 반납한 **late 내부 drain leaf**(subnet/VPC 이미 소멸)라 아무것도
+막지 않음. 오너 지시: "vpc 모두 삭제되고 부산물 정리되면 끝. 남은 자원은 이슈로 리포트".
+
+**반영**(cleanup/reconciler.py):
+- `_owned_vpcs_present(client)`: 소유 VPC(=`_is_deletable`, 캡 대상)를 직접 LIST로
+  카운트(리스트 실패 시 1=present, fail-safe). `_list_all`은 에러를 []로 삼켜 오판하므로 직접 GET.
+- main() grant-inprog 분기: 소유 VPC==0이면 leaf drain에 라운드를 더 주지 않고 STOP +
+  리포트. 소유 VPC가 남으면 기존 grant 유지(2026-07-03 TGW mid-deletion이 VPC를
+  409로 막는 인시던트 — 거기선 inprog 항목이 실제 blocker).
+- `_leftover_report(client)`: 멈출 때 남은 소유 자원을 read-only(verify_clean.scan_owned)
+  로 서비스별 열거 → console2/사람이 다음 end-sweep이 수렴시킬 대상을 봄.
+- offline: test_owned_vpcs_present_counts_owned_only, test_owned_vpc_probe_failure_
+  assumes_present, test_main_leaf_drain_stops_and_reports_when_no_vpc,
+  test_main_keeps_granting_while_a_vpc_is_present.

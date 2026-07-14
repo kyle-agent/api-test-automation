@@ -423,6 +423,82 @@ def test_scheduled_deletion_still_converges_pf09():
         "a pending-deletion-only collection still converge-caches"
 
 
+# --------------------------------------------------------------------------- #
+# Terminal policy (owner 2026-07-14): once no owned VPC remains, an async-
+# deleting LEAF (dbaas cluster in late internal drain / orphan TGW) blocks
+# nothing and must NOT buy the remaining full rounds — the sweep stops and
+# REPORTS it instead of holding the run open for a ~90-min drain ("vpc 모두
+# 삭제되고 부산물 정리되면 끝내는게 맞고 .. 이슈로 남은 자원 리포트"). A still-
+# present owned VPC keeps the grant (the 2026-07-03 TGW incident, where the
+# in-progress item IS what 409-blocks the VPC).
+# --------------------------------------------------------------------------- #
+def test_owned_vpcs_present_counts_owned_only():
+    client = FakeClient(lists={"/v1/vpcs": [
+        _owned("regrvpc-a", id="v1"),
+        {"name": "someone-elses-vpc", "id": "v2"},   # neither tag nor regr* name
+    ]})
+    assert recon._owned_vpcs_present(client) == 1, \
+        "only the owned regr* VPC counts toward the cap-clear check"
+    assert recon._owned_vpcs_present(FakeClient(lists={"/v1/vpcs": []})) == 0
+
+
+def test_owned_vpc_probe_failure_assumes_present():
+    """A list error must fail SAFE (assume a VPC is present → keep granting),
+    never declare the cap clear on a transient failure."""
+    class BoomClient(FakeClient):
+        def get(self, path, service=None, **kw):
+            raise RuntimeError("list host unreachable")
+    assert recon._owned_vpcs_present(BoomClient()) == 1
+
+
+class _StubSettings:
+    allow_destructive = True
+
+    def require_credentials(self):
+        pass
+
+
+def _stub_main_env(monkeypatch, vpcs_present, calls):
+    """Wire main() to a fake sweep that always presents a draining leaf
+    (genuine=0, inprog=1, reported=1 = the grant-inprog shape) and a stubbed
+    owned-VPC probe / leftover report, so the loop's terminal decision is what's
+    under test — not the real network machinery."""
+    def fake_sweep(client):
+        calls["sweep"] += 1
+        recon._INPROGRESS_THIS_ROUND[0] = 1   # a leaf is mid-async-deletion
+        recon._PROGRESS_THIS_ROUND[0] = 0     # nothing genuinely reaped
+        return 1                               # reported (deceptive)
+    monkeypatch.setattr(recon, "run_sweep", fake_sweep)
+    monkeypatch.setattr(recon, "_owned_vpcs_present", lambda c: vpcs_present)
+    monkeypatch.setattr(recon, "_leftover_report",
+                        lambda c: calls.__setitem__("report", calls["report"] + 1))
+    monkeypatch.setattr(recon.core, "settings", _StubSettings())
+    monkeypatch.setattr(recon.core, "ApiClient", lambda cfg: object())
+    monkeypatch.delenv("SCP_SWEEP_NOWAIT", raising=False)
+    monkeypatch.setenv("SCP_SWEEP_ROUNDS", "8")
+
+
+def test_main_leaf_drain_stops_and_reports_when_no_vpc(monkeypatch):
+    calls = {"sweep": 0, "report": 0}
+    _stub_main_env(monkeypatch, vpcs_present=0, calls=calls)
+    recon.main()
+    assert calls["sweep"] == 1, \
+        "no owned VPC + only a draining leaf → stop after ONE round, not all 8"
+    assert calls["report"] == 1, "the surviving leaf must be reported"
+
+
+def test_main_keeps_granting_while_a_vpc_is_present(monkeypatch):
+    """The negative control: a still-present owned VPC means the in-progress
+    item may be blocking it — keep granting rounds up to the cap (preserves the
+    2026-07-03 TGW-mid-deletion behaviour)."""
+    calls = {"sweep": 0, "report": 0}
+    _stub_main_env(monkeypatch, vpcs_present=1, calls=calls)
+    recon.main()
+    assert calls["sweep"] == 8, \
+        "a present owned VPC keeps granting rounds to the cap (blocker may drain)"
+    assert calls["report"] == 1, "the cap-stop still reports what is left"
+
+
 def test_round_verdict_grants_round_for_inprogress_only():
     """The exact incident shape: genuine=0, reported=1 (inflated by a truthy
     non-2xx), one item mid-async-deletion → the loop must CONTINUE. Without
