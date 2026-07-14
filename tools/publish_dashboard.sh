@@ -46,6 +46,10 @@ git show origin/dashboard-data:verified_endpoints_evidence.json > data/baselines
 python -m tools.derive_verified --observations reports/results/observations.jsonl \
   --out data/baselines/verified_endpoints.json || true
 
+echo "[publish] rendering op-timings page (cross-run p50/p90/max) ..."
+python -m tools.op_timings --store data/optimizer/op_timings.json \
+  --html dashboard/op_timings.html 2>/dev/null || true
+
 echo "[publish] pushing to dashboard-data ..."
 url=$(git remote get-url origin)
 pub=$(mktemp -d); dd="$pub/dd"
@@ -59,6 +63,7 @@ cp dashboard/verified_endpoints.json "$dd"/ 2>/dev/null || true
 cp dashboard/endpoint_status.json    "$dd"/ 2>/dev/null || true
 cp data/baselines/verified_endpoints.json "$dd"/verified_endpoints_evidence.json 2>/dev/null || true
 cp reports/dashboard/ops.html        "$dd"/ops.html 2>/dev/null || cp dashboard/ops.html "$dd"/ 2>/dev/null || true
+cp dashboard/op_timings.html         "$dd"/op_timings.html 2>/dev/null || true
 touch "$dd/.nojekyll"
 cd "$dd"
 git config user.name "Claude"; git config user.email "noreply@anthropic.com"
