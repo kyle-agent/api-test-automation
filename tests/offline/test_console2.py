@@ -791,6 +791,28 @@ def test_cleanup_phase_indicators_frontend_contract():
 
 
 # --------------------------------------------------------------------------- #
+# op-timings 콘솔 탭 (핸드오프 렌더분) — frontend contract
+# --------------------------------------------------------------------------- #
+def test_op_timings_tab_frontend_contract():
+    """GET /api/runs/<id>/op-timings 를 detail '타이밍' 탭으로 렌더. 탭 열 때 1회
+    fetch + 캐시(폴 재파생 안 함), 스코프 필터(전체/시나리오), total_s 내림차순
+    (API 정렬 유지) · 기본 ≥1s(전체 표시 토글) · 새로고침 · 크로스런 링크."""
+    html = (ROOT / "console2" / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    css = (ROOT / "console2" / "assets" / "console2.css").read_text(encoding="utf-8")
+    # 1) 탭 버튼 + 라우팅
+    assert 'data-d="op"' in html and ">타이밍" in html
+    assert 'detailTab === "op") reportOp()' in js
+    # 2) fetch + 캐시(폴 재파생 방지) + 스코프 필터
+    assert "/op-timings" in js and "opDataFor !== runId" in js
+    assert "d.agg || r.lifecycle === detailScope" in js
+    # 3) ≥1s 기본 + 전체 표시 토글 + 새로고침 + 크로스런 링크 + 표 CSS
+    assert "opShowAll" in js and 'id="op-showall"' in js and 'id="op-refresh"' in js
+    assert "/dashboard/op_timings.html" in js
+    assert ".optbl" in css and ".opk-create{" in css
+
+
+# --------------------------------------------------------------------------- #
 # P2C-24 (2026-07-09) — 폴링 다이어트 + 무깜빡 렌더 + 진행률 + per-lifecycle 중단
 # --------------------------------------------------------------------------- #
 def test_events_view_incremental_offset(tmp_path):

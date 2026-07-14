@@ -167,6 +167,7 @@ html.bare-console #backToShell{display:inline}</style>
             <button data-d="res" class="on">자원 <span class="n" id="d-nres">0</span></button>
             <button data-d="api">API <span class="n" id="d-napi">0</span></button>
             <button data-d="log">로그</button>
+            <button data-d="op" title="op별 실측 타이밍 — API 호출 왕복(api) + async 정착 대기(settle) = total. 이 런 events 로 파생, create/delete/update 실제 완료시간">타이밍 <span class="muted small">실측</span></button>
             <button data-d="rt" title="런타임(계정 실측) — 지금 계정에 실제 떠 있는 자원 토폴로지를 인라인으로 (runtime 뷰 임베드 · scope=mine · 자동 갱신)">런타임 <span class="muted small">계정 실측</span></button>
           </div>
           <div id="detail-body"></div>
