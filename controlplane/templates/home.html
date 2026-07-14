@@ -17,70 +17,66 @@
       {% if snap_is_stale %}<b>{{ snap_age or '48시간 이상 전' }} 스냅샷 기준 —</b>
       {% endif %}
       {% if fail_new %}
-      <b>REGRESSIONS — 신규 회귀 {{ fail_new }}건.</b>
+      <b>REGRESSIONS — 신규 fail {{ fail_new }}건.</b>
       마지막 스냅샷에서 새로 깨진 5xx/auth가 있습니다 —
       <a href="/reporting?tab=triage">Report › Triage에서 분류 확인 →</a>
       {% else %}
       <b>HEALTHY — 신규 회귀 0건.</b>
-      마지막 스냅샷에서 새로 깨진 5xx/auth 없음, 알려진 실패 {{ fail_known }}.
-      다음 레버: 쓰기 검증(cov_op {{ coverage.get('cov_op','-') }}%).
+      마지막 스냅샷에서 새로 깨진 5xx/auth 없음, known-red {{ fail_known }}.
+      다음 레버: 쓰기 커버리지(cov_op {{ coverage.get('cov_op','-') }}%).
       {% endif %}
       <span class="muted small">— 스냅샷 {{ coverage.get('ts','') }}{% if snap_age is defined and snap_age %}
         <b>({{ snap_age }})</b>{% endif %}</span>
-      {# v2 접목 1: 판정 헤드라인의 출처 배지 (기존 '노후 스냅샷' chip 을 흡수 —
-         stale 이면 배지가 노랑 + '노후' 표기) + D2 보조 칩(발행 이후 이 서버 런). #}
-      {{ badge('published', ts=(snap_ts_label if snap_ts_label is defined else none),
-               pub_ts=(dd_ts_label if dd_ts_label is defined and dd_ts_label else none), stale=snap_is_stale) }}
-      {# D2 칩 — 문구·링크 개정 (오너 2026-07-14 "발행 이후 이 서버 런 N건 헷갈림,
-         링크 이상"): 뜻(위 판정 이후 이 서버가 돌린 런 = 아직 공식 미반영)을 문구에
-         풀고, 목적지도 그 런들이 실제 보이는 런 타임라인으로 (실행 콘솔이 아니라). #}
-      {% if local_since_publish is defined and local_since_publish %}<a class="chip s-verified"
-        href="/reporting?tab=runs"
-        title="위 판정(공식 발행) 이후 이 서버에서 완료된 런 {{ local_since_publish }}건 — 그 결과는 아직 위 공식 수치에 반영되지 않았습니다 (다음 발행 때 반영). 클릭 = 런 타임라인에서 확인">판정 이후 이 서버 런 {{ local_since_publish }}건 (공식 미반영) →</a>{% endif %}
+      {# 출처 배지·D2 칩 제거 (오너 2026-07-14 재검수 "이런 표현이 필요한가"):
+         기본 출처(발행 스냅샷)는 헤더 Published 배지 + ctxbar 가 이미 선언 —
+         배너·타일에서의 반복은 노이즈. 판정 이후 로컬 런은 아래 최근 RUN 표
+         (source 열)로 충분. 노후 시각 정보는 위 '(N시간 전)' 텍스트가 담당. #}
     </div>
   </div>
 
   {# v2 접목 1: 타일 전부 발행본(S1) 출처 — 카드마다 배지 1개(계약 §0-4
      "한 카드의 기본값은 한 출처") + 노후 시 is-stale 로 수치 회색화(원칙 1-4). #}
   <div class="tiles">
-    {# 라벨 한국어 1급 + 코드 괄호 보조 (오너 2026-07-14 — TERMINOLOGY P1 적용):
-       write-op/GET/C3/static reachable 같은 코드 1급 표기가 헷갈린다는 검수. #}
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="cov_op — 쓰기(POST/PUT/PATCH/DELETE) 엔드포인트 중 이번 스냅샷에서 실제 2xx로 검증된 비율. 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)">
+    {# 타일별 Published 배지 제거 (오너 2026-07-14 재검수): 이 5장은 전부 페이지
+       기본 출처(발행 스냅샷) — 헤더·ctxbar 선언으로 충분, 반복은 노이즈.
+       노후 회색화(is-stale)는 유지 (배지와 무관한 시각 신호). #}
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체. 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)">
       <div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
-      <div class="k">쓰기 검증 (cov_op)</div>
+      <div class="k">write-op 커버리지 (cov_op)</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_op',0) }}%;background:var(--amber)"></i></div>
-      <div class="goal">목표 100% · {{ badge('published', stale=snap_is_stale) }}</div>
+      <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="cov_get — 읽기(GET) 엔드포인트 중 실제 2xx 검증 비율">
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율">
       <div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
-      <div class="k">읽기 검증 (cov_get)</div>
+      <div class="k">GET 커버리지 (cov_get)</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_get',0) }}%;background:var(--green)"></i></div>
-      <div class="goal">목표 100% · {{ badge('published', stale=snap_is_stale) }}</div>
+      <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="검증됨(C3) = 실제 run에서 2xx로 동작 확인(누적, reachability waiver는 도달충족 포함) = covered. 헤드라인 지표">
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인(누적, reachability waiver는 도달충족 포함) = covered. 헤드라인 지표">
       <div class="v">{{ coverage.get('cov_c3','-') }}%</div>
-      <div class="k">검증됨(C3) · 누적</div>
+      <div class="k">누적 C3 검증</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--blue)"></i></div>
-      <div class="goal">목표 100% · {{ badge('published', stale=snap_is_stale) }}</div>
+      <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="도달가능(C1) = enabled 시나리오가 정적으로 도달 가능한 엔드포인트 (라이브 호출 없음 — 정적 분석). 저작 진척 지표">
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="C1 도달가능(Plannable) — enabled 시나리오가 정적으로 도달 가능한 엔드포인트(라이브 호출 없음). 저작 진척 지표">
       <div class="v">{{ coverage.get('reachable_pct','-') }}%</div>
-      <div class="k">도달가능(C1) · 정적</div>
+      <div class="k">C1 static reachable</div>
       <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
-      <div class="goal">전체 {{ coverage.get('total','-') }} API · {{ badge('published', stale=snap_is_stale) }}</div>
+      <div class="goal">전체 {{ coverage.get('total','-') }} API</div>
     </div>
     <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보">
       <div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
-      <div class="k">신규 회귀 (fail_new)</div>
-      <div class="goal" style="margin-top:8px">{% if fail_new %}<a href="/reporting?tab=triage">회귀 발생 — Triage 확인 →</a>{% else %}회귀 없음{% endif %} · {{ badge('published', stale=snap_is_stale) }}</div>
+      <div class="k">신규 fail</div>
+      <div class="goal" style="margin-top:8px">{% if fail_new %}<a href="/reporting?tab=triage">회귀 발생 — Triage 확인 →</a>{% else %}회귀 없음{% endif %}</div>
     </div>
     {# D8: 잔존 자원 홈 승격 — 비용·안전 사안이 실행 화면 깊숙이 숨어 있던 것을
        KPI 로 끌어올림. 라이브 '이 서버' owned 스캔(발행 스냅샷 아님 → local 배지) +
        마지막 스캔 캐시만 표시(홈이 자동 스캔하지 않음, 스캔은 /testing/resources 에서).
        미스캔은 '미확인'(0 위장 금지, empty-state 규율). 정본 표면 = /testing/resources. #}
     <div class="card tile" title="잔존 자원 — 이 서버에서 실측(owned 스캔)한, 우리 소유 태그가 붙은 채 계정에 남아있는 자원. 라이브 관측(발행 스냅샷 아님). 홈은 마지막 스캔 결과 캐시만 보여주며 열 때 자동 스캔하지 않는다 — 새로 수집은 잔존 단일 표면(/testing/resources)에서.">
-      {# 문구 개정 (오너 2026-07-14): '단일 표면'(내부 설계 용어)·'0 아님'(축약) 이
-         화면에서 안 읽힘 → 행동이 보이는 말로. 테스트 키워드 '미확인'/'지금 확인' 유지. #}
+      {# 이 타일의 This server 배지는 유지 — 페이지 기본(발행 스냅샷)과 다른 유일한
+         예외(라이브 이 서버 실측)라 출처 표시가 정보가 된다 (예외만 배지 원칙).
+         문구는 행동이 보이는 말로 (오너 2026-07-14 — '단일 표면'·'0 아님' 안 읽힘). #}
       {% if owned_kpi is defined and owned_kpi and owned_kpi.scanned %}
       <div class="v" style="color:var({{ '--red' if owned_kpi.actionable else '--green' }})">{{ owned_kpi.actionable }}</div>
       <div class="k">잔존 자원{% if owned_kpi.stuck %} <span class="muted small" title="문서화된, 현재 API로 지울 수 없는 알려진 잔존 (known_issues.stuck_resources)">(+삭제불가 {{ owned_kpi.stuck }})</span>{% endif %}</div>
@@ -124,11 +120,12 @@
       · {{ badge('local') }}</div>
     <span class="chev">→</span>
   </a>
+  {# Reporting 카드 배지 제거 — 페이지 기본 출처(발행)와 동일 (예외만 배지 원칙).
+     Testing 카드의 This server 배지는 유지 (라이브 값 — 기본과 다른 예외). #}
   <a class="pstage" href="/reporting">
     <div class="pl">Reporting</div>
     <div class="pv">{{ coverage.get('cov_c3','-') if coverage else '-' }}%</div>
-    <div class="ps">C3 검증 · 신규 회귀 {{ (coverage.get('fail_new') or 0) if coverage else '-' }}
-      · {{ badge('published', stale=(snap_stale if snap_stale is defined else false)) }}</div>
+    <div class="ps">C3 검증 · 신규 회귀 {{ (coverage.get('fail_new') or 0) if coverage else '-' }}</div>
   </a>
 </div>
 

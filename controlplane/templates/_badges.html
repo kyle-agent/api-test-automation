@@ -10,11 +10,12 @@
            갱신된 시각. 결과 없는 재발행이면 판정 런 시각보다 나중일 수 있다.
            pub_ts 가 있고 ts 와 다르면 '판정 @… · 발행 @…' 로 분리 병기한다
            (v2 접목 5). 같거나 없으면 기존처럼 '@ts' 하나만. #}
-{# 라벨 한국어 1급 (오너 2026-07-14 "Published·This server 헷갈리고 의미도 모르겠다"
-   — V1-GRAFT 결정 지점 3 '영어 유지' 를 오너 검수로 개정, TERMINOLOGY P7).
-   CI 는 국제 관용·짧아서 유지. 툴팁이 각 라벨의 정확한 의미를 설명한다. #}
+{# 라벨은 영어 유지 (오너 2026-07-14 재검수: "한국어화는 필요없어" — 진짜 문제는
+   언어가 아니라 '기본 출처를 타일마다 반복 표기할 필요가 있냐'였다). 원칙 개정:
+   페이지 기본 출처는 헤더/ctxbar 가 1곳에서 선언하고, 이 배지는 **예외**(기본과
+   다른 출처 — 라이브 이 서버 값, 런 목록의 CI/로컬 행 구분)에만 붙인다. #}
 {% macro badge(source, ts=None, ident=None, stale=False, pub_ts=None) -%}
-{%- set names = {'published': '공식 발행', 'local': '이 서버', 'run': '이 런', 'ci': 'CI'} -%}
+{%- set names = {'published': 'Published', 'local': 'This server', 'run': 'This run', 'ci': 'CI'} -%}
 {%- set styles = {'published': 'published', 'local': 'local', 'run': 'run', 'ci': 'published'} -%}
 {%- set tips = {'published': '발행된 공식 집계 — 어느 서버에서 열어도 같은 값',
                 'local': '이 서버에서만 관측된 값 — 공식 집계와 다를 수 있음',
