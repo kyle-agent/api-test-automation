@@ -32,8 +32,10 @@
 `GET /api/runs/<id>/op-timings` → 이 런 events.jsonl 로 `derive()` → per-op 레코드
 (service·step·catalog_key·kind·api_ms·settle_s·total_s·status, total_s 내림차순).
 controlplane(`console_api.py`)·standalone(`console2_server.py`) 양쪽에 추가, 없는 런
-404·읽기 실패 500. **렌더(콘솔 탭)는 console2 세션 소관** — UI 충돌 방지로 백엔드만
-신설(핸드오프 명시). 검증: `test_run_op_timings_api`(controlplane/tests_offline).
+404·읽기 실패 500. **콘솔 '타이밍' 탭 렌더도 이 세션이 반영**(오너 요청 2026-07-14
+"op timing 화면 아직 없어?") — `reportOp()` + detail-subtabs `data-d="op"`, 스코프
+필터·≥1s·전체표시·새로고침·크로스런 링크. 검증: `test_run_op_timings_api`(API) +
+`test_op_timings_tab_frontend_contract`(UI 계약) + reportOp 헤드리스 하네스.
 
 ## 대시보드 반영 (cross-run)
 
@@ -52,8 +54,10 @@ dashboard-data에 발행(Pages).
 ## 단계
 
 - **MVP(반영됨)**: `tools/op_timings.py`(파생+표+누적+html) + publish 발행 + 문서
-- **v2**: 런별 백엔드 API `/api/runs/<id>/op-timings` **반영됨** · 콘솔 탭 렌더(console2
-  세션)·추세/회귀 알림 잔여
+- **v2**: 런별 백엔드 API `/api/runs/<id>/op-timings` **반영됨** + **콘솔 '타이밍' 탭
+  렌더 반영됨(2026-07-14)** — detail 탭, 탭 열 때 1회 fetch+캐시, 스코프 필터(전체/
+  시나리오), total_s 내림차순·기본 ≥1s(전체 표시 토글)·새로고침·크로스런 링크. 추세/
+  회귀 알림만 잔여
 - **v3**: 엔진 명시 태그(`settle_of`)로 신뢰도 100% + 타임아웃 자동 제안
 
 ## 리스크

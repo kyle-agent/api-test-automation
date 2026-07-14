@@ -423,6 +423,9 @@ function wireReportDelegation() {
     body._wired = true;
     body.addEventListener("click", ev => {
       if (ev.target.closest("#hidedup-soft") || ev.target.closest("label")) return;  // change 가 처리
+      // 타이밍 탭: 새로고침(events 재파생) · 전체 표시(≥1s 필터 해제)
+      if (ev.target.closest("#op-refresh")) { ensureOpData(true); return; }
+      if (ev.target.closest("#op-showall")) { opShowAll = true; keepDetailScroll(reportOp); return; }
       const dl = ev.target.closest("[data-defsvc]");
       if (dl) { openDefinition(dl.dataset.defsvc); return; }
       // kpi 타일 = 결과 필터 토글 (2026-07-11 성능 수리 + 오너 기대 동작)
@@ -2730,6 +2733,7 @@ function renderDetailBody() {
   keepDetailScroll(() => {
     if (detailTab === "res") reportR2();
     else if (detailTab === "api") reportR3();
+    else if (detailTab === "op") reportOp();
     else if (detailTab === "rt") reportRT();
     else reportR4();
   });
@@ -2748,6 +2752,82 @@ function reportRT() {
      <iframe id="rt-frame" class="rt-frame" src="${esc(url)}" title="런타임 뷰 — 계정 실측 토폴로지"></iframe>`;
   $("rt-popout").onclick = () =>
     window.open(url, "scp-runtime", "width=1320,height=900,scrollbars=yes,resizable=yes");
+}
+
+// 타이밍(op별 실측) — DETAIL 탭 (op-timings 핸드오프): GET /api/runs/<id>/op-timings
+// = op_timings.derive(events) — api_ms(호출 왕복) + settle_s(async 정착 poll) +
+// total_s. 탭 열 때 1회 fetch + 캐시 (폴마다 재파생 안 함 — 폴링 다이어트), 새로고침
+// 버튼 제공. 스코프 필터(전체/시나리오), total_s 내림차순(API 정렬 유지), 기본 ≥1s.
+let opData = null;        // {records, count} — opDataFor 런의 것
+let opDataFor = null;     // 이 데이터가 속한 runId (바뀌면 재fetch)
+let opLoading = false;
+let opShowAll = false;    // ≥1s 필터 해제 토글
+function ensureOpData(force) {
+  if (!runId) return;
+  if (!force && (opDataFor === runId || opLoading)) return;
+  opLoading = true;
+  const rid = runId;
+  fetch("/api/runs/" + encodeURIComponent(rid) + "/op-timings")
+    .then(r => r.json()).then(j => {
+      opLoading = false;
+      if (runId !== rid) return;                 // 폴 도중 재바인딩 — 폐기
+      opDataFor = rid;
+      opData = (j && !j.error) ? j : { error: (j && j.error) || "op-timings 실패", records: [] };
+      if (detailTab === "op") renderDetailBody();
+    }).catch(e => {
+      opLoading = false;
+      if (runId !== rid) return;
+      opDataFor = rid; opData = { error: e.message, records: [] };
+      if (detailTab === "op") renderDetailBody();
+    });
+}
+function _opFmt(s) {          // total/settle 초 → "m:ss" / "Ns" (op_timings.print_table _mmss 미러)
+  if (s == null) return "-";
+  s = Math.round(s);
+  return s >= 60 ? Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") : s + "s";
+}
+function reportOp() {
+  const body = $("detail-body");
+  if (opDataFor !== runId) {                    // 이 런 데이터 아직 — 로드 후 렌더
+    ensureOpData();
+    setHtmlIfChanged(body,
+      '<h3 class="detail-h">타이밍 <span class="muted small">· op별 실측 (api 호출 + async 정착)</span></h3>'
+      + '<p class="muted small">op 타이밍 계산 중… (events.jsonl 파생)</p>');
+    return;
+  }
+  const d = scopeData();
+  const err = opData && opData.error;
+  const all = (opData && opData.records) || [];
+  const recs = all.filter(r => d.agg || r.lifecycle === detailScope);   // 스코프 필터
+  const shown = opShowAll ? recs : recs.filter(r => (r.total_s || 0) >= 1);
+  const kindChip = k => `<span class="opk opk-${esc(k || "other")}">${esc(k || "-")}</span>`;
+  const stTxt = s => (typeof s === "number" && s < 300) ? "2xx" : esc(String(s));
+  const rows = shown.map(r =>
+    '<tr><td class="n"><b>' + _opFmt(r.total_s) + "</b></td>"
+    + '<td class="n">' + (r.api_ms != null ? Math.round(r.api_ms) + "ms" : "-") + "</td>"
+    + '<td class="n">' + _opFmt(r.settle_s) + "</td>"
+    + "<td>" + kindChip(r.kind) + "</td>"
+    + "<td>" + esc(shortName(r.service || "?")) + ' · <span class="mono">' + esc(r.step || "") + "</span>"
+    + (d.agg ? ' <span class="muted small">' + esc(r.lifecycle || "") + "</span>" : "") + "</td>"
+    + '<td class="n">' + stTxt(r.status) + "</td></tr>").join("");
+  const empty = err
+    ? '<tr><td colspan="6" class="empty">타이밍 계산 실패: ' + esc(err) + "</td></tr>"
+    : '<tr><td colspan="6" class="empty">' + (recs.length
+        ? "≥1s op 없음 — " + '<button class="minibtn" id="op-showall">전체 ' + recs.length + "건 표시</button>"
+        : ((d.status === "running" || runStatus === "running")
+            ? "아직 완료된 mutating op 없음 (진행 중)…" : "이 스코프에 mutating op 가 없습니다.")) + "</td></tr>";
+  const hiddenN = recs.length - shown.length;
+  setHtmlIfChanged(body,
+    '<h3 class="detail-h">타이밍 <span class="muted small">· ' + (d.agg ? "런 전체" : "이 라이프사이클")
+    + ' — op별 실측 (total = api 호출 + async 정착)</span>'
+    + '<button class="minibtn" id="op-refresh" title="events 재파생 — 진행 중 런은 최신 반영">↻ 새로고침</button>'
+    + '<a class="minibtn" href="/dashboard/op_timings.html" target="_blank" title="크로스런 p50/p90/max (발행 대시보드)">↗ 크로스런</a></h3>'
+    + '<div class="scroll" style="max-height:560px;margin-top:8px"><table class="tbl optbl">'
+    + "<thead><tr><th>total</th><th>api</th><th>settle</th><th>kind</th><th>service · op</th><th>status</th></tr></thead>"
+    + "<tbody>" + (rows || empty) + "</tbody></table></div>"
+    + ((!opShowAll && hiddenN > 0)
+        ? '<p class="muted small" style="margin:6px 0 0">total &lt;1s ' + hiddenN
+          + '건 숨김 · <button class="minibtn" id="op-showall">전체 표시</button></p>' : ""));
 }
 
 // Preserve the detail list's scroll position across a re-render. The live poll

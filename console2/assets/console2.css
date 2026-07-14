@@ -642,6 +642,17 @@ g.rg-selbox{cursor:pointer}
 #detail-body{padding:12px 14px}
 #detail-body .detail-h{font-size:12.5px;margin:0 0 9px;text-transform:none;letter-spacing:0;color:var(--ink)}
 #detail-body .empty{color:var(--muted);font-size:12.5px;padding:22px 8px;text-align:center}
+/* 타이밍(op별 실측) 탭 표 (op-timings 핸드오프) — total=api+async settle */
+.optbl .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.optbl td .mono{color:#3a424b}
+.optbl .detail-h a.minibtn{text-decoration:none}
+.opk{display:inline-block;font-size:9.5px;font-weight:700;border-radius:9px;padding:0 7px;
+  background:var(--panel2);color:var(--muted)}
+.opk-create{background:#eaf7ee;color:var(--green)}
+.opk-delete{background:#fdeaea;color:var(--red)}
+.opk-update,.opk-resize,.opk-upgrade{background:#fdf6e7;color:var(--amber)}
+.opk-start,.opk-stop,.opk-restart{background:#e8f0fd;color:var(--accent)}
+.opk-backup,.opk-sync,.opk-purge{background:#efeafb;color:var(--purple)}
 
 /* the dark structured per-lifecycle log box (scoped 로그) */
 .runlog.logbox{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;line-height:1.6}
