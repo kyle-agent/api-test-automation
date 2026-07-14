@@ -510,8 +510,9 @@ def test_source_badges_and_empty_states():
     """v2 접목 1 (2026-07-11, V2-L1-DATA-CONTRACT §1·§3·§4) — 출처 배지 3종.
 
     v1의 최대 약점이던 "발행본 fail N vs 이 서버 run 없음" 모순을 수치별 출처
-    배지(Published/This server/This run)와 empty-state 문구("관측 없음 ≠ 0")로
-    해소한다. 배지 마크업은 _badges.html 매크로 단일 구현."""
+    배지(공식 발행/이 서버/이 런 — 오너 2026-07-14 검수로 한국어 1급, 결정 지점 3
+    개정)와 empty-state 문구("관측 없음 ≠ 0")로 해소한다. 배지 마크업은
+    _badges.html 매크로 단일 구현."""
     from controlplane import common, dashdata
 
     # 매크로 시각 라벨 — history ts(UTC) → KST 짧은 라벨, 파싱 실패는 빈 문자열
@@ -528,22 +529,22 @@ def test_source_badges_and_empty_states():
     if snap:
         # 판정 배너·타일 = 발행본 출처 배지 (파랑, 노후면 badge-stale 병기)
         assert 'badge badge-published' in home
-        assert ">Published" in home
+        assert ">공식 발행" in home
     else:
         # 발행본 없음 = "관측 없음"으로 렌더 (0으로 위장 금지 — 계약 §3)
         assert "발행된 공식 수치를 가져올 수 없습니다" in home
         assert "관측 없음" in home
 
-    # 병합 런 타임라인 — 행별 출처 배지: local- 접두 = This server, 숫자 = CI
+    # 병합 런 타임라인 — 행별 출처 배지: local- 접두 = 이 서버, 숫자 = CI
     db.create_run("smoke", "stage", gh_run_id="local-badge-test")
     runs_page = client.get("/reporting?tab=runs").text
     assert ">source</th>" in runs_page
-    assert "badge badge-local" in runs_page and ">This server" in runs_page
+    assert "badge badge-local" in runs_page and ">이 서버" in runs_page
     assert ">CI" in runs_page          # 9200 등 CI 런 행 (파랑 재사용)
 
     # 런 상세 = 이 런(S3) 배지 — 과거형 고정 값임을 선언
     detail = client.get("/runs/9200").text
-    assert "badge badge-run" in detail and ">This run" in detail
+    assert "badge badge-run" in detail and ">이 런" in detail
 
 
 def test_verdict_vs_publish_time_split():
@@ -566,15 +567,17 @@ def test_verdict_vs_publish_time_split():
     assert "badge-ts2" in split                  # 발행 시각은 보조 스타일
     assert "dd:abc123" in split                  # ident 는 그대로
 
-    # 2) 두 시각이 같으면 기존처럼 '@ts' 하나만 (노이즈 억제)
+    # 2) 두 시각이 같으면 기존처럼 '@ts' 하나만 (노이즈 억제) — 분리 병기 마크업
+    #    (badge-ts2·'판정 ') 부재로 검사 (라벨 '공식 발행'에 '발행'이 들어가므로
+    #    문자열 '발행 ' 부정 검사는 쓰지 않는다).
     same = mod.badge("published", ts="07-09 19:27", pub_ts="07-09 19:27")
     assert "@07-09 19:27" in same
-    assert "판정 " not in same and "발행 " not in same
+    assert "badge-ts2" not in same and "판정 " not in same
 
     # 3) 발행 시각을 못 구하면(pub_ts 없음) 기존 표기 유지 — 절대 깨지지 않음
     none_pub = mod.badge("published", ts="07-09 19:27")
     assert "@07-09 19:27" in none_pub
-    assert "발행 " not in none_pub
+    assert "badge-ts2" not in none_pub
 
     # 4) dd_ts_short 는 best-effort — git 접근 실패/부재에도 문자열만 반환
     assert isinstance(common.dd_ts_short(), str)

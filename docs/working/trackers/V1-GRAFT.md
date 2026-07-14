@@ -160,6 +160,31 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   예상 타임라인엔 "행=워커 레인 · 실행 화면은 같은 sim 을 시나리오축으로", 예측 vs
   실제엔 "행=시나리오 · 워커축은 구성 ▸ 예상 타임라인". (라벨만, 로직 무변경.)
 
+## Overview 용어·링크 정비 (오너 검수 2026-07-14)
+
+오너 실사용 검수: "this server, 발행 이후 이 서버 런 2건, published 등 헷갈리고
+링크가 이상한 것도 많아, 의미도 잘 모르겠어" — 혼란의 뿌리 3종을 수리.
+
+1. **배지 라벨 한국어 1급** (`_badges.html`): Published→**공식 발행** ·
+   This server→**이 서버** · This run→**이 런** (CI 유지). 결정 지점 3 개정 =
+   TERMINOLOGY **P7** 오너 답. 툴팁(정확한 의미) 유지.
+2. **링크 수리** (`home.html`):
+   - D2 칩 "발행 이후 이 서버 런 N건 →" — 문구가 안 읽히고 링크가 실행 콘솔
+     (`/testing/embed`)로 가던 것 → **"판정 이후 이 서버 런 N건 (공식 미반영) →"**
+     + 그 런들이 실제 보이는 **런 타임라인**(`/reporting?tab=runs`)으로.
+   - REGRESSIONS 배너 "Report › Triage에서 확인하세요"(텍스트만) → 실제 링크.
+   - 신규 회귀 타일 "회귀 발생 — Triage 확인"(텍스트만) → 실제 링크.
+3. **화면 용어 정리** (TERMINOLOGY **P1·P4** 일부 적용):
+   - 타일 라벨 한국어 1급 + 코드 괄호: write-op 커버리지(cov_op)→**쓰기 검증
+     (cov_op)** · GET 커버리지→**읽기 검증 (cov_get)** · 누적 C3 검증→**검증됨(C3)
+     · 누적** · C1 static reachable→**도달가능(C1) · 정적** · 신규 fail→**신규
+     회귀 (fail_new)** (배너 REGRESSIONS 문구와 정합, known-red→알려진 실패).
+   - 내부 설계 용어 화면 노출 제거: 잔존 타일 "단일 표면 →"→**상세·새로 수집 →**,
+     "0 아님"→**"(미측정 — 0이라는 뜻 아님)"**, "(+기지 N)"→**"(+삭제불가 N)"**.
+- 검증: 렌더 12항목 전수(새 라벨·링크·영어 잔존 무) + tests_offline 31 passed
+  (배지 라벨 assertion 한국어로 갱신 — '공식 발행'에 '발행' 포함되므로 접목 5
+  테스트의 부정 검사는 badge-ts2 마크업 기준으로 교체).
+
 ## 대시보드 정비 (오너 지시 2026-07-14)
 
 - **서비스별 Platform 링크 제거** ("대시보드에 platform 링크들이 모든 서비스마다
@@ -311,8 +336,11 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
    낮추려면 `common.STALE_AFTER_H` 한 곳만 바꾸면 됨.
 2. **타일 배지 밀도** — 홈 타일은 카드마다 배지(계약 §0-4), 리포팅 타일 4장은
    섹션 헤더 배지 1개 + 회색화만(같은 출처 반복 노이즈 절충). 오너 검수 시 조정.
-3. 배지 라벨은 donor 그대로 영어(Published/This server/This run/CI), 툴팁
-   한국어 — D7 개정과 정합. v1 전반의 용어 정비는 접목 6에서 별도.
+3. ~~배지 라벨은 donor 그대로 영어(Published/This server/This run/CI)~~
+   **개정 (2026-07-14, 오너 검수)**: 오너가 Overview 실사용에서 "Published·This
+   server 헷갈리고 의미도 모르겠다" → 라벨 **한국어 1급**으로 전환 — 공식 발행 ·
+   이 서버 · 이 런 (CI 는 국제 관용이라 유지). 툴팁 한국어 유지. TERMINOLOGY P7
+   의 오너 답이기도 함 (아래 'Overview 용어·링크 정비' 참조).
 4. ~~PLAN ETA 가정 = 병렬 6~~ **개정 (2026-07-11): 예측 단일 소스 =
    `/api/schedule-sim` makespan** — 기존 세션이 main에 넣은 콘솔 간트
    (cf8792b3, '예측 vs 실제 타임라인' 패널)와 같은 예측을 스트립·종료 카드가
