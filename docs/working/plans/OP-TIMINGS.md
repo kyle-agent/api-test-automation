@@ -28,9 +28,12 @@
 ## 매 런 화면 표시
 
 `python -m tools.op_timings <run>` → 서비스×op 표(total/api/settle, 이번 런).
-[v2] console2 run-detail에 "타이밍" 탭 — 서버에 `derive(events)` 호출 엔드포인트
-`/api/runs/<id>/op-timings` 추가(콘솔이 이미 events 보유). ※ console2가 타 세션
-활성 영역이라 조율 후 반영.
+[v2] console2 run-detail에 "타이밍" 탭 — **백엔드 API 반영됨(2026-07-14)**:
+`GET /api/runs/<id>/op-timings` → 이 런 events.jsonl 로 `derive()` → per-op 레코드
+(service·step·catalog_key·kind·api_ms·settle_s·total_s·status, total_s 내림차순).
+controlplane(`console_api.py`)·standalone(`console2_server.py`) 양쪽에 추가, 없는 런
+404·읽기 실패 500. **렌더(콘솔 탭)는 console2 세션 소관** — UI 충돌 방지로 백엔드만
+신설(핸드오프 명시). 검증: `test_run_op_timings_api`(controlplane/tests_offline).
 
 ## 대시보드 반영 (cross-run)
 
@@ -49,7 +52,8 @@ dashboard-data에 발행(Pages).
 ## 단계
 
 - **MVP(반영됨)**: `tools/op_timings.py`(파생+표+누적+html) + publish 발행 + 문서
-- **v2**: console 탭 + 추세/회귀 알림
+- **v2**: 런별 백엔드 API `/api/runs/<id>/op-timings` **반영됨** · 콘솔 탭 렌더(console2
+  세션)·추세/회귀 알림 잔여
 - **v3**: 엔진 명시 태그(`settle_of`)로 신뢰도 100% + 타임아웃 자동 제안
 
 ## 리스크
