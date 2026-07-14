@@ -509,10 +509,14 @@ def test_quota_simulation_runs_on_dependencies_save():
 def test_source_badges_and_empty_states():
     """v2 접목 1 (2026-07-11, V2-L1-DATA-CONTRACT §1·§3·§4) — 출처 배지 3종.
 
-    v1의 최대 약점이던 "발행본 fail N vs 이 서버 run 없음" 모순을 수치별 출처
-    배지(공식 발행/이 서버/이 런 — 오너 2026-07-14 검수로 한국어 1급, 결정 지점 3
-    개정)와 empty-state 문구("관측 없음 ≠ 0")로 해소한다. 배지 마크업은
-    _badges.html 매크로 단일 구현."""
+    v1의 최대 약점이던 "발행본 fail N vs 이 서버 run 없음" 모순을 출처 배지
+    (Published/This server/This run)와 empty-state 문구("관측 없음 ≠ 0")로
+    해소한다. 배지 마크업은 _badges.html 매크로 단일 구현.
+
+    개정 (오너 2026-07-14 재검수 "이런 표현이 필요한가"): **예외만 배지** —
+    페이지 기본 출처(발행 스냅샷)는 헤더 Published 배지 + ctxbar 가 1곳에서
+    선언하고, 타일·배너에서의 반복은 제거. 배지는 기본과 다른 출처(잔존 타일의
+    라이브 This server, 런 목록의 CI/로컬 행 구분, 런 상세 This run)에만."""
     from controlplane import common, dashdata
 
     # 매크로 시각 라벨 — history ts(UTC) → KST 짧은 라벨, 파싱 실패는 빈 문자열
@@ -527,24 +531,28 @@ def test_source_badges_and_empty_states():
 
     snap = dashdata.latest_coverage()
     if snap:
-        # 판정 배너·타일 = 발행본 출처 배지 (파랑, 노후면 badge-stale 병기)
+        # 발행 출처 선언은 헤더 배지 1곳 (타일 반복 없음 — 예외만 배지 원칙)
         assert 'badge badge-published' in home
-        assert ">공식 발행" in home
+        assert ">Published" in home
+        # class 가 아니라 라벨로 센다 — 'ci' 배지가 파랑 스타일(badge-published)을
+        # 재사용해 런 표의 CI 행이 class 카운트에 잡힌다 (라벨은 '>CI').
+        assert home.count(">Published") == 1, \
+            "기본 출처(발행) 배지는 헤더 1곳만 — 타일·배너 반복 금지 (2026-07-14)"
     else:
         # 발행본 없음 = "관측 없음"으로 렌더 (0으로 위장 금지 — 계약 §3)
         assert "발행된 공식 수치를 가져올 수 없습니다" in home
         assert "관측 없음" in home
 
-    # 병합 런 타임라인 — 행별 출처 배지: local- 접두 = 이 서버, 숫자 = CI
+    # 병합 런 타임라인 — 행별 출처 배지: local- 접두 = This server, 숫자 = CI
     db.create_run("smoke", "stage", gh_run_id="local-badge-test")
     runs_page = client.get("/reporting?tab=runs").text
     assert ">source</th>" in runs_page
-    assert "badge badge-local" in runs_page and ">이 서버" in runs_page
+    assert "badge badge-local" in runs_page and ">This server" in runs_page
     assert ">CI" in runs_page          # 9200 등 CI 런 행 (파랑 재사용)
 
     # 런 상세 = 이 런(S3) 배지 — 과거형 고정 값임을 선언
     detail = client.get("/runs/9200").text
-    assert "badge badge-run" in detail and ">이 런" in detail
+    assert "badge badge-run" in detail and ">This run" in detail
 
 
 def test_verdict_vs_publish_time_split():
