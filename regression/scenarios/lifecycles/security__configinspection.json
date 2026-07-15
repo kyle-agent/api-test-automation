@@ -25,6 +25,16 @@
           "expect_status": [200, 400, 403, 404, 503]
         },
         {
+          "name": "list-checklist-versions",
+          "service": "configinspection",
+          "method": "GET",
+          "path": "/v1/configinspection/diagnosis/checklist/version",
+          "group": "config-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404, 503],
+          "_note": "getchecklistversion — NEW in v1.3 wave (2026-07-15). Zero-required-param list of diagnosis checklist versions (CheckListVersionResponse $.contents[] {check_list_name, check_list_state, check_list_version, check_list_version_id, csp_type, diagnosis_check_type}). CONFIRMED LIVE 2026-07-15: 200, 6 entries (BP+SSI x AWS/Azure/NURI). NOTE: SCP checklists carry csp_type 'NURI' (filter csp_type=SCP returns 0 rows)."
+        },
+        {
           "name": "get-diagnosis-result-detail",
           "service": "configinspection",
           "method": "GET",
@@ -44,8 +54,25 @@
       "id": "security-configinspection-diagnosis",
       "service": "security/configinspection",
       "enabled": true,
-      "_note": "COVERAGE-ONLY lifecycle for the 3 uncovered configinspection WRITE ops: POST /v1/configinspection/diagnosis/save (create a diagnosis object), POST /v1/configinspection/diagnosis/request (run a diagnosis), DELETE /v1/configinspection/diagnosis/terminate/{diagnosis_id} (terminate). Config Inspection diagnoses a CLOUD ACCOUNT (csp_type SCP or a foreign CSP) and the request/save bodies need REAL credentials of the account being inspected (diagnosisrequest: access_key/secret_key/tenant_id; diagnosisobjectrequest: a nested auth_key_request with a real auth_key_id, plus diagnosis_account_id). We do NOT have a throwaway inspectable account + auth key, so every write is a GUARDED OPTIONAL call with doc-sample ids and broad expect_status: it CALLS the endpoint (recording coverage for the 3 catalog keys) and 4xx's as expected. Bodies/field rules from data/api_docs.json (diagnosisobjectrequest, diagnosisrequest, diagnosisschedulerequest, authkeyrequest) — _UNPROVEN. save returns FLAT $.diagnosis_id (configinspectioncreateresponse) — soft-captured so that, if save unexpectedly succeeds, probe-reads can exercise GET .../diagnosis/detail/{diagnosis_id} and the terminate DELETE targets the real id; otherwise terminate fires against the doc-sample {diagnosis_id} (still records the DELETE write, 4xx). diagnosis_name pattern ^[a-zA-Z0-9-_]+$. Each write is isolated in its own group so a 4xx is a warning, not a run failure; nothing real is created so teardown is the terminate call itself (no separate cleanup resource). CONFIRMED PARAMS 2026-06-20: getdiagnosisresultdetail requires diagnosis_id + diagnosis_request_sequence (both REQUIRED, validated via live probing). getdiagnosisobjectdetail path-param id format: DIA-<32hex-uppercase>.",
+      "_note": "COVERAGE-ONLY lifecycle for the 3 uncovered configinspection WRITE ops: POST /v1/configinspection/diagnosis/save (create a diagnosis object), POST /v1/configinspection/diagnosis/request (run a diagnosis), DELETE /v1/configinspection/diagnosis/terminate/{diagnosis_id} (terminate). Config Inspection diagnoses a CLOUD ACCOUNT (csp_type SCP or a foreign CSP) and the request/save bodies need REAL credentials of the account being inspected (diagnosisrequest: access_key/secret_key/tenant_id; diagnosisobjectrequest: a nested auth_key_request with a real auth_key_id, plus diagnosis_account_id). We do NOT have a throwaway inspectable account + auth key, so every write is a GUARDED OPTIONAL call with doc-sample ids and broad expect_status: it CALLS the endpoint (recording coverage for the 3 catalog keys) and 4xx's as expected. Bodies/field rules from data/api_docs.json (diagnosisobjectrequestv1dot3, diagnosisrequestv1dot3, diagnosisschedulerequestv1dot3, authkeyrequest) — v1.3 wave 2026-07-15: save gained REQUIRED check_list_version_id (fed by the new getchecklistversion GET, first step), request lost diagnosis_check_type, schedule_request slimmed to {diagnosis_start_time_pattern, frequency_type, frequency_value}. Body shapes LIVE-CONFIRMED 2026-07-15 (pass validation; still 404 at the credential lookup as designed). save returns FLAT $.diagnosis_id (configinspectioncreateresponse) — soft-captured so that, if save unexpectedly succeeds, probe-reads can exercise GET .../diagnosis/detail/{diagnosis_id} and the terminate DELETE targets the real id; otherwise terminate fires against the doc-sample {diagnosis_id} (still records the DELETE write, 4xx). diagnosis_name pattern ^[a-zA-Z0-9-_]+$. Each write is isolated in its own group so a 4xx is a warning, not a run failure; nothing real is created so teardown is the terminate call itself (no separate cleanup resource). CONFIRMED PARAMS 2026-06-20: getdiagnosisresultdetail requires diagnosis_id + diagnosis_request_sequence (both REQUIRED, validated via live probing). getdiagnosisobjectdetail path-param id format: DIA-<32hex-uppercase>.",
       "steps": [
+        {
+          "name": "get-checklist-version",
+          "service": "configinspection",
+          "method": "GET",
+          "path": "/v1/configinspection/diagnosis/checklist/version",
+          "group": "xcov-config-save",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404, 503],
+          "capture_soft": {
+            "check_list_version_id": {
+              "list": "$.contents",
+              "where_prefix": {"csp_type": "NURI", "diagnosis_check_type": "BP"},
+              "get": "check_list_version_id"
+            }
+          },
+          "_note": "getchecklistversion (NEW v1.3, same wave as the save-body change) — feeds save's new REQUIRED check_list_version_id. CONFIRMED LIVE 2026-07-15 (200): SCP's own checklist rows carry csp_type 'NURI' (csp_type=SCP filter returns 0 rows), so the filter selects the NURI/BP Active/Latest row (SCP_BP_* name). Soft-capture: if it finds nothing the save body keeps the literal placeholder and 4xx's (tolerated, optional step)."
+        },
         {
           "name": "save",
           "service": "configinspection",
@@ -59,6 +86,7 @@
               "auth_key_id": "9b72a9856e494e67afc69atd3631fe38",
               "diagnosis_id": "DIA-943731CB8E3045C289BAECAEC3532097"
             },
+            "check_list_version_id": "{check_list_version_id}",
             "csp_type": "SCP",
             "diagnosis_account_id": "0e3dffc50eb247a1adf4f2e5c82c4f99",
             "diagnosis_check_type": "BP",
@@ -67,15 +95,15 @@
             "diagnosis_type": "Console",
             "plan_type": "STANDARD",
             "schedule_request": {
-              "diagnosis_id": "DIA-943731CB8E3045C289BAECAEC3532097",
+              "diagnosis_start_time_pattern": "08:00",
               "frequency_type": "ONCE",
-              "use_diagnosis_check_type_bp": "true",
-              "use_diagnosis_check_type_ssi": "false"
+              "frequency_value": "1"
             },
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {"diagnosis_id": "$.diagnosis_id"}
+          "capture_soft": {"diagnosis_id": "$.diagnosis_id"},
+          "_note": "v1.3 body (DiagnosisObjectRequestV1Dot3, spec refresh 2026-07-15): NEW REQUIRED check_list_version_id (from get-checklist-version lookup step; omitting it gets 400 ValidationError 'Field required' — CONFIRMED LIVE 2026-07-15). diagnosis_check_type is STILL required in the save model (only the /request model dropped it). schedule_request is now DiagnosisScheduleRequestV1Dot3: diagnosis_id/use_diagnosis_check_type_bp/use_diagnosis_check_type_ssi REMOVED, diagnosis_start_time_pattern + frequency_value now required. CONFIRMED LIVE 2026-07-15: this exact body shape passes field validation — 404 ConfigAccessKeyNotFoundError (doc-sample auth_key_id, credential-gated as before), no longer a schema 400."
         },
         {
           "name": "request",
@@ -86,12 +114,12 @@
           "optional": true,
           "json": {
             "access_key": "SAMPLE KEY",
-            "diagnosis_check_type": "BP",
             "diagnosis_id": "DIA-943731CB8E3045C289BAECAEC3532097",
             "secret_key": "SAMPLE KEY",
             "tenant_id": "1234567890"
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "v1.3 body (DiagnosisRequestV1Dot3, spec refresh 2026-07-15): diagnosis_check_type REMOVED from the model (no replacement). CONFIRMED LIVE 2026-07-15: new 4-field body passes validation — 404 ConfigDiagnosisIdNotFoundError (doc-sample diagnosis_id, as before); sending the legacy field is silently ignored (same 404) but we follow the spec and drop it."
         },
         {
           "name": "get-diagnosis-detail",

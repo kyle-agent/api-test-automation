@@ -14,14 +14,47 @@
 #   not a 404). Could NOT re-confirm constraints from the live page this round.
 #   The constraints already recorded below are prior-curated (provenance: docs)
 #   and remain UNPROVEN (no live 2xx). Re-fetch when the subtree recovers.
+# V1.3 SPEC WAVE (2026-07-15, SPEC-DIFF-20260715 §2⑤): save body is now
+#   DiagnosisObjectRequestV1Dot3 — NEW REQUIRED check_list_version_id (fed by the
+#   new getchecklistversion GET, modeled as lookup node ci-checklist-version
+#   below); schedule_request is DiagnosisScheduleRequestV1Dot3 (diagnosis_id /
+#   use_diagnosis_check_type_bp / use_diagnosis_check_type_ssi REMOVED;
+#   diagnosis_start_time_pattern + frequency_value now required).
+#   diagnosisrequest (POST .../diagnosis/request) lost diagnosis_check_type.
+#   Body shapes LIVE-CONFIRMED 2026-07-15: pass validation, 404 at the
+#   credential lookup (doc-sample auth key) as before.
 version: 1
 resources:
+  # 읽기 전용 LOOKUP — getchecklistversion (NEW v1.3). 진단 생성(save)의
+  # 신규 필수 check_list_version_id 공급원. LIVE-VALIDATED 2026-07-15: 200,
+  # 6 rows (BP+SSI x AWS/Azure/NURI). 주의: SCP 자체 체크리스트의 csp_type은
+  # 'NURI' — csp_type=SCP 필터는 0건을 돌려준다.
+  ci-checklist-version:
+    lookup: true
+    code: "sec-ci-checklist-version"
+    service: security/configinspection
+    requires: []
+    create:
+      endpoint: "GET /v1/configinspection/diagnosis/checklist/version"
+    capture:
+      check_list_version_id:
+        list: "$.contents"
+        where_prefix: {csp_type: "NURI", diagnosis_check_type: "BP"}
+        get: "check_list_version_id"
+    verify:
+      - {name: read, endpoint: "GET /v1/configinspection/diagnosis/checklist/version",
+         expect_status: [200]}
+    provenance: VALIDATED
+    source: {lifecycle: security-configinspection-diagnosis, steps: [get-checklist-version]}
+    notes: "CheckListVersionResponse $.contents[] {check_list_name, check_list_state, check_list_version, check_list_version_id, csp_type, diagnosis_check_type}. NURI/BP 행 = SCP_BP_* (Active/Latest). 외부 CSP 진단이면 csp_type prefix를 AWS/Azure로 바꿔 캡처. 쿼리 파라미터 전부 optional (size/page/sort/csp_type/diagnosis_check_type/checklist_name/check_list_version)."
+
   diagnosis:
     code: "sec-ci-diagnosis"
     service: security/configinspection
     requires:
+      - ci-checklist-version
       - {credential: inspectable-account-auth-key,
-         note: "진단 대상 계정(SCP 또는 외부 CSP)의 실제 auth_key_id/계정 자격 — 콘솔 발급, API로 생성 불가. 환경에 표시 없으면 env-skip. 진단 실행(request)은 추가로 access_key/secret_key/tenant_id 실값 요구"}
+         note: "진단 대상 계정(SCP 또는 외부 CSP)의 실제 auth_key_id/계정 자격 — 콘솔 발급, API로 생성 불가. 환경에 표시 없으면 env-skip. 진단 실행(request)은 추가로 access_key/secret_key/tenant_id 실값 요구 (v1.3부터 request 바디에서 diagnosis_check_type 제거됨)"}
     create:
       endpoint: "POST /v1/configinspection/diagnosis/save"
       body:
@@ -29,6 +62,7 @@ resources:
         auth_key_request:
           auth_key_id: "9b72a9856e494e67afc69atd3631fe38"
           diagnosis_id: "DIA-943731CB8E3045C289BAECAEC3532097"
+        check_list_version_id: "{ci-checklist-version.check_list_version_id}"
         csp_type: "{opt.csp_type}"
         diagnosis_account_id: "0e3dffc50eb247a1adf4f2e5c82c4f99"
         diagnosis_check_type: BP
@@ -37,10 +71,9 @@ resources:
         diagnosis_type: Console
         plan_type: STANDARD
         schedule_request:
-          diagnosis_id: "DIA-943731CB8E3045C289BAECAEC3532097"
+          diagnosis_start_time_pattern: "08:00"
           frequency_type: ONCE
-          use_diagnosis_check_type_bp: "true"
-          use_diagnosis_check_type_ssi: "false"
+          frequency_value: "1"
         tags: []
       options:
         csp_type: {type: enum, values: [SCP, AWS, AZURE], required: true,
@@ -57,4 +90,4 @@ resources:
     provenance: docs
     gated: credential  # 진단 대상 계정 auth_key 콘솔 발급 — KNOWN-UNSATISFIABLE
     source: {lifecycle: security-configinspection-diagnosis, steps: [save, terminate]}
-    notes: "body의 account/auth_key/diagnosis id들은 doc-sample 값 — 진단 가능한 throwaway 계정+인증키가 없어 KNOWN-UNSATISFIABLE, create는 4xx 예상 (소스는 coverage-only guarded). capture는 FLAT $.diagnosis_id (configinspectioncreateresponse) — 소스에서 capture_soft, UNPROVEN. diagnosis_name 규칙 ^[a-zA-Z0-9-_]+$. teardown verb는 DELETE .../terminate/{diagnosis_id}. 진단 결과 per-item ERROR는 인증키 권한 부족 신호 (services/security__configinspection.yaml error-status-means-auth)."
+    notes: "body의 account/auth_key/diagnosis id들은 doc-sample 값 — 진단 가능한 throwaway 계정+인증키가 없어 KNOWN-UNSATISFIABLE, create는 4xx 예상 (소스는 coverage-only guarded). capture는 FLAT $.diagnosis_id (configinspectioncreateresponse) — 소스에서 capture_soft, UNPROVEN. diagnosis_name 규칙 ^[a-zA-Z0-9-_]+$. teardown verb는 DELETE .../terminate/{diagnosis_id}. 진단 결과 per-item ERROR는 인증키 권한 부족 신호 (services/security__configinspection.yaml error-status-means-auth). V1.3 LIVE-CONFIRMED 2026-07-15: check_list_version_id 누락 시 400 ValidationError 'Field required'; 위 v1.3 body(실제 checklist id + doc-sample auth key)는 검증 통과 후 404 ConfigAccessKeyNotFoundError — 즉 스키마는 맞고 게이트는 여전히 credential. diagnosis_check_type은 save 모델에는 v1.3에도 여전히 필수(제거는 request 모델만)."
