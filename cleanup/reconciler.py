@@ -303,6 +303,187 @@ _SWEEP_COLLECTIONS: tuple = (
 _LIST_CACHE: dict = {}     # (id(client), service, path) -> (monotonic_ts, items)
 _PRESCAN_TTL_S = 120.0     # 배리어 뒤 늦은 소비의 state-staleness 상한
 
+# --------------------------------------------------------------------------- #
+# 태그 인벤토리 스코프 축소 (오너 2026-07-15 아이디어: "resourcemanager
+# listresources로 우리가 생성한 tag로 안 지워진 게 있는지 조회가 가능하다.
+# 이걸로 범위를 좁히고, 나머지는 부산물(서비스와치 로그그룹 같은 거) 종류별로
+# 일괄 리스트 조회"). GET /v1/resources 는 계정 전 리소스를 service ·
+# resource_type · resource_name · tags 와 함께 한 컬렉션으로 반환한다
+# (management/resourcemanager/listresources) — 몇 페이지만 받아 owner 태그로
+# 거르면 "우리 잔존물이 어느 컬렉션에 있는지"가 나오고, 그 밖의 컬렉션은
+# 이 라운드에서 나열 자체를 건너뛴다.
+#
+# SAFETY (스코프를 좁히는 최적화이므로 놓침=잔존이다 — 삼중 방어):
+#   1. 부산물 컬렉션(_DERIVATIVE_COLLS)은 무조건 종전대로 나열: 태그가 목록/
+#      레지스트리에 안 잡히는 플랫폼 파생물들 (IGW는 2026-07-15 실측 태그
+#      미노출, 로그그룹 /scp/*, 파생 snapshot/image/boot-volume, unnamed
+#      publicip, PF-47 숨은 VPC_ENDPOINT 서브넷 뷰, LB/NAT 파생 port,
+#      LC 파생 keypair, 추가-리전 필터가 도는 filestorage).
+#   2. 인벤토리에 매핑 모르는 (service, type)의 소유 아이템이 하나라도 있으면
+#      이 라운드의 축소를 통째로 포기하고 전체 나열 (미지 타입이 자기 컬렉션
+#      스킵을 유발하지 않게).
+#   3. 인벤토리 호출 실패/의심(0건인데 규모 판단 불가) → 전체 나열 (fail-open).
+# 끄기: SCP_SWEEP_TAG_SCOPE=false. 소유권 게이트/삭제 순서는 불변 — 이 축소는
+# "어느 컬렉션을 나열하나"만 정한다 (각 패스의 _is_deletable 판정은 그대로).
+# --------------------------------------------------------------------------- #
+_DERIVATIVE_COLLS: frozenset = frozenset({
+    ("servicewatch", "/v1/log-groups"),
+    ("vpc", "/v1/internet-gateways"),
+    ("vpc", "/v1/publicips"),
+    ("vpc", "/v1/ports"),
+    ("vpc", "/v1/subnets"),
+    ("vpc", "/v1/subnets?type=VPC_ENDPOINT"),
+    ("vpc", "/v1/nat-gateways"),
+    ("loadbalancer", "/v1/loadbalancers"),
+    ("virtualserver", "/v1/images"),
+    ("virtualserver", "/v1/snapshots"),
+    ("virtualserver", "/v1/volumes"),
+    ("virtualserver", "/v1/keypairs"),
+    ("filestorage", "/v1/volumes"),     # 추가-리전 필터는 인벤토리 밖
+})
+
+# 인벤토리 (service, resource_type) -> 스윕 컬렉션. 인벤토리 항목이 여기 없으면
+# 그 라운드는 축소 포기 (SAFETY 2). dbaas 엔진들은 service명이 곧 스윕의
+# 서비스 키다 (mysql/postgresql/… -> /v1/clusters).
+_TYPE_TO_COLL: dict = {
+    ("virtualserver", "virtual-server"): ("virtualserver", "/v1/servers"),
+    ("virtualserver", "server-group"): ("virtualserver", "/v1/server-groups"),
+    ("virtualserver", "launch-configuration"):
+        ("virtualserver", "/v1/launch-configurations"),
+    ("virtualserver", "keypair"): ("virtualserver", "/v1/keypairs"),
+    ("virtualserver", "image"): ("virtualserver", "/v1/images"),
+    ("virtualserver", "snapshot"): ("virtualserver", "/v1/snapshots"),
+    ("virtualserver", "volume"): ("virtualserver", "/v1/volumes"),
+    ("filestorage", "volume"): ("filestorage", "/v1/volumes"),
+    ("vpc", "vpc"): ("vpc", "/v1/vpcs"),
+    ("vpc", "subnet"): ("vpc", "/v1/subnets"),
+    ("vpc", "port"): ("vpc", "/v1/ports"),
+    ("vpc", "publicip"): ("vpc", "/v1/publicips"),
+    ("vpc", "public-ip"): ("vpc", "/v1/publicips"),
+    ("vpc", "internet-gateway"): ("vpc", "/v1/internet-gateways"),
+    ("vpc", "nat-gateway"): ("vpc", "/v1/nat-gateways"),
+    ("vpc", "transit-gateway"): ("vpc", "/v1/transit-gateways"),
+    ("vpc", "vpc-endpoint"): ("vpc", "/v1/vpc-endpoints"),
+    ("vpc", "vpc-peering"): ("vpc", "/v1/vpc-peerings"),
+    ("loadbalancer", "loadbalancer"): ("loadbalancer", "/v1/loadbalancers"),
+    ("loadbalancer", "load-balancer"): ("loadbalancer", "/v1/loadbalancers"),
+    ("security-group", "security-group"):
+        ("security-group", "/v1/security-groups"),
+    ("ske", "cluster"): ("ske", "/v1/clusters"),
+    ("mysql", "cluster"): ("mysql", "/v1/clusters"),
+    ("postgresql", "cluster"): ("postgresql", "/v1/clusters"),
+    ("mariadb", "cluster"): ("mariadb", "/v1/clusters"),
+    ("epas", "cluster"): ("epas", "/v1/clusters"),
+    ("cachestore", "cluster"): ("cachestore", "/v1/clusters"),
+    ("eventstreams", "cluster"): ("eventstreams", "/v1/clusters"),
+    ("searchengine", "cluster"): ("searchengine", "/v1/clusters"),
+    ("sqlserver", "cluster"): ("sqlserver", "/v1/clusters"),
+    ("vertica", "cluster"): ("vertica", "/v1/clusters"),
+    ("scr", "container-registry"): ("scr", "/v1/container-registries"),
+    ("scr", "repository"): ("scr", "/v1/repositories"),
+    ("scf", "cloud-function"): ("scf", "/v1/cloud-functions"),
+    ("apigateway", "api"): ("apigateway", "/v1/apis"),
+    ("cdn", "cdn"): ("cdn", "/v1/cdns"),
+    ("dns", "hosted-zone"): ("dns", "/v1/hosted-zones"),
+    ("dns", "private-dns"): ("dns", "/v1/private-dns"),
+    ("direct-connect", "direct-connect"):
+        ("direct-connect", "/v1/direct-connects"),
+    ("certificatemanager", "certificate"):
+        ("certificatemanager", "/v1/certificatemanager"),
+    ("kms", "key"): ("kms", "/v1/kms/transit"),
+    ("kms", "transit"): ("kms", "/v1/kms/transit"),
+    ("secretsmanager", "secret"): ("secretsmanager", "/v1/secrets"),
+    ("queueservice", "queue"): ("queueservice", "/v1/queues"),
+    ("resourcemanager", "resource-group"):
+        ("resourcemanager", "/v1/resource-groups"),
+    ("iam", "group"): ("iam", "/v1/groups"),
+    ("iam", "policy"): ("iam", "/v1/policies"),
+}
+
+
+def _tag_scope_enabled() -> bool:
+    return os.environ.get("SCP_SWEEP_TAG_SCOPE", "").lower() != "false"
+
+
+def _item_tags(it: dict):
+    """listresources 아이템의 tags — [{key,value}] 또는 문자열화된 JSON."""
+    tags = it.get("tags")
+    if isinstance(tags, str):
+        try:
+            import json as _json
+            tags = _json.loads(tags)
+        except ValueError:
+            return []
+    return tags if isinstance(tags, list) else []
+
+
+def _tag_inventory(client):
+    """GET /v1/resources 를 페이지로 받아 소유(owner 태그 또는 regr*/zznet*
+    이름) 아이템만 돌려준다. 실패하면 None (호출측이 전체 나열로 폴백)."""
+    from core.registry import OWNER_KEY, OWNER
+    size, max_pages = 100, 30
+    owned, total_seen = [], 0
+    try:
+        for page in range(max_pages):
+            r = client.get(f"/v1/resources?size={size}&page={page}",
+                           service="resourcemanager")
+            if not r.ok:
+                print(f"  tag-inventory: list /v1/resources -> {r.status} — "
+                      "전체 나열로 폴백")
+                return None
+            items = [it for it in _items(r.body) if isinstance(it, dict)]
+            total_seen += len(items)
+            for it in items:
+                name = str(it.get("resource_name") or "")
+                has_tag = any(isinstance(t, dict) and t.get("key") == OWNER_KEY
+                              and t.get("value") == OWNER
+                              for t in _item_tags(it))
+                if has_tag or name.startswith(("regr", "zznet")):
+                    owned.append(it)
+            if len(items) < size:
+                break
+        else:
+            # max_pages 소진 = 계정이 비정상적으로 큼 — 축소 신뢰 불가
+            print("  tag-inventory: 페이지 상한 도달 — 전체 나열로 폴백")
+            return None
+    except Exception as exc:  # noqa: BLE001 — 축소 실패가 스윕 실패면 안 됨
+        print(f"  tag-inventory error: {exc} — 전체 나열로 폴백")
+        return None
+    print(f"  tag-inventory: {total_seen} resource(s) seen, "
+          f"{len(owned)} owned")
+    return owned
+
+
+def _tag_scope_collections(client):
+    """이 라운드에서 나열할 컬렉션 집합을 돌려준다 — 태그 인벤토리 기반
+    축소가 가능하면 (매핑된 소유 컬렉션 ∪ 부산물 컬렉션), 아니면 None
+    (= 전체 나열)."""
+    if not _tag_scope_enabled():
+        return None
+    inv = _tag_inventory(client)
+    if not inv:
+        # None(호출 실패) 또는 소유 0건 — 0건이어도 축소하지 않는다: 태그
+        # 인덱싱 사각지대(태그 미노출 파생물)가 있는 한 "깨끗함"의 최종 확인은
+        # 전체 나열이 해야 한다. 축소의 가치는 "일부가 남았을 때 나머지 스킵".
+        if inv is not None:
+            print("  tag-scope: 소유 잔존 0건 — 축소 없이 전체 나열로 최종 확인")
+        return None
+    needed = set(_DERIVATIVE_COLLS)
+    for it in inv:
+        key = (str(it.get("service") or ""), str(it.get("resource_type") or ""))
+        coll = _TYPE_TO_COLL.get(key)
+        if coll is None:
+            # SAFETY 2: 미지 타입의 소유 잔존 — 축소를 통째로 포기 (그 타입의
+            # 실제 컬렉션이 스킵되는 것을 막는다) + PF 후보로 보고.
+            print(f"  tag-scope: 미지 타입 {key} (이름 "
+                  f"{it.get('resource_name')!r}) — 축소 포기, 전체 나열")
+            return None
+        needed.add(coll)
+    skipped = [p for p in _SWEEP_COLLECTIONS if p not in needed]
+    print(f"  tag-scope: owned {len(inv)}건 → 컬렉션 {len(needed & set(_SWEEP_COLLECTIONS))}개"
+          f" 나열, {len(skipped)}개 스킵")
+    return needed
+
 
 def _prescan_enabled() -> bool:
     return os.environ.get("SCP_SWEEP_NO_PRESCAN", "").lower() != "true"
@@ -315,6 +496,14 @@ def _prescan(client) -> None:
     되면 안 됨)."""
     if not _prescan_enabled() or _sweep_workers() <= 1:
         return
+    # 태그 인벤토리 스코프 축소 — 소유 잔존이 있는 컬렉션 + 부산물 컬렉션만
+    # 나열하고, 나머지는 converged로 마킹해 패스 자체를 스킵시킨다 (오너
+    # 2026-07-15). 축소 불가(None)면 전체 나열 (fail-open).
+    scope = _tag_scope_collections(client)
+    if scope is not None and _converge_enabled():
+        for p in _SWEEP_COLLECTIONS:
+            if p not in scope:
+                _CONVERGED.add(p)
     pairs = [(svc, path) for svc, path in _SWEEP_COLLECTIONS
              if not (_converge_enabled() and (svc, path) in _CONVERGED)]
     if not pairs:

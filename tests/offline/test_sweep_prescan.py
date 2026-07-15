@@ -120,3 +120,93 @@ def test_run_sweep_results_identical_with_and_without_prescan(monkeypatch):
 
     assert dels_on == dels_off, (dels_on, dels_off)
     assert "/v1/images/im-1" in dels_on
+
+
+# --------------------------------------------------------------------------- #
+# 태그 인벤토리 스코프 축소 (오너 2026-07-15: listresources로 범위를 좁히고
+# 부산물만 종류별 일괄 조회)
+# --------------------------------------------------------------------------- #
+def _inv_item(service, rtype, name, tags=None):
+    return {"service": service, "resource_type": rtype, "resource_name": name,
+            "id": f"id-{name}",
+            "tags": tags if tags is not None else
+            [{"key": "owner", "value": "apitest"}]}
+
+
+def test_tag_scope_narrows_to_owned_plus_derivative_collections():
+    """인벤토리가 vpc 잔존만 보이면 — vpc 컬렉션 + 부산물 컬렉션만 나열하고
+    나머지(예: apigateway/cdn/queues)는 converged 마킹으로 패스째 스킵."""
+    client = FakeClient(lists={
+        "/v1/resources": [_inv_item("vpc", "vpc", "regrvpcx")],
+        "/v1/vpcs": [_owned("regrvpcx", id="vpc-1")],
+    })
+    recon._prescan(client)
+    listed = {p for m, p in client.calls if m == "GET"}
+    assert "/v1/vpcs" in listed, "잔존이 있는 컬렉션은 나열"
+    assert "/v1/log-groups" in listed, "부산물 컬렉션은 무조건 나열"
+    assert "/v1/apis" not in listed and "/v1/cdns" not in listed, \
+        "잔존 없는 비-부산물 컬렉션은 나열 자체를 스킵"
+    assert ("apigateway", "/v1/apis") in recon._CONVERGED, \
+        "스킵 컬렉션은 converged 마킹 → 패스도 스킵"
+
+
+def test_tag_scope_unknown_type_falls_back_to_full_listing():
+    """매핑에 없는 (service, type)의 소유 잔존이 보이면 축소를 통째로 포기 —
+    미지 타입이 자기 컬렉션 스킵을 유발하면 안 된다 (SAFETY 2)."""
+    client = FakeClient(lists={
+        "/v1/resources": [_inv_item("newservice", "widget", "regrwidget1")],
+    })
+    recon._prescan(client)
+    listed = {p for m, p in client.calls if m == "GET"}
+    assert "/v1/apis" in listed, "미지 타입 → 전체 나열 폴백"
+    assert ("apigateway", "/v1/apis") not in recon._CONVERGED
+
+
+def test_tag_scope_empty_inventory_means_full_final_verification():
+    """소유 0건이어도 축소하지 않는다 — 태그 미노출 파생물의 최종 확인은
+    전체 나열이 해야 한다 (SAFETY 3)."""
+    client = FakeClient(lists={"/v1/resources": []})
+    recon._prescan(client)
+    listed = {p for m, p in client.calls if m == "GET"}
+    assert "/v1/apis" in listed and "/v1/vpcs" in listed
+
+
+def test_tag_scope_inventory_error_falls_back(monkeypatch):
+    class Err503Client(FakeClient):
+        def get(self, path, service=None, **kw):
+            self.calls.append(("GET", path))
+            if path.startswith("/v1/resources"):
+                from tests.offline.test_reconciler_convergence import _Resp
+                return _Resp(503, {})
+            return super().get(path, service=service, **kw)
+
+    client = Err503Client(lists={})
+    recon._prescan(client)
+    listed = {p for m, p in client.calls if m == "GET"}
+    assert "/v1/apis" in listed, "listresources 실패 → 전체 나열 폴백"
+
+
+def test_tag_scope_opt_out_env(monkeypatch):
+    monkeypatch.setenv("SCP_SWEEP_TAG_SCOPE", "false")
+    client = FakeClient(lists={})
+    recon._prescan(client)
+    assert not any(p.startswith("/v1/resources")
+                   for m, p in client.calls if m == "GET"), \
+        "opt-out이면 인벤토리 호출 자체가 없다"
+
+
+def test_tag_scope_stringified_tags_and_name_prefix_fallback():
+    """listresources의 tags가 문자열화된 JSON이어도 파싱하고, 태그가 없어도
+    regr* 이름이면 소유로 인정한다 (스윕의 이중 판정과 동일 원리)."""
+    client = FakeClient(lists={
+        "/v1/resources": [
+            _inv_item("vpc", "subnet", "sub-x",
+                      tags='[{"key": "owner", "value": "apitest"}]'),
+            _inv_item("vpc", "vpc", "regrvpcy", tags=[]),
+        ],
+        "/v1/vpcs": [_owned("regrvpcy", id="vpc-2")],
+    })
+    recon._prescan(client)
+    listed = {p for m, p in client.calls if m == "GET"}
+    assert "/v1/vpcs" in listed and "/v1/subnets" in listed
+    assert "/v1/apis" not in listed
