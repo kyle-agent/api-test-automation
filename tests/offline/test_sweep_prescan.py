@@ -289,3 +289,18 @@ def test_blast_kill_switch(monkeypatch):
     recon._LIST_CACHE[(id(c), "queueservice", "/v1/queues")] = (
         time.monotonic(), [_owned("regrq-a", id="q1")])
     assert recon._blast_delete(c) == 0 and c.calls == []
+
+
+def test_hex_orphan_volume_swept_but_attached_or_regular_skipped():
+    """공유-이미지 파생 임시 볼륨 (오너 실측 2026-07-16): 태그 없음 + 32-hex
+    이름 + 미부착 → 픽. 부착 중이거나 hex-이름이 아닌 무태그 볼륨은 불변."""
+    hexname = "d8d0653743c148f6b76ae13c1ebf029c"
+    client = FakeClient(lists={"/v1/volumes": [
+        {"id": "v-hex", "name": hexname, "servers": []},
+        {"id": "v-att", "name": "a" * 32, "servers": [{"id": "srv1"}]},
+        {"id": "v-usr", "name": "customer-volume", "servers": []},
+    ]})
+    recon.run_sweep(client)
+    dels = [p for m, p in client.calls if m == "DELETE"]
+    assert "/v1/volumes/v-hex" in dels, dels
+    assert "/v1/volumes/v-att" not in dels and "/v1/volumes/v-usr" not in dels

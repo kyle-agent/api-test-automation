@@ -182,6 +182,9 @@
             ],
             "timeout": 180,
             "interval": 10
+          },
+          "capture": {
+            "share_target_account_id": "$.vpc.account_id"
           }
         },
         {
@@ -538,7 +541,7 @@
           "method": "POST",
           "path": "/v1/images/{custom_image_id}/share",
           "json": {
-            "account_id": "ec11538abf8f46d2953539521f745366"
+            "account_id": "{share_target_account_id}"
           },
           "expect_status": [
             200,
@@ -549,7 +552,7 @@
             409,
             422
           ],
-          "_note": "2026-07-11 라이브 프로브 확정: share는 BDM(block device mapping) 있는 이미지 요구 (셸에서 400 Image.InvalidImageWithBlockDeviceMapping 실측) — BDM은 server-유래 custom image만 가짐 → custom-image 그룹의 create 직후로 이동 (923a의 404는 verify 실패로 그룹 teardown이 이미지를 먼저 지운 순서 문제)."
+          "_note": "ACCOUNT REPAIR 2026-07-16: 종전엔 구계정 id(ec11538a…) 하드코딩 — 계정 교체 후 '타계정 공유'가 되어 공유 이미지 생성용 임시 볼륨(hex-이름, 104GB)이 계정에 고아로 남았고 Volume.VolumeForSharingImageDelete로 삭제도 거부됨 (오너 실측 2026-07-16 + 원본 이미지 선삭제로 파이프라인 웨지). wait-vpc 응답의 $.vpc.account_id(현재 계정)를 캡처해 자기계정 공유로 전환 — 계정 불변. self-share 수락 여부는 미검증(expect가 4xx 관용이라 무해), 다음 런 판정."
         },
         {
           "name": "create-image-shell",

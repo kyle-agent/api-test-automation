@@ -3510,3 +3510,25 @@ api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 �
 - **gen-cloudml-chain waiver** (오너 지시): 전체런에서 계속 '대기중' —
   9-노드 클로저(ske 선행 + SCP_SCR_* requires_env)가 스케줄만 점유.
   enabled:false + _status=blocked-owner. SKE 안정화 후 재활성화 검토.
+
+## SKE createnodepool 500 = zone 미지정 (단일 AZ 계정) 추정 + 공유이미지 임시볼륨 고아 (2026-07-16)
+
+- **SKE 단독 재런 실측**: 클러스터는 RUNNING 정상 도달(24 ok), `POST /v1/nodepools`
+  만 **500 ContactAdminForAssistance** (16.7s, req-87752221…). 이전 전체런 1076s
+  실패와 동일 지점 — "클러스터 ERROR" 가설 기각. ubuntu-22.04-kube-v1.34.3
+  이미지 존재(k8s 이미지 33종 전수 확인) — 이미지 부재 아님.
+  nodepoolcreaterequest**v1dot5**에 `zone`(optional) 신설 + 이 계정은
+  kr-west1-a 불가 단일 AZ → zone 미지정 시 기본 zone 배치의 내부 오류로 추정,
+  `zone={region}-b` 주입(미검증). **매칭 실패에 400 대신 500** — conformance
+  후보 (errors.5xx-on-client-error 클래스).
+- **createsharingimage 임시 볼륨 고아**: gen-heavy-vs-netops가 구계정
+  id(ec11538a…)로 공유 → 플랫폼이 hex-이름(32자)·무태그 임시 볼륨(104GB)을
+  파생시키고, 원본 이미지 선삭제로 파이프라인이 웨지되어 삭제가
+  `Volume.VolumeForSharingImageDelete` 400으로 영구 거부됨 (비공개 이미지
+  0인데도 플래그 잔존 — 백엔드 stuck 의심). 수리: ① share 대상을 wait-vpc
+  응답 `$.vpc.account_id`(현재 계정) 캡처로 교체(계정 불변), ② 스윕 VS 볼륨
+  패스에 '무태그+32-hex 이름+미부착' 픽 신설 (전용 계정 부산물 — 오너 확인),
+  ③ 해당 볼륨은 백그라운드 재시도 중 (플래그 해제 대기).
+- **VM 볼륨 일반론(오너)**: delete_on_termination 없이 만든 VM 볼륨은 VM
+  삭제 후 별도 삭제 필요 — VS 볼륨 패스의 regr-토큰/force_unnamed 픽이 담당,
+  이번 건은 '이름이 hex'라 새 매처가 필요했던 것.

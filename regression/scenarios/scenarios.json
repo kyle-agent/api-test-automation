@@ -13,7 +13,9 @@
           "json": {
             "name": "regr-rg-{unique}",
             "description": "created by API regression suite",
-            "resource_types": ["resourcemanager:resource-group"]
+            "resource_types": [
+              "resourcemanager:resource-group"
+            ]
           },
           "_note": "SPEC TIGHTENING 2026-07-15 (run fe88): 400 'The resource_types field cannot be null' without it (scp-resourcemanager.resource-group.value-error, req-4a28ed92-98a0-4ae1-8318-0870b2b1a637; correct pin resourcemanager 1.0 — not 406-class). docs still mark it optional (docs-vs-server divergence). With field: LIVE 201 (2026-07-15).",
           "expect_status": [
@@ -56,7 +58,10 @@
               "resourcemanager:resource-group"
             ],
             "tags": [
-              {"key": "owner", "value": "apitest"}
+              {
+                "key": "owner",
+                "value": "apitest"
+              }
             ]
           },
           "expect_status": [
@@ -359,7 +364,9 @@
           "_note": "svc-opt 2026-07-11: 서브넷 늦활성 벨트 — not-active 400은 재시도로 흡수",
           "method": "POST",
           "path": "/v1/ports",
-          "retry_on_status": [400],
+          "retry_on_status": [
+            400
+          ],
           "retries": 4,
           "retry_interval": 15,
           "json": {
@@ -1292,7 +1299,13 @@
             "path": "/v1/queues/{fifo_queue_id}",
             "service": "queueservice"
           },
-          "expect_status": [200, 201, 202, 400, 409],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            409
+          ],
           "_note": "2026-07-11 run-892a: deduplication/deduplication-scope는 '.fifo' 큐 전용 (400 'queue name must end with .fifo' 실측) — fifo 큐를 별도 생성해 dedup 2키를 연다. envelope $.queue.id는 본 큐 create와 동일 가정 — 라이브가 정정."
         },
         {
@@ -1461,7 +1474,10 @@
             "description": "API regression suite — updated description",
             "loggable": false
           },
-          "expect_status": [200, 202],
+          "expect_status": [
+            200,
+            202
+          ],
           "_note": "2026-07-08 DEDUP 이관(owner GO, DEDUP-AUDIT-2026-07-08): networking-security-group-update 은퇴분. setsecuritygroup VALIDATED 2026-06-23 (200 live). Body: {description, loggable} ONLY — 'name' 은 유효 필드 아님 (docs 확인; 포함 시 400)."
         },
         {
@@ -1706,10 +1722,15 @@
           "name": "wait-snapshot-available",
           "method": "GET",
           "path": "/v1/snapshots/{snap_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.status",
-            "until": ["available", "AVAILABLE"],
+            "until": [
+              "available",
+              "AVAILABLE"
+            ],
             "timeout": 300,
             "interval": 10
           },
@@ -1720,8 +1741,16 @@
           "optional": true,
           "method": "PUT",
           "path": "/v1/snapshots/{snap_id}",
-          "json": {"name": "regrsnap{unique}u", "description": "updated by API regression suite"},
-          "expect_status": [200, 202, 400, 404],
+          "json": {
+            "name": "regrsnap{unique}u",
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            404
+          ],
           "_note": "2026-07-08 25-편입(owner GO): updatesnapshot. 2026-07-11 run-923a 수리: name 필수(ValidationError 'Field name is invalid' — description만으로 400), 정규식 ^[a-zA-Z0-9-_ ]+$ · regrsnap prefix 유지(스윕 매처)."
         },
         {
@@ -1729,8 +1758,16 @@
           "optional": true,
           "method": "POST",
           "path": "/v1/volumes/{vol_id}/revert",
-          "json": {"snapshot_id": "{snap_id}"},
-          "expect_status": [200, 202, 400, 404, 409],
+          "json": {
+            "snapshot_id": "{snap_id}"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            404,
+            409
+          ],
           "_note": "2026-07-08 25-편입(owner GO): revertvolumetosnapshot — 독립 볼륨(available)이라 되돌리기 안전; body 추정. 2026-07-11 run-923a: 400 뿌리는 스냅샷 creating 상태 — 앞의 wait-snapshot-available이 수리."
         },
         {
@@ -1738,11 +1775,19 @@
           "optional": true,
           "method": "GET",
           "path": "/v1/volumes/{vol_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.state",
-            "until": ["available", "AVAILABLE"],
-            "terminal_bad": ["error", "ERROR"],
+            "until": [
+              "available",
+              "AVAILABLE"
+            ],
+            "terminal_bad": [
+              "error",
+              "ERROR"
+            ],
             "timeout": 300,
             "interval": 10
           },
@@ -1984,7 +2029,10 @@
             204
           ],
           "destructive": true,
-          "retry_on_status": [400, 409],
+          "retry_on_status": [
+            400,
+            409
+          ],
           "retries": 24,
           "retry_interval": 15
         },
@@ -2737,7 +2785,8 @@
             "is_auto_recovery": "true",
             "is_auto_scale": "false",
             "volume_max_iops": "10000",
-            "volume_max_throughput": "500"
+            "volume_max_throughput": "500",
+            "zone": "{region}-b"
           },
           "expect_status": [
             200,
@@ -2751,7 +2800,8 @@
             "method": "DELETE",
             "path": "/v1/nodepools/{nodepool_id}",
             "service": "ske"
-          }
+          },
+          "_note": "ZONE REPAIR 2026-07-16 (SKE 단독 재런 실측: POST /v1/nodepools → 500 ContactAdminForAssistance, req-87752221-eaa8-45d5-83a7-6e28fc13f7a0. 클러스터는 RUNNING 정상 도달 — 노드풀만 사망, 이전 전체런 1076s 실패와 동일 지점. ubuntu-22.04-kube-v1.34.3 이미지는 존재하므로 이미지 부재 아님. nodepoolcreaterequestv1dot5에 zone(optional) 신설 + 이 계정은 kr-west1-a 불가 단일 AZ — zone 미지정 시 기본 zone(a) 배치 시도의 내부 오류로 추정, zone={region}-b 주입. 미검증 — 다음 SKE 런 판정. 매칭 실패에 400 대신 500 ContactAdminForAssistance를 주는 것은 백엔드 결함(conformance 후보)."
         },
         {
           "name": "wait-nodepool",
@@ -2967,8 +3017,19 @@
           "service": "ske",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200],
-          "poll": {"field": "$.cluster.status", "until": ["RUNNING", "ACTIVE", "Running"], "timeout": 900, "interval": 20},
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "_note": "2026-07-15 run-f5a9: upgrade-nodepool 후 nodepool은 Running인데 cluster가 UPDATING이면 scale-up이 400 status-invalid — 노드풀 폴만으로는 부족, 클러스터 게이트 필요."
         },
         {
@@ -3396,14 +3457,18 @@
           "name": "list-server-groups",
           "method": "GET",
           "path": "/v1/server-groups",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): listservergroups."
         },
         {
           "name": "get-partition-size",
           "method": "GET",
           "path": "/v1/server-groups/partition-size",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): getpartitionsize."
         },
         {
@@ -3428,35 +3493,45 @@
           "name": "list-default-configs",
           "method": "GET",
           "path": "/v1/default-configs",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
         },
         {
           "name": "show-default-volume-type",
           "method": "GET",
           "path": "/v1/volume-types/default",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
         },
         {
           "name": "show-quota-set",
           "method": "GET",
           "path": "/v1/quota-sets",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
         },
         {
           "name": "show-volume-quota-set",
           "method": "GET",
           "path": "/v1/volumes/quota-sets",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
         },
         {
           "name": "list-pending-images",
           "method": "GET",
           "path": "/v1/pending-images",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): 글로벌 read (파라미터 없음)."
         },
         {
@@ -3483,7 +3558,9 @@
           "name": "show-server-type",
           "method": "GET",
           "path": "/v1/server-types/{server_type_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): showservertype — find-server-type 이 고른 실측 id."
         },
         {
@@ -3550,7 +3627,9 @@
           "name": "list-virtual-servers",
           "method": "GET",
           "path": "/v1/servers",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "2026-07-08 25-편입(owner GO): listvirtualservers."
         },
         {
@@ -3753,9 +3832,24 @@
           "method": "POST",
           "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats",
           "json": {},
-          "capture_soft": {"pvnat_id": "$.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}", "service": "virtualserver"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {
+            "pvnat_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}",
+            "service": "virtualserver"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "_note": "2026-07-08 25-편입(owner GO): createserverinterfaceprivatenat — body 스키마 미문서(빈 body로 도달+정정 유도), PF-15 계열 403 관용. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
@@ -3765,7 +3859,15 @@
           "destructive": true,
           "method": "DELETE",
           "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409
+          ],
           "_note": "2026-07-08 25-편입(owner GO): deleteserverinterfaceprivatenat."
         },
         {
@@ -3926,7 +4028,10 @@
           "method": "GET",
           "path": "/v1/servers/{server_id}/volumes/{vol_id}",
           "optional": true,
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "_note": "2026-07-08 25-편입(owner GO): showservervolume — attach 202 직후라 404 관용. 미검증 신규 — 라이브 응답이 정정한다 (하우스 룰 ②)."
         },
         {
@@ -4350,7 +4455,15 @@
           "path": "/v1/servers/{server_id}/interfaces/{std_port_id}/private-static-nats/{pvnat_id}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409
+          ],
           "_note": "2026-07-08 delete-sg 409 회귀 수리 (이번 라이브 런: delete-sg 409 scp-network.securitygroup.has-related-resources + 계정에 이 체인의 포트 2개 잔존). 무그룹 safety-net 1/5 — vs-port 그룹이 중도 실패(엔진: 그룹 실패 시 같은 그룹 후속만 skip)했든 그룹 내 teardown이 관용 409로 '통과'만 했든, delete-sg 전에 NAT해제→detach→port삭제→port-subnet삭제를 무조건 한 번 더 시도한다(무그룹 스텝은 항상 실행). 정상 경로(서버 이미 삭제·포트 이미 정리)에선 404 관용 no-op. pvnat_id/std_port_id 는 capture_soft 라 미해결 placeholder 로 남을 수 있음 → 400/404 관용."
         },
         {
@@ -4359,8 +4472,17 @@
           "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 404, 409],
-          "retry_on_status": [409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409
+          ],
           "retries": 4,
           "retry_interval": 15,
           "_note": "무그룹 safety-net 2/5: 서버가 아직 살아있는 엣지(wait-server-gone 200 타임아웃 통과)에서 표준 포트를 실제로 detach. 서버가 이미 사라진 정상 경로에선 404 관용. 409 사다리는 그룹 내 detach-port-from-server 와 동일 패턴(4×15s)."
@@ -4372,8 +4494,16 @@
           "path": "/v1/ports/{std_port_id}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 404],
-          "retry_on_status": [409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
+          "retry_on_status": [
+            409
+          ],
           "retries": 6,
           "retry_interval": 20,
           "_note": "무그룹 safety-net 3/5 — 핵심 스텝: map-sg-to-port 가 SG 를 참조시킨 표준 포트를 delete-sg 전에 확실히 제거. 서버 삭제가 표준 포트를 detach 상태로 살려두는 것이 이번 런에서 실측됨(포트 2개 잔존). expect 에 409 미포함(netops port-delete 패턴) — 사다리(6×20s) 소진 후에도 409 면 optional 실패 로그로 신호를 남기고 계속 진행, 최종 판정은 delete-sg 가 내린다. 400/404 는 이미 삭제됐거나 std_port_id placeholder 미해결(생성 자체가 실패)인 정상 경로."
@@ -4384,12 +4514,20 @@
           "method": "GET",
           "path": "/v1/ports/{std_port_id}",
           "optional": true,
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "poll": {
-            "until_status": [404],
+            "until_status": [
+              404
+            ],
             "timeout": 180,
             "interval": 10,
-            "give_up_status": [400]
+            "give_up_status": [
+              400
+            ]
           },
           "_note": "무그룹 safety-net 4/5: 포트 삭제(202 비동기)가 실제로 끝나 SG 참조가 풀린 것을 delete-sg 전에 확인 — until_status[404] 는 wait-subnet-gone, give_up_status 는 wait-port-subnet 의 기존 파일 패턴 복사. 이미 삭제된 정상 경로에선 첫 GET 404 로 즉시 종료(체감 0s), placeholder 미해결이면 400 즉시 give-up."
         },
@@ -4400,8 +4538,16 @@
           "path": "/v1/subnets/{port_subnet_id}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 404],
-          "retry_on_status": [409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
+          "retry_on_status": [
+            409
+          ],
           "retries": 4,
           "retry_interval": 15,
           "_note": "무그룹 safety-net 5/5: vs-port 전용 서브넷 최종 청소 — 그룹 실패로 그룹 내 delete-port-subnet 이 skip 된 경로를 닫아 공유 VPC teardown 의 자식-잔존 실패(07-07 사건 유형)까지 방지. 포트가 방금 지워졌으면 409 사다리(4×15s, 그룹 내 스텝과 동일)로 흡수."
@@ -4417,7 +4563,9 @@
             204
           ],
           "destructive": true,
-          "retry_on_status": [409],
+          "retry_on_status": [
+            409
+          ],
           "retries": 6,
           "retry_interval": 20,
           "_note": "2026-07-08 회귀 수리: 이번 라이브 런에서 이 스텝이 409 scp-network.securitygroup.has-related-resources 로 종결(과거 passed → failed). 1차 방어는 바로 앞 무그룹 final-* 포트 청소 라인 + vs-port 그룹 create 3종(create-port/attach/create-nat)의 cleanup 등록(그룹 실패 시 엔진 _teardown_group 이 NAT→detach→port→subnet LIFO 로 청소); 이 사다리(6×20s)는 포트 삭제의 202 비동기 전파·참조 해소 지연을 흡수한다. expect 는 strict 유지 — 사다리 소진 후에도 409 면 진짜 잔존이므로 실패가 맞다(회귀 신호 보존, role=verify 유지)."
@@ -4608,8 +4756,14 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
-              "where_prefix": {"purpose": "general", "type": "Standard-1"},
-              "min_by": ["cpu_core", "memory_gb"],
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -4707,7 +4861,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -4776,7 +4932,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -4819,7 +4977,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -4861,7 +5021,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -4919,7 +5081,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -4965,7 +5129,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5006,7 +5172,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5060,7 +5228,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5209,7 +5379,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5261,7 +5433,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5330,7 +5504,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5370,7 +5546,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5409,7 +5587,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5455,7 +5635,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5693,20 +5875,40 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
-              "where_prefix": {"purpose": "general", "type": "Standard-1"},
-              "min_by": ["cpu_core", "memory_gb"],
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           },
           "capture_soft": {
-            "db_server_type_alt": {"list": "$.contents", "where_prefix": {"purpose": "general", "type": "Standard-1"}, "min_by": ["cpu_core", "memory_gb"], "nth": 1, "get": "name"}
+            "db_server_type_alt": {
+              "list": "$.contents",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           }
         },
         {
           "name": "create-cluster",
           "method": "POST",
           "path": "/v1/clusters",
-          "retry_on_status": [500],
+          "retry_on_status": [
+            500
+          ],
           "retries": 2,
           "retry_interval": 60,
           "json": {
@@ -5792,7 +5994,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5894,7 +6098,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -5959,7 +6165,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6033,7 +6241,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6109,7 +6319,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6176,7 +6388,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6302,7 +6516,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6346,7 +6562,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6398,7 +6616,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6467,7 +6687,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6506,7 +6728,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6544,7 +6768,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6590,7 +6816,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cluster_id}/sync-state",
               "max": 2
@@ -6721,7 +6949,7 @@
       "enabled": false,
       "_status": "done-modeled",
       "_replaced_by": "mariadb-cluster-subops-full,epas-cluster-subops-full,cachestore-cluster-subops-full",
-      "_disabled_reason": "\uc740\ud1f4 1\ub2e8\uacc4 (owner \uc2b9\uc778 2026-07-09 '\uc9c4\ud589'): service \ud0dc\uadf8\uac00 networking/vpc\ub77c vpc \uc120\ud0dd\ub9cc\uc73c\ub85c \uacfc\uae08 DB \ud074\ub7ec\uc2a4\ud130 3\uae30\uac00 \ub534\ub824\uc624\ub358 \ubb38\uc81c(\uc624\ub108 \uc2e4\uce21 run 2\ud68c). \uc815\uc801 \ub300\uc870: \uc774 \ub77c\uc774\ud504\uc0ac\uc774\ud074\uc758 21 op = subops-full 3\uc885(D2-D7 \ub77c\uc774\ube0c \uadf8\ub9b0)+vpc \ub77c\uc774\ud504\uc0ac\uc774\ud074\uc774 \uc804\ubd80 \ucee4\ubc84, \uace0\uc720 \ucee4\ubc84\ub9ac\uc9c0 0. \ud55c \uc708\ub3c4\uc6b0 \ubb34\uc601\ud5a5 \ud655\uc778 \ud6c4 phase-2 \ubb3c\ub9ac\uc0ad\uc81c \ub300\uc0c1.",
+      "_disabled_reason": "은퇴 1단계 (owner 승인 2026-07-09 '진행'): service 태그가 networking/vpc라 vpc 선택만으로 과금 DB 클러스터 3기가 딴려오던 문제(오너 실측 run 2회). 정적 대조: 이 라이프사이클의 21 op = subops-full 3종(D2-D7 라이브 그린)+vpc 라이프사이클이 전부 커버, 고유 커버리지 0. 한 윈도우 무영향 확인 후 phase-2 물리삭제 대상.",
       "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 5 dbaas engines (mysql/postgresql/mariadb/epas/cachestore); VM excluded (#6 no identifiable boot image); eventstreams (undocumented topology value_error), searchengine/sqlserver/vertica (require a real license) excluded. Subnet/vpc teardown retries 409 to wait out async cluster termination. created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body). SLIMMED 2026-06-10 (run e3ba190 timing: 160min wall, ~135min of it teardown wait): mysql/postgresql legs REMOVED (redundant — the standalone database-mysql-cluster/database-postgresql-cluster heavy lifecycles cover the same catalog keys and more); -gone polls capped at 900s (mariadb took ~90min to vanish; a still-deleting cluster just means the subnet delete 409s, which is tolerated); delete-subnet/delete-vpc 409-retry budget 20min->4min each (they burned 45min combined and STILL 409'd — the tag-scoped sweep job is the designed backstop for late-releasing ports).",
       "steps": [
         {
@@ -6845,8 +7073,14 @@
           "capture": {
             "maria_stype": {
               "list": "$.contents",
-              "where_prefix": {"purpose": "general", "type": "Standard-1"},
-              "min_by": ["cpu_core", "memory_gb"],
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -6954,8 +7188,14 @@
           "capture": {
             "epas_stype": {
               "list": "$.contents",
-              "where_prefix": {"purpose": "general", "type": "Standard-1"},
-              "min_by": ["cpu_core", "memory_gb"],
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -7065,8 +7305,15 @@
           "capture": {
             "cache_stype": {
               "list": "$.contents",
-              "where_prefix": {"purpose": "general", "type": "Standard-1", "name": "css"},
-              "min_by": ["cpu_core", "memory_gb"],
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -7158,7 +7405,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{maria_cid}/sync-state",
               "max": 2
@@ -7186,7 +7435,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{epas_cid}/sync-state",
               "max": 2
@@ -7214,7 +7465,9 @@
             "field": "$.service_state",
             "refire": {
               "field": "$.service_state",
-              "when": ["UNKNOWN"],
+              "when": [
+                "UNKNOWN"
+              ],
               "method": "POST",
               "path": "/v1/clusters/{cache_cid}/sync-state",
               "max": 2
@@ -8712,7 +8965,9 @@
           "path": "/v1/nat-gateways",
           "json": {
             "description": "API regression shared-net",
-            "publicip_ids": ["{publicip_id}"],
+            "publicip_ids": [
+              "{publicip_id}"
+            ],
             "subnet_id": "{subnet_id}",
             "tags": []
           },
@@ -10021,14 +10276,13 @@
             "retention_period": 365,
             "tags": []
           },
-          "retry_on_status": [500],
-          "expect_status": [
-            200,
-            201
-          ],
           "retry_on_status": [
             500,
             503
+          ],
+          "expect_status": [
+            200,
+            201
           ],
           "retries": 2,
           "retry_interval": 60,
@@ -10156,7 +10410,9 @@
             "namespaces": [
               {
                 "dimensions": [
-                  ["resource_id"]
+                  [
+                    "resource_id"
+                  ]
                 ],
                 "name": "Virtual Server"
               }

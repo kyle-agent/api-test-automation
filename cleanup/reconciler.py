@@ -2418,6 +2418,28 @@ def run_sweep(client) -> int:
             deleted += 1
         else:
             print(f"  volume {_name_of(it)} ({vid}) delete -> {st}")
+    # 2c-hex. 공유-이미지 생성용 임시 볼륨 (오너 실측 2026-07-16, run a690):
+    # createsharingimage가 플랫폼 측에 순수 hex-이름(32자) 볼륨을 파생시키는데
+    # 태그도 regr 토큰도 없어 위 게이트가 전부 놓친다. 전용 테스트 계정에서
+    # '태그 없음 + 32-hex 이름 + 미부착(servers 비어 있음)'은 우리 테스트의
+    # 부산물뿐(오너 확인: "어제 테스트에서 발생한 건임")이라 픽한다. 공유
+    # 파이프라인이 잡고 있는 동안은 400 Volume.VolumeForSharingImageDelete 로
+    # 거부되며(백엔드 플래그), 라운드/차기 런 재시도로 수렴한다.
+    from core.registry import _tag_value as _tv, OWNER_KEY as _OK, OWNER as _OW
+    import re as _re
+    for it in _list_all(c, "virtualserver", "/v1/volumes"):
+        if not isinstance(it, dict):
+            continue
+        vid, name = it.get("id"), str(it.get("name") or "")
+        if (not vid or it.get("servers") or _tv(it, _OK) == _OW
+                or not _re.fullmatch(r"[0-9a-f]{32}", name)):
+            continue
+        st = _delete(c, "virtualserver", f"/v1/volumes/{vid}")
+        if _note_progress(st, it):
+            deleted += 1
+        else:
+            print(f"  hex-orphan volume {name} ({vid}) delete -> {st} "
+                  f"(sharing-image 파생)")
 
     # 2d. dbaas clusters (regr* per engine service) — MUST go before
     # subnets/vpcs. The nine engines are independent services (separate hosts,
