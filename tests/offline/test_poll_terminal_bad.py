@@ -115,3 +115,30 @@ def test_terminal_bad_override_empty_disables_early_exit_but_still_fails(monkeyp
     with pytest.raises(AssertionError, match="poll timed out"):
         engine.run_lifecycle(lc, client, _cfg())
     assert slept, "opt-out poll should keep waiting to timeout (no early exit)"
+
+
+def test_adaptive_poll_interval_ladder(monkeypatch):
+    """적응형 폴 간격 (2026-07-14): 첫 재시도 3s에서 2배씩 interval로 수렴 —
+    빠른 정착이 interval 격자(예: DBaaS 20s → 22s 양자화)에 갇히지 않는다.
+    interval_start=interval이면 종전 고정 간격과 동일(opt-out)."""
+    monkeypatch.setattr(engine, "_commands", None)
+    slept = []
+    monkeypatch.setattr(engine.time, "sleep", lambda s: slept.append(s))
+    fake_now = [0.0]
+    monkeypatch.setattr(engine.time, "monotonic",
+                        lambda: fake_now.__setitem__(0, fake_now[0] + 1) or fake_now[0])
+    client = FakeClient({("GET", "/v1/servers/"): _r(200, {"status": "CREATING"})})
+    lc = _lc(optional=True, group="g",
+             poll={"field": "$.status", "until": ["ACTIVE"],
+                   "timeout": 60, "interval": 20})
+    engine.run_lifecycle(lc, client, _cfg())
+    assert slept[:4] == [3.0, 6.0, 12.0, 20.0], f"ladder 3→6→12→20: {slept[:6]}"
+    assert all(s == 20.0 for s in slept[4:]), "수렴 후엔 interval 고정"
+
+    slept.clear()
+    fake_now[0] = 0.0
+    lc2 = _lc(optional=True, group="g",
+              poll={"field": "$.status", "until": ["ACTIVE"],
+                    "timeout": 60, "interval": 20, "interval_start": 20})
+    engine.run_lifecycle(lc2, client, _cfg())
+    assert all(s == 20.0 for s in slept), f"opt-out은 종전 고정 20s: {slept[:4]}"

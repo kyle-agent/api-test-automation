@@ -2996,3 +2996,25 @@ diff의 old는 커밋된 카탈로그 그대로 사용.
 **유력 원인 = 서버 타입 용량**: 우리 body는 `ess1v16m32`(16vCPU/32G)×3(=48vCPU)로 202 접수 후 FAILED; 콘솔 성공본은 `ess1v2m4`(2vCPU/4G)×3. es-find-stype 목록의 contents[0]가 16vCPU라 "첫 항목 캡처"가 대형 타입을 물어온 것.
 
 **반영(콘솔 성공본 미러링)**: es_stype = `where_prefix name:"ess1v2m"` 하드캡처(ess1v2m4), es_stype2(resize 대상) = `ess1v4m*` 소프트캡처, DATA 16GB SSD 블록스토리지 추가, service_watch_log_collection=false, maintenance_option 제거. 콘솔 성공 조합 = Kafka 3.9.1 · combined ZK&Broker 3노드 · OS 104GB SSD + DATA 16GB SSD · 포트 9091/2180 · NAT/로그수집/유지관리 미사용.
+
+## DBaaS subops 40분의 정체 + 적응형 폴 간격 (2026-07-14, 오너 캡쳐 분석)
+
+**진단**: epas-cluster-subops-full은 77스텝 직렬 체인이고 settle 폴 ~30개가 전부
+interval=20s. 타이밍 실측의 op 시간이 22s/43-44s/1:04/1:26/2:50/3:35로 양자화 —
+정확히 ~21.5s(20s sleep + GET)의 1·2·3·4·8·10배수. 즉 측정 settle은 실제 정착
+시간이 아니라 **폴 격자에 걸린 시간**이며, 빠른 config성 op(sync/set류, 실제
+2~10s 추정)도 최소 한 격자(22s)를 냈다. 폴 op ~30개 × 초과대기 11~18s =
+시나리오당 8~12분 순수 격자 손실. 나머지는 진짜 플랫폼 시간(create ~10분+,
+upgrade-kernel 3:35, start 2:50 등)의 직렬 합산.
+
+**반영(엔진 공통, 기본값)**: 폴 재시도 간격 ladder — interval_start(기본
+min(3, interval))에서 시작해 2배씩 interval로 수렴 (3→6→12→20…). 빠른 정착은
+3~9s에 잡히고 느린 정착은 초기 3~4회 가벼운 GET 뒤 종전과 동일. per-poll
+opt-out: poll.interval_start=interval. 429 영향: 폴당 최대 +4 GET(초기 30s
+한정)로 유계. offline: test_adaptive_poll_interval_ladder.
+
+**타임라인 도구(신규)**: `python -m tools.lifecycle_timeline <run>.events.jsonl
+--lifecycle <id>` — step-start/end/poll-progress로 시간축 워터폴 HTML
+([API|settle|idle 갭] 분해 + 폴 횟수). console2 타이밍 탭(op별 합산)의 시간순
+보완. 남은 레버(미구현): subops 체인을 2 클러스터로 분할(벽시계 반감, 과금 2배
+— 오너 결정 사안).

@@ -701,6 +701,15 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     # 28602725440 burned 900s x ~15 waits after a rejected create).
     give_up_status = _as_status_list(poll.get("give_up_status")) or None
     timeout, interval = float(poll.get("timeout", 300)), float(poll.get("interval", 10))
+    # 적응형 폴 간격 (오너 2026-07-14 "시간을 줄일 수 있는지"): 측정 settle이
+    # interval 격자에 양자화돼(DBaaS subops iv=20 → 22s/43s/1:04… 전부 ~21.5s
+    # 배수 실측) 빠르게 정착하는 op도 최소 한 격자(≈interval)를 대기했다.
+    # 첫 재시도를 interval_start(기본 min(3, interval))에서 시작해 2배씩 늘려
+    # interval에 수렴 — 빠른 정착은 3~9s에 잡히고(op당 ~11~18s 절감 ×
+    # subops 폴 ~30개 = 시나리오당 8~12분), 느린 정착(클러스터 create 등)은
+    # 초기 3~4회의 가벼운 GET 뒤 종전과 동일한 간격/타임아웃. per-poll
+    # 오버라이드: poll.interval_start (interval과 같게 주면 종전 고정 간격).
+    _iv = max(0.5, float(poll.get("interval_start", min(3.0, interval))))
     # Optional refire: while polling for a teardown to complete, a resource can
     # wedge in a FAILED-delete state (field report: a console delete of a
     # failed-state DB cluster succeeds immediately). When the polled body's
@@ -785,7 +794,8 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
                 print(f"    ⏳ {step.get('name')}: {_poll_n}회차 state={_state} "
                       f"({round(time.monotonic() - _poll_t0)}s/{timeout:.0f}s)",
                       flush=True)
-        time.sleep(interval)
+        time.sleep(_iv)
+        _iv = min(interval, _iv * 2)   # ladder: interval_start → ×2 → interval
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
     # Poll loop ended without an in-loop success return — the deadline passed
