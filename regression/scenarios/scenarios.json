@@ -4580,6 +4580,7 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "where_prefix": {"purpose": "general", "type": "Standard-1"},
               "min_by": ["cpu_core", "memory_gb"],
               "get": "name"
             }
@@ -5663,12 +5664,13 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "where_prefix": {"purpose": "general", "type": "Standard-1"},
               "min_by": ["cpu_core", "memory_gb"],
               "get": "name"
             }
           },
           "capture_soft": {
-            "db_server_type_alt": {"list": "$.contents", "min_by": ["cpu_core", "memory_gb"], "nth": 1, "get": "name"}
+            "db_server_type_alt": {"list": "$.contents", "where_prefix": {"purpose": "general", "type": "Standard-1"}, "min_by": ["cpu_core", "memory_gb"], "nth": 1, "get": "name"}
           }
         },
         {
@@ -6809,6 +6811,7 @@
           "capture": {
             "maria_stype": {
               "list": "$.contents",
+              "where_prefix": {"purpose": "general", "type": "Standard-1"},
               "min_by": ["cpu_core", "memory_gb"],
               "get": "name"
             }
@@ -6917,6 +6920,7 @@
           "capture": {
             "epas_stype": {
               "list": "$.contents",
+              "where_prefix": {"purpose": "general", "type": "Standard-1"},
               "min_by": ["cpu_core", "memory_gb"],
               "get": "name"
             }
@@ -7025,6 +7029,7 @@
           "capture": {
             "cache_stype": {
               "list": "$.contents",
+              "where_prefix": {"purpose": "general", "type": "Standard-1", "name": "css"},
               "min_by": ["cpu_core", "memory_gb"],
               "get": "name"
             }

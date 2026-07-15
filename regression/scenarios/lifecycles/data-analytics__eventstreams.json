@@ -436,7 +436,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           },
           "capture_soft": {
@@ -447,7 +451,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           },
           "_note": "2026-07-15 오너 콘솔 실증 반영: 16vCPU(ess1v16m32) 3노드는 프로비저닝 FAILED, 콘솔은 ess1v2m4(2vCPU/4G)로 성공 — es_stype은 ess1v2m* 하드캡처(용량가설), es_stype2(resize 대상)는 ess1v4m* 소프트캡처."

@@ -125,7 +125,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -1071,7 +1075,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           },
           "_note": "completeness-audit 2026-07-08 (supports the mysqlsetservertype 편입 below): captures the SECOND server-types entry as the resize target — resizing to the SAME type used at create is an intentional hard 400 (see the epas/mariadb capture-server-type / resize notes in this file, HB1 repair 2026-07-04). Separate optional capture_soft step (epas pattern) so a single-entry server-types list can never fail mysql's strict find-server-type."
@@ -1441,7 +1449,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -2435,7 +2447,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -2840,7 +2856,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           },
           "_note": "completeness-audit 2026-07-08 (supports the mysqlsetservertype 편입 below): captures the SECOND server-types entry as the resize target — resizing to the SAME type used at create is an intentional hard 400 (see the epas/mariadb capture-server-type / resize notes in this file, HB1 repair 2026-07-04). Separate optional capture_soft step (epas pattern) so a single-entry server-types list can never fail mysql's strict find-server-type."
@@ -3213,7 +3233,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -3413,7 +3437,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           },
           "_note": "repointed to $.contents[1].name 2026-07-04 (HB1 repair, mariadb-analogous fix): this step previously re-captured index[0] — the SAME server type epas-create already used for the instance group, so resize-instance-group's same-type request is expected to hard-fail (see mariadb's identical note; same InstanceGroupResizeRequest DTO). index[1] gives a genuinely different target type. UNVERIFIED LIVE — apply + observe in HB1b/HB2b."
@@ -5187,7 +5215,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -6666,7 +6698,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -6860,7 +6896,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           },
           "_note": "repointed to $.contents[1].name 2026-07-04 (HB1 repair, mariadb-analogous fix): this step previously re-captured index[0] — the SAME server type epas-create already used for the instance group, so resize-instance-group's same-type request is expected to hard-fail (see mariadb's identical note; same InstanceGroupResizeRequest DTO). index[1] gives a genuinely different target type. UNVERIFIED LIVE — apply + observe in HB1b/HB2b."
@@ -7628,7 +7668,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             },
             "maria_stype2": {
               "list": "$.contents",
@@ -7637,7 +7681,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -9528,7 +9576,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             },
             "maria_stype2": {
               "list": "$.contents",
@@ -9537,7 +9589,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -10956,7 +11012,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             },
             "maria_stype2": {
               "list": "$.contents",
@@ -10965,7 +11025,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -11897,7 +11961,12 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              }
             },
             "cache_stype2": {
               "list": "$.contents",
@@ -11906,7 +11975,12 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              }
             }
           }
         },
@@ -13411,7 +13485,12 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              }
             },
             "cache_stype2": {
               "list": "$.contents",
@@ -13420,7 +13499,12 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              }
             }
           }
         },
@@ -14512,7 +14596,12 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              }
             },
             "cache_stype2": {
               "list": "$.contents",
@@ -14521,7 +14610,12 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              }
             }
           }
         },
@@ -15374,7 +15468,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             },
             "db_server_type2": {
               "list": "$.contents",
@@ -15383,7 +15481,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -17339,7 +17441,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             },
             "db_server_type2": {
               "list": "$.contents",
@@ -17348,7 +17454,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },
@@ -18780,7 +18890,11 @@
                 "cpu_core",
                 "memory_gb"
               ],
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             },
             "db_server_type2": {
               "list": "$.contents",
@@ -18789,7 +18903,11 @@
                 "memory_gb"
               ],
               "nth": 1,
-              "get": "name"
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
             }
           }
         },

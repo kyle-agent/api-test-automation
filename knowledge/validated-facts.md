@@ -3062,3 +3062,9 @@ run_scoped 배리어)은 console2 **서버 프로세스 안**에서 실행된다
 후 **서버 재시작 없이는 옛 코드가 메모리에 남아** 적용 안 됨 (run-8de6 실측:
 정리 29.1분 = 최적화 전 27.1분과 동일 프로파일). reconciler 스윕만 서브프로세스
 라 새 코드를 탄다. 판별: 런 로그에 "shared teardown chain" 라인 유무.
+
+## 서버타입 목록의 purpose/type 축 — min_by 필터 필수 (2026-07-15, 런 실측 400)
+
+**발견**: `/v1/server-types`(DBaaS 계열 공통)의 항목엔 `purpose`(general|zookeeper|akhq|sentinel)와 `type`(Standard-1|Standard-2) 축이 있다. 무필터 min_by가 ES에서 절대최소 `ess1v1m2`(**zookeeper 전용**)를 집어 create가 **400 "The server type is invalid"** (run 실측). 콘솔 성공본의 ess1v2m4는 purpose=general의 최소형.
+
+**규약**: 서버타입 min_by 캡처는 반드시 `where_prefix {purpose:"general", type:"Standard-1"}`을 합성한다(48곳 적용). cachestore는 css/redis 두 패밀리가 동률이라 `name:"css"`도 고정. 라이브 시뮬레이션 결과: mysql/pg/epas=db1v2m4(→db1v2m8), mariadb=db1v1m2(→db1v2m4), cachestore=css1v1m2(→css1v2m4), ES=ess1v2m4(→ess1v2m8). mariadb/cachestore의 1vCPU general 타입은 미검증 — create 400 시 cpu_core 하한 추가가 다음 수순.
