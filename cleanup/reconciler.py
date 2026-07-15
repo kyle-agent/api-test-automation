@@ -867,12 +867,50 @@ _SRN_DELETE_MAP = {
 }
 
 
+def _reap_igw_firewall_rules(client, igw_id: str) -> int:
+    """IGW 삭제 전, 그 IGW의 implicit firewall(``FW_IGW_*``)에 남은 rule을
+    비운다. firewall 본체는 create/delete API가 없는 암묵 리소스(carrier와
+    함께 소멸, ``knowledge/formal/resources/networking__firewall.yaml``)라 스윕
+    대상이 아닌데, **rule 잔존이 carrier IGW DELETE를 409로 잡는다** — 실측
+    2026-07-15: 중단 런이 delete-firewall-rule 전에 죽자 ``FW_IGW_regrvpcnb…``
+    의 rule이 남아 IGW→VPC 삭제 체인이 6회 409 루프. firewall→IGW 연결은
+    목록 응답의 ``fw_resource_id``(carrier id, api_docs firewalllistresponse).
+    안전 근거: 이미 소유가 확인된 IGW의 id로만 firewall을 매치한다."""
+    n = 0
+    try:
+        fws = _items(client.get("/v1/firewalls", service="firewall").body)
+    except Exception:
+        return 0
+    for fw in fws:
+        if not (isinstance(fw, dict) and fw.get("fw_resource_id") == igw_id):
+            continue
+        fid = fw.get("id")
+        if not fid:
+            continue
+        try:
+            rules = _items(client.get(
+                f"/v1/firewalls/rules?firewall_id={fid}",
+                service="firewall").body)
+        except Exception:
+            continue
+        for r in rules:
+            if isinstance(r, dict) and r.get("id"):
+                st = _delete(client, "firewall",
+                             f"/v1/firewalls/rules/{r['id']}")
+                print(f"  igw {igw_id} firewall {fid} rule {r['id']} "
+                      f"delete -> {st}")
+                if st and (200 <= st < 300 or st == 404):
+                    n += 1
+    return n
+
+
 def _purge_409_holders(client, body: dict) -> int:
     """소유 VPC의 DELETE 409 본문 ``related_resources``(SRN)가 명시한 홀더를
     직접 삭제하고 삭제 발행 수를 반환한다. 안전 근거는 ``_purge_vpc_children``
     과 동일 — 이미 소유가 확인된 VPC의 삭제를 막는 자식만 대상이고, id는
     플랫폼이 명시한 것이다. direct-connect는 자식 routing-rules를 먼저 비운다
-    (run-892a: rule이 남은 DC는 DELETE 409)."""
+    (run-892a: rule이 남은 DC는 DELETE 409). internet-gateway는 implicit
+    firewall의 rule을 먼저 비운다 (2026-07-15: rule 잔존 IGW는 DELETE 409)."""
     srns = " ".join(
         str(x) for err in (body.get("errors") or [])
         for x in (err.get("related_resources") or []))
@@ -893,6 +931,9 @@ def _purge_409_holders(client, body: dict) -> int:
                                 f"{coll}/{rid}/routing-rules/{rr['id']}")
             except Exception:
                 pass
+        if rtype == "internet-gateway":
+            # rule 잔존 → IGW DELETE 409 (firewall rule 먼저, 그 다음 IGW)
+            _reap_igw_firewall_rules(client, rid)
         st = _delete(client, svc, f"{coll}/{rid}")
         print(f"  vpc-409 holder {rtype} {rid} delete -> {st}")
         if _note_progress(st):   # 홀더 소멸 = genuine 진행 (라운드 유지 근거)
@@ -2017,11 +2058,15 @@ def run_sweep(client) -> int:
     # regr* 프리픽스에 안 걸려 영구 스킵됐다(구 계정에도 IGW_regrvpcnb(ERROR)
     # 동일 잔존). 토큰 분해(IGW / regrvpcnb…)로 regr* 토큰을 잡는다 — 남의
     # IGW는 토큰이 자기 VPC명이라 안전. 파생 방화벽(FW_IGW_*)은 DELETE API가
-    # 없어(카탈로그: GET/PUT뿐) IGW 삭제에 따라간다.
+    # 없어(카탈로그: GET/PUT뿐) IGW 삭제에 따라가는데, **rule이 남아 있으면
+    # carrier IGW DELETE 자체가 409** (FW_IGW_regrvpcnb… 실측) — rule부터
+    # 비운다 (_reap_igw_firewall_rules).
     for it in _select(c, "vpc", "/v1/internet-gateways",
                       name_prefixes=("regr", "zznet"), match_token=True):
-        if it.get("id") and _delete(
-                c, "vpc", f"/v1/internet-gateways/{it['id']}"):
+        if not it.get("id"):
+            continue
+        _reap_igw_firewall_rules(c, it["id"])
+        if _delete(c, "vpc", f"/v1/internet-gateways/{it['id']}"):
             deleted += 1
             _igw_wait.append(("vpc", f"/v1/internet-gateways/{it['id']}"))
     _wait_all_gone(c, _igw_wait, 300, 15)
