@@ -184,10 +184,13 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
 
 > conf: 0.3 · seen: 2026-06-17 · obs: 1
 
-- **Subnet `type` enum = `(GENERAL, LOCAL, VPC_ENDPOINT)`** (required). A **VPC
-  Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet** — passing a GENERAL
-  subnet yields 400 `scp-network.vpc-endpoint.subnet-not-found` ("VPC Endpoint
-  Type Subnet not found", run 27466988779).
+- **Subnet `type` enum = `(PUBLIC, PRIVATE, LOCAL, VPC_ENDPOINT)`** (required;
+  changed server-side 2026-07-15 — was `(GENERAL, LOCAL, VPC_ENDPOINT)`, and
+  `GENERAL` now 400s, see the 2026-07-15 section below). A **VPC Endpoint needs
+  a dedicated `VPC_ENDPOINT`-type subnet** — passing a general-purpose
+  (GENERAL, now PUBLIC) subnet yields 400
+  `scp-network.vpc-endpoint.subnet-not-found` ("VPC Endpoint Type Subnet not
+  found", run 27466988779).
 - A **Transit Gateway is "Connectable" only once it has a VPC connection in
   ACTIVE state.** `create-private-nat` over the TGW path needs this, else 400
   `scp-network.private-nat.connectable-transit-gateway-not-found`. VPC-connection
@@ -2136,8 +2139,9 @@ _pass_scf에 ladder 반영). SCF 전용 privatelink 경로는 scf 서비스의
 만든 **VPC_ENDPOINT 타입 서브넷을 숨긴다** — 콘솔에는 보이는데 API 목록에 없어
 "스윕이 못 보는 유령 서브넷"이 되고, VPC 삭제를 409로 잡는데 holder 탐지에도
 안 걸린다 (아침 regrsubb6750b93·오후 regrsubc86cfbf3 실측; 수작업 삭제는 됐음 —
-show/DELETE by id는 정상 동작). 조회는 `?type=VPC_ENDPOINT` (enum: GENERAL·
-LOCAL·VPC_ENDPOINT; 잘못된 값은 400에 enum 명시, 미지의 쿼리키는 조용히 무시됨
+show/DELETE by id는 정상 동작). 조회는 `?type=VPC_ENDPOINT` (당시 enum: GENERAL·
+LOCAL·VPC_ENDPOINT — 2026-07-15부로 PUBLIC·PRIVATE·LOCAL·VPC_ENDPOINT로 변경, 아래
+2026-07-15 섹션; 잘못된 값은 400에 enum 명시, 미지의 쿼리키는 조용히 무시됨
 — `subnet_type=`은 무시되고 기본 목록 반환). reconciler의 서브넷 패스와
 _purge_vpc_children이 두 컬렉션을 모두 훑도록 수정(PF-47). run_scoped의 409
 related_resources SRN 폴백은 이런 숨은 서브넷의 기존 완화책이었다.
@@ -3242,3 +3246,22 @@ stderr 리다이렉트로 보존. 실패는 best-effort(해당 시나리오가 4
 (상태 풀리면 즉시 DELETE). 교훈: CREATING wedge는 시나리오/스윕 어느 쪽도
 못 지운다 — 플랫폼이 상태를 전이시켜야 함 (서브넷은 자연 ERROR 전이 후 삭제
 가능해졌음).
+
+## Subnet type enum 변경: GENERAL → PUBLIC (2026-07-15, 신규 테스트 계정 환경)
+
+`POST /v1/subnets`가 기존 body(`type: GENERAL`)를 400으로 거부하기 시작:
+`"detail": ["Type should be 'PUBLIC' or 'PRIVATE' or 'LOCAL' or 'VPC_ENDPOINT'",
+"Field required"]`. **enum이 (GENERAL, LOCAL, VPC_ENDPOINT) →
+(PUBLIC, PRIVATE, LOCAL, VPC_ENDPOINT)로 변경** — 범용 서브넷은 이제
+`type: PUBLIC`. 신규 테스트 계정 전환(위 2026-07-15 섹션)과 같은 날 관측되어
+계정이 보는 API 버전 차이일 가능성 있음. 스위트 전체(엔진 shared subnet,
+scenarios.json, lifecycles/*.json 52곳, formal yaml)를 PUBLIC으로 전환함.
+
+**미해결**: detail의 두 번째 항목 `"Field required"`는 어떤 필드가 새로
+필수가 됐는지 미상 (enum 외 추가 필수 필드일 수 있음 — PUBLIC/PRIVATE 분화와
+함께 IGW/라우팅 관련 필드가 생겼을 개연성). PUBLIC 전환 후에도 400이 지속되면
+응답 detail을 다시 채집하고 spec-intel로 `data/api_docs.json`
+(subnetcreaterequest) 리프레시 필요 — 스냅샷은 아직 구 enum(GENERAL·LOCAL·
+VPC_ENDPOINT)을 담고 있다. `GET /v1/subnets?type=` 쿼리 enum도 함께 바뀌었는지
+미검증 (reconciler는 bare list + `?type=VPC_ENDPOINT`만 사용, PF-47 — VPC_ENDPOINT는
+신구 enum 모두에 존재해 즉각 영향 없음).

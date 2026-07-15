@@ -341,7 +341,7 @@ lifecycle `heavy-asg-full-coverage` in
 
 - **Host:** regional. Consumes the **vpc** quota (cap 5).
 - vpc `cidr` /20 (e.g. `10.123.0.0/20`), `$.vpc.id`, poll `$.vpc.state` →
-  `ACTIVE`. subnet `type: GENERAL`, `$.subnet.id`. port `security_groups: []`,
+  `ACTIVE`. subnet `type: PUBLIC` (was `GENERAL` until 2026-07-15), `$.subnet.id`. port `security_groups: []`,
   `$.port.id`. Teardown reverse with 409 retries (wait 404 before parent delete).
 - public-ip `type: IGW` → `$.publicip.id`. internet-gateway needs `vpc_id`,
   `firewall_enabled`, `type: IGW` → `$.internet_gateway.id`.
@@ -391,7 +391,8 @@ lifecycle `heavy-asg-full-coverage` in
     `exist-connected-endpoint` until all PLEs are gone.
   - VPC create returns 201 (not 200/202); body: top-level fields not wrapped.
   - Subnet create: POST /v1/subnets (NOT /v1/vpcs/{id}/subnets); body: top-level fields
-    `{name, cidr, type: GENERAL, vpc_id, tags: []}`. Returns 202; poll $.subnet.state → ACTIVE.
+    `{name, cidr, type: PUBLIC, vpc_id, tags: []}`. Returns 202; poll $.subnet.state → ACTIVE.
+    (type enum changed 2026-07-15: `GENERAL` → `PUBLIC`; see validated-facts.md.)
   - Response fields: `$.privatelink_service.id`, `$.privatelink_endpoint.id`.
 - **Transit gateway CREATING → ACTIVE settle timing (CONFIRMED, HB4 run 28738115294, 2026-07-05):**
   `POST /v1/transit-gateways` returns 202 (async) and the TGW sits in `CREATING` for a while — any
@@ -488,8 +489,10 @@ lifecycle `heavy-asg-full-coverage` in
   live-validated run 27583285457 2026-06-15; re-confirmed by HB4 run 28738115294, 2026-07-05):**
   `POST /v1/vpc-endpoints` with `subnet_id` pointing at a `GENERAL` subnet 400s
   `scp-network.vpc-endpoint.subnet-not-found` ("VPC Endpoint Type Subnet not found"). Subnet
-  `type` enum is `(GENERAL, LOCAL, VPC_ENDPOINT)` (`data/api_docs.json`
-  `subnetcreaterequest`). The `vpc-endpoint` lifecycle in `networking__vpc.json` had not applied
+  `type` enum was `(GENERAL, LOCAL, VPC_ENDPOINT)` (`data/api_docs.json`
+  `subnetcreaterequest`) — changed server-side 2026-07-15 to
+  `(PUBLIC, PRIVATE, LOCAL, VPC_ENDPOINT)`; the suite now sends `PUBLIC` where it sent
+  `GENERAL`. The `vpc-endpoint` lifecycle in `networking__vpc.json` had not applied
   this already-known fix (was still sending `type:GENERAL`, and adopting the shared/GENERAL
   subnet) — fixed OFFLINE 2026-07-06 (self-creates its own `VPC_ENDPOINT`-type subnet every run,
   no longer adopts the shared subnet). Separately, `resource_key` still needs a REAL

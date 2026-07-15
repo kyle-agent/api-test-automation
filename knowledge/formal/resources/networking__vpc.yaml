@@ -42,7 +42,7 @@ resources:
     create:
       endpoint: "POST /v1/subnets"
       body: {name: "regrsub{unique}", description: "API regression suite",
-             cidr: "{opt.cidr}", type: GENERAL, vpc_id: "{vpc.vpc_id}", tags: []}
+             cidr: "{opt.cidr}", type: PUBLIC, vpc_id: "{vpc.vpc_id}", tags: []}
       options:
         cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr,
                note: "VPC cidr의 하위 /24 (composer가 부모 블록에서 8+j번째 /24를 절단)"}
@@ -68,7 +68,7 @@ resources:
              cidr: "{opt.cidr}", type: VPC_ENDPOINT, vpc_id: "{vpc.vpc_id}", tags: []}
       options:
         cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr,
-               note: "VPC cidr 하위 /24 (composer가 부모 블록 8+j번째 /24를 절단; endpoint-subnet은 GENERAL subnet과 공존 시 다른 /24를 받는다)"}
+               note: "VPC cidr 하위 /24 (composer가 부모 블록 8+j번째 /24를 절단; endpoint-subnet은 PUBLIC(구 GENERAL) subnet과 공존 시 다른 /24를 받는다)"}
     capture: {subnet_id: "$.subnet.id"}
     ready: {field: "$.subnet.state", until: ACTIVE, timeout: 180, interval: 10}
     delete: {endpoint: "DELETE /v1/subnets/{subnet_id}", destructive: true}
@@ -78,11 +78,15 @@ resources:
     notes: >
       VPC Endpoint 전용 subnet (subnet type=VPC_ENDPOINT). vpc-endpoint create가
       400 'scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet
-      not found' (run 27466988779)로 실패한 근본 원인 — generic GENERAL subnet으로는
-      불충분하고, subnet을 VPC_ENDPOINT 유형으로 생성해야 VPC Endpoint가 그 subnet에
-      붙는다. subnet type enum (GENERAL, LOCAL, VPC_ENDPOINT)은
+      not found' (run 27466988779)로 실패한 근본 원인 — generic GENERAL(현 PUBLIC)
+      subnet으로는 불충분하고, subnet을 VPC_ENDPOINT 유형으로 생성해야 VPC Endpoint가
+      그 subnet에 붙는다. subnet type enum은 2026-07-15부로 서버 측에서
+      (PUBLIC, PRIVATE, LOCAL, VPC_ENDPOINT)로 변경 — GENERAL은 400
+      "Type should be 'PUBLIC' or 'PRIVATE' or 'LOCAL' or 'VPC_ENDPOINT'".
+      (구 enum (GENERAL, LOCAL, VPC_ENDPOINT)은
       api_docs subnetcreaterequestv1dot2 / userguide VPC overview('VPC Endpoint
-      Subnet: VPC Endpoint로 활용 가능한 Subnet')에서 확인. type=VPC_ENDPOINT
+      Subnet: VPC Endpoint로 활용 가능한 Subnet') 기준 — data/api_docs.json
+      스냅샷은 아직 구 enum이므로 spec-intel 리프레시 필요). type=VPC_ENDPOINT
       생성 body는 docs-derived(UNPROVEN) — endpoint-subnet 자체 2xx + vpc-endpoint
       2xx는 라이브 재검증 대기(READY FOR LIVE RE-VALIDATION, IB-013). 다른 subnet
       유형과 동일하게 standalone subnet 생성/삭제로 teardown.

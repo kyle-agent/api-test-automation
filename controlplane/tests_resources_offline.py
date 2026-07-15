@@ -81,7 +81,7 @@ resources:
     requires: [vpc]
     create:
       endpoint: "POST /v1/subnets"
-      body: {vpc_id: "{vpc.vpc_id}", cidr: "{opt.cidr}", type: GENERAL}
+      body: {vpc_id: "{vpc.vpc_id}", cidr: "{opt.cidr}", type: PUBLIC}
       options:
         cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr}
     provenance: VALIDATED

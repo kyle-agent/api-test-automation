@@ -48,7 +48,7 @@ resources:
     create:
       endpoint: "POST /v1/subnets"
       body: {name: "regrsub{ualpha}", vpc_id: "{vpc.vpc_id}",
-             cidr: "{opt.cidr}", type: GENERAL}
+             cidr: "{opt.cidr}", type: PUBLIC}
       options:
         cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr}
     capture: {subnet_id: "$.subnet.id"}

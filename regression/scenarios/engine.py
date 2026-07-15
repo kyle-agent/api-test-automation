@@ -1990,7 +1990,7 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
                   f"fall back to find-or-create.")
 
     # 2)+3) shared SUBNETs under the shared VPC — the general one (mirrors a
-    #    create-subnet step body: name/description/cidr/type=GENERAL/vpc_id/tags,
+    #    create-subnet step body: name/description/cidr/type=PUBLIC/vpc_id/tags,
     #    carved from the first /24 of the VPC's /20) and the DB-lane one (the DB
     #    cluster lifecycles adopt THIS one via adopt: "subnet#db" so their slow
     #    provisioning is isolated from the VM/SKE/networking adopters).
@@ -2002,7 +2002,9 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
             # IB-051: subnet name length 3..20 ('regrsubsh(db)'+8-hex ≤ 19 chars,
             # 'regrsub'-prefixed so the reconciler's subnet sweep reclaims them).
             "name": name, "description": desc,
-            "cidr": cidr, "type": "GENERAL", "vpc_id": vpc_id, "tags": [],
+            # 2026-07-15: subnet type enum changed server-side to
+            # (PUBLIC, PRIVATE, LOCAL, VPC_ENDPOINT) — GENERAL now 400s.
+            "cidr": cidr, "type": "PUBLIC", "vpc_id": vpc_id, "tags": [],
         }, axis="regression")
         create = {"name": step_name, "method": "POST", "service": "vpc"}
         resp = _run_step(client, create, _SUBNET_CREATE_PATH, body, "vpc", {})

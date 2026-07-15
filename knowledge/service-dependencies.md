@@ -40,7 +40,7 @@ mysql cluster           — needs vpc + subnet
 
 **Networking (vpc + subnet + port)** — `networking-vpc-subnet`:
 1. create vpc (`cidr` e.g. `10.123.0.0/20`) → capture `$.vpc.id` → poll `$.vpc.state == ACTIVE`
-2. create subnet (`type: GENERAL`, `vpc_id`) → `$.subnet.id` → poll `$.subnet.state == ACTIVE`
+2. create subnet (`type: PUBLIC` — was `GENERAL` until the 2026-07-15 server-side enum change, `vpc_id`) → `$.subnet.id` → poll `$.subnet.state == ACTIVE`
 3. create port (`subnet_id`, `security_groups: []`) → `$.port.id`
 4. teardown reverse: **port → subnet → vpc**, each with `409` retry (dependency
    still releasing). Wait for subnet 404 before deleting vpc.

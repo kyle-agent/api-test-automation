@@ -59,7 +59,7 @@ resources:
     service: networking/vpc
     requires: [vpc]
     provenance: VALIDATED
-    notes: "type GENERAL; CIDR must be a sub-range of the VPC CIDR; poll $.subnet.state == ACTIVE"
+    notes: "type PUBLIC (was GENERAL until the 2026-07-15 enum change); CIDR must be a sub-range of the VPC CIDR; poll $.subnet.state == ACTIVE"
   port:
     service: networking/vpc
     requires: [subnet]
