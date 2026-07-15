@@ -107,7 +107,10 @@ def test_prescan_skips_converged_collections(monkeypatch):
 
 def test_run_sweep_results_identical_with_and_without_prescan(monkeypatch):
     """프리스캔은 순수 지연 최적화 — 같은 계정 상태에서 삭제 집합/순서가
-    프리스캔 on/off와 무관해야 한다 (images→volumes 역방향 순서 포함)."""
+    프리스캔 on/off와 무관해야 한다 (images→volumes 역방향 순서 포함).
+    블라스트(2026-07-16)는 설계상 프리스캔 캐시에 결합돼 있어(off면 무동작)
+    이 패리티 명제 밖 — 여기선 끈다."""
+    monkeypatch.setenv("SCP_SWEEP_BLAST", "false")
     def _mk():
         return FakeClient(lists={
             "/v1/images": [_owned("regrimg-a", id="im-1", state="ACTIVE")],
@@ -252,3 +255,37 @@ def test_rm_ghost_report_unknown_type_is_not_declared_ghost(monkeypatch, capsys)
     recon._rm_ghost_report(client)
     out = capsys.readouterr().out
     assert "미확인 1건" in out and "유령 레코드" not in out
+
+
+# ---- 블라스트 (오너 2026-07-16: "조회 → 전체 삭제 동시 발사 → 409만 시나리오") --
+
+def test_blast_fires_leaves_skips_parents_pending_and_live(monkeypatch):
+    """_blast_delete: 프리스캔 캐시의 리프 소유 아이템만 동시 삭제하고 —
+    부모 컬렉션(_BLAST_EXCLUDE), 삭제-진행 상태, 살아있는(미만료 태그)
+    아이템은 건드리지 않는다. 2xx로 죽은 아이템은 캐시에서도 걷어낸다."""
+    c = FakeClient(lists={})
+    now = time.monotonic()
+    recon._LIST_CACHE.clear()
+    recon._LIST_CACHE[(id(c), "queueservice", "/v1/queues")] = (
+        now, [_owned("regrq-a", id="q1")])
+    recon._LIST_CACHE[(id(c), "vpc", "/v1/vpcs")] = (
+        now, [_owned("regrvpc-a", id="v1")])            # excluded parent
+    recon._LIST_CACHE[(id(c), "kms", "/v1/kms/transit")] = (
+        now, [_owned("regrkms-a", id="k1", state="Deleting")])   # pending
+    n = recon._blast_delete(c)
+    dels = [p for m, p in c.calls if m == "DELETE"]
+    assert "/v1/queues/q1" in dels
+    assert "/v1/vpcs/v1" not in dels and "/v1/kms/transit/k1" not in dels
+    assert n == 1
+    # killed item pruned from the cache so later passes don't re-DELETE it
+    _, q_items = recon._LIST_CACHE[(id(c), "queueservice", "/v1/queues")]
+    assert q_items == []
+
+
+def test_blast_kill_switch(monkeypatch):
+    monkeypatch.setenv("SCP_SWEEP_BLAST", "false")
+    c = FakeClient(lists={})
+    recon._LIST_CACHE.clear()
+    recon._LIST_CACHE[(id(c), "queueservice", "/v1/queues")] = (
+        time.monotonic(), [_owned("regrq-a", id="q1")])
+    assert recon._blast_delete(c) == 0 and c.calls == []

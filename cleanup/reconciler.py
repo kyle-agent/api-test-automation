@@ -531,6 +531,104 @@ def _prescan(client) -> None:
           f"({time.monotonic() - _t0:.1f}s)")
 
 
+# --------------------------------------------------------------------------- #
+# 블라스트 삭제 (오너 설계 2026-07-16: "1단계 리소스 조회, 2단계 해당 리소스
+# 전체 삭제 api 호출 — 병렬로, 동시에. 그러고 409로 안지워지는 놈들만
+# 시나리오에 따라 정리. 부산물 동시에 전체 삭제. 이러면 끝 아닌가?")
+# --------------------------------------------------------------------------- #
+_BLAST_EXCLUDE: frozenset = frozenset({
+    ("servicewatch", "/v1/log-groups"),   # bulk-body DELETE — 전용 병렬 패스
+    ("secretsmanager", "/v1/secrets"),    # waiting_time_ndays body 필요
+    # 부모/특수-순서 컬렉션 — 자식이 살아 있는 동안 DELETE는 어차피 409라
+    # 블라스트 이득이 0이고, 전용 패스가 시나리오 순서(룰→FW→IGW, 노드풀→
+    # 클러스터, static-nat→LB, 연결→TGW, 스냅샷→이미지→볼륨, 복제해제→볼륨)
+    # 를 보증한다. 블라스트는 리프 전용.
+    ("vpc", "/v1/vpcs"),
+    ("vpc", "/v1/subnets"),
+    ("vpc", "/v1/subnets?type=VPC_ENDPOINT"),
+    ("vpc", "/v1/internet-gateways"),
+    ("vpc", "/v1/transit-gateways"),
+    ("loadbalancer", "/v1/loadbalancers"),
+    ("direct-connect", "/v1/direct-connects"),
+    ("virtualserver", "/v1/images"),
+    ("virtualserver", "/v1/volumes"),
+    ("virtualserver", "/v1/snapshots"),
+    ("filestorage", "/v1/volumes"),
+    ("ske", "/v1/clusters"),
+})
+_BLAST_PFX = ("regr", "zznet")
+
+
+def _blast_enabled() -> bool:
+    return os.environ.get("SCP_SWEEP_BLAST", "").lower() != "false"
+
+
+def _blast_delete(c) -> int:
+    """2단계 동시 발사: 프리스캔이 채운 _LIST_CACHE의 모든 컬렉션에서 소유
+    아이템을 골라 일반형 ``DELETE {collection}/{id}`` 를 스윕 풀 전체로
+    동시에 발사한다. 독립 리소스는 이 라운드 하나에 병렬로 다 죽고,
+    비-2xx(409 의존 홀더, 특수-삭제 4xx)는 조용히 남아 뒤의 의존순서 패스
+    체인이 시나리오대로(룰→FW→IGW 등) 줍는다. 실패를 세지도 기다리지도
+    않는다 — 목표는 wall-time 하나다.
+
+    소유 게이트는 패스와 동일한 _is_deletable (owner 태그 + TTL/자기-런
+    규칙) + regr/zznet 접두 (태그 인벤토리와 같은 계정 소유 규칙, Hard Rule
+    3 불변). 태그가 살아 있는(미만료·타-런) 아이템은 여기서도 보호된다.
+    2xx로 죽은 아이템은 캐시에서도 걷어내 뒤 패스의 중복 DELETE를 막는다."""
+    if not _blast_enabled():
+        return 0
+    from core.registry import _tag_value, OWNER_KEY, OWNER
+    targets = []
+    with _STATE_LOCK:
+        cached = [(svc, path, items)
+                  for (cid, svc, path), (_ts, items) in _LIST_CACHE.items()
+                  if cid == id(c)]
+    for svc, path, items in cached:
+        if (svc, path) in _BLAST_EXCLUDE:
+            continue
+        base = path.split("?")[0]
+        for it in items:
+            if not isinstance(it, dict) or not it.get("id"):
+                continue
+            if _is_pending_deletion(it):
+                continue  # 이미 삭제 진행/예약 상태 — 재-DELETE는 소음일 뿐
+            has_tag = _tag_value(it, OWNER_KEY) == OWNER
+            ok = _is_deletable(it, name_prefixes=_BLAST_PFX) or (
+                # 대체 name 키 폴백 (_select와 동일) — 단 태그가 있는데
+                # _is_deletable이 거른 것(미만료 보호)은 되살리지 않는다.
+                not has_tag and not it.get("name")
+                and _name_of(it).startswith(_BLAST_PFX))
+            if ok:
+                targets.append((svc, path, base, it["id"]))
+    if not targets:
+        return 0
+    print(f"  blast: {len(targets)} owned item(s) — 전체 동시 삭제 발사")
+
+    def _fire(t):
+        svc, path, base, rid = t
+        st = _delete(c, svc, f"{base}/{rid}")
+        return t if (st is not None and 200 <= st < 300) else None
+
+    killed = [t for t in _map_parallel(_fire, targets) if t]
+    # 죽은 아이템은 프리스캔 캐시에서도 제거 — 뒤 패스가 같은 id에 중복
+    # DELETE를 직렬로 다시 쏘는 낭비 방지.
+    dead: dict = {}
+    for svc, path, _base, rid in killed:
+        dead.setdefault((svc, path), set()).add(str(rid))
+    with _STATE_LOCK:
+        for (cid, svc, path), (ts, items) in list(_LIST_CACHE.items()):
+            gone = dead.get((svc, path))
+            if cid != id(c) or not gone:
+                continue
+            _LIST_CACHE[(cid, svc, path)] = (
+                ts, [it for it in items
+                     if not (isinstance(it, dict)
+                             and str(it.get("id")) in gone)])
+    print(f"  blast: {len(killed)}/{len(targets)} deleted in round 0 "
+          f"(잔여 {len(targets) - len(killed)}건은 의존순서 패스가 정리)")
+    return len(killed)
+
+
 # Per-campaign convergence cache (Task C, change 1). A (service, path) pass that
 # lists ZERO deletable-owned items — either nothing of ours is left, or only
 # un-deletable items remain (live-ttl, name-mismatch, or PF-09 pending-deletion
@@ -2208,6 +2306,11 @@ def run_sweep(client) -> int:
     # 제거 (오너 2026-07-15). SKE 퓨처 뒤: 최장 극인 SKE teardown을 먼저
     # 굴려 놓고 나열을 겹친다.
     _prescan(c)
+
+    # 0c. 블라스트 — 프리스캔 캐시의 소유 아이템 전체에 삭제를 동시 발사
+    # (오너 2026-07-16). 독립 리소스는 여기서 끝나고, 아래 의존순서 패스들은
+    # 409/특수-삭제 생존자만 상대한다 (캐시가 pruned 되어 재나열 없이 얇아짐).
+    deleted += _blast_delete(c)
 
     # 1. servers (virtualserver) — issue every delete, then ONE barrier until
     # all are gone (frees subnet/sg). Server teardown drains concurrently
