@@ -27,7 +27,7 @@ resources:
     requires: []
     create:
       endpoint: "POST /v1/volumes"
-      body: {name: "regrpfs{ualpha}", capacity_tb: 1, tags: []}
+      body: {name: "regrpfs{ualpha}", capacity_tb: 1, zone: kr-west1-a, tags: []}
       optional: true
       expect_status: [200, 201, 202, 400, 403, 404, 409, 422]
       note: "reachability-only (owner): access-tested, 4xx tolerated, no real creation expected. body VolumeCreateRequest (docs), capture $.id UNPROVEN."
@@ -45,7 +45,7 @@ resources:
     provenance: docs
     source: {lifecycle: parallel-filestorage-capacity-restore,
              steps: [create-volume, wait-volume-available, set-volume-capacity, delete-volume]}
-    notes: "REACHABILITY-COVERAGE (not functional validation). 모든 write/GET access-tested, 4xx 관용, 2xx 미기대. capacity_tb 1은 문서상 최소값(min 1 / max 1000), BILLABLE → heavy. teardown delete-volume은 stray 2xx 정리용(관용 expect로 누수 방지). capture envelope $.id (Volume.id, filestorage의 flat $.volume_id와 다름) — UNPROVEN. 이름 규칙은 filestorage와 동일 (^[a-z]([a-z0-9_]){2,20}$). 연결(attach)은 Multi-node GPU Cluster에서만 가능 (services/storage__parallel-filestorage.yaml mngc-prereq). 용량 증설 PUT /v1/volumes/{volume_id}/capacity가 set-capacity verify로 reachable."
+    notes: "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot1): zone 신규 REQUIRED — 라이브 실측: zone 누락 → 400 'Field required'; zone=kr-west1-a + 규칙 위반 name 프로브 → 400이 name 에러만 반환 = zone 스키마 통과 (2xx 생성은 reachability-only 정책대로 미시도). REACHABILITY-COVERAGE (not functional validation). 모든 write/GET access-tested, 4xx 관용, 2xx 미기대. capacity_tb 1은 문서상 최소값(min 1 / max 1000), BILLABLE → heavy. teardown delete-volume은 stray 2xx 정리용(관용 expect로 누수 방지). capture envelope $.id (Volume.id, filestorage의 flat $.volume_id와 다름) — UNPROVEN. 이름 규칙은 filestorage와 동일 (^[a-z]([a-z0-9_]){2,20}$). 연결(attach)은 Multi-node GPU Cluster에서만 가능 (services/storage__parallel-filestorage.yaml mngc-prereq). 용량 증설 PUT /v1/volumes/{volume_id}/capacity가 set-capacity verify로 reachable."
 
   pfs-snapshot:
     code: "st-pfs-snapshot"

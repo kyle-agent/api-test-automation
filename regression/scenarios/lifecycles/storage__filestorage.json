@@ -15,8 +15,10 @@
           "json": {
             "name": "regrfsr{unique}",
             "protocol": "NFS",
-            "type_name": "HDD"
+            "type_name": "HDD",
+            "zone": "kr-west1-b"
           },
+          "_note": "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot2): zone은 신규 REQUIRED — 누락 시 400 'Field required', 엉뚱한 값이면 400 filestorage.BadRequest.Invalid.zone (둘 다 라이브 실측 2026-07-15). zone=kr-west1-b LIVE VALIDATED 2026-07-15: create 202(응답이 zone 에코) → available → delete 202 → 404. kr-west1-b를 쓰는 이유: GET /v1/replications/zones (신규 lookup, 라이브 실측) 기준 HDD/replication의 복제 가능 쌍이 kr-west1-b↔kr-east1-a 뿐 — kr-west1-a는 대상 zone이 비어(zones:[]) 이 라이프사이클의 create-replication이 불가능해진다.",
           "expect_status": [200, 201, 202],
           "capture": {"volume_id": "$.volume_id"},
           "cleanup": {
@@ -143,14 +145,14 @@
           "json": {
             "name": "regrfsrepl{unique}",
             "volume_id": "{volume_id}",
-            "region": "kr-east1",
+            "zone": "kr-east1-a",
             "replication_frequency": "5min",
             "replication_type": "replication",
             "backup_retention_count": 2
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture": {"replication_id": "$.replication_id", "dr_volume_id": "$.replication_volume_id"},
-          "_note": "CONFIRMED LIVE 2026-06-24: createvolumereplication returns 202 with real volume_id. Response has $.replication_id and $.replication_volume_id (the DR volume in kr-east1). GROUP-RIDE (2026-07-09 repair): capture는 의도적으로 HARD — create가 400 등으로 실패하거나 202인데 envelope이 비면 optional+capture 미스 규칙으로 그룹 fs-replication 전체가 스킵되어, 후속 스텝들(특히 dr 3스텝)이 리터럴 {replication_id}/{dr_volume_id}로 발화하지 않는다 (2026-07-08 런의 set-replication-dr 리터럴 사망 수리). TEARDOWN = 오너 절차 (2026-07-09): 상대(복제본) 리전에서 ① 일시중지(set-replication-dr) ② 삭제(delete-replication-dr) → ③ snapshot 정리 → ④ 양 리전 볼륨 삭제 (source purpose original→none 전이). dr 스텝들은 'filestorage-dr' service alias 사용 — SCP_SERVICE_HOSTS='{\"filestorage-dr\":\"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' 를 런타임에 설정해야 동작."
+          "_note": "SPEC BUMP 2026-07-15 (ReplicationCreateRequestV1Dot2): region 필드 제거 + zone(REQUIRED) 신설 — 대상은 이제 리전이 아니라 존. 유효 대상 존은 신규 lookup GET /v1/replications/zones?type_name=&source_zone=&replication_type= (라이브 실측 2026-07-15: HDD/replication은 kr-west1-b↔kr-east1-a 쌍만 유효, kr-west1-a·SSD·backup은 zones:[]) — 그래서 create-volume이 zone=kr-west1-b, 여기가 zone=kr-east1-a. replica는 여전히 kr-east1에 생기므로 filestorage-dr alias/teardown 절차는 불변으로 추정(복제 create 자체는 이번에 라이브 재검증 안 함 — heavy 정리 절차가 커서 스킵). CONFIRMED LIVE 2026-06-24: createvolumereplication returns 202 with real volume_id. Response has $.replication_id and $.replication_volume_id (the DR volume in kr-east1). GROUP-RIDE (2026-07-09 repair): capture는 의도적으로 HARD — create가 400 등으로 실패하거나 202인데 envelope이 비면 optional+capture 미스 규칙으로 그룹 fs-replication 전체가 스킵되어, 후속 스텝들(특히 dr 3스텝)이 리터럴 {replication_id}/{dr_volume_id}로 발화하지 않는다 (2026-07-08 런의 set-replication-dr 리터럴 사망 수리). TEARDOWN = 오너 절차 (2026-07-09): 상대(복제본) 리전에서 ① 일시중지(set-replication-dr) ② 삭제(delete-replication-dr) → ③ snapshot 정리 → ④ 양 리전 볼륨 삭제 (source purpose original→none 전이). dr 스텝들은 'filestorage-dr' service alias 사용 — SCP_SERVICE_HOSTS='{\"filestorage-dr\":\"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' 를 런타임에 설정해야 동작."
         },
         {
           "name": "list-replications",

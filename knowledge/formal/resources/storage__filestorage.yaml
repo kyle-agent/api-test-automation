@@ -15,7 +15,7 @@ resources:
     requires: []
     create:
       endpoint: "POST /v1/volumes"
-      body: {name: "regrfs{unique}", protocol: NFS, type_name: HDD}
+      body: {name: "regrfs{unique}", protocol: NFS, type_name: HDD, zone: kr-west1-b}
     capture: {volume_id: "$.volume_id"}
     ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
             timeout: 300, interval: 15}
@@ -26,7 +26,7 @@ resources:
     delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: filestorage-volume, steps: [create, wait-available, delete]}
-    notes: "standalone NFS volume (no vpc) — cross-service.yaml 키와 동일 노드. capture는 FLAT $.volume_id (virtualserver block volume의 $.id와 다름 — validated-facts). protocol NFS + type_name HDD가 유일하게 라이브 검증된 body (CIFS는 Windows용, 문서). 이름 규칙: 소문자 시작, 소문자/숫자/_, 3-21자 (services/storage__filestorage.yaml). 삭제 후 404 도달까지 폴링(소스 wait-gone 300s). ske-cluster의 volume_id 선행자원 (cross-service ske-volume-is-filestorage)."
+    notes: "standalone NFS volume (no vpc) — cross-service.yaml 키와 동일 노드. capture는 FLAT $.volume_id (virtualserver block volume의 $.id와 다름 — validated-facts). protocol NFS + type_name HDD가 유일하게 라이브 검증된 body (CIFS는 Windows용, 문서). SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot2): zone 신규 REQUIRED — 누락 400 'Field required', 무효값 400 filestorage.BadRequest.Invalid.zone (라이브 실측). zone=kr-west1-b LIVE VALIDATED 2026-07-15 (202→available→delete 202→404). kr-west1-b 채택 이유: HDD/replication의 복제 가능 쌍이 kr-west1-b↔kr-east1-a 뿐 (신규 lookup GET /v1/replications/zones 라이브 실측; kr-west1-a는 zones:[]) — fs-replication 선행자원이 되려면 b존이어야 함. 이름 규칙: 소문자 시작, 소문자/숫자/_, 3-21자 (services/storage__filestorage.yaml). 삭제 후 404 도달까지 폴링(소스 wait-gone 300s). ske-cluster의 volume_id 선행자원 (cross-service ske-volume-is-filestorage)."
 
   fs-snapshot:
     code: "st-fs-snapshot"
@@ -80,13 +80,13 @@ resources:
       body:
         name: "regrfsrepl{unique}"
         volume_id: "{filestorage-volume.volume_id}"
-        region: "{opt.region}"
+        zone: "{opt.zone}"
         replication_frequency: 5min
         replication_type: "{opt.replication_type}"
         backup_retention_count: 2
       options:
-        region: {type: string, required: true, default: "kr-east1",
-                 note: "복제 대상 리전 — 소유자 지식(2026-06-12): 볼륨과 DIFFERENT 리전을 선택하며 실사용은 kr-east1 (추출기의 kr-west1 기본값은 오류였음). 유효 목록은 GET /v1/replications/regions (R3 lookup 노드 후보)"}
+        zone: {type: string, required: true, default: "kr-east1-a",
+                 note: "SPEC BUMP 2026-07-15 (ReplicationCreateRequestV1Dot2): region 필드 제거, zone(REQUIRED) 신설 — 복제 대상이 리전에서 존 단위로 바뀜(멀티-AZ 웨이브). 유효 목록은 신규 lookup GET /v1/replications/zones?type_name=&source_zone=&replication_type= (3개 쿼리 전부 REQUIRED; 라이브 실측 2026-07-15: HDD/replication은 kr-west1-b↔kr-east1-a 쌍만, kr-west1-a·SSD·backup은 zones:[]) — 소스 볼륨이 zone=kr-west1-b일 때만 default kr-east1-a가 유효 (R3 lookup 노드 후보)"}
         replication_type: {type: enum, values: [replication, backup],
                  default: replication, vary: true,
                  note: "소유자 지식(2026-06-12): replication=타리전 DR 복제, backup=디스크백업(다른 FS 볼륨을 대상으로 — 두 번째 볼륨 선행 생성 필요). backup 변형의 대상 볼륨 필드 매핑은 유저가이드 확인 후 배선 (그 전까지 backup 변형 합성 금지)"}
