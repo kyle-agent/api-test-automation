@@ -1193,8 +1193,23 @@ def _reap_igw_firewall_rules(client, igw_id: str) -> int:
         fws = _items(client.get("/v1/firewalls", service="firewall").body)
     except Exception:
         return 0
+    # 라이브 실측 2026-07-15: 목록 응답의 fw_resource_id가 문서 예시와 달리
+    # None으로 온다 (FW_IGW_regrvpcnb6a578e6d 케이스) — id 매치가 항상
+    # 실패하므로 플랫폼 명명 규칙(FW_<IGW이름>, IGW이름=IGW_<vpc명>)으로
+    # 폴백한다. IGW 이름은 show로 1회 조회 (실패해도 id 매치는 시도).
+    igw_name = ""
+    try:
+        _g = client.get(f"/v1/internet-gateways/{igw_id}", service="vpc").body
+        igw_name = str(((_g or {}).get("internet_gateway") or {}).get("name")
+                       or "")
+    except Exception:
+        pass
     for fw in fws:
-        if not (isinstance(fw, dict) and fw.get("fw_resource_id") == igw_id):
+        if not isinstance(fw, dict):
+            continue
+        linked = (fw.get("fw_resource_id") == igw_id
+                  or (igw_name and fw.get("name") == f"FW_{igw_name}"))
+        if not linked:
             continue
         fid = fw.get("id")
         if not fid:

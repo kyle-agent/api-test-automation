@@ -2,7 +2,8 @@
 
 Automated testing **platform** for the Samsung Cloud Platform (SCP) Open APIs
 documented at <https://docs.e.samsungsdscloud.com/apireference/>
-(**13 categories / ~60 services / ~1,372 endpoints**). Engineered by a team of
+(**13 categories / ~60 services / 1,416 endpoints** as of the 2026-07 version
+bump — `python -m spec.summary` is the live source of truth). Engineered by a team of
 AI agents (`docs/agent-team.md`); session entry point: `START_HERE.md`; current
 state: `docs/working/CONTEXT.md`; doc index: `docs/INDEX.md`.
 
