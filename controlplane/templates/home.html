@@ -103,36 +103,10 @@
       확인하세요. 이는 "회귀 0"이 아니라 <b>관측 없음</b>입니다.</div></div>
 {% endif %}
 
-{# 2026-07-07 오너 결정: Catalog 칸 제거(4→3칸) — Modeling이 카탈로그를 흡수,
-   부제에 전체 API 분모(catalog_count)로 흡수를 표기. 인벤토리 참조는 상단 📖 카탈로그. #}
-<h2>파이프라인 <span class="hint">3단계 현황 — 클릭하면 해당 영역으로 (상단 네비와 동일)</span></h2>
-<div class="pipe">
-  <a class="pstage" href="/planning/resources/map">
-    <div class="pl">Modeling</div>
-    <div class="pv">{{ model_stats.validated }}<span
-      style="font-size:13px;font-weight:600;color:var(--muted)">/{{ model_stats.nodes }}</span></div>
-    <div class="ps">전체 {{ catalog_count }} API의 테스트 모델 저작 — VALIDATED/전체 노드
-      · <span class="note" title="자원 모델은 저장소(main) 파일 기준 — 발행본/로컬 관측이 아님 (계약 §2.7)">저장소 기준</span></div>
-    <span class="chev">→</span>
-  </a>
-  <a class="pstage" href="/testing/embed">
-    <div class="pl">Testing</div>
-    <div class="pv">{{ running|length }}
-      <span style="font-size:12px;font-weight:500;color:var(--muted)">진행 중</span></div>
-    <div class="ps">스케줄 {{ schedules|length }} · 오늘 실행 {{ runs_today }}{%
-      if stale_running %} · <span title="running/dispatched 상태로 24시간 이상 방치된 기록 — 죽은 워커/미회수 run일 가능성이 높아 '진행 중' 집계에서 제외">오래된 미회수 {{ stale_running|length }}</span>{% endif %}
-      · {{ badge('local') }}</div>
-    <span class="chev">→</span>
-  </a>
-  {# Reporting 카드 배지 제거 — 페이지 기본 출처(발행)와 동일 (예외만 배지 원칙).
-     Testing 카드의 This server 배지는 유지 (라이브 값 — 기본과 다른 예외). #}
-  <a class="pstage" href="/reporting">
-    <div class="pl">Reporting</div>
-    <div class="pv">{{ coverage.get('cov_c3','-') if coverage else '-' }}%</div>
-    <div class="ps">C3 검증 · 신규 회귀 {{ (coverage.get('fail_new') or 0) if coverage else '-' }}</div>
-  </a>
-</div>
-
+{# 파이프라인 스트립 제거 (오너 확정 2026-07-15, 블록 ③): 세 카드 전부 중복이거나
+   관객 부재 — Modeling 수치=에이전트 저작 지표(Modeling 화면 소관), Testing 진행
+   중=최근 RUN 표와 중복, Reporting %=위 사다리와 중복, 점프=상단 네비와 중복.
+   최종 홈 = ① 회귀 판정 배너 · ② 미니 사다리 + 잔존 · ③ 최근 RUN (유지). #}
 <h2>최근 RUN <span class="hint">control plane 기록 — 15초마다 갱신</span></h2>
 <div class="card pad" style="padding-top:4px">
   <div hx-get="/partials/runs?limit=5" hx-trigger="every 15s" hx-swap="innerHTML">
