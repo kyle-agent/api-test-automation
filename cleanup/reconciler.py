@@ -2685,6 +2685,69 @@ def _owned_vpcs_present(client) -> int:
                if _is_deletable(v, name_prefixes=_VPC_NAME_PREFIXES))
 
 
+def _rm_ghost_report(client) -> None:
+    """resourcemanager 인덱스의 '유령 레코드' 분리 보고 (오너 2026-07-16:
+    "/v1/resources로 조회하면 남아 있다는데 실제 자원은 없는 경우가 있다 —
+    버그로 기록해 두고 나중에 데이터 고치라고 해야 하고, 전체 정리할 때
+    헷갈리지 않게 해야 함").
+
+    스윕 종료 시 1회: 태그 인벤토리의 소유 항목을 실제 컬렉션 목록과 대조해
+    (매핑 가능한 타입만) 실자원이 없는 항목을 GHOST로 표시 — 잔존 리포트와
+    분리해 혼동을 막고, conformance finding(resourcemanager.stale-index-entry)
+    으로 기록해 플랫폼 데이터 수정 요청의 증거를 남긴다. 삭제 시도는 하지
+    않는다 (실자원이 없으므로). Fail-open: 판정 불가 항목은 GHOST로 단정하지
+    않고 '미확인'으로 보고만."""
+    if not _tag_scope_enabled():
+        return
+    inv = _tag_inventory(client)
+    if not inv:
+        return
+    by_coll: dict = {}
+    ghosts, unknown = [], []
+    for it in inv:
+        key = (str(it.get("service") or ""), str(it.get("resource_type") or ""))
+        coll = _TYPE_TO_COLL.get(key)
+        if coll is None:
+            unknown.append(it)
+            continue
+        if coll not in by_coll:
+            try:
+                by_coll[coll] = {str(x.get("id")) for x in
+                                 _list_all(client, coll[0], coll[1])
+                                 if isinstance(x, dict)}
+            except Exception:  # noqa: BLE001
+                by_coll[coll] = None
+        ids = by_coll[coll]
+        if ids is None:
+            unknown.append(it)
+        elif str(it.get("id")) not in ids:
+            ghosts.append((it, coll))
+    if ghosts:
+        print(f"  RM 유령 레코드 {len(ghosts)}건 — /v1/resources엔 있는데 "
+              "실제 컬렉션엔 없음 (플랫폼 인덱스 버그, 삭제 시도 안 함):")
+        for it, coll in ghosts[:10]:
+            print(f"    ghost {it.get('service')}/{it.get('resource_type')} "
+                  f"{it.get('resource_name')} id={str(it.get('id'))[:12]} "
+                  f"(실컬렉션 {coll[1]}에 부재)")
+        try:
+            from core import results as _results
+            for it, coll in ghosts:
+                _results.record_finding(_results.Finding(
+                    endpoint_key="GET /v1/resources",
+                    rule_id="resourcemanager.stale-index-entry",
+                    severity="yellow", source="runtime",
+                    detail=(f"stale index entry: {it.get('service')}/"
+                            f"{it.get('resource_type')} "
+                            f"name={it.get('resource_name')!r} "
+                            f"id={it.get('id')} srn={it.get('srn')} — real "
+                            f"collection {coll[1]} does not contain it")))
+        except Exception:  # noqa: BLE001
+            pass
+    if unknown:
+        print(f"  RM 잔존 미확인 {len(unknown)}건 (타입 매핑/목록 불가 — "
+              "유령 여부 판정 보류)")
+
+
 def _leftover_report(client) -> None:
     """The "이슈로 남은 자원 리포트" (owner 2026-07-14): when the sweep STOPS with
     resources still present — an async-deleting leaf mid-drain, or a genuinely
@@ -2850,6 +2913,11 @@ def main() -> int:
     # deceptive re-list — so enumerate what survives instead of ending silently.
     if report_leftovers or _STUCK:
         _leftover_report(client)
+    # RM 인덱스 유령 레코드 분리 보고 — "잔존"과 헷갈리지 않게 (오너 2026-07-16)
+    try:
+        _rm_ghost_report(client)
+    except Exception as exc:  # noqa: BLE001 — 보고 실패가 스윕을 깨면 안 됨
+        print(f"  rm-ghost report error: {exc}")
     if _STUCK:
         print(f"--- {len(_STUCK)} owned item(s) could not be deleted "
               f"(reported, not forced) ---")

@@ -3402,3 +3402,15 @@ runtime conformance finding(`versioning.doc-version-not-supported`) 기록.
 ③ 보낸 핀은 X-Apitest-Sent-Api-Version으로 응답 레코드에 동봉 (콘솔에서
 "뭘 보냈는지" 확인 가능 — 오너 지적). 스펙 리프레시 시
 api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 규약).
+
+## resourcemanager 인덱스 유령 레코드 — /v1/resources 잔존 ≠ 실자원 (2026-07-16, 오너)
+
+`/v1/resources`(listresources)에 **레코드는 남아 있는데 실제 자원은 이미 없는**
+경우가 있다 (플랫폼 인덱스 버그 — 데이터 정정 요청 대상). 전체 정리/잔존
+판정 시 헷갈리지 말 것: **잔존의 진실은 각 서비스의 실제 컬렉션 목록**이고,
+/v1/resources는 스코프 힌트로만 쓴다. 스윕 종료 시 `_rm_ghost_report`가
+인벤토리 vs 실컬렉션을 대조해 유령을 분리 보고하고 conformance finding
+(`resourcemanager.stale-index-entry`, srn 포함)으로 기록한다 — 유령에는 삭제
+시도하지 않음(실자원이 없으므로), 태그 스코프 축소는 원래 실컬렉션 나열로
+수렴하므로 안전. live-watcher 등 /v1/resources 총량을 진행 신호로 쓰는
+관측자도 이 사실을 전제로 해석해야 한다.

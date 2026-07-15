@@ -210,3 +210,39 @@ def test_tag_scope_stringified_tags_and_name_prefix_fallback():
     listed = {p for m, p in client.calls if m == "GET"}
     assert "/v1/vpcs" in listed and "/v1/subnets" in listed
     assert "/v1/apis" not in listed
+
+
+def test_rm_ghost_report_separates_ghosts_from_real_leftovers(monkeypatch, capsys):
+    """오너 2026-07-16: /v1/resources엔 남아 있는데 실자원은 없는 유령 레코드가
+    있다 — 잔존과 분리해 보고하고 conformance finding으로 기록, 삭제 시도 금지."""
+    from core import results as res
+    recorded = []
+    monkeypatch.setattr(res, "record_finding", lambda f: recorded.append(f))
+    client = FakeClient(lists={
+        "/v1/resources": [
+            _inv_item("vpc", "vpc", "regrvpc-ghost"),      # 인덱스엔 있고
+            _inv_item("vpc", "vpc", "regrvpc-real"),
+        ],
+        "/v1/vpcs": [_owned("regrvpc-real", id="id-regrvpc-real")],  # 실자원엔 real만
+    })
+    recon._rm_ghost_report(client)
+    out = capsys.readouterr().out
+    assert "유령 레코드 1건" in out and "regrvpc-ghost" in out
+    assert "regrvpc-real" not in out.split("유령")[1].split("미확인")[0] \
+        if "미확인" in out else "regrvpc-real" not in out
+    assert len(recorded) == 1
+    assert recorded[0].rule_id == "resourcemanager.stale-index-entry"
+    assert "regrvpc-ghost" in recorded[0].detail
+    assert not any(m == "DELETE" for m, p in client.calls), "유령에 삭제 시도 금지"
+
+
+def test_rm_ghost_report_unknown_type_is_not_declared_ghost(monkeypatch, capsys):
+    from core import results as res
+    monkeypatch.setattr(res, "record_finding",
+                        lambda f: (_ for _ in ()).throw(AssertionError("no finding")))
+    client = FakeClient(lists={
+        "/v1/resources": [_inv_item("newsvc", "widget", "regrwidget")],
+    })
+    recon._rm_ghost_report(client)
+    out = capsys.readouterr().out
+    assert "미확인 1건" in out and "유령 레코드" not in out
