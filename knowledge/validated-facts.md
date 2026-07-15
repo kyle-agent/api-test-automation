@@ -2988,3 +2988,11 @@ diff의 old는 커밋된 카탈로그 그대로 사용.
 - **gen-heavy-lb-members `delete-public-ip` 400**: `delete-lb-static-nat`(204)는 async detach인데 1.2초 뒤 IP 삭제 발사 → `publicip.not-deletable-state(ATTACHED)`. `retry_on_status`에 400 추가([409]→[400,409], 사다리 40×30s)로 detach 전파 흡수 — lb-server-group delete와 동일 검증 패턴.
 - **heavy-shared-networking `wait-subnet` 타임아웃**: subnet이 CREATING 305.9s 유지 vs 폴 예산 300s — 아슬아슬 초과로 실패. 누적 op-timings상 createsubnet p90 4:20/max 5:27(327s)이므로 300s는 관측 최대치 미만 → 600s로 확대. (주의: 이 lifecycle의 until은 ACTIVE만 수용; DBaaS 계열 wait-subnet은 CREATED/RUNNING도 수용해 180s로도 미실패 — 건드리지 않음.)
 - **eventstreams es-wait FAILED**: 백엔드 프로비저닝 실패(202 접수 후 state FAILED, teardown 정상). 구버전 선택(es-prefer-older-version)이 원인인지 최신 버전 실험은 오너 대기 중.
+
+## eventstreams 프로비저닝 FAILED — 원인 좁힘 + 콘솔 실증 미러링 (2026-07-15)
+
+**기각된 가설 2개**: (1) 구버전 선택 — `es-find-version` 목록에 Kafka 3.9.1 **단일 버전**뿐이라 버전 선택지가 애초에 없음(es-prefer-older-version의 $.contents[1]은 항상 미스). (2) 결합 토폴로지 — 오너가 콘솔에서 ZK&Broker 3노드 결합(combined)으로 **성공(Running)** 재현.
+
+**유력 원인 = 서버 타입 용량**: 우리 body는 `ess1v16m32`(16vCPU/32G)×3(=48vCPU)로 202 접수 후 FAILED; 콘솔 성공본은 `ess1v2m4`(2vCPU/4G)×3. es-find-stype 목록의 contents[0]가 16vCPU라 "첫 항목 캡처"가 대형 타입을 물어온 것.
+
+**반영(콘솔 성공본 미러링)**: es_stype = `where_prefix name:"ess1v2m"` 하드캡처(ess1v2m4), es_stype2(resize 대상) = `ess1v4m*` 소프트캡처, DATA 16GB SSD 블록스토리지 추가, service_watch_log_collection=false, maintenance_option 제거. 콘솔 성공 조합 = Kafka 3.9.1 · combined ZK&Broker 3노드 · OS 104GB SSD + DATA 16GB SSD · 포트 9091/2180 · NAT/로그수집/유지관리 미사용.

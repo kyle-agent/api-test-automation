@@ -432,10 +432,22 @@
           "capture": {
             "es_stype": {
               "list": "$.contents",
+              "where_prefix": {
+                "name": "ess1v2m"
+              },
               "get": "name"
-            },
-            "es_stype2": "$.contents[1].name"
-          }
+            }
+          },
+          "capture_soft": {
+            "es_stype2": {
+              "list": "$.contents",
+              "where_prefix": {
+                "name": "ess1v4m"
+              },
+              "get": "name"
+            }
+          },
+          "_note": "2026-07-15 오너 콘솔 실증 반영: 16vCPU(ess1v16m32) 3노드는 프로비저닝 FAILED, 콘솔은 ess1v2m4(2vCPU/4G)로 성공 — es_stype은 ess1v2m* 하드캡처(용량가설), es_stype2(resize 대상)는 ess1v4m* 소프트캡처."
         },
         {
           "name": "es-create",
@@ -451,7 +463,7 @@
             "dbaas_engine_version_id": "{es_ver}",
             "is_combined": true,
             "nat_enabled": false,
-            "service_watch_log_collection": true,
+            "service_watch_log_collection": false,
             "subnet_id": "{subnet_id}",
             "timezone": "Asia/Seoul",
             "tags": [],
@@ -463,11 +475,6 @@
               "zookeeper_sasl_id": "regruser",
               "zookeeper_sasl_password": "Regr1ss@2026"
             },
-            "maintenance_option": {
-              "period_hour": "5",
-              "starting_day_of_week": "MON",
-              "starting_time": "0000"
-            },
             "instance_groups": [
               {
                 "role_type": "ZOOKEEPER_BROKER",
@@ -476,6 +483,11 @@
                   {
                     "role_type": "OS",
                     "size_gb": 104,
+                    "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 16,
                     "volume_type": "SSD"
                   }
                 ],
@@ -512,7 +524,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "eventstreams"
           },
-          "_note": "Body per CAMPAIGN-C3-100-docs-research.md §3 (docs-derived structure + carried-over topology hypothesis, see lifecycle _note). init_config_option.broker_sasl_id/zookeeper_sasl_id pattern ^[a-z]+$ 2-20 chars (api_docs eventstreamsinitconfigoptionrequest, VALIDATED via knowledge/formal/services/data-analytics__eventstreams.yaml create-cluster-required-init-config); name pattern ^[a-zA-Z]*$ (letters only, no digits) so {ualpha} (all-lowercase unique suffix) is used instead of {unique}. instance_groups is a SINGLE group of 3 ZOOKEEPER_BROKER instances (is_combined:true) — UNVERIFIED topology hypothesis, see lifecycle _note."
+          "_note": "Body per CAMPAIGN-C3-100-docs-research.md §3 (docs-derived structure + carried-over topology hypothesis, see lifecycle _note). init_config_option.broker_sasl_id/zookeeper_sasl_id pattern ^[a-z]+$ 2-20 chars (api_docs eventstreamsinitconfigoptionrequest, VALIDATED via knowledge/formal/services/data-analytics__eventstreams.yaml create-cluster-required-init-config); name pattern ^[a-zA-Z]*$ (letters only, no digits) so {ualpha} (all-lowercase unique suffix) is used instead of {unique}. instance_groups is a SINGLE group of 3 ZOOKEEPER_BROKER instances (is_combined:true) — UNVERIFIED topology hypothesis, see lifecycle _note. | 2026-07-15 오너 콘솔 성공사례 미러링: server_type ess1v2m4(16vCPU→2vCPU 축소), DATA 16GB SSD 추가, service_watch_log_collection=false, maintenance_option 제거 — 콘솔 생성본과 동일 조합(Kafka 3.9.1, ZK&Broker 3노드, OS 104GB SSD, 포트 9091/2180)."
         },
         {
           "name": "get-request-status",
