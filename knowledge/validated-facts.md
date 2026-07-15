@@ -3315,3 +3315,50 @@ best-effort, 실패해도 런 지속 — logsink와 동일 규약, `_ensure_oplo
   SCP_ACCOUNT_ID env 우선, 없으면 bucket ACL Owner에서 유도)을
   `SCP_QCOW2_ASSET_URL` env로 노출하며 시나리오는 `{env:SCP_QCOW2_ASSET_URL}`
   토큰으로 소비한다 (구 계정 id 하드코딩 URL 2곳 제거, generated__heavy-vs).
+
+## 2026-07 스펙 버전업 수리 캠페인 — 라이브 확정 팩트 모음 (2026-07-15, 7-agent 병렬)
+
+breaking 12조합/48스텝 수리 + 신규 45 엔드포인트 착수에서 라이브로 확정된 사실:
+
+- **계정 유일 AZ = `kr-west1-b`** (dev/e kr-west1). 문서 예시 `kr-west1-a`는
+  400 (compute: `Volume.InvalidAvailabilityZone: must be one of ['kr-west1-b']`;
+  publicip: `scp-network.ip.invalid-zone` — 이쪽은 유효 목록 미제공, 에러 가이던스
+  불일치 = conformance 후보). VPC show 응답에 `zones:["kr-west1-b"]` 필드 신설
+  관측. zone을 새로 보내는 모든 create는 `{region}-b`/`kr-west1-b` 규약.
+- **subnet `category`는 type 무관 무조건 필수, VPC_ENDPOINT에도 `PRIMARY` 유효**
+  (enum PRIMARY/SECONDARY) — type=VPC_ENDPOINT+PRIMARY 202→ACTIVE→삭제 404
+  실측. v1.3 신설 optional `primary_subnet_id`는 SECONDARY용으로 추정(미검증).
+- **NAT GW `publicip_id`→`publicip_ids`(배열) breaking rename** — docs 기준
+  반영, 라이브 2xx는 다음 heavy 런에서 관측 (natgw 실생성 안 함).
+- **DBaaS `service_watch_log_collection`(boolean, required)** — pg/epas/
+  cachestore/searchengine/vertica 5엔진 빈-바디 400 detail에 필수 명시, 필드
+  포함 시 미언명 (5/5 차분 프로브, 클러스터 생성 0). fake uuid는 400이 아닌
+  **404 ResourceNotFound**(스키마→id해석 순서) — negative 프로브 설계에 유용.
+- **zone 필수 웨이브는 13개 엔드포인트** — 표면 10개 + 중첩 모델 3개(aimlops
+  NodePoolCreateRequestV1Dot2, baremetal ServerDetailsRequestV1Dot2(+
+  use_hyper_threading 제거), multinodegpucluster GpuNodeDetailsRequestV1Dot3).
+  이 3개 서비스 lifecycle은 **미수리 잔여** (heavy/BM 게이트라 후속 큐).
+- **filestorage 복제 토폴로지**: region→zone 전환, HDD/replication 유효 쌍은
+  kr-west1-b↔kr-east1-a 뿐 (`GET /v1/replications/zones` 실측; kr-west1-a·SSD·
+  backup은 빈 목록). 볼륨은 creating 중 delete 400(~10s 후 available).
+- **configinspection**: `csp_type` 실데이터는 `NURI`(문서 예시 SCP로 필터하면
+  0건 — getchecklistversion/configinspectionlist/getdiagnosisresultlist 3개
+  문서의 Example 불일치, conformance 후보). save v1.3 `check_list_version_id`
+  필수(400 실측), `diagnosis_check_type`은 request에서만 제거(save엔 유지).
+  schedule_request는 v1.3에서 형태 교체(중첩 모델이라 diff에서 누락됐던 것).
+- **Address Group(신규 8, security-group)**: 무선행 무료 논리 리소스, 전 CRUD
+  라이브 2xx (create 201/set·add·remove 200/delete 204→404). quirk: create
+  응답 address_limit 5 vs list/show 1000.
+- **servicewatch**: createalert 1.4는 dimension 없이 400 "At least one
+  dimension must be set"(문서는 optional — 기존 servicewatch-alert lifecycle의
+  create-alert가 이제 400, optional이라 hard-fail 아님, dimension 실값 주입
+  수리 필요). setalertnotifications 수신자는 IAM 사용자 한정 + `user_ids:[]`는
+  500 ContactAdminForAssistance(백엔드 버그 후보, 에러 detail이 request_id
+  필드에 실리는 응답 기형).
+- **Scp-Api-Version 핀 첫 실검증 통과**: 수리 캠페인의 모든 라이브 프로브가
+  핀 헤더를 달고 나갔고 헤더 유발 400은 0건 — 판정이 신 모델 버전 기준임을
+  보장하는 부수 효과까지 확인.
+
+미수리 잔여 큐: aimlops/baremetal/multinodegpucluster zone(중첩), servicewatch
+create-alert dimension, natgw publicip_ids 라이브 관측, SQL Server DR·KMS ACL·
+DBaaS instance-ops 라이브 검증(heavy 게이트).
