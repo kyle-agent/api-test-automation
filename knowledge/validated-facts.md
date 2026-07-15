@@ -3227,3 +3227,18 @@ state='ERROR'(대문자 확정) — create는 202 접수 후 CREATING으로 폴 
 (gen-wave4-nlog 등)이 있으면 `oplog.ensure_logsink()`(테스트 키, 멱등)를 자동
 호출 — 새 계정에서 수동 ensure-logsink 명령 불필요, stdout KEY=VALUE 계약은
 stderr 리다이렉트로 보존. 실패는 best-effort(해당 시나리오가 4xx로 표면화).
+
+## DBaaS 클러스터 CREATING wedge — 플랫폼 장애 증거 (2026-07-15, 실측)
+
+중단 런의 DB 클러스터 10개(mysql 3·pg 3·maria 2·epas 2)가 08:54 UTC 생성 후
+**~3시간째 CREATING** (정상 ~10분). API 레벨 회수 불가 실측:
+- DELETE → 400 `Dbaas.ValidationError.InvalidServiceState`
+  (예: global_request_id req-be8ab3cb-5281-4a96-835c-2d8fb5bafd81)
+- sync-state → 400 `Dbaas.ResourceStateError.InvalidState`
+  "Resource State is not in [RUNNING, UNKNOWN]" — 복구 API가 CREATING엔 무효
+  (req-8c9986f1-6790-43a9-8623-ec5513516db3)
+같은 날 서브넷 동시다발 ERROR(CREATING 장기 체류 후 전이)와 동일 시간대 —
+저녁 API 변경/플랫폼 프로비저닝 장애의 정황. 대응: 10분 간격 자동 회수 감시
+(상태 풀리면 즉시 DELETE). 교훈: CREATING wedge는 시나리오/스윕 어느 쪽도
+못 지운다 — 플랫폼이 상태를 전이시켜야 함 (서브넷은 자연 ERROR 전이 후 삭제
+가능해졌음).
