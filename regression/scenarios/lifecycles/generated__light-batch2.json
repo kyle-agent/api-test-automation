@@ -60,10 +60,11 @@
             "description": "API regression endpoint subnet",
             "cidr": "10.124.10.0/24",
             "type": "VPC_ENDPOINT",
+            "category": "PRIMARY",
             "vpc_id": "{vpc_id}",
             "tags": []
           },
-          "_note": "REPAIR 2026-07-08 (live run): 400 scp-network 'Cidr should be included in the vpc cidr. : (10.160.8.0/24)' — create-vpc is {\"adopt\":\"vpc\"} so {vpc_id} resolves to the SESSION-SHARED VPC (engine.py _SHARED_VPC_CIDR = 10.124.0.0/20), not this lifecycle's own 10.160.0.0/20 fallback body. Re-homed to the free /24 slot 10 of the shared /20 (slot map: 0=shared main subnet, 1-6=adopter self-create fallback reserved, 7=DB lane, 8=vs-port [scenarios.json], 9=networking-vpc endpoint subnet [networking__vpc.json HB4c]) — same fix shape as HB4c. engine.py's shared-CIDR map comment documents only 0/1-6/7; slot 8/9/10 usage lives in the lifecycle notes (engine comment update = separate task, not this file). RESIDUAL (same as HB4c): the create-vpc fallback body (10.160.0.0/20) is now CIDR-incompatible with this subnet, but under xdist a missing shared VPC SKIPS adopters entirely (IB-049) so the fallback path is effectively dead code in dispatch runs. UNVERIFIED LIVE (offline repair).",
+          "_note": "SPEC BUMP 2026-07-15 (SubnetCreateRequestV1Dot3): category 신규 REQUIRED (type 무관). type=VPC_ENDPOINT + category=PRIMARY LIVE VALIDATED 2026-07-15 (프로브 VPC 10.198.0.0/20, subnet 202->ACTIVE->delete->404). REPAIR 2026-07-08 (live run): 400 scp-network 'Cidr should be included in the vpc cidr. : (10.160.8.0/24)' — create-vpc is {\"adopt\":\"vpc\"} so {vpc_id} resolves to the SESSION-SHARED VPC (engine.py _SHARED_VPC_CIDR = 10.124.0.0/20), not this lifecycle's own 10.160.0.0/20 fallback body. Re-homed to the free /24 slot 10 of the shared /20 (slot map: 0=shared main subnet, 1-6=adopter self-create fallback reserved, 7=DB lane, 8=vs-port [scenarios.json], 9=networking-vpc endpoint subnet [networking__vpc.json HB4c]) — same fix shape as HB4c. engine.py's shared-CIDR map comment documents only 0/1-6/7; slot 8/9/10 usage lives in the lifecycle notes (engine comment update = separate task, not this file). RESIDUAL (same as HB4c): the create-vpc fallback body (10.160.0.0/20) is now CIDR-incompatible with this subnet, but under xdist a missing shared VPC SKIPS adopters entirely (IB-049) so the fallback path is effectively dead code in dispatch runs. UNVERIFIED LIVE (offline repair).",
           "expect_status": [
             200,
             201,
@@ -98,12 +99,14 @@
         {
           "name": "create-filestorage-volume",
           "service": "filestorage",
+          "_note": "SPEC BUMP 2026-07-15 (storage/filestorage VolumeCreateRequestV1Dot2): zone 신규 REQUIRED — zone=kr-west1-b (knowledge/formal/resources/storage__filestorage.yaml LIVE VALIDATED 2026-07-15).",
           "method": "POST",
           "path": "/v1/volumes",
           "json": {
             "name": "regrfs{unique}",
             "protocol": "NFS",
-            "type_name": "HDD"
+            "type_name": "HDD",
+            "zone": "kr-west1-b"
           },
           "expect_status": [
             200,

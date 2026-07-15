@@ -388,9 +388,11 @@
             "description": "API regression endpoint subnet",
             "cidr": "10.160.8.0/24",
             "type": "VPC_ENDPOINT",
+            "category": "PRIMARY",
             "vpc_id": "{vpc_id}",
             "tags": []
           },
+          "_note": "SPEC BUMP 2026-07-15 (SubnetCreateRequestV1Dot3): category 신규 REQUIRED (type 무관). type=VPC_ENDPOINT + category=PRIMARY LIVE VALIDATED 2026-07-15 (프로브 VPC 10.198.0.0/20, subnet 202->ACTIVE->delete->404).",
           "expect_status": [
             200,
             201,
@@ -425,12 +427,14 @@
         {
           "name": "create-filestorage-volume",
           "service": "filestorage",
+          "_note": "SPEC BUMP 2026-07-15 (storage/filestorage VolumeCreateRequestV1Dot2): zone 신규 REQUIRED — zone=kr-west1-b (knowledge/formal/resources/storage__filestorage.yaml LIVE VALIDATED 2026-07-15).",
           "method": "POST",
           "path": "/v1/volumes",
           "json": {
             "name": "regrfs{unique}",
             "protocol": "NFS",
-            "type_name": "HDD"
+            "type_name": "HDD",
+            "zone": "kr-west1-b"
           },
           "expect_status": [
             200,
@@ -1480,11 +1484,13 @@
         {
           "name": "create-public-ip",
           "service": "vpc",
+          "_note": "SPEC BUMP 2026-07-15 (PublicIpCreateRequestV1Dot3): zone 신규 REQUIRED. zone=kr-west1-b LIVE VALIDATED 2026-07-15 (201->delete 204->404); kr-west1-a는 400 scp-network.ip.invalid-zone.",
           "method": "POST",
           "path": "/v1/publicips",
           "json": {
             "description": "API regression suite",
             "type": "IGW",
+            "zone": "kr-west1-b",
             "tags": []
           },
           "expect_status": [

@@ -355,11 +355,13 @@
         {
           "name": "create-public-ip",
           "service": "vpc",
+          "_note": "SPEC BUMP 2026-07-15 (PublicIpCreateRequestV1Dot3): zone 신규 REQUIRED. zone=kr-west1-b LIVE VALIDATED 2026-07-15 (201->delete 204->404); kr-west1-a는 400 scp-network.ip.invalid-zone.",
           "method": "POST",
           "path": "/v1/publicips",
           "json": {
             "description": "API regression suite",
             "type": "IGW",
+            "zone": "kr-west1-b",
             "tags": []
           },
           "expect_status": [

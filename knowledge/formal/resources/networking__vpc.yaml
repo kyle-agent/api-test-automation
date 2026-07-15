@@ -66,7 +66,8 @@ resources:
     create:
       endpoint: "POST /v1/subnets"
       body: {name: "regrvpces{unique}", description: "API regression endpoint subnet",
-             cidr: "{opt.cidr}", type: VPC_ENDPOINT, vpc_id: "{vpc.vpc_id}", tags: []}
+             cidr: "{opt.cidr}", type: VPC_ENDPOINT, category: "PRIMARY",
+             vpc_id: "{vpc.vpc_id}", tags: []}
       options:
         cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr,
                note: "VPC cidr 하위 /24 (composer가 부모 블록 8+j번째 /24를 절단; endpoint-subnet은 PUBLIC(구 GENERAL) subnet과 공존 시 다른 /24를 받는다)"}
@@ -91,7 +92,13 @@ resources:
       생성 body는 docs-derived(UNPROVEN) — endpoint-subnet 자체 2xx + vpc-endpoint
       2xx는 라이브 재검증 대기(READY FOR LIVE RE-VALIDATION, IB-013). 다른 subnet
       유형과 동일하게 standalone subnet 생성/삭제로 teardown.
-      live-validated run 27583285457 (2026-06-15)
+      live-validated run 27583285457 (2026-06-15).
+      SPEC BUMP 2026-07-15 (SubnetCreateRequestV1Dot3): category(enum
+      PRIMARY/SECONDARY) 신규 REQUIRED — subnet type과 무관하게 무조건 필수
+      (스키마에 조건부 표시 없음). type=VPC_ENDPOINT + category=PRIMARY
+      LIVE VALIDATED 2026-07-15: 프로브 VPC(10.198.0.0/20) 안에 subnet
+      10.198.1.0/24를 202로 생성, state ACTIVE 도달 확인 후 delete 202 -> 404
+      (VPC도 204 -> 404). 즉 VPC_ENDPOINT 서브넷도 PRIMARY가 유효값.
 
   port:
     code: "nw-vpc-port"
@@ -152,7 +159,7 @@ resources:
     create:
       endpoint: "POST /v1/nat-gateways"
       body: {description: "API regression suite",
-             publicip_id: "{public-ip.publicip_id}",
+             publicip_ids: ["{public-ip.publicip_id}"],
              subnet_id: "{subnet.subnet_id}", tags: []}
     capture: {nat_gateway_id: "$.nat_gateway.id"}
     ready: {field: "$.nat_gateway.state",
@@ -161,6 +168,13 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: heavy-shared-networking,
              steps: [natgw-create, natgw-wait, natgw-delete]}
+    notes: >
+      SPEC BUMP 2026-07-15 (NatGatewayCreateRequestV1Dot3): 단수 publicip_id(string)
+      필드가 제거되고 복수 publicip_ids(array[string], REQUIRED)로 대체 + 옵션
+      multi_zone_enabled 신설(미사용). 배선은 동일 public-ip capture를 1-원소
+      배열로 감싼 형태 — data/api_docs.json 모델 기준(docs-derived), 새 필드명의
+      라이브 2xx는 다음 heavy 런에서 관측 대기 (구 body의 VALIDATED는 v1.2 시절
+      증거라 새 스키마에는 이월 불가).
 
   public-ip:
     code: "nw-vpc-public-ip"
@@ -168,14 +182,22 @@ resources:
     requires: []
     create:
       endpoint: "POST /v1/publicips"
-      body: {description: "API regression suite", type: IGW, tags: []}
+      body: {description: "API regression suite", type: IGW, zone: kr-west1-b, tags: []}
     capture: {publicip_id: "$.publicip.id"}
     ready: {field: "$.publicip.state",
             until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
     delete: {endpoint: "DELETE /v1/publicips/{publicip_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: networking-vpc-publicip, steps: [create, delete]}
-    notes: "경로는 /v1/publicips (붙여쓰기) — 모델 노드 id는 cross-service의 public-ip 표기를 따른다"
+    notes: >
+      경로는 /v1/publicips (붙여쓰기) — 모델 노드 id는 cross-service의 public-ip
+      표기를 따른다. SPEC BUMP 2026-07-15 (PublicIpCreateRequestV1Dot3): zone
+      (string) 신규 REQUIRED + type enum (IGW, GGW, SIGW). zone=kr-west1-b
+      LIVE VALIDATED 2026-07-15: 201(state RESERVED) -> delete 204 -> GET 404.
+      kr-west1-a는 400 scp-network.ip.invalid-zone 'This zone (kr-west1-a) is
+      not available.' — 이 계정의 유일 AZ는 kr-west1-b (compute의 기존 실측
+      'must be one of [kr-west1-b]'와 정합; VPC show 응답의 zones:[kr-west1-b]도
+      동일). 400 detail이 유효 zone 목록을 알려주지 않음(에러 개선 후보).
 
   private-nat:
     code: "nw-vpc-private-nat"

@@ -874,12 +874,14 @@
       "steps": [
         {
           "name": "create",
+          "_note": "SPEC BUMP 2026-07-15 (storage/filestorage VolumeCreateRequestV1Dot2): zone 신규 REQUIRED. zone=kr-west1-b LIVE VALIDATED 2026-07-15 (knowledge/formal/resources/storage__filestorage.yaml — HDD 복제쌍이 kr-west1-b<->kr-east1-a뿐, kr-west1-a는 zones:[]).",
           "method": "POST",
           "path": "/v1/volumes",
           "json": {
             "name": "regrfs{unique}",
             "protocol": "NFS",
-            "type_name": "HDD"
+            "type_name": "HDD",
+            "zone": "kr-west1-b"
           },
           "expect_status": [
             200,
@@ -1602,6 +1604,7 @@
       "steps": [
         {
           "name": "create-volume",
+          "_note": "SPEC BUMP 2026-07-15 (compute/virtualserver VolumeCreateRequestV1Dot4): zone 신규 REQUIRED. zone=kr-west1-b — compute 라이브 실측 'must be one of [kr-west1-b]' (knowledge/formal/resources/compute__virtualserver.yaml).",
           "method": "POST",
           "path": "/v1/volumes",
           "json": {
@@ -1611,6 +1614,7 @@
             "volume_type": "SSD_Provisioned",
             "max_iops": 10000,
             "max_throughput": 500,
+            "zone": "kr-west1-b",
             "tags": []
           },
           "expect_status": [
@@ -1910,11 +1914,13 @@
       "steps": [
         {
           "name": "create",
+          "_note": "SPEC BUMP 2026-07-15 (PublicIpCreateRequestV1Dot3): zone 신규 REQUIRED. zone=kr-west1-b LIVE VALIDATED 2026-07-15 (201->delete 204->404); kr-west1-a는 400 scp-network.ip.invalid-zone 'This zone (kr-west1-a) is not available.'",
           "method": "POST",
           "path": "/v1/publicips",
           "json": {
             "description": "API regression suite",
             "type": "IGW",
+            "zone": "kr-west1-b",
             "tags": []
           },
           "expect_status": [
@@ -2355,12 +2361,14 @@
         {
           "name": "create-vol",
           "service": "filestorage",
+          "_note": "SPEC BUMP 2026-07-15 (storage/filestorage VolumeCreateRequestV1Dot2): zone 신규 REQUIRED — zone=kr-west1-b (filestorage-volume create와 동일 근거).",
           "method": "POST",
           "path": "/v1/volumes",
           "json": {
             "name": "regrfsk{unique}",
             "protocol": "NFS",
-            "type_name": "HDD"
+            "type_name": "HDD",
+            "zone": "kr-west1-b"
           },
           "expect_status": [
             200,
@@ -3477,6 +3485,7 @@
         },
         {
           "name": "create-server",
+          "_note": "SPEC BUMP 2026-07-15 (ServerCreateRequestV1Dot4): zone 신규 REQUIRED. zone=kr-west1-b — compute 라이브 실측 'must be one of [kr-west1-b]' (knowledge/formal/resources/compute__virtualserver.yaml).",
           "method": "POST",
           "path": "/v1/servers",
           "json": {
@@ -3486,6 +3495,7 @@
             "keypair_name": "regrkey{unique}",
             "product_category": "compute",
             "product_offering": "virtual_server",
+            "zone": "kr-west1-b",
             "networks": [
               {
                 "subnet_id": "{subnet_id}"
@@ -3709,7 +3719,6 @@
             "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
             "service": "virtualserver"
           },
-
           "_note": "2026-07-08(3) owner run: port_id+subnet_id 동시 전송 400 — 같은 런 netops attach(port_id 단독) 200 라이브 증명 → subnet_id 제거. | HB3b-2 (2026-07-06, run 28766151214): CONFIRMED live 400 `VirtualServer.CreateInterface.Duplicated` when this sent `subnet_id: {subnet_id}` — that's the server's OWN boot subnet, and it already has an interface there (create-server). Switched to `{port_subnet_id}` (the dedicated vs-port-group subnet created by create-port-subnet, matching create-port's own subnet_id) so the new interface lands on a subnet the server has no prior interface on. Not re-verified live this session (offline-only).",
           "expect_status": [
             200,
@@ -3845,6 +3854,7 @@
         },
         {
           "name": "create-volume",
+          "_note": "SPEC BUMP 2026-07-15 (compute/virtualserver VolumeCreateRequestV1Dot4): zone 신규 REQUIRED. zone=kr-west1-b — compute 라이브 실측 'must be one of [kr-west1-b]' (knowledge/formal/resources/compute__virtualserver.yaml).",
           "method": "POST",
           "path": "/v1/volumes",
           "json": {
@@ -3854,6 +3864,7 @@
             "volume_type": "SSD_Provisioned",
             "max_iops": 10000,
             "max_throughput": 500,
+            "zone": "kr-west1-b",
             "tags": []
           },
           "expect_status": [
@@ -5695,13 +5706,13 @@
           "retry_on_status": [500],
           "retries": 2,
           "retry_interval": 60,
-          "_note": "2026-07-15: 런의 첫 번째 /v1/clusters POST가 3런 연속 500 ContactAdmin(1~2초 뒤 병렬 4건은 전부 202) — 백엔드 콜드스타트로 추정, 2회/60s 재시도 실험. body는 성공 케이스와 동일함을 실측 확인(run-ddbf).",
           "json": {
             "name": "regrpg{ualpha}",
             "instance_name_prefix": "regrpg",
             "dbaas_engine_version_id": "{engine_version_id}",
             "ha_enabled": false,
             "nat_enabled": false,
+            "service_watch_log_collection": true,
             "subnet_id": "{subnet_id}",
             "timezone": "Asia/Seoul",
             "allowable_ip_addresses": [],
@@ -5765,7 +5776,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
           },
-          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived."
+          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived. 2026-07-15: 런의 첫 번째 /v1/clusters POST가 3런 연속 500 ContactAdmin(1~2초 뒤 병렬 4건은 전부 202) — 백엔드 콜드스타트로 추정, 2회/60s 재시도 실험. body는 성공 케이스와 동일함을 실측 확인(run-ddbf). SPEC BUMP 2026-07-15 (PostgresqlClusterCreateRequestV1Dot2): service_watch_log_collection 신규 REQUIRED — mysql/mariadb와 동일값 true로 추가 (data/api_docs.json 모델 기준)."
         },
         {
           "name": "wait-cluster",
@@ -6951,11 +6962,13 @@
           "service": "epas",
           "group": "epas",
           "optional": true,
+          "_note": "SPEC BUMP 2026-07-15 (EpasClusterCreateRequestV1Dot2): service_watch_log_collection 신규 REQUIRED — mysql/mariadb와 동일값 true로 추가 (data/api_docs.json 모델 기준).",
           "method": "POST",
           "path": "/v1/clusters",
           "json": {
             "ha_enabled": false,
             "nat_enabled": false,
+            "service_watch_log_collection": true,
             "subnet_id": "{subnet_id}",
             "timezone": "Asia/Seoul",
             "allowable_ip_addresses": [],
@@ -7060,11 +7073,13 @@
           "service": "cachestore",
           "group": "cachestore",
           "optional": true,
+          "_note": "SPEC BUMP 2026-07-15 (RedisClusterCreateRequestV1Dot1): service_watch_log_collection 신규 REQUIRED — mysql/mariadb와 동일값 true로 추가 (data/api_docs.json 모델 기준).",
           "method": "POST",
           "path": "/v1/clusters",
           "json": {
             "ha_enabled": false,
             "nat_enabled": false,
+            "service_watch_log_collection": true,
             "subnet_id": "{subnet_id}",
             "timezone": "Asia/Seoul",
             "allowable_ip_addresses": [],
@@ -8588,11 +8603,13 @@
         {
           "name": "create-publicip",
           "service": "vpc",
+          "_note": "SPEC BUMP 2026-07-15 (PublicIpCreateRequestV1Dot3): zone 신규 REQUIRED. zone=kr-west1-b LIVE VALIDATED 2026-07-15 (201->delete 204->404); kr-west1-a는 400 scp-network.ip.invalid-zone.",
           "method": "POST",
           "path": "/v1/publicips",
           "json": {
             "description": "API regression shared-net",
             "type": "IGW",
+            "zone": "kr-west1-b",
             "tags": []
           },
           "capture": {
@@ -8687,11 +8704,12 @@
           "service": "vpc",
           "group": "natgw",
           "optional": true,
+          "_note": "SPEC BUMP 2026-07-15 (NatGatewayCreateRequestV1Dot3): 단수 publicip_id(string) 제거 -> 복수 publicip_ids(array[string], REQUIRED)로 개명 (+ 옵션 multi_zone_enabled 신설, 미사용). data/api_docs.json 모델 기준.",
           "method": "POST",
           "path": "/v1/nat-gateways",
           "json": {
             "description": "API regression shared-net",
-            "publicip_id": "{publicip_id}",
+            "publicip_ids": ["{publicip_id}"],
             "subnet_id": "{subnet_id}",
             "tags": []
           },
