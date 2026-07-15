@@ -1547,6 +1547,26 @@ def _post_run_rescans(rec: dict, offsets=_RESCAN_OFFSETS_S,
             prev = float(off)
         if float(off) in done_offsets:
             continue                        # already ran (before the restart)
+        # +0 스킵 (오너 2026-07-15 "반영해" — 정리 표시시간 단축): run-end 자동
+        # 클린업 스윕이 실제 수행된 런에서는 +0 재스캔이 순수 중복이다 — 스윕의
+        # 라운드 루프가 방금 '무진행'까지 전 컬렉션을 재나열했고, 그 직후의 전
+        # 컬렉션 dry-scan(수 분)은 같은 답을 다시 계산할 뿐이다. 늦출현 감시는
+        # +5m/+15m이 그대로 담당하고(late-alert base는 첫 실행 스캔이 됨), 스윕이
+        # 생략된 경로(타 실행 진행/자원 미생성/게이트 off)는 +0을 유지한다.
+        if float(off) == 0.0 and rec.get("end_sweep_ran"):
+            entry = {"offset_s": 0.0, "ts": time.time(), "total": None,
+                     "skipped": "run-end 스윕 수행됨 — +0 재스캔은 중복 (스윕이 "
+                                "방금 무진행까지 재나열; +5m/+15m가 늦출현 감시)"}
+            with _LOCK:
+                rec.setdefault("rescans", []).append(entry)
+            _persist_rescans(rec)
+            try:
+                with open(rec["log"], "a", encoding="utf-8") as f:
+                    f.write("\n=== 종료 후 재스캔 +0s: 건너뜀 "
+                            "(run-end 스윕이 방금 수행 — 중복) ===\n")
+            except OSError:
+                pass
+            continue
         if wait > 0:
             sleep(wait)
         label = f"+{int(off // 60)}m" if off >= 60 else f"+{int(off)}s"
@@ -2287,6 +2307,8 @@ def _run_worker(rec: dict) -> None:
                          "SCP_ALLOW_DESTRUCTIVE": "true",
                          "SCP_SWEEP_NOWAIT": "true"},
                     stdout=f, stderr=subprocess.STDOUT)
+                with _LOCK:
+                    rec["end_sweep_ran"] = True   # +0 재스캔 중복 스킵 근거
                 f.write("\n=== 중단 처리 완료 — 실측 재스캔 예약됨 ===\n")
                 f.flush()
             elif runner_missing:
@@ -2365,6 +2387,8 @@ def _run_worker(rec: dict) -> None:
                                  "SCP_SWEEP_IGNORE_TTL": "true",
                                  "SCP_SWEEP_NOWAIT": "true"},
                             stdout=f, stderr=subprocess.STDOUT)
+                        with _LOCK:
+                            rec["end_sweep_ran"] = True   # +0 재스캔 중복 스킵 근거
                         f.write("  자동 클린업 완료 — 늦출현(스냅샷류 ~20분 지연)은 "
                                 "아래 +5m/+15m 재스캔이 감시, 다음 런 종료 스윕이 "
                                 "정리합니다.\n")

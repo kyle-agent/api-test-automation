@@ -533,3 +533,39 @@ def test_runtime_view_fresh_window_has_no_stale_chip():
         with C2._RUNTIME_LOCK:
             C2._RUNTIME_CACHE.clear()
             C2._RUNTIME_CACHE.update(saved)
+
+
+def test_post_run_rescans_skip_plus0_when_end_sweep_ran(tmp_path):
+    """+0 스킵 (오너 2026-07-15): run-end 스윕이 수행된 런은 +0 재스캔이 순수
+    중복(스윕이 방금 무진행까지 재나열) — 스킵 엔트리를 남기고 +5m/+15m만
+    실행한다. late-alert base는 첫 실행 스캔(+5m)이 된다."""
+    rec = {"id": "t-sweep", "log": str(tmp_path / "t.log"),
+           "end_sweep_ran": True}
+    Path(rec["log"]).write_text("", encoding="utf-8")
+    calls = []
+    scans = iter([[], [{"service": "vpc", "path": "/v1/vpcs/x"}]])  # +5m, +15m
+
+    def scan():
+        calls.append(1)
+        return next(scans)
+
+    C2._post_run_rescans(rec, offsets=(0, 300, 900), scan=scan,
+                         sleep=lambda s: None)
+    assert len(calls) == 2, "+0은 스캔하지 않고 +5m/+15m만"
+    ent0 = rec["rescans"][0]
+    assert ent0["offset_s"] == 0.0 and ent0["total"] is None
+    assert "스윕" in ent0["skipped"]
+    # base = +5m(0건), +15m 1건 → 늦출현 알람은 그대로 동작
+    assert rec["late_alert"]["base"] == 0 and rec["late_alert"]["delta"] == 1
+    assert "건너뜀" in Path(rec["log"]).read_text(encoding="utf-8")
+
+
+def test_post_run_rescans_plus0_kept_when_sweep_skipped(tmp_path):
+    """스윕이 생략된 런(end_sweep_ran 없음)은 종전대로 +0부터 실행."""
+    rec = {"id": "t-nosweep", "log": str(tmp_path / "t.log")}
+    Path(rec["log"]).write_text("", encoding="utf-8")
+    calls = []
+    C2._post_run_rescans(rec, offsets=(0,), scan=lambda: calls.append(1) or [],
+                         sleep=lambda s: None)
+    assert len(calls) == 1, "스윕 미수행이면 +0 유지"
+    assert rec["rescans"][0]["total"] == 0

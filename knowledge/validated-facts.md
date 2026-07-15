@@ -3045,3 +3045,20 @@ opt-out: poll.interval_start=interval. 429 영향: 폴당 최대 +4 GET(초기 3
 **적용 30곳**: scenarios.json 6(mysql/pg db_server_type, pg alt→nth1, heavy-shared maria/epas/cache) + subops-full 10(5엔진 + *_stype2/server_type_name/db_server_type2→nth1) + eventstreams 2(es_stype/es_stype2 — prefix 하드코딩 제거) + heavy-dbaas 9 + heavy-pg 3. 버전/파라미터그룹 캡처(engine_version_id 등)는 크기 개념이 아니라 불변.
 
 **관찰 항목(다음 런)**: (1) 실제 잡힌 최소 타입명(오너 추정 2vCPU/4G) — events의 find-* resp로 확인, (2) 생성시간 변화 — op_timings store의 createcluster p50 대비 last_s (기준: mysql 9:24 / pg 8:54 / ES는 종전 FAILED).
+
+
+## console2 +0 재스캔 스킵 (2026-07-15, 오너 "반영해")
+
+run-end 자동 클린업 스윕이 실제 수행된 런은 직후의 +0 재스캔(scan_owned 전
+컬렉션 dry-scan, 수 분)이 순수 중복 — 스윕 라운드 루프가 방금 '무진행'까지
+재나열했기 때문. 반영: 스윕 서브프로세스 호출 직후 rec["end_sweep_ran"]=true,
+_post_run_rescans가 +0을 스킵 엔트리(사유 포함)로 남기고 +5m/+15m만 실행
+(늦출현 감시 유지, late-alert base는 첫 실행 스캔으로 자연 전이). 스윕이
+생략된 경로(타 실행 진행/자원 미생성/게이트 off)는 +0 유지. — 정리 표시
+시간(마지막 스윕→완료 전환) 수 분 단축.
+
+**중요 운영 규약(같은 날 실측)**: 정리 최적화의 대부분(공유 teardown 병렬화·
+run_scoped 배리어)은 console2 **서버 프로세스 안**에서 실행된다 — git pull
+후 **서버 재시작 없이는 옛 코드가 메모리에 남아** 적용 안 됨 (run-8de6 실측:
+정리 29.1분 = 최적화 전 27.1분과 동일 프로파일). reconciler 스윕만 서브프로세스
+라 새 코드를 탄다. 판별: 런 로그에 "shared teardown chain" 라인 유무.
