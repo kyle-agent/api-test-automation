@@ -28,10 +28,11 @@ Supports: `spec/` (extract+diff the spec), `dashboard/` (visualize both axes),
 
 ## The catalog at a glance (source of truth: `data/api_catalog.json`)
 
-- **1,372 endpoints**, all resolved. 13 categories present in the catalog.
-- By method: GET 527 · POST 383 · PUT 244 · DELETE 209 · PATCH 9.
-- Smoke-testability split: **225** GETs are directly testable (no path params);
-  **302** GETs need a resource id (reached via CRUD/read-chains); **845** are
+- **1,416 endpoints** (2026-07 spec bump), 1,415 resolved / 1 unresolved.
+  13 categories present in the catalog.
+- By method: GET 546 · POST 392 · PUT 257 · DELETE 211 · PATCH 9.
+- Smoke-testability split: **231** GETs are directly testable (no path params);
+  **315** GETs need a resource id (reached via CRUD/read-chains); **869** are
   mutating (reached via CRUD lifecycles).
 - Re-run the live summary any time: `python -m spec.summary`.
 
@@ -113,6 +114,18 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **CURRENT (2026-07-16 — 신규 테스트 계정, main=`c5393399`):** 오너가 계정을
+  수동 정리 후 **전체 런 a690 진행 중** (127 lifecycles, 01:54Z~). 이 세션에서
+  main 반영 완료: ① fe88 12건 실패 전원 원인확정+수리 (406 핀 클래스 3 ·
+  zone 3 · resource_types 3 · scr 1 · fw 202-빈바디 1 · asg user 하드코딩 1 —
+  lb/asg 2건은 다음 런 판정), ② durations 재보정 (성공 112건 fe88 실측 스팬
+  대체, makespan 예측 55.9분), ③ 스윕 대개편: ledger-reclaim 레코드단위 프룬,
+  로그그룹 병렬 전량 삭제, **블라스트**(프리스캔 캐시 소유 리프 전체 동시
+  DELETE → 409 생존자만 의존순서 패스, SCP_SWEEP_BLAST=false로 끔), ④ a690
+  조기 실패 2건 수리: lb-listener ACTIVE settle, vpn publicip zone 누락
+  (라이브 201/204/404 검증), ⑤ gen-cloudml-chain waiver(blocked-owner, 오너
+  지시). 카탈로그 1,416 (위 at-a-glance 갱신됨). 다음: a690 종료 시 실패
+  분석 + lb/asg/fw 수리 판정 + durations 재확인.
 - **HANDOFF (2026-07-13 — api-test-coverage-gzukh0 세션, 배치 ① 착수):** 인계된
   "①배치 코드로 즉시 노려볼 4xx"를 착수. **코드 수리 4종 반영**(전부 heavy라
   실 2xx는 다음 SCP_RUN_HEAVY 콘솔 런 판정; validate 0 err, offline 550 pass —
