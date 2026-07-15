@@ -34,3 +34,14 @@ def test_fallback_when_no_override(monkeypatch):
     monkeypatch.delenv("SCP_OPLOG_ACCESS_KEY", raising=False)
     monkeypatch.delenv("SCP_OPLOG_SECRET_KEY", raising=False)
     assert oplog._cfg()["access"] == "only-key", "단일 계정 구성 폴백 무회귀"
+
+
+def test_needs_logsink_detection(monkeypatch):
+    """선택에 apitest-logsink 참조 스텝(gen-wave4-nlog)이 있으면 True — provision
+    이 테스트 키로 자동 ensure(새 계정 자기충족). 없으면 False(불필요한 S3 호출
+    없음)."""
+    from regression.scenarios import shared_infra
+    monkeypatch.setenv("SCP_CRUD_IDS", "gen-wave4-nlog")
+    assert shared_infra._needs_logsink() is True
+    monkeypatch.setenv("SCP_CRUD_IDS", "iam-role-full")
+    assert shared_infra._needs_logsink() is False

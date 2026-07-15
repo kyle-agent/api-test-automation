@@ -155,6 +155,28 @@ def _needs_shared_tgw() -> bool:
         return True
 
 
+def _needs_logsink() -> bool:
+    """선택에 logsink 버킷(apitest-logsink)을 참조하는 스텝이 있으면 True —
+    network-logging/loggingaudit 계열. OBS 버킷 생성은 SCP REST 카탈로그에
+    없어(S3 프로토콜 전용, /v1/buckets CRUD는 Archive Storage) 시나리오 스텝으로
+    못 만들므로, provision이 테스트 키로 ensure한다(멱등·상주 — 오너 2026-07-15
+    "시나리오에 생성 step이 있으면 되는거 아닌가?"의 플랫폼-제약 절충).
+    Fail-open: 판정 오류 → True (ensure는 멱등이라 무해)."""
+    import os
+    try:
+        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
+                if x.strip()}
+        for lc in engine.active_lifecycles():
+            if only and lc.get("id") not in only:
+                continue
+            for s in lc.get("steps", []):
+                if "apitest-logsink" in str(s.get("json", "")):
+                    return True
+        return False
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def _needs_shared_igw() -> bool:
     """선택에 ``{"adopt": "igw"}`` 스텝이 하나라도 있으면 True — 메인 공유 VPC에
     IGW 1개 상주 필요 (오너 2026-07-14). 없으면 공유 IGW는 순수 낭비. Fail-open:
@@ -199,6 +221,16 @@ def provision():
     net_tags = _needed_net_vpc_tags()   # ('a','b') / ('a',) / ('b',) / () — 세분화
     need_tgw = _needs_shared_tgw()       # adopt:tgw 시나리오 있으면 공유 TGW 1개
     need_igw = _needs_shared_igw()       # adopt:igw 시나리오 있으면 공유 IGW 1개
+    # logsink 자동 부트스트랩 (새 계정 자기충족): stdout은 KEY=VALUE 계약이므로
+    # ensure의 진단 print는 stderr로 돌린다. 실패해도 런은 계속 — 해당 시나리오가
+    # 4xx로 표면화하고, 원인은 stderr 로그에 남는다.
+    if _needs_logsink():
+        try:
+            with contextlib.redirect_stdout(sys.stderr):
+                from core import oplog as _oplog
+                _oplog.ensure_logsink()
+        except Exception as exc:  # noqa: BLE001 — best-effort bootstrap
+            _eprint(f"[shared_infra] logsink ensure 실패(계속): {exc}")
     try:
         with contextlib.redirect_stdout(sys.stderr):
             shared_ctx, _teardown = engine.provision_shared_vpc(

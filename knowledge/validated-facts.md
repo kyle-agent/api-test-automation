@@ -3215,3 +3215,15 @@ state='ERROR'(대문자 확정) — create는 202 접수 후 CREATING으로 폴 
 - 잔여 갱신처: GitHub repo secrets(CI), 원격 세션 env(모니터링). 새 계정은
   쿼터/entitlement가 다를 수 있어 smoke 먼저 + waiver/베이스라인 재검.
 - 구 계정 잔존(DB 10·VPC 5·ERROR 서브넷 등)은 교체 전 구 키로 정리.
+
+## logsink 자동 부트스트랩 (2026-07-15, 오너 "시나리오에 버킷 생성 step" 제안의 절충)
+
+**플랫폼 제약 확정**: Object Storage 버킷 생성은 SCP REST 카탈로그에 없다 —
+카탈로그의 /v1/buckets CRUD 14개는 전부 **Archive Storage**. OBS는 S3 프로토콜
+(AWS 서명, boto3) 전용이라 엔진 스텝(SCP HMAC)으로 생성 불가 → 시나리오
+자체-생성 스텝은 불가능, 상주 픽스처 + ensure가 정답.
+
+**절충 구현**: `shared_infra.provision()`이 선택에 apitest-logsink 참조 스텝
+(gen-wave4-nlog 등)이 있으면 `oplog.ensure_logsink()`(테스트 키, 멱등)를 자동
+호출 — 새 계정에서 수동 ensure-logsink 명령 불필요, stdout KEY=VALUE 계약은
+stderr 리다이렉트로 보존. 실패는 best-effort(해당 시나리오가 4xx로 표면화).
