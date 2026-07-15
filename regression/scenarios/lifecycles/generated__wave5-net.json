@@ -1074,6 +1074,25 @@
           }
         },
         {
+          "name": "wait-lb-health-check",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.lb_health_check.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "group": "lb-health-check",
+          "_note": "settle 신설 (2026-07-15 run 7a40/fe88, agent-B): Scp-Api-Version 제품 핀(loadbalancer 1.4)에서 createlbhealthcheck가 202 비동기+CREATING으로 바뀌어 직후 PUT set이 400 scp-loadbalancer.lb-health-checks.InvalidState('Unable to update the LB Health Check in the current state'). 무핀(구 코드, run ddbf)은 201 동기. 엔드포인트별 핀(1.3) 복귀로 대부분 해소 예상이나(라이브 미검증 — 오너 전체 정리로 중단), 버전 semantics 무관하게 안전하도록 ACTIVE settle 후 set. 동기 201 경로에선 즉시 통과라 무해. 미해석 토큰 시(선행 create 400 관용 경로) 엔진이 폴을 스킵."
+        },
+        {
           "name": "verify-lb-health-check-read",
           "service": "loadbalancer",
           "method": "GET",

@@ -45,6 +45,14 @@ resources:
           vpc_id: "{vpc.vpc_id}"
           tags: []
     capture: {lb_health_check_id: "$.lb_health_check.id"}
+    # ready 신설 (2026-07-15 run 7a40/fe88, agent-B): Scp-Api-Version 제품 핀
+    # (loadbalancer 1.4)에서 create가 202 비동기+CREATING — 직후 set이 400
+    # scp-loadbalancer.lb-health-checks.InvalidState. 무핀/구코드(run ddbf)는
+    # 201 동기. 버전 semantics와 무관하게 안전하도록 ACTIVE settle 후 set
+    # (동기 경로에선 즉시 통과, 무해).
+    ready: {endpoint: "GET /v1/lb-health-checks/{lb_health_check_id}",
+            field: "$.lb_health_check.state", until: [ACTIVE],
+            timeout: 300, interval: 10}
     verify:
       - {name: read, endpoint: "GET /v1/lb-health-checks/{lb_health_check_id}",
          expect_status: [200]}

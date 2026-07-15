@@ -223,7 +223,8 @@
           },
           "expect_status": [200, 201, 202],
           "capture": {
-            "auto_scaling_group_id": "$.id"
+            "auto_scaling_group_id": "$.id",
+            "asg_creator_id": "$.created_by"
           },
           "cleanup": {
             "method": "DELETE",
@@ -447,12 +448,12 @@
         },
         {
           "name": "create-asg-notification",
-          "_note": "Covers createautoscalinggroupnotification. user_ids=[f2b627e6bf4f4b3996f04de4f877bd11] (the service account user id confirmed from GET /v1/access-keys created_by field). notification_id captured from $.notifications[0].id (list envelope, NOT $.id).",
+          "_note": "Covers createautoscalinggroupnotification. REPAIR 2026-07-15 (run fe88 + agentB-repro 재현, agent-B): 종전 user_ids는 구계정(ec11538a…)의 사용자 f2b627e6…를 하드코딩 — 계정 교체(81eccb26…/732e2090…)로 무효가 되어 schedule 삭제 직후 이 스텝에서 lifecycle 사망(run ddbf=구계정 201, fe88·agentB-repro=신계정 실패; IAM 유저 목록은 403이라 사전조회 불가). 같은 lifecycle의 create-auto-scaling-group 응답 $.created_by(호출 주체 user id, 항상 유효)를 {asg_creator_id}로 캡처해 주입 — 계정 불변. notification_id captured from $.notifications[0].id (list envelope, NOT $.id). 정확한 4xx 코드는 오너 전체 정리로 라이브 재확인 미완 — 다음 전체 런 판정.",
           "method": "POST",
           "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications",
           "service": "virtualserver",
           "json": {
-            "user_ids": ["f2b627e6bf4f4b3996f04de4f877bd11"],
+            "user_ids": ["{asg_creator_id}"],
             "notification_events": ["SCALE_OUT", "SCALE_OUT_FAIL"]
           },
           "expect_status": [200, 201, 202],
