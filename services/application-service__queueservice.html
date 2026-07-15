@@ -127,6 +127,10 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 .ms.slow{color:var(--red);font-weight:700}
 .probe{font-size:10.5px;color:var(--faint);margin-left:6px}
 .prev{font-size:10px;color:var(--faint);margin-left:5px}
+.chgbadge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;
+  padding:1px 6px;border-radius:9px;margin-left:6px;vertical-align:1px}
+.chgbadge.added{background:#dafbe1;color:#116329;border:1px solid #aceebb}
+.chgbadge.changed{background:#fff1c2;color:#7a5901;border:1px solid #f0d879}
 .ok{color:var(--green);font-size:12px}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 .foot{margin-top:22px;font-size:11.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:12px}
@@ -201,11 +205,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-07-14 16:37 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-07-15 17:19 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/queues/{queue_id}", "api": "deletequeue", "c": "y", "s": 204, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "DELETE", "p": "/v1/queues/{queue_id}/acl", "api": "deleteacl", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "GET", "p": "/v1/queues", "api": "listqueue", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "GET", "p": "/v1/queues/{queue_id}", "api": "showqueue", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "GET", "p": "/v1/queues/{queue_id}/attributes", "api": "getqueueattributes", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "GET", "p": "/v1/queues/check-duplication", "api": "checkqueuenameduplication", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "POST", "p": "/v1/queues", "api": "createqueue", "c": "y", "s": 201, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "POST", "p": "/v1/queues/{queue_id}/acl", "api": "setacl", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/queues/{queue_id}/config", "api": "updatequeueconfig", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/queues/{queue_id}/deduplication", "api": "updatequeuededuplication", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/queues/{queue_id}/deduplication-scope", "api": "updatequeuededuplicationscope", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/queues/{queue_id}/description", "api": "updatequeuedescription", "c": "y", "s": 200, "t": null, "src": "bb7f6bd", "d": [], "ev": null}];
+var R=[{"m": "DELETE", "p": "/v1/queues/{queue_id}", "api": "deletequeue", "c": "y", "s": 204, "t": null, "src": "", "d": [], "ev": null}, {"m": "DELETE", "p": "/v1/queues/{queue_id}/acl", "api": "deleteacl", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/queues", "api": "listqueue", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/queues/{queue_id}", "api": "showqueue", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/queues/{queue_id}/attributes", "api": "getqueueattributes", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "GET", "p": "/v1/queues/check-duplication", "api": "checkqueuenameduplication", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "POST", "p": "/v1/queues", "api": "createqueue", "c": "y", "s": 201, "t": null, "src": "", "d": [], "ev": null}, {"m": "POST", "p": "/v1/queues/{queue_id}/acl", "api": "setacl", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/queues/{queue_id}/config", "api": "updatequeueconfig", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/queues/{queue_id}/deduplication", "api": "updatequeuededuplication", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/queues/{queue_id}/deduplication-scope", "api": "updatequeuededuplicationscope", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}, {"m": "PUT", "p": "/v1/queues/{queue_id}/description", "api": "updatequeuedescription", "c": "y", "s": 200, "t": null, "src": "", "d": [], "ev": null}];
 var CONF_EVAL=false;   // 이 빌드 머신에서 per-endpoint 컨포먼스 점검이 실행됐는가
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
@@ -271,7 +275,9 @@ function rowHTML(r){
   return '<tr class="cov-'+r.c+'">'
     +'<td class="cbar"></td>'
     +'<td><span class="mb '+r.m+'">'+r.m+'</span></td>'
-    +'<td class="path"><code>'+esc(r.p)+'</code></td>'
+    +'<td class="path"><code>'+esc(r.p)+'</code>'
+    +(r.chg?'<span class="chgbadge '+r.chg+'" title="스펙 변경분 (diff @ '+esc(r.chw||'')+')">'+(r.chg==='added'?'NEW':'UPD')+'</span>':'')
+    +'</td>'
     +'<td class="api">'+esc(r.api)+'</td>'
     +'<td><span class="cov '+r.c+'">'+covSym+'</span></td>'
     +'<td>'+st+ms+probe+prev+'</td>'
