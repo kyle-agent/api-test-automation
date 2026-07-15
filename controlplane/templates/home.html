@@ -12,7 +12,10 @@
      48h+ 는 시각을 앞세운 중립 배너 + [지금 실행](결정 3 — 콘솔로, pre-flight 가
      게이트라 자동 실행 아님). 통과도 배너 유지(결정 2). 판정 기준은 툴팁. #}
   {% set crit_tip = '판정 기준: 신규 = 알려진-버그 베이스라인(data/baselines/known_issues.json)에 없는 5xx/auth 실패. 직전 런 대비가 아니라, Triage에서 등재(알려진 실패로 이동)하거나 수리해야 사라집니다.' %}
-  {% set when_txt %}{{ snap_ts_label or coverage.get('ts','') }} 런{% if snap_age is defined and snap_age %} ({{ snap_age }}){% endif %}{% if coverage.get('run_type') %} · {{ coverage.get('run_type') }} suite{% endif %}{% endset %}
+  {# '공식 런' 라벨 + 이후 로컬 런 미반영 주석 (오너 2026-07-15 "오늘 아침에도
+     돌렸는데 왜 21시간 전이지?"): 판정은 CI 발행 런 기준 — 콘솔 로컬 런은 여기
+     반영되지 않는다. 판정 이후 로컬 런이 있으면 그 사실을 배너가 직접 말한다. #}
+  {% set when_txt %}<span title="공식 판정은 발행 파이프라인(CI)의 회귀 런 기준입니다 — 콘솔에서 직접 돌린 로컬 런은 이 판정에 반영되지 않습니다 (로컬 런은 아래 최근 RUN 표)">{{ snap_ts_label or coverage.get('ts','') }} 공식 런</span>{% if snap_age is defined and snap_age %} ({{ snap_age }}){% endif %}{% if coverage.get('run_type') %} · {{ coverage.get('run_type') }} suite{% endif %}{% if local_after is defined and local_after %} · <span class="muted" title="이 판정(공식 런) 이후 이 서버 콘솔에서 완료된 로컬 런 — 결과는 다음 CI 발행 때 공식 판정에 반영됩니다">이후 로컬 런 {{ local_after }}건 미반영</span>{% endif %}{% endset %}
   {% if snap_is_stale %}
   <div class="verdict none"><span class="pip"></span>
     <div><b>⚠ 마지막 회귀 테스트가 {{ snap_age or '48시간 이상' }} 전입니다</b>
@@ -39,40 +42,36 @@
   </div>
   {% endif %}
 
-  {# v2 접목 1: 타일 전부 발행본(S1) 출처 — 카드마다 배지 1개(계약 §0-4
-     "한 카드의 기본값은 한 출처") + 노후 시 is-stale 로 수치 회색화(원칙 1-4). #}
-  <div class="tiles">
-    {# 타일별 Published 배지 제거 (오너 2026-07-14 재검수): 이 5장은 전부 페이지
-       기본 출처(발행 스냅샷) — 헤더·ctxbar 선언으로 충분, 반복은 노이즈.
-       노후 회색화(is-stale)는 유지 (배지와 무관한 시각 신호). #}
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체. 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)">
-      <div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
-      <div class="k">write-op 커버리지 (cov_op)</div>
-      <div class="bar"><i style="width:{{ coverage.get('cov_op',0) }}%;background:var(--amber)"></i></div>
-      <div class="goal">목표 100%</div>
-    </div>
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율">
-      <div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
-      <div class="k">GET 커버리지 (cov_get)</div>
-      <div class="bar"><i style="width:{{ coverage.get('cov_get',0) }}%;background:var(--green)"></i></div>
-      <div class="goal">목표 100%</div>
-    </div>
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인(누적, reachability waiver는 도달충족 포함) = covered. 헤드라인 지표">
-      <div class="v">{{ coverage.get('cov_c3','-') }}%</div>
-      <div class="k">누적 C3 검증</div>
-      <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--blue)"></i></div>
-      <div class="goal">목표 100%</div>
-    </div>
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="C1 도달가능(Plannable) — enabled 시나리오가 정적으로 도달 가능한 엔드포인트(라이브 호출 없음). 저작 진척 지표">
-      <div class="v">{{ coverage.get('reachable_pct','-') }}%</div>
-      <div class="k">C1 static reachable</div>
-      <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
-      <div class="goal">전체 {{ coverage.get('total','-') }} API</div>
-    </div>
-    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보">
-      <div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
-      <div class="k">신규 fail</div>
-      <div class="goal" style="margin-top:8px">{% if fail_new %}<a href="/reporting?tab=triage">회귀 발생 — Triage 확인 →</a>{% else %}회귀 없음{% endif %}</div>
+  {# 타일 행 재구성 (오너 공동 설계 2026-07-15): 커버리지 4장(write-op 오표기·
+     GET·C3·C1) + 신규 fail 타일 → **미니 사다리 1장** + 잔존 자원. 사다리는 발행
+     대시보드·Reporting 과 같은 그림(C3 green·C2 amber·C1 blue, 정의 툴팁 동일) —
+     한 번 배우면 세 화면이 같이 읽힌다. 신규 fail 은 위 판정 배너가 담당(중복 제거).
+     '남은 실질 gap'(gap_write·gap_getid — waiver 정리 후 실제 액션 대상)이 다음
+     걸음. 아래 파이프라인·최근 RUN 은 오너와 재논의 예정 — 이번엔 불변. #}
+  <div class="tiles cov">
+    {% set total = coverage.get('total') or 0 %}
+    {% set tested = coverage.get('tested') or 0 %}
+    {% set c2pct = (tested * 100 / total)|round(1) if total else 0 %}
+    {% set gap_w = coverage.get('gap_write') or 0 %}
+    {% set gap_g = coverage.get('gap_getid') or 0 %}
+    <div class="card tile {{ 'is-stale' if snap_is_stale }}" title="커버리지 사다리 — C1 도달 → C2 호출 → C3 검증 (정의: docs/COVERAGE-CRITERIA.md). 목표 100% = waiver 제외 전 엔드포인트 C3 검증">
+      <div class="k" style="margin:0 0 2px"><b style="color:var(--text)">커버리지</b> · 목표: C3 검증 100%</div>
+      <div class="lad mini"><span class="lv" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인 (reachability waiver 서비스는 도달충족 포함) = covered. 헤드라인 지표, 목표 100%">C3</span>
+        <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--green)"></i></div>
+        <span class="pct" style="color:var(--green)">{{ coverage.get('cov_c3','-') }}%</span>
+        <span class="desc">검증됨 · 누적</span></div>
+      <div class="lad mini"><span class="lv" title="C2 호출됨(Called) — 실제 run에서 4xx 포함 어떤 응답이든 수신. '이 API는 호출은 된다'(라우팅/인증/경로 증명), 2xx 보장 아님">C2</span>
+        <div class="bar"><i style="width:{{ c2pct }}%;background:var(--amber)"></i></div>
+        <span class="pct" style="color:var(--amber)">{{ c2pct }}%</span>
+        <span class="desc">호출됨 {{ tested }}/{{ total }}</span></div>
+      <div class="lad mini"><span class="lv" title="C1 도달가능(Plannable) — enabled 시나리오가 정적으로 도달 가능(라이브 호출 없음). 저작 진척 지표">C1</span>
+        <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
+        <span class="pct" style="color:var(--blue)">{{ coverage.get('reachable_pct','-') }}%</span>
+        <span class="desc">도달가능</span></div>
+      <div class="goal" style="margin-top:7px">남은 실질 gap <b>{{ gap_w + gap_g }}</b>
+        {%- if gap_w + gap_g %} — write {{ gap_w }} · id-bound GET {{ gap_g }}{% endif %}
+        <span title="waiver(과금·권한 등 검증 불가로 사람이 승인한 제외) {{ coverage.get('waived','-') }}건·reachability 도달충족을 정리한 뒤 실제로 남은 액션 대상">· waiver {{ coverage.get('waived','-') }} 제외</span>
+        · <a href="/dashboard/index.html" title="발행 대시보드 — 사다리 전체 각주(읽기/쓰기 분해·waiver 해제 후보) + 서비스별 상세">사다리·서비스별 상세 →</a></div>
     </div>
     {# D8: 잔존 자원 홈 승격 — 비용·안전 사안이 실행 화면 깊숙이 숨어 있던 것을
        KPI 로 끌어올림. 라이브 '이 서버' owned 스캔(발행 스냅샷 아님 → local 배지) +
