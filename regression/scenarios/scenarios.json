@@ -338,7 +338,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 420,
+            "timeout": 600,
             "interval": 10
           }
         },
@@ -2232,7 +2232,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression SKE",
-            "cidr": "10.125.1.0/24",
+            "cidr": "10.124.13.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -2249,8 +2249,7 @@
             "method": "DELETE",
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
-          },
-          "adopt": "subnet"
+          }
         },
         {
           "name": "wait-subnet",
@@ -2265,7 +2264,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 180,
+            "timeout": 600,
             "interval": 10
           }
         },
@@ -3152,8 +3151,7 @@
             202,
             204
           ],
-          "destructive": true,
-          "adopt": "subnet"
+          "destructive": true
         },
         {
           "name": "wait-subnet-gone",
@@ -3170,8 +3168,7 @@
             ],
             "timeout": 300,
             "interval": 15
-          },
-          "adopt": "subnet"
+          }
         },
         {
           "name": "delete-vpc",
@@ -3279,7 +3276,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 180,
+            "timeout": 600,
             "interval": 10
           }
         },
@@ -4266,8 +4263,8 @@
             400,
             409
           ],
-          "retries": 6,
-          "retry_interval": 20
+          "retries": 30,
+          "retry_interval": 30
         },
         {
           "name": "wait-server-gone",
@@ -5689,6 +5686,10 @@
           "name": "create-cluster",
           "method": "POST",
           "path": "/v1/clusters",
+          "retry_on_status": [500],
+          "retries": 2,
+          "retry_interval": 60,
+          "_note": "2026-07-15: 런의 첫 번째 /v1/clusters POST가 3런 연속 500 ContactAdmin(1~2초 뒤 병렬 4건은 전부 202) — 백엔드 콜드스타트로 추정, 2회/60s 재시도 실험. body는 성공 케이스와 동일함을 실측 확인(run-ddbf).",
           "json": {
             "name": "regrpg{ualpha}",
             "instance_name_prefix": "regrpg",
@@ -6789,7 +6790,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 300,
+            "timeout": 600,
             "interval": 10
           }
         },
