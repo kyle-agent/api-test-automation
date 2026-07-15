@@ -5,8 +5,10 @@
 # 27258520218; cross-service.yaml postgresql-cluster is VALIDATED).
 #
 # PG body shape diverges from MySQL: database_encoding/database_locale instead
-# of character_set/case_sensitive, audit_enabled is a BOOLEAN, and there is no
-# service_watch_log_collection field (source body, kept verbatim).
+# of character_set/case_sensitive, audit_enabled is a BOOLEAN. (Historical: PG
+# had no service_watch_log_collection field; the 2026-07-15 spec version-up —
+# PostgresqlClusterCreateRequestV1Dot2 — made it required (boolean) for PG too,
+# so the create body now sends it, same as MySQL.)
 #
 # 2026-06-13 확장 (owner 승인 같은 날): replica 체인(동일 리전) ·
 # restore · patch/kernel-upgrade · parameter/sg-rules/storage sub-op들.
@@ -81,6 +83,7 @@ resources:
         dbaas_engine_version_id: "{opt.engine_version_id}"
         ha_enabled: false
         nat_enabled: false
+        service_watch_log_collection: true
         subnet_id: "{subnet.subnet_id}"
         timezone: Asia/Seoul
         allowable_ip_addresses: []

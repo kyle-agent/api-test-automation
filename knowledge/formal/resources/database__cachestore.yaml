@@ -28,6 +28,7 @@ resources:
         ha_enabled: false
         nat_enabled: false
         replica_count: 0
+        service_watch_log_collection: true
         subnet_id: "{subnet.subnet_id}"
         timezone: Asia/Seoul
         allowable_ip_addresses: []
@@ -78,4 +79,4 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: cachestore-cluster-subops-full,
              steps: [cache-create, cache-wait, cache-delete]}
-    notes: "HEAVY 과금. relational 템플릿과 최대 발산: origin_cluster_id/vip_public_ip_id/virtual_ip_address/service_watch_log_collection 없음, init_config는 port/password/sentinel_port만, role_type MASTER, OS+DATA 두 block_storage_group 필수, replica_count 0이 라이브 검증됨 (문서는 Sentinel 토폴로지 replica 1-2를 말하지만 202 관측 — services constraint sentinel-topology와 충돌, R3 확인 과제). capture 변수는 소스 cache_cid → cluster_id 개명. sub-op 면도 발산: archive/audit/log-export/replicas 없음, 대신 PUT /commands(+sync). 알려진 quirk: PUT backup-histories 401 (유효 HMAC, run 27258520218). point-in-time recovery는 별도 클러스터를 만든다 — 복구 테스트는 2번째 클러스터 teardown 필요."
+    notes: "HEAVY 과금. relational 템플릿과 최대 발산: origin_cluster_id/vip_public_ip_id/virtual_ip_address 없음 (service_watch_log_collection은 2026-07-15 스펙 버전업(RedisClusterCreateRequestV1Dot1)으로 required(boolean) 신설되어 추가됨), init_config는 port/password/sentinel_port만, role_type MASTER, OS+DATA 두 block_storage_group 필수, replica_count 0이 라이브 검증됨 (문서는 Sentinel 토폴로지 replica 1-2를 말하지만 202 관측 — services constraint sentinel-topology와 충돌, R3 확인 과제). capture 변수는 소스 cache_cid → cluster_id 개명. sub-op 면도 발산: archive/audit/log-export/replicas 없음, 대신 PUT /commands(+sync). 알려진 quirk: PUT backup-histories 401 (유효 HMAC, run 27258520218). point-in-time recovery는 별도 클러스터를 만든다 — 복구 테스트는 2번째 클러스터 teardown 필요."
