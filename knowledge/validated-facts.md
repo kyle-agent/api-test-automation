@@ -3382,3 +3382,23 @@ compute-virtualserver-full의 create-port-subnet(포트 테스트용 2nd 서브�
 안 된다** — adopt하거나 자기 VPC를 만들 것. vip-nat(vpc#a)·vpc-endpoint류
 (VPC_ENDPOINT 타입)는 각각 다른 VPC/풀이라 무관. SECONDARY(+
 primary_subnet_id)로 우회하는 선택지는 시맨틱스 미검증 — 후속 실험 감.
+
+## Scp-Api-Version은 엔드포인트 단위다 — 제품 핀은 64%에서 406 (2026-07-16, run fe88 실측)
+
+버전 핀 1단계(제품 최신 일괄)의 회귀: 엔드포인트별 지원 버전(스펙
+endpoints[].support, 각 1개)이 **1,416개 중 903개(64%)에서 제품 최신과 다르고**,
+안 맞는 메서드에 제품 버전을 보내면 **406 NoSuchVersion** ("API version X is
+not supported on this method"). 과거-2xx 기록이 있는 엔드포인트의 406은
+baseline 회귀로 lifecycle을 실패시킨다 — heavy 런 fe88 실패 12건 중 다수가
+이 클래스 (scf metrics 1.3 vs 제품 1.4, filestorage /v1/replications/regions,
+virtualserver /v1/servers/{id}/ips 실측 스크린샷 3건).
+
+수리(2026-07-16): ① 핀 소스를 엔드포인트 단위로 —
+`data/api_endpoint_versions.json`(스펙 스냅샷 생성물), 경로-shape 매칭, 제품
+핀은 미등재 폴백, env 오버라이드 최우선. ② **406 NoSuchVersion 안전망**:
+핀 없이 1회 재시도(서버 기본=latest current — 오너: "문제가 되면 헤더 없이
+보내면 최신버전이 되긴 할 거야"), 응답에 X-Apitest-Version-Fallback 표식 +
+runtime conformance finding(`versioning.doc-version-not-supported`) 기록.
+③ 보낸 핀은 X-Apitest-Sent-Api-Version으로 응답 레코드에 동봉 (콘솔에서
+"뭘 보냈는지" 확인 가능 — 오너 지적). 스펙 리프레시 시
+api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 규약).
