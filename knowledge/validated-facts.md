@@ -3294,3 +3294,20 @@ enabled 거부)/트리거 선삭제 흐름의 stuck 여부를 스윕 로그에�
 - 스윕 수리 ②(match_token에 더해): `_reap_igw_firewall_rules` — IGW 삭제 전
   그 firewall의 rule을 비움, 직접 IGW 패스와 `_purge_409_holders`(VPC 409
   SRN 홀더 경로) 양쪽에 배선.
+
+
+## oplog 자격 원칙 전환 — 테스트 계정 기본 + 최초 1회 자동 ensure (2026-07-15, 오너)
+
+위 "(b) 결정"(oplog 키=구 계정 유지)을 **대체**: oplog 미러/자동수리 버킷
+(apitest-oplog-permanent)도 이제 **테스트 계정 키(SCP_*)가 기본**이고, 버킷이
+없으면 `_client()` 경유 최초 사용 시 1회 자동 ensure(create+CORS+public-read,
+best-effort, 실패해도 런 지속 — logsink와 동일 규약, `_ensure_oplog_once`).
+`SCP_OPLOG_ACCESS_KEY/SECRET_KEY`는 **둘 다 설정된 경우에만** 명시적
+오버라이드(레거시 분리 구성; 한쪽만 설정은 키쌍이 갈라지므로 무시하고 테스트
+키로). logsink(`keys="test"`)는 종전대로 항상 테스트 키 — 오버라이드를 절대
+따라가지 않는다.
+- **이관 미해결**: 구 계정 버킷의 미러 히스토리·`assets/regr-minimal.qcow2`
+  (createimage/importimage가 public tenant-path URL로 참조)는 자동 이관되지
+  않는다 — 히스토리가 중요하면 한시적으로 SCP_OPLOG_* 오버라이드 유지 또는
+  1회 객체 복사 + qcow2 재업로드(URL의 account-id 갱신) 필요. CI repo
+  secrets/원격 세션 env의 SCP_OPLOG_*를 비워야 새 원칙이 적용된다.

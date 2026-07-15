@@ -22,6 +22,12 @@ and accepts the SAME access/secret key pair as the Open APIs (owner-confirmed
 2026-06-11). SDK region for kr-west1 is "kr-west"; the real region is resolved
 from the endpoint URL.
 
+Credentials (owner principle 2026-07-15): the oplog bucket lives in the
+CURRENT TEST ACCOUNT by default (SCP_ACCESS_KEY/SECRET_KEY) and is
+auto-created on first use if missing (same contract as the logsink bucket).
+SCP_OPLOG_ACCESS_KEY/SECRET_KEY — only when BOTH are set — act as an explicit
+override for legacy split configurations. See ``_cfg`` for the exact priority.
+
 Everything here is BEST-EFFORT and self-disabling: missing boto3, missing
 credentials, or an unreachable endpoint prints one notice and no-ops — a
 broken oplog must never fail a test run.
@@ -51,22 +57,30 @@ _NOTICE_SHOWN = False
 def _cfg(keys: str = "oplog"):
     """Resolve endpoint/bucket/credentials from env (None = disabled).
 
-    ``keys`` — 자격 선택 (2026-07-15 테스트 계정 교체, 오너 (b) 결정):
-      * "oplog"(기본): SCP_OPLOG_ACCESS_KEY/SECRET_KEY 우선, 없으면 SCP_* 폴백
-        — **미러/자동수리 버킷**(apitest-oplog-permanent)용. 계정 교체 후에도
-        구 계정 키를 SCP_OPLOG_*로 유지해 미러 히스토리 연속성을 보존한다.
-      * "test": SCP_ACCESS_KEY/SECRET_KEY만 — **logsink 버킷**(apitest-logsink)
-        용. logsink는 network-logging/loggingaudit 시나리오가 '테스트 계정
-        안에서' 참조하는 픽스처라, oplog 키(구 계정)로 ensure하면 새 계정
-        시나리오가 자기 계정에 없는 버킷을 가리켜 실패한다.
+    ``keys`` — 자격 선택 (2026-07-15 오너 원칙 전환: "oplog도 테스트 계정에
+    있는 걸 원칙으로, 없으면 최초 한 번은 만들자" — logsink와 동일 원칙):
+      * "oplog"(기본) — **미러/자동수리 버킷**(apitest-oplog-permanent)용.
+        우선순위:
+          ① SCP_OPLOG_ACCESS_KEY/SECRET_KEY가 **둘 다** 설정돼 있으면 명시적
+             오버라이드 — 레거시 분리 구성 하위호환(예: 구 계정 미러를 한시적
+             으로 유지). 한쪽만 설정된 경우 키쌍이 갈라져 서명 오류가 되므로
+             오버라이드를 무시하고 ②로 간다.
+          ② 기본값: SCP_ACCESS_KEY/SECRET_KEY (현재 테스트 계정). 새 계정에
+             버킷이 없으면 최초 사용 시 1회 자동 ensure(_ensure_oplog_once,
+             best-effort — logsink 규약과 동일).
+      * "test": 항상 SCP_ACCESS_KEY/SECRET_KEY만 — **logsink 버킷**
+        (apitest-logsink)처럼 시나리오가 '테스트 계정 안에서' 참조하는 고정
+        픽스처용. 오버라이드가 다른 계정을 가리켜도 절대 따라가지 않는다
+        (다른 계정에 ensure되는 오배치 방지).
     """
     bucket = os.getenv("SCP_OPLOG_BUCKET", "apitest-oplog-permanent").strip()
-    if keys == "test":
-        access = (os.getenv("SCP_ACCESS_KEY") or "").strip()
-        secret = (os.getenv("SCP_SECRET_KEY") or "").strip()
+    o_access = (os.getenv("SCP_OPLOG_ACCESS_KEY") or "").strip()
+    o_secret = (os.getenv("SCP_OPLOG_SECRET_KEY") or "").strip()
+    if keys != "test" and o_access and o_secret:
+        access, secret = o_access, o_secret          # ① 명시적 오버라이드(쌍)
     else:
-        access = (os.getenv("SCP_OPLOG_ACCESS_KEY") or os.getenv("SCP_ACCESS_KEY") or "").strip()
-        secret = (os.getenv("SCP_OPLOG_SECRET_KEY") or os.getenv("SCP_SECRET_KEY") or "").strip()
+        access = (os.getenv("SCP_ACCESS_KEY") or "").strip()   # ② 테스트 계정
+        secret = (os.getenv("SCP_SECRET_KEY") or "").strip()
     endpoint = os.getenv("SCP_OPLOG_S3_ENDPOINT", "").strip()
     if not endpoint:
         # per-service host convention; override via SCP_OPLOG_S3_ENDPOINT with
@@ -83,6 +97,32 @@ def _cfg(keys: str = "oplog"):
         return None
     return {"bucket": bucket, "endpoint": endpoint, "region": sdk_region,
             "access": access, "secret": secret}
+
+
+_OPLOG_ENSURED = [False]  # 프로세스당 1회 auto-ensure 가드 (mutable holder)
+
+
+def _ensure_oplog_once(c, cfg) -> None:
+    """oplog 버킷 최초-1회 자동 ensure — ensure_logsink()와 동일 규약.
+
+    2026-07-15 원칙 전환으로 oplog 버킷도 테스트 계정이 기본이라, 새 계정
+    첫 사용 시 버킷이 없다. OBS 버킷 생성은 S3 프로토콜(boto3) 전용(SCP REST
+    카탈로그에 없음 — logsink에서 확인된 제약과 동일)이므로 여기서 만든다.
+    존재하면 no-op(head 1회, 프로세스당 최대 1번); 없으면 ensure_bucket()
+    (create + CORS + public-read — 정적 ops 뷰어 계약 포함)을 재사용. 모든
+    실패는 삼킨다 — 깨진 oplog가 런을 죽여서는 절대 안 된다."""
+    if _OPLOG_ENSURED[0]:
+        return
+    _OPLOG_ENSURED[0] = True   # 실패해도 재시도 폭주 방지: 프로세스당 1회만
+    try:
+        c.head_bucket(Bucket=cfg["bucket"])
+        return                                   # 있으면 무음 no-op (멱등)
+    except Exception:
+        pass
+    try:
+        ensure_bucket()
+    except Exception as exc:  # noqa: BLE001 — best-effort bootstrap
+        print(f"[oplog] auto-ensure failed (continuing): {exc}")
 
 
 def _client(keys: str = "oplog"):
@@ -106,6 +146,13 @@ def _client(keys: str = "oplog"):
         aws_access_key_id=cfg["access"], aws_secret_access_key=cfg["secret"],
         config=Config(connect_timeout=10, read_timeout=20,
                       retries={"max_attempts": 2}))
+    if keys == "oplog":
+        # oplog를 처음 쓰는 모든 경로(emit/put_text/snapshot 미러 업로드 등)가
+        # _client를 지나므로 여기서 best-effort 부트스트랩 — 실패해도 계속.
+        try:
+            _ensure_oplog_once(c, cfg)
+        except Exception:  # noqa: BLE001
+            pass
     return c, cfg
 
 
@@ -182,8 +229,9 @@ LOGSINK_BUCKET = "apitest-logsink"  # shared pre-existing OBS sink for
 
 
 def ensure_logsink() -> bool:
-    # logsink는 테스트-계정 픽스처 — 항상 테스트 키로 (oplog 키가 구 계정을
-    # 가리키는 (b) 구성에서 구 계정에 ensure되는 오배치 방지, 2026-07-15).
+    # logsink는 테스트-계정 픽스처 — 항상 테스트 키로. SCP_OPLOG_* 오버라이드가
+    # 다른 계정을 가리키는 구성에서도 절대 따라가지 않는다 (오배치 방지,
+    # 2026-07-15).
     c, cfg = _client(keys="test")
     if not c:
         return False
