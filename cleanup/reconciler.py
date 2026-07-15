@@ -812,6 +812,10 @@ def _purge_vpc_children(client, vid):
         _coll_wait = []
         for it in items:
             if isinstance(it, dict) and it.get("id") and str(it.get("vpc_id")) == vid:
+                if coll == "/v1/internet-gateways":
+                    # rule 잔존 IGW는 DELETE 409 — 직접 패스/409-holder 경로와
+                    # 동일하게 implicit firewall의 rule부터 비운다.
+                    _reap_igw_firewall_rules(client, it["id"])
                 if _delete(client, svc, f"{coll}/{it['id']}"):
                     n += 1
                     _coll_wait.append((svc, f"{coll}/{it['id']}"))
@@ -889,7 +893,7 @@ def _reap_igw_firewall_rules(client, igw_id: str) -> int:
             continue
         try:
             rules = _items(client.get(
-                f"/v1/firewalls/rules?firewall_id={fid}",
+                f"/v1/firewalls/rules?firewall_id={fid}&fetch_all=true",
                 service="firewall").body)
         except Exception:
             continue

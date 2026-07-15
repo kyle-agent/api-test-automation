@@ -834,3 +834,60 @@ def test_platform_named_igw_reclaimed_via_token_match():
         "플랫폼 자동명명 IGW_regr* 는 토큰 매칭으로 회수"
     assert "/v1/internet-gateways/igw-theirs" not in dels, \
         "남의 IGW는 토큰이 regr*가 아니므로 안전"
+
+
+def test_igw_pass_reaps_implicit_firewall_rules_before_igw():
+    """rule 잔존 IGW는 DELETE 409 (FW_IGW_regrvpcnb… 실측 2026-07-15) — 직접
+    IGW 패스는 implicit firewall(fw_resource_id로 연결)의 rule을 먼저 비운 뒤
+    IGW를 삭제해야 한다. DC routing-rules 선삭제(run-892a)와 동형."""
+    igw = {"name": "IGW_regrvpcnb6a5774bd", "id": "igw-1"}   # 태그리스+플랫폼 명명
+    client = FakeClient(lists={
+        "/v1/internet-gateways": [igw],
+        "/v1/firewalls": [{"id": "fw-1", "fw_resource_id": "igw-1",
+                           "name": "FW_IGW_regrvpcnb6a5774bd",
+                           "product_type": "IGW"}],
+        "/v1/firewalls/rules": [{"id": "rule-7", "firewall_id": "fw-1"}],
+    })
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    rule_i = _ordered_index(seq, "/v1/firewalls/rules/rule-7")
+    igw_i = _ordered_index(seq, "/v1/internet-gateways/igw-1")
+    assert rule_i >= 0, f"firewall rule must be reaped: {seq}"
+    assert igw_i >= 0, f"IGW must still be deleted: {seq}"
+    assert rule_i < igw_i, f"rule 삭제가 IGW 삭제보다 먼저여야: {seq}"
+
+
+def test_vpc_409_igw_holder_reaps_fw_rules_before_igw_delete():
+    """VPC DELETE 409 본문이 internet-gateway 홀더 SRN을 명시하면, 그 IGW의
+    implicit firewall rule부터 비우고 IGW를 지운 뒤 VPC를 재시도한다."""
+    vpc = _owned("regrvpcnb-igw", id="vpc-igw")
+    srn = ("srn:e::acct1:kr-west1::vpc:internet-gateway/"
+           "d9390026d4054d4e842b6ffcba823c8d")
+
+    class IGW409Client(FakeClient):
+        def delete(self, path, service=None, json=None, **kw):
+            self.calls.append(("DELETE", path))
+            if path == "/v1/vpcs/vpc-igw":
+                # IGW가 지워진 뒤에만 204 — 그 전엔 409 + SRN 홀더
+                if any(p.startswith("/v1/internet-gateways/d9390026")
+                       for (m, p) in self.calls if m == "DELETE"):
+                    return _Resp(204)
+                return _Resp(409, {"errors": [{
+                    "code": "scp-network.vpc.related-resource",
+                    "related_resources": [srn]}]})
+            return _Resp(204)
+
+    client = IGW409Client(lists={
+        "/v1/vpcs": [vpc],
+        "/v1/firewalls": [{"id": "fw-9",
+                           "fw_resource_id":
+                               "d9390026d4054d4e842b6ffcba823c8d"}],
+        "/v1/firewalls/rules": [{"id": "rule-3", "firewall_id": "fw-9"}],
+    })
+    recon.run_sweep(client)
+    seq = _delete_paths(client)
+    rule_i = _ordered_index(seq, "/v1/firewalls/rules/rule-3")
+    igw_i = _ordered_index(seq, "/v1/internet-gateways/d9390026")
+    assert rule_i >= 0 and igw_i >= 0 and rule_i < igw_i, \
+        f"홀더 IGW도 rule 선삭제 후 삭제: {seq}"
+    assert "/v1/vpcs/vpc-igw" in seq, "VPC 재시도까지 도달"
