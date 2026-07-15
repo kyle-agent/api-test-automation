@@ -50,7 +50,7 @@ STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
              "expect_status", "capture", "capture_soft", "cleanup", "poll",
              "wait", "retries", "retry_interval", "retry_on_status",
              "group", "optional", "destructive", "adopt", "probe_reads",
-             "action", "input", "output", "json_b64_fields",
+             "action", "input", "output", "json_b64_fields", "skip",
              "_note", "_comment"}
 METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 BUILTINS = {"unique", "ualpha", "region", "today", "today_plus_5y",

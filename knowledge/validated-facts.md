@@ -3532,3 +3532,19 @@ api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 �
 - **VM 볼륨 일반론(오너)**: delete_on_termination 없이 만든 VM 볼륨은 VM
   삭제 후 별도 삭제 필요 — VS 볼륨 패스의 regr-토큰/force_unnamed 픽이 담당,
   이번 건은 '이름이 hex'라 새 매처가 필요했던 것.
+
+## createsharingimage = API 비가역 (취소/수락/거절 API 부재) → 스텝 스킵 (2026-07-16, 오너 확인)
+
+- 공유 파이프라인 전모: `POST /v1/images/{id}/share` (202, 바디 없음) → ①
+  **대상 계정** pending 목록(`GET /v1/pending-images`)에 공유 사본 등재 ② 우리
+  계정에 hex-이름 임시 볼륨(104GB) 파생. 수락/거절/취소 API는 카탈로그에
+  **없음** (listpendingimages GET만 — 콘솔 전용 기능). 수락/거절 전까지 임시
+  볼륨은 `Volume.VolumeForSharingImageDelete` 400으로 삭제 불가 → **런마다
+  104GB 고아 누적**. 대상이 타계정이면 우리가 개입할 수단 자체가 없다.
+- 조치: 엔진에 **스텝 단위 `skip: true`** 신설(모델링 보존, 실행만 끔) —
+  createsharingimage 스킵 + `list-pending-images` read 커버리지 신설.
+  공유 API에 취소 짝이 생기면 재활성화.
+- conformance 후보: 비가역 async 작업에 취소 API 부재 / 산출물(임시 볼륨)
+  정리 경로 부재 / 실패 시 500 클래스.
+- 잔존 볼륨 fba72ab6…: pending이 **구계정**에 있어 구계정 콘솔에서 거절(또는
+  수락 후 사본 삭제)해야 풀릴 것으로 추정 — 오너 액션 필요할 수 있음.

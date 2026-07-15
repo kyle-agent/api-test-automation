@@ -552,7 +552,18 @@
             409,
             422
           ],
-          "_note": "ACCOUNT REPAIR 2026-07-16: 종전엔 구계정 id(ec11538a…) 하드코딩 — 계정 교체 후 '타계정 공유'가 되어 공유 이미지 생성용 임시 볼륨(hex-이름, 104GB)이 계정에 고아로 남았고 Volume.VolumeForSharingImageDelete로 삭제도 거부됨 (오너 실측 2026-07-16 + 원본 이미지 선삭제로 파이프라인 웨지). wait-vpc 응답의 $.vpc.account_id(현재 계정)를 캡처해 자기계정 공유로 전환 — 계정 불변. self-share 수락 여부는 미검증(expect가 4xx 관용이라 무해), 다음 런 판정."
+          "_note": "SKIP 2026-07-16 (오너: '이미지 공유 시나리오를 봐야 할 것 같아' — 로직 구멍 확정): createsharingimage(202, 응답 바디 없음)는 ① 대상 계정 pending 목록에 공유 사본을 넣고 ② 우리 계정에 hex-이름 임시 볼륨(104GB)을 파생시키는데, pending 공유를 수락/거절/취소하는 API가 카탈로그에 없다 (listpendingimages GET만 존재 — 콘솔 전용 기능). 즉 API만으로는 비가역이고 수락/거절 전까지 임시 볼륨 삭제가 Volume.VolumeForSharingImageDelete 400으로 거부돼 런마다 104GB 볼륨이 쌓인다 (2026-07-15 run a690 실측: 구계정 하드코딩 대상 + 원본 이미지 선삭제로 웨지). 공유 API에 취소/거절 짝이 생기거나 콘솔 자동 수락 배선이 생길 때까지 실행 스킵 — 모델링은 보존. conformance: 비가역 async 작업에 취소 API 부재 + 산출물 정리 불가 클래스. || ACCOUNT REPAIR 2026-07-16: 종전엔 구계정 id(ec11538a…) 하드코딩 — 계정 교체 후 '타계정 공유'가 되어 공유 이미지 생성용 임시 볼륨(hex-이름, 104GB)이 계정에 고아로 남았고 Volume.VolumeForSharingImageDelete로 삭제도 거부됨 (오너 실측 2026-07-16 + 원본 이미지 선삭제로 파이프라인 웨지). wait-vpc 응답의 $.vpc.account_id(현재 계정)를 캡처해 자기계정 공유로 전환 — 계정 불변. self-share 수락 여부는 미검증(expect가 4xx 관용이라 무해), 다음 런 판정.",
+          "skip": true
+        },
+        {
+          "name": "list-pending-images",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/pending-images",
+          "expect_status": [
+            200
+          ],
+          "_note": "listpendingimages 커버리지 (2026-07-16 신설) — share 스킵과 무관하게 안전한 read."
         },
         {
           "name": "create-image-shell",

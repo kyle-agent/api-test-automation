@@ -1181,6 +1181,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             ctx.update(pem)
 
         for step in lifecycle["steps"]:
+            # 스텝 단위 스킵 (2026-07-16): 되돌릴 API가 없는 비가역 호출을
+            # 시나리오에서 빼지 않고(모델링 보존) 실행만 끈다 — 첫 용례:
+            # createsharingimage (pending 공유 수락/거절 API 부재로 임시 볼륨
+            # 104GB가 런마다 고아로 잔존). 사유는 step._note에 기록.
+            if step.get("skip"):
+                print(f"  [{lifecycle['id']}] skipping step "
+                      f"'{step.get('name')}' (skip=true — see _note)")
+                continue
             # Platform command channel (M2): a step boundary is the only point
             # where stopping mid-lifecycle is safe — _teardown() reclaims every
             # resource created so far (reverse order, budget slots released),
