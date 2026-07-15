@@ -146,7 +146,12 @@ def test_missing_versions_file_means_no_header(tmp_path, monkeypatch):
 def test_request_injects_header_for_known_service(cfg, version_map):
     c, sent = _capture_client(cfg)
     c.get("/v1/vpcs", service="vpc")
-    assert sent[0]["headers"]["Scp-Api-Version"] == "vpc 1.3"
+    # 엔드포인트별 핀(2026-07-16) 이후: 값은 listvpcs 엔드포인트의 지원
+    # 버전(data/api_endpoint_versions.json) — 제품 최신(1.3)과 다를 수 있다.
+    from core import http_client as hc
+    expected = hc._endpoint_version_for("vpc", "GET", "/v1/vpcs")
+    assert expected, "listvpcs는 엔드포인트 버전 맵에 있어야"
+    assert sent[0]["headers"]["Scp-Api-Version"] == f"vpc {expected}"
     assert sent[0]["url"].startswith("https://vpc.kr-west1.e.samsungsdscloud.com")
 
 
@@ -179,3 +184,35 @@ def test_committed_api_versions_json_loads_and_covers_core_services():
     for svc in ("vpc", "firewall", "virtualserver", "mysql", "ske"):
         assert svc in products, f"{svc} missing from data/api_versions.json"
         assert products[svc].count(".") == 1  # "major.minor"
+
+
+# ---- 엔드포인트별 버전 핀 (2026-07-16, run fe88 406 NoSuchVersion 실측) ------
+def test_endpoint_pin_beats_product_pin(monkeypatch):
+    """엔드포인트 지원 버전(1,416개 중 903개가 제품 최신과 다름)이 제품 핀보다
+    우선 — scf 제품 1.4 vs showcloudfunctionmetrics 1.3 실측 케이스."""
+    from core import http_client as hc
+    hdr = hc.api_version_header(
+        "scf", "GET", "/v1/cloud-functions/abc123/metrics")
+    assert hdr == {hc.API_VERSION_HEADER: "scf 1.3"}, hdr
+    # 같은 서비스의 다른(1.4 지원) 엔드포인트는 제 버전대로
+    hdr2 = hc.api_version_header("scf", "GET", "/v1/cloud-functions")
+    assert hdr2.get(hc.API_VERSION_HEADER, "").startswith("scf "), hdr2
+
+def test_endpoint_pin_filestorage_regions_and_vs_ips():
+    from core import http_client as hc
+    h1 = hc.api_version_header("filestorage", "GET", "/v1/replications/regions")
+    assert h1 and h1[hc.API_VERSION_HEADER] != "filestorage 1.2", h1
+    h2 = hc.api_version_header("virtualserver", "GET", "/v1/servers/xyz/ips")
+    assert h2 and h2[hc.API_VERSION_HEADER] != "virtualserver 1.4", h2
+
+def test_endpoint_pin_unknown_path_falls_back_to_product():
+    from core import http_client as hc
+    hdr = hc.api_version_header("vpc", "GET", "/v1/no-such-collection")
+    assert hdr == {hc.API_VERSION_HEADER: f"vpc {hc._pinned_versions()['vpc']}"}
+
+def test_override_still_wins_over_endpoint_pin(monkeypatch):
+    from core import http_client as hc
+    monkeypatch.setenv("SCP_API_VERSION_OVERRIDES", "scf=9.9")
+    hdr = hc.api_version_header(
+        "scf", "GET", "/v1/cloud-functions/abc123/metrics")
+    assert hdr == {hc.API_VERSION_HEADER: "scf 9.9"}

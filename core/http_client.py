@@ -76,6 +76,7 @@ class MutationBlocked(Exception):
 #     (the minimal hook for back-compat regression against older versions)
 API_VERSION_HEADER = "Scp-Api-Version"
 _VERSIONS_FILE = Path(__file__).resolve().parent.parent / "data" / "api_versions.json"
+_EP_VERSIONS_FILE = Path(__file__).resolve().parent.parent / "data" / "api_endpoint_versions.json"
 
 
 @lru_cache(maxsize=1)
@@ -89,6 +90,46 @@ def _pinned_versions() -> dict:
     if not isinstance(products, dict):
         return {}
     return {str(k): str(v) for k, v in products.items() if k and v}
+
+
+@lru_cache(maxsize=1)
+def _endpoint_versions() -> dict:
+    """(service) -> {(method, n_segments): [(literal_pos_segments, version)]}.
+
+    필드 실측 2026-07-16 (run fe88): 엔드포인트별 지원 버전은 제품 최신과
+    **1,416개 중 903개(64%)가 다르다** — 제품 단위 핀은 그 메서드들에서 406
+    NoSuchVersion("API version X is not supported on this method")을 만든다
+    (예: scf 제품 1.4 vs showcloudfunctionmetrics 1.3). 그래서 핀의 1차
+    소스는 data/api_endpoint_versions.json(스펙 스냅샷의 endpoints[].support),
+    제품 핀은 미등재 엔드포인트의 폴백이다."""
+    try:
+        data = _json.loads(_EP_VERSIONS_FILE.read_text(encoding="utf-8"))
+        services = data.get("services") or {}
+    except (OSError, ValueError):
+        return {}
+    idx: dict = {}
+    for svc, eps in services.items():
+        for key, ver in eps.items():
+            method, _, shape = key.partition(" ")
+            segs = shape.split("/")
+            idx.setdefault(svc, {}).setdefault((method, len(segs)), []).append(
+                (tuple(segs), str(ver)))
+    return idx
+
+
+def _endpoint_version_for(svc: str, method: str | None, path: str | None):
+    """live path를 카탈로그 shape에 매칭해 그 엔드포인트의 지원 버전을 찾는다.
+    모호(0 또는 2+ 매치)하면 None — 호출측이 제품 핀으로 폴백."""
+    if not (method and path):
+        return None
+    cands = _endpoint_versions().get(svc, {}).get(
+        (method.upper(), len(path.split("?")[0].split("/"))))
+    if not cands:
+        return None
+    segs = path.split("?")[0].split("/")
+    matches = [ver for shape, ver in cands
+               if all(s == "{}" or s == seg for s, seg in zip(shape, segs))]
+    return matches[0] if len(set(matches)) == 1 else None
 
 
 def _version_overrides() -> dict:
@@ -105,11 +146,14 @@ def _version_overrides() -> dict:
     return out
 
 
-def api_version_header(service: str | None) -> dict:
-    """Headers to pin `service`'s API microversion — {} when nothing applies.
+def api_version_header(service: str | None, method: str | None = None,
+                       path: str | None = None) -> dict:
+    """Headers to pin the API microversion — {} when nothing applies.
 
-    Empty when: no service, kill-switch off, or no known version for it.
-    `<svc>-dr` aliases pin the base service's version (same product).
+    우선순위: env 오버라이드 > **엔드포인트별 지원 버전**(method+path shape
+    매칭 — 제품 최신과 64%가 달라 제품 핀만으로는 406 NoSuchVersion) >
+    제품 최신(폴백). `<svc>-dr` aliases pin the base service's product.
+    Empty when: no service, kill-switch off, or no known version at all.
     """
     if not service:
         return {}
@@ -117,7 +161,9 @@ def api_version_header(service: str | None) -> dict:
             "0", "false", "no", "off"):
         return {}
     svc = service[:-3] if service.endswith("-dr") else service
-    version = _version_overrides().get(svc) or _pinned_versions().get(svc)
+    version = (_version_overrides().get(svc)
+               or _endpoint_version_for(svc, method, path)
+               or _pinned_versions().get(svc))
     if not version:
         return {}
     return {API_VERSION_HEADER: f"{svc} {version}"}
@@ -202,7 +248,7 @@ class ApiClient:
         # of the HMAC signing string, so this does not interact with signing.
         # An explicit caller-supplied Scp-Api-Version still wins (hdrs.update
         # below runs after).
-        _ver_hdr = api_version_header(service)
+        _ver_hdr = api_version_header(service, method, path)
         backoff = 2.0
         last_exc: Exception | None = None
         for attempt in range(1, _max + 1):
@@ -239,12 +285,60 @@ class ApiClient:
                     time.sleep(min(_wait, 30))
                     backoff = min(backoff * 2, 16)
                     continue
+            # 406 NoSuchVersion 안전망: 우리가 붙인 버전 핀이 이 메서드에서
+            # 지원 안 되면(스냅샷 낡음/매핑 오류) 핀 없이 1회 재시도 — 서버
+            # 기본(latest current)으로라도 커버리지를 살린다. 재시도 사실은
+            # 응답 헤더에 표식(X-Apitest-Version-Fallback)으로 남겨 콘솔에서
+            # 구분 가능하게. (오너 2026-07-16: scf metrics 1.3 vs 제품 1.4 실측)
+            if (resp.status_code == 406 and _ver_hdr
+                    and "NoSuchVersion" in (resp.text or "")):
+                _sent = _ver_hdr.get(API_VERSION_HEADER, "")
+                print(f"[api-version] 406 NoSuchVersion ({_sent}) "
+                      f"{method} {path} — 핀 없이 재시도")
+                # 문서 기술 버전 ≠ 실제 지원 = 컨포먼스 finding (오너 2026-07-16:
+                # "문서에 기술된 버전이 달라서이면 컨포먼스 기록해두고 버전
+                # 헤더 없이 해봐야지"). best-effort — 기록 실패가 호출을 깨면 안 됨.
+                try:
+                    from core import results as _results
+                    _results.record_finding(_results.Finding(
+                        endpoint_key=f"{method.upper()} {path.split('?')[0]}",
+                        rule_id="versioning.doc-version-not-supported",
+                        severity="yellow", source="runtime",
+                        detail=(f"docs-derived pin '{_sent}' -> 406 NoSuchVersion"
+                                f" ({(resp.text or '')[:160]}) — served without"
+                                " the header instead (latest current)")))
+                except Exception:  # noqa: BLE001
+                    pass
+                _ver_hdr = {}
+                hdrs2 = {"Accept": "application/json"}
+                if json is not None:
+                    hdrs2["Content-Type"] = "application/json"
+                hdrs2.update(self.signer.headers(method, url, body))
+                if headers:
+                    hdrs2.update(headers)
+                try:
+                    resp = self.session.request(
+                        method.upper(), url,
+                        data=body if json is not None else None,
+                        headers=hdrs2, timeout=_to)
+                except requests.RequestException:
+                    pass    # 폴백 실패 — 원래 406으로 계속
+                else:
+                    resp.headers = dict(resp.headers)
+                    resp.headers["X-Apitest-Version-Fallback"] = _sent
             elapsed = (time.monotonic() - start) * 1000
             try:
                 parsed = resp.json()
             except ValueError:
                 parsed = None
-            return Response(resp.status_code, elapsed, dict(resp.headers), parsed, resp.text)
+            out_headers = dict(resp.headers)
+            if _ver_hdr.get(API_VERSION_HEADER):
+                # 콘솔 가시성 (오너 2026-07-16: "헤더로 뭘 보냈는지 알 수가
+                # 없네") — 보낸 버전 핀을 응답 레코드에 동봉해 스텝 상세에서
+                # 확인 가능하게. 서명/자격 헤더는 절대 동봉하지 않는다.
+                out_headers["X-Apitest-Sent-Api-Version"] = \
+                    _ver_hdr[API_VERSION_HEADER]
+            return Response(resp.status_code, elapsed, out_headers, parsed, resp.text)
         raise last_exc  # pragma: no cover
 
     # convenience verbs
