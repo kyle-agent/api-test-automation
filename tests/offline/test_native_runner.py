@@ -75,7 +75,8 @@ def test_vpc_creator_waits_and_retries_on_budget_skip(monkeypatch):
     monkeypatch.setattr(core.http_client, "ApiClient", lambda cfg: object())
     monkeypatch.setattr(core.budgets, "live_count", lambda kind: None)
     monkeypatch.setattr(engine, "active_lifecycles", lambda: [lc])
-    monkeypatch.setattr(engine, "provision_shared_vpc", lambda c, cfg: ({}, lambda: None))
+    monkeypatch.setattr(engine, "provision_shared_vpc",
+                        lambda c, cfg, **kw: ({}, lambda: None))
     monkeypatch.setattr(engine, "ResourceRegistry", lambda: object())
     monkeypatch.setattr(nr, "_durations", lambda: {})
     monkeypatch.setattr(nr, "_true_dependents", lambda: set())
@@ -111,10 +112,19 @@ def _run_with_mocked_engine(monkeypatch, lcs, *, workers, sleep=0.02,
                         lambda self: None, raising=False)
     monkeypatch.setattr(core.http_client, "ApiClient", lambda cfg: object())
     monkeypatch.setattr(engine, "active_lifecycles", lambda: lcs)
-    # 세마포어 시드는 shared_ctx의 상주 키 개수로 정해진다 (raw live_count 아님)
+    # 세마포어 시드는 shared_ctx의 상주 키 개수로 정해진다 (raw live_count 아님).
+    # shared_needs는 항상-필요로 고정: 이 하네스의 lcs엔 adopt 마커가 없어
+    # 선택-게이트가 provision을 스킵해버리면 residents 시드를 관측할 수 없다
+    # (게이트 자체는 test_shared_infra_needs.py가 검증).
+    from regression.scenarios import shared_infra
+    monkeypatch.setattr(shared_infra, "shared_needs",
+                        lambda only_ids=None: {"main": True, "db": False,
+                                               "net": (), "tgw": False,
+                                               "igw": False, "any": True})
     _rkeys = ["shared_vpc_id", "shared_net_vpc_a_id", "shared_net_vpc_b_id"]
     _sctx = {k: f"r{i}" for i, k in enumerate(_rkeys[:residents])}
-    monkeypatch.setattr(engine, "provision_shared_vpc", lambda c, cfg: (_sctx, lambda: None))
+    monkeypatch.setattr(engine, "provision_shared_vpc",
+                        lambda c, cfg, **kw: (_sctx, lambda: None))
     monkeypatch.setattr(engine, "ResourceRegistry", lambda: object())
 
     conc = {"cur": 0, "peak": 0}

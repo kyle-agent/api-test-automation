@@ -173,15 +173,27 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
 
     # 공유 인프라 — provision_shared_vpc는 env-aware (SCP_SHARED_VPC_ID 있으면 adopt,
     # 없으면 provision + teardown 반환). local_run이 앞서 provision했으면 adopt.
+    # 선택 기반 게이트 (오너 2026-07-15): adopt 마커가 하나도 없는 self-create
+    # 전용 선택(예: networking-vpc-subnet 단독)이면 공유 인프라를 아예 세우지
+    # 않고, 있으면 필요한 것만(db/net/tgw/igw 세분화 — CLI provision과 동일
+    # 계약) 세운다. 종전엔 무조건 main+DB 서브넷을 만들었다.
+    from regression.scenarios import shared_infra as _shared
     shared_ctx, shared_teardown = {}, (lambda: None)
-    try:
-        res = engine.provision_shared_vpc(client, cfg)
-        if isinstance(res, tuple):
-            shared_ctx, shared_teardown = res
-        else:
-            shared_ctx = res or {}
-    except Exception as e:  # noqa: BLE001
-        log(f"[native] shared VPC provision 경고: {e}")
+    needs = _shared.shared_needs(only_ids=idset)
+    if not needs["any"]:
+        log("[native] 공유 인프라 스킵 — 선택에 adopt 시나리오 없음 (self-create 전용)")
+    else:
+        try:
+            res = engine.provision_shared_vpc(
+                client, cfg, need_db_subnet=needs["db"],
+                need_net_vpcs=needs["net"], need_tgw=needs["tgw"],
+                need_igw=needs["igw"])
+            if isinstance(res, tuple):
+                shared_ctx, shared_teardown = res
+            else:
+                shared_ctx = res or {}
+        except Exception as e:  # noqa: BLE001
+            log(f"[native] shared VPC provision 경고: {e}")
 
     # 공유 서브넷 ACTIVE 게이트 — adopter를 준비된 인프라에만 디스패치 (라이브
     # 검증: 이게 없으면 서브넷 CREATING 중 adopt → wait-subnet 타임아웃 → VM ERROR).

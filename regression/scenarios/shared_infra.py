@@ -90,26 +90,65 @@ def print_filters():
 # --------------------------------------------------------------------------- #
 # provision / teardown
 # --------------------------------------------------------------------------- #
+def shared_needs(only_ids=None) -> dict:
+    """이 선택이 필요로 하는 공유 인프라를 ONE PASS로 스캔 — adopt 마커 기반.
+
+    반환 키: ``main``(메인 공유 VPC+서브넷 — vpc/subnet adopter, 또는 메인 VPC에
+    붙는 db/tgw/igw가 있으면 True) · ``db``(subnet#db) · ``net``(('a','b')의
+    부분집합) · ``tgw`` · ``igw`` · ``any``(하나라도 필요).
+
+    오너 2026-07-15: adopt 마커가 하나도 없는 self-create 전용 선택
+    (networking-vpc-subnet 단독 런)이 공유 VPC+서브넷 2개까지 세우는 낭비 지적 —
+    "subnet이 필요한(의존관계 있는) 시나리오면 공용 subnet을 만들어서 활용하면
+    되는데, 모든 시나리오에 무조건 만드는 게 맞지는 않다". db-subnet 게이트
+    (2026-07-08)와 같은 원리를 메인 공유 인프라 전체로 확장한 것.
+
+    ``only_ids=None``이면 ``SCP_CRUD_IDS`` env(CLI 계약, 빈 값 = 전체 선택),
+    아니면 그 id 집합으로 제한 (native 러너가 명시 선택을 넘긴다).
+    Fail-open: 판정 오류 → 전부 필요(종전 동작 — 만들어도 무해, 스윕이 회수)."""
+    import os
+    try:
+        if only_ids is None:
+            only_ids = {x.strip() for x in
+                        os.environ.get("SCP_CRUD_IDS", "").split(",")
+                        if x.strip()}
+        only = {str(x) for x in only_ids if str(x)}
+        vpc_or_subnet = db = tgw = igw = False
+        net: set = set()
+        for lc in engine.active_lifecycles():
+            if only and lc.get("id") not in only:
+                continue
+            for s in lc.get("steps", []):
+                ad = s.get("adopt") or ""
+                if ad in ("vpc", "subnet"):
+                    vpc_or_subnet = True
+                elif ad == "subnet#db":
+                    db = True
+                elif ad == "tgw":
+                    tgw = True
+                elif ad == "igw":
+                    igw = True
+                elif ad == "vpc#a":
+                    net.add("a")
+                elif ad == "vpc#b":
+                    net.add("b")
+        main = vpc_or_subnet or db or tgw or igw
+        net_tags = tuple(sorted(net))
+        return {"main": main, "db": db, "net": net_tags, "tgw": tgw,
+                "igw": igw, "any": bool(main or net_tags)}
+    except Exception:  # noqa: BLE001 — 스킵 최적화가 provision 실패 원인이 되면 안 됨
+        return {"main": True, "db": True, "net": ("a", "b"), "tgw": True,
+                "igw": True, "any": True}
+
+
 def _needs_db_subnet() -> bool:
     """True iff this run's selection (``SCP_CRUD_IDS``; unset = every enabled
     lifecycle) contains at least one ``{"adopt": "subnet#db"}`` step. Without
     this check a VS-only interactive run serialized ~1-2 min behind a DB-lane
     subnet nothing would adopt (owner 2026-07-08: "db subnet 만들어지기 전까지
     아무것도 안 하고 있네.. 이게 맞나?"). Fail-open: any error → True (create
-    the subnet; harmless, just slower)."""
-    import os
-    try:
-        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
-                if x.strip()}
-        for lc in engine.active_lifecycles():
-            if only and lc.get("id") not in only:
-                continue
-            if any((s.get("adopt") or "") == "subnet#db"
-                   for s in lc.get("steps", [])):
-                return True
-        return False
-    except Exception:  # noqa: BLE001 — 스킵 최적화가 provision 실패 원인이 되면 안 됨
-        return True
+    the subnet; harmless, just slower). ``shared_needs()``의 db 필드 위임."""
+    return shared_needs()["db"]
 
 
 def _needed_net_vpc_tags() -> tuple:
@@ -117,42 +156,16 @@ def _needed_net_vpc_tags() -> tuple:
     vpc#b 어댑터가 있으면 'b' (오너 2026-07-13 세분화). peering은 vpc#a·vpc#b를
     둘 다 가지므로 자동으로 ('a','b'); vip-nat만이면 ('a',); dc/fw만이면 ('b',).
     없는 것은 만들지 않아 슬롯(각 1)·프로비저닝 시간 낭비를 막는다. Fail-open:
-    판정 오류 → ('a','b') (만들어도 무해, 약간 느릴 뿐)."""
-    import os
-    try:
-        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
-                if x.strip()}
-        tags = set()
-        for lc in engine.active_lifecycles():
-            if only and lc.get("id") not in only:
-                continue
-            for s in lc.get("steps", []):
-                ad = s.get("adopt") or ""
-                if ad == "vpc#a":
-                    tags.add("a")
-                elif ad == "vpc#b":
-                    tags.add("b")
-        return tuple(sorted(tags))
-    except Exception:  # noqa: BLE001 — 스킵 최적화가 provision 실패 원인이 되면 안 됨
-        return ("a", "b")
+    판정 오류 → ('a','b') (만들어도 무해, 약간 느릴 뿐). ``shared_needs()``의
+    net 필드 위임."""
+    return shared_needs()["net"]
 
 
 def _needs_shared_tgw() -> bool:
     """선택에 ``{"adopt": "tgw"}`` 스텝이 하나라도 있으면 True — 공유 TGW 1개 필요
     (오너 2026-07-13). 없으면 공유 TGW는 순수 낭비(슬롯 1). Fail-open: 판정 오류
-    → True (만들어도 무해, 잔재는 스윕 회수)."""
-    import os
-    try:
-        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
-                if x.strip()}
-        for lc in engine.active_lifecycles():
-            if only and lc.get("id") not in only:
-                continue
-            if any((s.get("adopt") or "") == "tgw" for s in lc.get("steps", [])):
-                return True
-        return False
-    except Exception:  # noqa: BLE001
-        return True
+    → True (만들어도 무해, 잔재는 스윕 회수). ``shared_needs()``의 tgw 필드 위임."""
+    return shared_needs()["tgw"]
 
 
 def _needs_logsink() -> bool:
@@ -180,19 +193,9 @@ def _needs_logsink() -> bool:
 def _needs_shared_igw() -> bool:
     """선택에 ``{"adopt": "igw"}`` 스텝이 하나라도 있으면 True — 메인 공유 VPC에
     IGW 1개 상주 필요 (오너 2026-07-14). 없으면 공유 IGW는 순수 낭비. Fail-open:
-    판정 오류 → True (만들어도 무해, 잔재는 스윕 회수)."""
-    import os
-    try:
-        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
-                if x.strip()}
-        for lc in engine.active_lifecycles():
-            if only and lc.get("id") not in only:
-                continue
-            if any((s.get("adopt") or "") == "igw" for s in lc.get("steps", [])):
-                return True
-        return False
-    except Exception:  # noqa: BLE001
-        return True
+    판정 오류 → True (만들어도 무해, 잔재는 스윕 회수). ``shared_needs()``의
+    igw 필드 위임."""
+    return shared_needs()["igw"]
 
 
 def provision():
@@ -210,7 +213,7 @@ def provision():
     import contextlib
     import os
     shared_ctx = {}
-    need_db = _needs_db_subnet()
+    needs = shared_needs()   # ONE PASS: main/db/net/tgw/igw — 선택 기반 세분화
     # 기본 no-wait (2026-07-13, 오너 풀런에서 conftest 인라인 경로가 구식 대기를
     # 타는 것 관측 후 전 경로 기본 승격): 서브넷 create+track 후 ACTIVE 대기 없이
     # 반환 — run-543a 실측처럼 백엔드가 같은 VPC 서브넷 ACTIVE 전이를 직렬화해
@@ -218,12 +221,10 @@ def provision():
     # 게이트가 보장(라이브 검증 2026-07-13 5/5 pass). 구식 대기가 필요하면
     # SCP_PROVISION_SUBNET_WAIT=true 로 강제.
     nowait = os.environ.get("SCP_PROVISION_SUBNET_WAIT", "").strip().lower() != "true"
-    net_tags = _needed_net_vpc_tags()   # ('a','b') / ('a',) / ('b',) / () — 세분화
-    need_tgw = _needs_shared_tgw()       # adopt:tgw 시나리오 있으면 공유 TGW 1개
-    need_igw = _needs_shared_igw()       # adopt:igw 시나리오 있으면 공유 IGW 1개
     # logsink 자동 부트스트랩 (새 계정 자기충족): stdout은 KEY=VALUE 계약이므로
     # ensure의 진단 print는 stderr로 돌린다. 실패해도 런은 계속 — 해당 시나리오가
-    # 4xx로 표면화하고, 원인은 stderr 로그에 남는다.
+    # 4xx로 표면화하고, 원인은 stderr 로그에 남는다. 공유-VPC 게이트보다 먼저:
+    # logsink 참조와 adopt 마커는 독립이다.
     if _needs_logsink():
         try:
             with contextlib.redirect_stdout(sys.stderr):
@@ -231,12 +232,18 @@ def provision():
                 _oplog.ensure_logsink()
         except Exception as exc:  # noqa: BLE001 — best-effort bootstrap
             _eprint(f"[shared_infra] logsink ensure 실패(계속): {exc}")
+    if not needs["any"]:
+        # 오너 2026-07-15: adopt 마커 없는 self-create 전용 선택이 공유 인프라를
+        # 세우는 낭비 — 아무도 adopt하지 않으면 프로비저닝 자체를 스킵한다.
+        _eprint("[shared_infra] 선택에 공유 인프라 adopter가 없음(self-create "
+                "전용) — 공유 VPC/서브넷 프로비저닝 스킵. NO SCP_SHARED_* emitted.")
+        return 0
     try:
         with contextlib.redirect_stdout(sys.stderr):
             shared_ctx, _teardown = engine.provision_shared_vpc(
-                client, cfg, need_db_subnet=need_db,
-                wait_subnets_active=not nowait, need_net_vpcs=net_tags,
-                need_tgw=need_tgw, need_igw=need_igw)
+                client, cfg, need_db_subnet=needs["db"],
+                wait_subnets_active=not nowait, need_net_vpcs=needs["net"],
+                need_tgw=needs["tgw"], need_igw=needs["igw"])
     except Exception as exc:
         # Wave D root cause: provision_shared_vpc CREATED the VPC (slot won,
         # counts against the 5-cap) but a *post-create* step inside it raised —
