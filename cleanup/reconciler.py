@@ -2012,8 +2012,14 @@ def run_sweep(client) -> int:
     # 3b. internet gateways + public IPs (regr*) — children that would
     # 409-block their VPC; delete them (and wait) before the vpc pass.
     _igw_wait = []
+    # match_token (2026-07-15 오너 실측, 신규계정 첫 런): IGW create 바디에
+    # name이 없어 플랫폼이 `IGW_<vpc이름>`으로 자동 명명 — "IGW_regrvpcnb…"는
+    # regr* 프리픽스에 안 걸려 영구 스킵됐다(구 계정에도 IGW_regrvpcnb(ERROR)
+    # 동일 잔존). 토큰 분해(IGW / regrvpcnb…)로 regr* 토큰을 잡는다 — 남의
+    # IGW는 토큰이 자기 VPC명이라 안전. 파생 방화벽(FW_IGW_*)은 DELETE API가
+    # 없어(카탈로그: GET/PUT뿐) IGW 삭제에 따라간다.
     for it in _select(c, "vpc", "/v1/internet-gateways",
-                      name_prefixes=("regr", "zznet")):
+                      name_prefixes=("regr", "zznet"), match_token=True):
         if it.get("id") and _delete(
                 c, "vpc", f"/v1/internet-gateways/{it['id']}"):
             deleted += 1

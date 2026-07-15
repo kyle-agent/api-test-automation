@@ -818,3 +818,19 @@ def test_dbaas_deleting_cluster_not_redeleted_no_barrier_hostage():
     assert not any(p == "/v1/clusters/cl-1" for p in _delete_paths(client)), \
         "DELETING 클러스터 재-DELETE 금지 (배리어 인질 방지)"
     assert recon._INPROGRESS_THIS_ROUND[0] >= 1, "in-progress 집계는 유지"
+
+
+def test_platform_named_igw_reclaimed_via_token_match():
+    """IGW는 create 바디에 name이 없어 플랫폼이 IGW_<vpc이름>으로 자동 명명 —
+    'IGW_regrvpcnb…'가 regr* 프리픽스에 안 걸려 영구 스킵되던 갭(2026-07-15
+    신규계정 첫 런 실측; 구 계정에도 동일 잔존). 토큰 매칭으로 회수하되 남의
+    IGW(IGW_othervpc)는 절대 안 지운다."""
+    ours = {"name": "IGW_regrvpcnb6a5774bd", "id": "igw-ours"}
+    theirs = {"name": "IGW_customer-prod-vpc", "id": "igw-theirs"}
+    client = FakeClient(lists={"/v1/internet-gateways": [ours, theirs]})
+    recon.run_sweep(client)
+    dels = _delete_paths(client)
+    assert "/v1/internet-gateways/igw-ours" in dels, \
+        "플랫폼 자동명명 IGW_regr* 는 토큰 매칭으로 회수"
+    assert "/v1/internet-gateways/igw-theirs" not in dels, \
+        "남의 IGW는 토큰이 regr*가 아니므로 안전"

@@ -3265,3 +3265,15 @@ scenarios.json, lifecycles/*.json 52곳, formal yaml)를 PUBLIC으로 전환함.
 VPC_ENDPOINT)을 담고 있다. `GET /v1/subnets?type=` 쿼리 enum도 함께 바뀌었는지
 미검증 (reconciler는 bare list + `?type=VPC_ENDPOINT`만 사용, PF-47 — VPC_ENDPOINT는
 신구 enum 모두에 존재해 즉각 영향 없음).
+
+## 플랫폼 자동명명 IGW 스윕 갭 + 파생 방화벽 (2026-07-15, 신규계정 첫 런 실측)
+
+IGW create 바디에는 name 필드가 없어 **플랫폼이 `IGW_<vpc이름>`으로 자동 명명**
+(예: IGW_regrvpcnb6a5774bd). 스윕 IGW 패스가 regr* 프리픽스만 봐서 이 이름을
+영구 스킵 — 구 계정에도 IGW_regrvpcnb(ERROR) 동일 잔존. match_token 추가로
+토큰(regrvpcnb…)이 잡히게 수리 (남의 IGW는 토큰이 자기 VPC명이라 안전).
+**파생 방화벽 FW_IGW_<vpc이름>**: firewall_enabled:true IGW가 자동 생성하는
+플랫폼 파생물 — DELETE API가 없어(카탈로그: firewalls는 GET/PUT + rules CRUD뿐)
+직접 삭제 불가, IGW 삭제에 따라간다(IGW 삭제 후에도 남으면 플랫폼 PF로 보고).
+SCF(regrscf*)는 패스 프리픽스에 이미 매칭 — 잔존이 보이면 PF-46(privatelink
+enabled 거부)/트리거 선삭제 흐름의 stuck 여부를 스윕 로그에서 확인.
