@@ -849,7 +849,15 @@
             "method": "DELETE",
             "path": "/v1/direct-connects/{direct_connect_id}",
             "service": "direct-connect"
-          }
+          },
+          "_note": "RETRY LADDER 2026-07-16 (run a690 실측: 4초 사망·자원 0 — routing lifecycle의 DC 2개가 18:03 delete 후에도 서버측 드레인 중이라 18:09 create가 캡/배타 4xx. 같은 바디로 계정이 조용할 때 라이브 프로브 202+전체바디→ACTIVE→delete 202→404 확인 — 엔드포인트 정상, 순수 타이밍). DC 드레인은 수 분 걸리므로 30s×10 사다리로 흡수. DC delete는 CREATING 상태에서 400(라이브 실측)이라 드레인 대기 없이는 재시도가 답.",
+          "retry_on_status": [
+            400,
+            409,
+            422
+          ],
+          "retries": 10,
+          "retry_interval": 30
         },
         {
           "name": "verify-direct-connect",
