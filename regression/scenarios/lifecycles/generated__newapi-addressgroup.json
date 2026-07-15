@@ -1,0 +1,103 @@
+{
+  "lifecycles": [
+    {
+      "id": "gen-newapi-addressgroup",
+      "service": "networking/security-group",
+      "enabled": true,
+      "heavy": false,
+      "_note": "NEW API wave 2026-07-15 (SPEC-DIFF-20260715 §2⑥): Address Group — 8 new endpoints on networking/security-group (security-group 1.1). FREE logical resource: account/region-scoped, NO VPC/SG prerequisite (confirmed live — created in a bare state with zero address groups). FULL lifecycle VALIDATED LIVE 2026-07-15, every endpoint 2xx: create 201 -> list 200 -> show 200 -> set 200 -> add_addresses 200 -> list addresses 200 -> remove_addresses 200 -> delete 204 -> show-after-delete 404 (AddressGroupNotFound, clean error JSON). Response envelope: create/show wrap in $.address_group.{id,name,addresses,address_count,address_limit,state:ACTIVE,...}; list wraps in $.address_groups[] + count; add/remove/list-addresses return flat {addresses:[...]} (+count on list). Body models: AddressGroupCreateRequest {name REQ, addresses opt array[cidr], description opt, tags opt array[Tag]} — tags accepted live so engine owner-tag injection applies; AddressGroupSetRequest {description opt} (set returns 200 with EMPTY body {} — do not capture from it); add/remove BOTH use AddressGroupCidrsAddRequest {addresses REQ array[cidr]}. QUIRK (conformance candidate): create response said address_limit:5 but list/show of the same group immediately said address_limit:1000 — inconsistent limit reporting between envelopes. Delete of a group whose addresses are referenced by an SG rule (remote_address_group_id) untested — likely 409/422; this lifecycle never wires the group into a rule so delete is safe.",
+      "steps": [
+        {
+          "name": "list-address-groups",
+          "method": "GET",
+          "path": "/v1/address-groups",
+          "group": "ag",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200],
+          "_note": "listaddressgroups: unconditional 200 even with zero groups ({address_groups:[],count:0}) — light-runnable anchor. Optional query filters: size/page/sort/id/name."
+        },
+        {
+          "name": "create-address-group",
+          "method": "POST",
+          "path": "/v1/address-groups",
+          "group": "ag",
+          "json": {
+            "name": "regrag{unique}",
+            "description": "API regression suite",
+            "addresses": ["10.199.1.0/24", "10.199.2.0/24"],
+            "tags": []
+          },
+          "expect_status": [200, 201],
+          "capture": {"ag_id": "$.address_group.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/address-groups/{ag_id}",
+            "service": "security-group"
+          },
+          "_note": "createaddressgroup: 201 live. Envelope $.address_group.id. name REQ (only required field); addresses/description/tags optional. tags [] present so the engine injects owner/run/ttl tags (accepted live 2026-07-15)."
+        },
+        {
+          "name": "show-address-group",
+          "method": "GET",
+          "path": "/v1/address-groups/{ag_id}",
+          "group": "ag",
+          "expect_status": [200],
+          "_note": "showaddressgroup: 200 live, $.address_group envelope with state:ACTIVE."
+        },
+        {
+          "name": "set-address-group",
+          "method": "PUT",
+          "path": "/v1/address-groups/{ag_id}",
+          "group": "ag",
+          "json": {"description": "API regression suite (updated)"},
+          "expect_status": [200],
+          "_note": "setaddressgroup: 200 live. AddressGroupSetRequest carries ONLY description (name/addresses not updatable here — addresses via add/remove endpoints). Returns 200 with empty JSON body {}."
+        },
+        {
+          "name": "add-address-group-cidrs",
+          "method": "PUT",
+          "path": "/v1/address-groups/{ag_id}/add_addresses",
+          "group": "ag",
+          "json": {"addresses": ["10.199.3.0/24"]},
+          "expect_status": [200],
+          "_note": "addaddressgroupcidrs: 200 live, returns the FULL merged address list {addresses:[...3 cidrs]}. Duplicate-add behavior untested (likely idempotent or 409)."
+        },
+        {
+          "name": "list-address-group-cidrs",
+          "method": "GET",
+          "path": "/v1/address-groups/{ag_id}/addresses",
+          "group": "ag",
+          "expect_status": [200],
+          "_note": "listaddressgroupcidrs: 200 live, {addresses:[...],count:3} after the add. Optional filters size/page/sort/address."
+        },
+        {
+          "name": "remove-address-group-cidrs",
+          "method": "PUT",
+          "path": "/v1/address-groups/{ag_id}/remove_addresses",
+          "group": "ag",
+          "json": {"addresses": ["10.199.3.0/24"]},
+          "expect_status": [200],
+          "_note": "removeaddressgroupcidrs: 200 live, returns remaining {addresses:[...2 cidrs]}. Same body model as add (AddressGroupCidrsAddRequest, addresses REQ)."
+        },
+        {
+          "name": "delete-address-group",
+          "method": "DELETE",
+          "path": "/v1/address-groups/{ag_id}",
+          "group": "ag",
+          "destructive": true,
+          "expect_status": [200, 202, 204],
+          "_note": "deleteaddressgroup: 204 live, empty body. Post-delete GET returns 404 scp-network.securitygroup.addressgroup.not-found (verified — no lingering resource)."
+        },
+        {
+          "name": "show-address-group-after-delete",
+          "method": "GET",
+          "path": "/v1/address-groups/{ag_id}",
+          "group": "ag-post-delete",
+          "optional": true,
+          "expect_status": [404],
+          "_note": "Deletion proof: 404 AddressGroupNotFound with clean JSON error (verified live 2026-07-15). Separate group so it never blocks teardown accounting."
+        }
+      ]
+    }
+  ]
+}

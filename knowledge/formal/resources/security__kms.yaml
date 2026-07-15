@@ -38,4 +38,44 @@ resources:
     delete: {endpoint: "DELETE /v1/kms/transit/{key_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: security-kms-transit-crypto, steps: [create, delete]}
-    notes: "선행 없음 — bare account에서 생성 가능 (services/security__kms.yaml no-prereq). region 스코프 (타 region 참조 4xx). DELETE는 해지 스케줄(즉시/72h 예약) — capture envelope $.key.id는 doc+라이브 확인. 키 비활성화는 그 키를 쓰는 소비자(Secrets Manager secret)를 즉시 깨뜨림 → teardown은 소비자 먼저 (disabled-key-blocks-consumers). security-kms-transit-crypto / security-secretsmanager-secret(-writes)도 동일 create body로 생성한다."
+    notes: "선행 없음 — bare account에서 생성 가능 (services/security__kms.yaml no-prereq). region 스코프 (타 region 참조 4xx). DELETE는 해지 스케줄(즉시/72h 예약) — capture envelope $.key.id는 doc+라이브 확인. 키 비활성화는 그 키를 쓰는 소비자(Secrets Manager secret)를 즉시 깨뜨림 → teardown은 소비자 먼저 (disabled-key-blocks-consumers). security-kms-transit-crypto / security-secretsmanager-secret(-writes)도 동일 create body로 생성한다. NEW 2026-07-15 (kms 1.4, SPEC-DIFF §2⑨): createkey에 opt 필드 acl_cidr/private_acl_enabled/private_acl_resources 추가 — 아래 kms-set-acl-cidr/kms-set-private-acl 노드의 필드를 생성 시점에 인라인으로도 설정 가능."
+
+  # ==== NEW API wave 2026-07-15 (SPEC-DIFF-20260715 §2⑨) — key ACL 2종 ====
+  # kms 1.4 신규: kmssetaclcidr / kmssetprivateacl. secretsmanager의
+  # setsecretaclcidr/setprivateacl 패턴 이식. kms-key 자체는 무료·즉시지만
+  # 오너 지시(2026-07-15)로 이번 웨이브는 MODELED ONLY — 라이브 0회.
+  kms-set-acl-cidr:
+    code: "sec-kms-set-acl-cidr"
+    service: security/kms
+    requires: [kms-key]
+    create:
+      endpoint: "PUT /v1/kms/transit/{kms-key.key_id}/acl-cidr"
+      body: {acl_cidr: "{opt.acl_cidr}"}
+      options:
+        acl_cidr: {type: string, required: true, default: "192.168.0.0/24",
+                   note: "KeySetAclCidrRequest.acl_cidr REQ — 콤마 구분 다중 CIDR 문자열 (doc 예: '192.168.1.1/24, 10.0.0.1/16'; array 아님). secretsmanager 동일 필드의 라이브 확정 제약 'acl_cidr는 /25 이상(넓게)이어야 함'(2026-06-23, validated-facts)이 KMS에도 적용될 가능성 높음 — /24 기본값은 그 제약을 통과하는 선택. /32 등 좁은 CIDR은 400 예상(라이브 정제)"}
+    verify:
+      - {name: read-key, endpoint: "GET /v1/kms/transit/{kms-key.key_id}",
+         expect_status: [200]}
+    provenance: docs
+    source: {doc: "apireference/security/kms/apis/kmssetaclcidr/1.4 (fetched live 2026-07-15)"}
+    notes: "MODELED ONLY. 응답은 전체 키 envelope $.key.{acl_cidr,...} (doc response_example) — verify read로 acl_cidr 반영 확인 가능. 가역 in-place setter (빈/기본 CIDR로 되돌리는 값 미문서 — 라이브 정제) — DELETE 없음, 부모 kms-key delete로 회수. 주의: ACL을 좁히면 우리 러너 소스 IP가 차단돼 후속 키 조작이 403될 수 있음 — 검증 시 러너 egress IP를 포함하는 CIDR 사용."
+
+  kms-set-private-acl:
+    code: "sec-kms-set-private-acl"
+    service: security/kms
+    requires: [kms-key]
+    create:
+      endpoint: "PUT /v1/kms/transit/{kms-key.key_id}/private-acl"
+      body: {private_acl_enabled: "{opt.private_acl_enabled}",
+             private_acl_resources: []}
+      options:
+        private_acl_enabled: {type: enum, values: [false, true], default: false,
+                              vary: true,
+                              note: "KeySetPrivateAclRequest 두 필드 모두 opt. true면 private endpoint 접근을 private_acl_resources(형식 [{resource_id:'vs-xxxxx'}])로 제한 — 빈 목록+true 조합의 동작(전면 차단?) 미문서. false 기본값이 안전(현행 유지·가역)"}
+    verify:
+      - {name: read-key, endpoint: "GET /v1/kms/transit/{kms-key.key_id}",
+         expect_status: [200]}
+    provenance: docs
+    source: {doc: "apireference/security/kms/apis/kmssetprivateacl/1.4 (fetched live 2026-07-15)"}
+    notes: "MODELED ONLY. PrivateAclResourceId 형식 [{resource_id:'vs-...'}] (doc 예시 — VM 등 리소스 id). secretsmanager setprivateacl 선례와 동형. 응답 전체 키 envelope. 가역 setter — DELETE 없음. 후속 요건: ①실 키에 false→true→false 왕복 라이브 ②빈 resources+enabled:true의 시맨틱 확인 ③enabled:true 상태에서 크립토 op(encrypt) 접근성 영향 확인(잠금 리스크라 1회용 키로)."

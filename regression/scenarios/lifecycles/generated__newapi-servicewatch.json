@@ -1,0 +1,192 @@
+{
+  "lifecycles": [
+    {
+      "id": "gen-newapi-servicewatch-alerts",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "heavy": false,
+      "_note": "NEW API wave 2026-07-15 (SPEC-DIFF-20260715 §3): 5 of the 6 new servicewatch 1.4 endpoints — listalerts / listnamespacebyalerts / showalertlevelcountsbyservice (bare-account reads, all 200 live 2026-07-15) + listalertnotifications / setalertnotifications (alert-bound: a free alert is created for the ids). LIVE RESULTS 2026-07-15: listalerts 200, listnamespacebyalerts 200, showalertlevelcountsbyservice 200 (returns per-namespace HIGH/MIDDLE/LOW counts for ALL namespaces even with zero alerts), createalert 201, listalertnotifications 200 (empty list), setalertnotifications 400/500 (see step note — cannot reach 2xx in this account: recipients must be IAM users and the account has ZERO IAM users, listiamuser count:0), deletebulkalerts 200, show-after-delete 404. BREAKING BEHAVIOR CHANGE vs servicewatch 1.3 (affects the OLDER servicewatch-alert lifecycle, NOT modified here — hand-off): createalert now REJECTS a body without a dimension — 400 ValidationError 'At least one dimension must be set.' even though AlertCreateRequest marks dimension/dimensions optional (docs-vs-runtime mismatch, conformance candidate). Fix = send dimension {key,value} copied verbatim from the metric catalog entry: POST /v1/metrics -> namespaces[].dimensions[].metrics[].dimensions[0] carries a REAL {key:resource_id,value:<uuid>} pair per metric-emitting resource.",
+      "steps": [
+        {
+          "name": "list-alerts",
+          "method": "GET",
+          "path": "/v1/alerts",
+          "group": "alert-reads",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200],
+          "_note": "listalerts (NEW 1.4): unconditional 200, {alerts:[],count:0,page,size,sort} on a bare account. 12 optional query filters (name/activated_yn/states/levels/namespace_ids/...)."
+        },
+        {
+          "name": "list-namespaces-by-alerts",
+          "method": "GET",
+          "path": "/v1/alerts/namespaces",
+          "group": "alert-reads",
+          "expect_status": [200],
+          "_note": "listnamespacebyalerts (NEW 1.4): 200 live, {count:0,namespaces:[]} with zero alerts. No query params."
+        },
+        {
+          "name": "show-alert-level-counts",
+          "method": "GET",
+          "path": "/v1/alerts/level-counts-by-service",
+          "group": "alert-reads",
+          "expect_status": [200],
+          "_note": "showalertlevelcountsbyservice (NEW 1.4): 200 live. Returns level_counts[] for EVERY known namespace (apigateway, archivestorage, ...) with zeroed HIGH/MIDDLE/LOW even when the account has no alerts."
+        },
+        {
+          "name": "list-metric-catalog",
+          "method": "POST",
+          "path": "/v1/metrics",
+          "group": "alert-notif",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {
+            "swn_namespace_id": "$.namespaces[0].id",
+            "swn_metric_id": "$.namespaces[0].dimensions[0].metrics[0].id",
+            "swn_dim_key": "$.namespaces[0].dimensions[0].metrics[0].dimensions[0].key",
+            "swn_dim_value": "$.namespaces[0].dimensions[0].metrics[0].dimensions[0].value"
+          },
+          "_note": "listmetricinfos POST-as-read (constraint metric-posts-are-queries). NEW vs the older servicewatch-alert lifecycle: ALSO soft-captures the metric's real dimension {key,value} pair (metrics[].dimensions[0]) because createalert 1.4 requires >=1 dimension at runtime. Requires at least one metric-emitting resource in the account (live 2026-07-15: 9 namespaces present)."
+        },
+        {
+          "name": "create-alert",
+          "method": "POST",
+          "path": "/v1/alerts",
+          "group": "alert-notif",
+          "optional": true,
+          "json": {
+            "description": "regr newapi alert {unique}",
+            "dimension": {"key": "{swn_dim_key}", "value": "{swn_dim_value}"},
+            "evaluation_count": 3,
+            "level": "HIGH",
+            "lower_bound": 80.0,
+            "metric_id": "{swn_metric_id}",
+            "missing_data_option": "BREACHING",
+            "name": "regrnewapi{unique}",
+            "namespace_id": "{swn_namespace_id}",
+            "operator": "RANGE",
+            "period": 300,
+            "recipient_ids": [],
+            "statistic": "AVG",
+            "tags": [],
+            "upper_bound": 90.0,
+            "violation_count": 2
+          },
+          "expect_status": [200, 201, 400, 403, 404, 409, 422],
+          "capture_soft": {"swn_alert_id": "$.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/alerts",
+            "service": "servicewatch",
+            "json": {"ids": ["{swn_alert_id}"]}
+          },
+          "_note": "createalert with the runtime-required dimension: 201 live 2026-07-15 (flat response {id,created_at,created_by}). WITHOUT dimension: 400 'At least one dimension must be set.' — docs mark it optional (conformance candidate)."
+        },
+        {
+          "name": "list-alert-notifications",
+          "method": "GET",
+          "path": "/v1/alerts/{swn_alert_id}/notifications",
+          "group": "alert-notif",
+          "optional": true,
+          "expect_status": [200, 403, 404],
+          "_note": "listalertnotifications (NEW 1.4): 200 live on a fresh alert — {alert_notifications:[],count:0,page,size,sort}. Optional filters size/page/sort/user_name."
+        },
+        {
+          "name": "set-alert-notifications",
+          "method": "PUT",
+          "path": "/v1/alerts/{swn_alert_id}/notifications",
+          "group": "alert-notif-set",
+          "optional": true,
+          "json": {"user_ids": ["1234da92-634a-4f8c-932e-9d650599ab1b"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 422],
+          "_note": "setalertnotifications (NEW 1.4) — 2xx UNREACHABLE in this account (live 2026-07-15): recipients must be IAM users (400 ValidationError, detail in the request_id field(!): 'Only IAM users can be added as alert recipients.') and listiamuser returns count:0 for this account. Sent with the doc-sample uuid -> deterministic 400 records write coverage. DO NOT send user_ids:[] — empty array is a live-observed 500 ContactAdminForAssistance (backend bug candidate for the conformance axis / known_issues baseline). Promote to a real 2xx once an IAM user exists (then also verify list shows the recipient). Separate group so its 4xx never skips teardown."
+        },
+        {
+          "name": "delete-alerts",
+          "method": "DELETE",
+          "path": "/v1/alerts",
+          "group": "alert-notif",
+          "optional": true,
+          "destructive": true,
+          "json": {"ids": ["{swn_alert_id}"]},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "_note": "deletebulkalerts: 200 live {ids:[...]}. Post-delete GET /v1/alerts/{id} 404 ResourceNotFound (verified — no lingering alert)."
+        }
+      ]
+    },
+    {
+      "id": "gen-newapi-servicewatch-logexport",
+      "service": "management/servicewatch",
+      "enabled": false,
+      "_status": "done-modeled",
+      "heavy": false,
+      "_note": "NEW API wave 2026-07-15 (SPEC-DIFF-20260715 §3): createloggroupexporttask (POST /v1/log-groups/export-tasks, NEW 1.4) — MODELED ONLY (provenance: docs), NOT live-validated. Blocker: LogGroupExportTaskCreateRequest requires a REAL Object Storage bucket_name (all 5 fields REQUIRED: bucket_name, log_group_id, log_stream_ids[], start_at, end_at) and this session's scope forbids creating OBS buckets; the account also has zero log groups (GET /v1/log-groups count:0 live 2026-07-15). The log-group + log-stream prereqs ARE self-serve free (see servicewatch-log-group lifecycle, VALIDATED) — only the bucket gates this. ENABLE PATH: create/borrow an OBS bucket, set bucket_name to it (replace the regrexport{unique} placeholder), flip enabled:true, run, record the response envelope $.log_group_export.{id,state,...} (per doc response_example). Response likely async (completed_at field). Export task delete endpoint NOT present in the 1.4 catalog — task rows appear immutable history (no teardown step needed for the task itself).",
+      "steps": [
+        {
+          "name": "create-log-group",
+          "method": "POST",
+          "path": "/v1/log-groups",
+          "group": "logexport",
+          "optional": true,
+          "json": {"name": "regrlgx{unique}", "retention_period": 365, "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"lgx_group_id": "$.log_group.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/log-groups",
+            "service": "servicewatch",
+            "json": {"ids": ["{lgx_group_id}"]}
+          },
+          "_note": "Same recipe as the VALIDATED servicewatch-log-group lifecycle — free."
+        },
+        {
+          "name": "create-log-stream",
+          "method": "POST",
+          "path": "/v1/log-groups/{lgx_group_id}/log-streams",
+          "group": "logexport",
+          "optional": true,
+          "json": {"name": "regrlsx{unique}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"lgx_stream_id": "$.log_stream.id"}
+        },
+        {
+          "name": "create-log-group-export-task",
+          "method": "POST",
+          "path": "/v1/log-groups/export-tasks",
+          "group": "logexport",
+          "optional": true,
+          "json": {
+            "bucket_name": "regrexport{unique}",
+            "end_at": "{iso_today}",
+            "log_group_id": "{lgx_group_id}",
+            "log_stream_ids": ["{lgx_stream_id}"],
+            "start_at": "{iso_29d_ago}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"lgx_task_id": "$.log_group_export.id"},
+          "_note": "createloggroupexporttask (NEW 1.4): all 5 body fields REQUIRED per LogGroupExportTaskCreateRequest. bucket_name here is a PLACEHOLDER — a nonexistent bucket will 4xx; substitute a real OBS bucket to reach 2xx (see lifecycle _note enable path)."
+        },
+        {
+          "name": "delete-log-streams",
+          "method": "DELETE",
+          "path": "/v1/log-groups/{lgx_group_id}/log-streams",
+          "group": "logexport",
+          "optional": true,
+          "destructive": true,
+          "json": {"ids": ["{lgx_stream_id}"]},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-log-group",
+          "method": "DELETE",
+          "path": "/v1/log-groups",
+          "group": "logexport",
+          "optional": true,
+          "destructive": true,
+          "json": {"ids": ["{lgx_group_id}"]},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    }
+  ]
+}

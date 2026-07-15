@@ -20,6 +20,46 @@ resources:
     source: {lifecycle: networking-security-group, steps: [create-sg, delete-sg]}
     notes: "account/region 스코프 — VPC 불필요 (cross-service와 일치)"
 
+  # NEW API wave 2026-07-15 (SPEC-DIFF-20260715 §2⑥) — Address Group: named,
+  # reusable CIDR list. FREE logical resource, account/region-scoped, NO VPC/SG
+  # prerequisite (confirmed live in a bare state). Full CRUD + add/remove/list
+  # addresses VALIDATED LIVE 2026-07-15 (create 201, reads 200, set 200,
+  # add/remove 200, delete 204, post-delete GET 404 AddressGroupNotFound).
+  address-group:
+    code: "nw-sg-addressgroup"
+    service: networking/security-group
+    requires: []
+    create:
+      endpoint: "POST /v1/address-groups"
+      body: {name: "regrag{unique}", description: "API regression suite",
+             addresses: ["10.199.1.0/24", "10.199.2.0/24"], tags: []}
+    capture: {address_group_id: "$.address_group.id"}
+    verify:
+      - {name: list, endpoint: "GET /v1/address-groups", expect_status: [200]}
+      - {name: read, endpoint: "GET /v1/address-groups/{address_group_id}",
+         expect_status: [200]}
+      - {name: set,
+         endpoint: "PUT /v1/address-groups/{address_group_id}",
+         json: {description: "API regression suite (updated)"},
+         expect_status: [200]}
+      - {name: add-addresses,
+         endpoint: "PUT /v1/address-groups/{address_group_id}/add_addresses",
+         json: {addresses: ["10.199.3.0/24"]},
+         expect_status: [200]}
+      - {name: list-addresses,
+         endpoint: "GET /v1/address-groups/{address_group_id}/addresses",
+         expect_status: [200]}
+      - {name: remove-addresses,
+         endpoint: "PUT /v1/address-groups/{address_group_id}/remove_addresses",
+         json: {addresses: ["10.199.3.0/24"]},
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/address-groups/{address_group_id}",
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: gen-newapi-addressgroup,
+             steps: [create-address-group, delete-address-group]}
+    notes: "security-group 1.1 신규 8종 (2026-07-15 라이브 전수 2xx). AddressGroupCreateRequest {name REQ(유일 필수), addresses/description/tags opt} — tags 라이브 수용(owner-tag 주입 가능). 응답 envelope: create/show=$.address_group.{id,state:ACTIVE,address_count,address_limit,...}, list=$.address_groups[]+count, add/remove/list-addresses=flat {addresses:[...]}. set(PUT)은 description만 받고 200+빈바디 {} — 캡처 금지. add/remove 둘 다 AddressGroupCidrsAddRequest {addresses REQ} 공유. QUIRK(conformance 후보): create 응답 address_limit:5 vs 직후 list/show 동일 그룹 address_limit:1000 — envelope 간 한도 보고 불일치. 소비처: createsecuritygrouprule 신규 opt 필드 remote_address_group_id가 이 id를 참조(rule 결합 시 delete 409/422 가능성 미검증 — rule 미결합 상태 delete는 204 확인)."
+
   security-group-rule:
     code: "nw-sg-rule"
     service: networking/security-group

@@ -505,6 +505,114 @@ resources:
     source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [add-secondary]}
     notes: "ESCALATE — SqlserverAddSecondaryRequest {license REQ string, name REQ ^[a-z][a-z0-9\\-]*[a-z0-9]$ 3-15, service_ip_address opt}. userguide 확정 (2026-06-14, secondary how_to): Secondary는 '이중화 구성(HA) 및 Enterprise Edition으로 생성되어야 하며, 백업 기능이 활성화' 되어야 하고 '하나의 클러스터당 1개만 구성 가능'. 즉 선행: ① Enterprise engine-version id(ss-engine-version override) ② ha_enabled:true 클러스터 ③ 백업 활성 ④ 유효 라이선스 key. name 패턴 ^[a-z]…[a-z0-9]$ 3-15는 relational replica(3-20)와 다름 (regrsec{ualpha} 충족). service_ip_address는 user subnet IP(opt) — 빈 문자열=auto. 라이선스 발급 절차가 문서에 없어 우선 credential 게이트로 차단; 합성은 라이선스 확보 시까지 보류."
 
+  # ==== NEW API wave 2026-07-15 (SPEC-DIFF-20260715 §2⑦) — DR Secondary ====
+  # sqlserver 1.1 신규 5종: adddrsecondary / listdrsecondaries /
+  # promotedrsecondary / syncdrsecondarystate (+ manualbackup, 아래 별도 노드).
+  # 재해복구(DR) 세컨더리 = ss-add-secondary(Always On 동일-리전 HA)와 별개의
+  # CROSS-REGION 복제본. 전부 heavy-클러스터 종속이라 MODELED ONLY (라이브 금지
+  # 지시, 2026-07-15) — 문서 페이지 + 바디 모델 라이브 fetch 근거.
+  ss-dr-secondary:
+    code: "db-sqlserver-dr-secondary"
+    service: database/sqlserver
+    heavy: true
+    requires:
+      - sqlserver-cluster
+      - {credential: sqlserver-license,
+         note: "SqlserverDrSecondaryCreateRequest.license REQUIRED — ss-add-secondary와 동일한 SQL Server License Key 자격 게이트 (ESCALATE 선례 공유)"}
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/dr-secondaries"
+      body:
+        ad_user_id: "regraduser"
+        ad_user_password: "{opt.ad_user_password}"
+        license: "{opt.license}"
+        name: "regrdrsec"
+        region: "{opt.dr_region}"
+        service_ip_address: ""
+        subnet_id: "{opt.dr_subnet_id}"
+      options:
+        license: {type: string, required: true,
+                  note: "SQL Server License Key — 기본값 없음(credential 게이트, ss-add-secondary와 동일)"}
+        ad_user_password: {type: string, required: true,
+                           note: "AD User Password 8-30 — 자격값이라 모델에 리터럴 금지, 합성 시 주입"}
+        dr_region: {type: string, required: true,
+                    note: "DR 대상 리전 문자열 (예: kr-east1) — cross-region 복제 대상. region REQ (모델 필드)"}
+        dr_subnet_id: {type: string, required: true,
+                       note: "DR 리전 쪽 subnet id REQUIRED — 'GET /vpc/v1/subnets로 조회' (doc). 현재 shared_subnet_id는 주 리전이라 부적합 — DR 리전 subnet 선행 필요"}
+    capture: {dr_secondary_id: "$.resource.id"}
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    verify:
+      # listdrsecondaries — DrSecondaryListResponse $.contents[] {name, region_nm,
+      # state, state_detail, check_time} + count (doc response_example).
+      - {name: list-dr-secondaries,
+         endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}/dr-secondaries",
+         expect_status: [200]}
+    provenance: docs
+    gated: license
+    source: {doc: "apireference/database/sqlserver/apis/sqlserveradddrsecondary/1.1 (fetched live 2026-07-15)"}
+    notes: "MODELED ONLY — 라이브 0회. SqlserverDrSecondaryCreateRequest {ad_user_id REQ ^[a-zA-Z0-9.\\-]+$ 3-20, ad_user_password REQ 8-30, license REQ, name REQ 3-15, region REQ, subnet_id REQ, service_ip_address opt}. ad_* 필드가 있는 것으로 보아 Always On AD 도메인 조인 전제 → HA(Enterprise+Secondary) 클러스터 선행 추정(미확증). 응답 AsyncResponse {request_id, resource:{id}} — $.resource.id가 DR secondary id인지 신규 클러스터 id인지 미확증(doc 예시는 id만). DELETE 엔드포인트 없음 — 회수 경로 미문서: promote 후 독립 클러스터화(추정) 또는 부모 cluster delete. NO-TEARDOWN-BY-DESIGN 헤더 규약 적용. 후속 요건: ①유효 라이선스 ②HA Enterprise 클러스터 ③DR 리전 subnet ④promote/list의 실제 envelope 라이브 확인."
+
+  # promote — DR 세컨더리를 primary로 승격. path param은 (문서 기준) '주 클러스터'
+  # id로 보이나 세컨더리 클러스터 id일 가능성도 있음(미확증 — 라이브 정제).
+  ss-promote-dr-secondary:
+    code: "db-sqlserver-promote-dr-secondary"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster, ss-dr-secondary]
+    create:
+      endpoint: "PUT /v1/clusters/{sqlserver-cluster.cluster_id}/dr-secondaries/promote"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    provenance: docs
+    gated: license
+    source: {doc: "apireference/database/sqlserver/apis/sqlserverpromotedrsecondary/1.1 (fetched live 2026-07-15)"}
+    notes: "MODELED ONLY. body 없음 (path param cluster_id만, doc params=1). 응답 AsyncResponse. IRREVERSIBLE 추정(승격 후 원복 엔드포인트 없음) — 1회용 DR 페어 전용, 합성 순서는 sync-state → promote 마지막. 액션 sub-op — DELETE 없음."
+
+  ss-sync-dr-secondary-state:
+    code: "db-sqlserver-sync-dr-secondary-state"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster, ss-dr-secondary]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/dr-secondaries/sync-state"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 900, interval: 30}
+    provenance: docs
+    gated: license
+    source: {doc: "apireference/database/sqlserver/apis/sqlserversyncdrsecondarystate/1.1 (fetched live 2026-07-15)"}
+    notes: "MODELED ONLY. body 없음. ss-sync-state(클러스터 상태 동기화)의 DR 변형 — listdrsecondaries의 state/state_detail/check_time 갱신용으로 추정. 안전한(읽기성) 액션이라 DR 페어 확보 시 첫 검증 후보. 액션 sub-op — DELETE 없음."
+
+  # ==== NEW API wave 2026-07-15 (SPEC-DIFF-20260715 §2⑧) — manual backup ====
+  # {engine}manualbackup 공통 패턴의 sqlserver 인스턴스. 즉시 실행 수동 백업
+  # (기존 ss-set-backup은 백업 '정책' 설정 — 별개). 타 엔진 공통 설계는
+  # docs/working/NEWAPI-DBAAS-INSTANCE-OPS.md 참고.
+  ss-manual-backup:
+    code: "db-sqlserver-manual-backup"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/backups/manual"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    gated: license
+    source: {doc: "apireference/database/sqlserver/apis/sqlservermanualbackup/1.1 (fetched live 2026-07-15)"}
+    notes: "MODELED ONLY. body 없음 (doc params=1, path만) — 6개 엔진 공통 (epas/mariadb/mysql/postgresql/searchengine/sqlserver, §2⑧). 응답 AsyncResponse {request_id, resource:{id}} — resource.id는 백업 이력 id 추정. 백업 정책(ss-set-backup) 선행 필요 여부 미문서 — 미설정 클러스터에서 4xx 가능(라이브 정제). 백업 이력은 remove-backup-histories(PUT .../backup-histories)로 정리 — 즉시 실행이라 과금 스토리지 잔존 주의. 액션 sub-op — DELETE 없음."
+
   # ---- databases (add/del) — Enterprise only, ≤100/cluster. add/del 모두
   # ---- optional array → 빈 목록 no-op 검증 가능 (라이선스 불요). ----------
   ss-databases:
