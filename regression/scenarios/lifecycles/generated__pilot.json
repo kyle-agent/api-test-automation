@@ -485,7 +485,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 24,
+          "retry_interval": 15
         }
       ]
     }

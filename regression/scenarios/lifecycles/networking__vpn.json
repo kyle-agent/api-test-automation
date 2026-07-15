@@ -289,7 +289,7 @@
           "path": "/v1/publicips/{publicip_id}",
           "expect_status": [200, 202, 204, 409, 404],
           "destructive": true,
-          "retry_on_status": [409],
+          "retry_on_status": [400, 409],
           "retries": 20,
           "retry_interval": 20
         },

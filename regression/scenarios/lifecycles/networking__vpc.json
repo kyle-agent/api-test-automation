@@ -2808,9 +2808,7 @@
             409
           ],
           "destructive": true,
-          "retry_on_status": [
-            409
-          ],
+          "retry_on_status": [400, 409],
           "retries": 4,
           "retry_interval": 15,
           "_note": "Closes deletepublicip (DELETE /v1/publicips/{publicip_id})."

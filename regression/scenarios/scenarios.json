@@ -1974,7 +1974,10 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [400, 409],
+          "retries": 24,
+          "retry_interval": 15
         },
         {
           "name": "wait-gone",
@@ -2946,6 +2949,15 @@
           "optional": true,
           "group": "ske-upgrade",
           "_note": "Node roll after control-plane upgrade (ct-ske-nodepool-upgrade model: 2400/30)."
+        },
+        {
+          "name": "wait-cluster-before-scale-up",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.cluster.status", "until": ["RUNNING", "ACTIVE", "Running"], "timeout": 900, "interval": 20},
+          "_note": "2026-07-15 run-f5a9: upgrade-nodepool 후 nodepool은 Running인데 cluster가 UPDATING이면 scale-up이 400 status-invalid — 노드풀 폴만으로는 부족, 클러스터 게이트 필요."
         },
         {
           "name": "scale-up-nodepool",
@@ -9628,6 +9640,7 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 8,

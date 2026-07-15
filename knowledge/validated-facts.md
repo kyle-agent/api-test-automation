@@ -3121,3 +3121,13 @@ block-storages가 전부 B). makespan 40.0분의 결정자 = mariadb-b 35.2분.
 max(A,B) ≈ 25.8~27.1분 → DB가 SKE(~35분) 아래로 → makespan 바닥 = SKE.
 B 잔류: patch·upgrade-kernel·resize-ig·add/resize-block-storages(+capture-server-type).
 합집합 불변 재검증 통과.
+
+## 최소 사이즈 첫 실측 (run-f5a9) — 시간 불변, 1vCPU도 유효 + 후속 수리 2종 (2026-07-15)
+
+**타이밍 판정(오너 질문 "느려지지 않았는지")**: 2vCPU(db2v2m4)로 줄여도 **생성/수정/삭제 시간 변화 없음** — create mysql 9:41~9:45(기준 9:24)/pg 9:11(8:54), resize 4:36~6:24(동일), upgrade-kernel 3:33~4:37(동일), delete 2:53~3:57(동일). DBaaS 오케스트레이션 시간이 지배하고 인스턴스 크기는 무관 → **작게 = 같은 속도 + 비용 절감**이 결론.
+
+**타입 실증**: 무필터 min_by 동률에서 Standard-2가 선착(db2v2m4·db2v1m2·css1v1m2) — **mariadb 1vCPU(db2v1m2)·cachestore 1vCPU(css1v1m2)도 프로비저닝 성공**(1vCPU general 유효성 실증). purpose 필터 적용 후엔 Standard-1(db1v*)로 고정된다. ES만 zookeeper 타입(ess1v1m2) 400 — 필터로 기수리.
+
+**run-f5a9 수리 검증**: gen-heavy-lb-members delete-public-ip **통과**(400 retry 유효). 동일 클래스 잔존 5곳(vpn-gateway-tunnel<-이번 런 실패, vpc-publicip, networking-vpc-publicip, heavy-shared publicip-delete, pilot) 전부 [400,409]로 정렬 — publicip DELETE는 detach 전파 지연으로 ATTACHED 400이 구조적, **모든 publicip delete에 400 retry가 규약**.
+
+**ske scale-up 400 (신규)**: upgrade-nodepool 후 **nodepool은 Running인데 cluster는 UPDATING** — 노드풀 폴만으로 게이트 불충분. scale-up-nodepool 앞에 wait-cluster-before-scale-up($.cluster.status Running, 900s) 삽입. 클러스터-자원 이중 상태는 각각 게이트해야 함.
