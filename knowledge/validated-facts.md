@@ -3107,3 +3107,17 @@ queueservice가 원형)이 404만 gone 확정으로 봐서, 이미 지워진 api
 ## ES 전용 subnet 실험 (2026-07-15, 오너 승인)
 
 콘솔 성공(ess1v2m4·combined 3노드·Running) vs API 실패(동일 조합인데 202 후 provision FAILED, run-9c64)의 잔여 격차 후보 = **네트워크 배치**: 콘솔은 전용 VPC/subnet(regrvpcd6d5f60l), API는 공유 VPC의 공유 db-subnet(10.124.7.0/24). 실험: eventstreams-cluster-subops-full의 subnet adopt 해제 → 공유 VPC 내 전용 /24 **10.124.12.0/24** 자체 생성/삭제(waits 600/900s, teardown 스텝 기존재). VPC는 공유 유지. 공유 VPC(10.124.0.0/20) /24 사용 맵: 0=공유, 7=db, 8·9·10=타 lifecycle — 신규는 1~6·11~15에서 고를 것.
+
+## DBaaS A/B 분할 실측 + 시간-균형 재배분 (2026-07-15, run-f5a9)
+
+**A/B 분할 1차 실측(run-f5a9, 테스트 40.0분)**: 생성wait 8.1~11.7분 = 과거 3런과
+동일(생성 지연 아님). 분할은 전 엔진 개선(−2.7~−8.5분)했지만 **ops 배분 비대칭**
+이 이득을 깎음 — mariadb A ops 4.3분 vs B ops 22.5분 (stop/start·upgrade·resize·
+block-storages가 전부 B). makespan 40.0분의 결정자 = mariadb-b 35.2분.
+
+**재배분**: restart·stop/start·sync-cluster-state·switchover(+waits)를 B→A 이동
+(mysql/epas/mariadb/postgresql — **cachestore는 이미 6.1/6.1 균형이라 제외**;
+일괄 이동 시 역비대칭 10.6/1.6으로 악화 검산). 실측 기반 기대: 전 엔진
+max(A,B) ≈ 25.8~27.1분 → DB가 SKE(~35분) 아래로 → makespan 바닥 = SKE.
+B 잔류: patch·upgrade-kernel·resize-ig·add/resize-block-storages(+capture-server-type).
+합집합 불변 재검증 통과.

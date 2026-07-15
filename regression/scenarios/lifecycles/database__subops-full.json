@@ -1329,7 +1329,7 @@
       "service": "database/mysql",
       "enabled": true,
       "heavy": true,
-      "_note": "2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': mysql-cluster-subops-full의 config/백업/아카이브/로그export 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of mysql-cluster-subops-guarded: provisions a dedicated mysql cluster (create bodies/wait/teardown copied VERBATIM from the live-proven database-mysql-cluster (run gha-chatheavy-28595785223, 2026-07-02)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
+      "_note": "2026-07-15 시간-균형 재배분(run-f5a9 실측): B ops가 A의 2.5~5배 비대칭(mariadb 22.5m vs 4.3m)이라 restart·stop/start·sync-state·switchover를 B→A 이동 → max(A,B) ≈ 27분 기대. cachestore는 이미 균형이라 제외. 2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': mysql-cluster-subops-full의 config/백업/아카이브/로그export 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of mysql-cluster-subops-guarded: provisions a dedicated mysql cluster (create bodies/wait/teardown copied VERBATIM from the live-proven database-mysql-cluster (run gha-chatheavy-28595785223, 2026-07-02)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
       "steps": [
         {
           "name": "create-vpc",
@@ -2165,6 +2165,112 @@
           "group": "backup-hist"
         },
         {
+          "name": "switchover-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/switchover",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "wait-after-switchover-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "ha"
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "ha"
+        },
+        {
           "name": "pre-delete-sync-state",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
@@ -2327,7 +2433,7 @@
       "service": "database/mysql",
       "enabled": true,
       "heavy": true,
-      "_note": "2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': mysql-cluster-subops-full의 상태전이/헤비(restart·stop/start·upgrade·resize) 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of mysql-cluster-subops-guarded: provisions a dedicated mysql cluster (create bodies/wait/teardown copied VERBATIM from the live-proven database-mysql-cluster (run gha-chatheavy-28595785223, 2026-07-02)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
+      "_note": "2026-07-15 시간-균형 재배분(run-f5a9 실측): B ops가 A의 2.5~5배 비대칭(mariadb 22.5m vs 4.3m)이라 restart·stop/start·sync-state·switchover를 B→A 이동 → max(A,B) ≈ 27분 기대. cachestore는 이미 균형이라 제외. 2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': mysql-cluster-subops-full의 상태전이/헤비(restart·stop/start·upgrade·resize) 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of mysql-cluster-subops-guarded: provisions a dedicated mysql cluster (create bodies/wait/teardown copied VERBATIM from the live-proven database-mysql-cluster (run gha-chatheavy-28595785223, 2026-07-02)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
       "steps": [
         {
           "name": "create-vpc",
@@ -2620,112 +2726,6 @@
             "param_id": "$.contents[0].id",
             "param_old_value": "$.contents[0].applied_value"
           }
-        },
-        {
-          "name": "switchover-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/switchover",
-          "json": {},
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "ha"
-        },
-        {
-          "name": "wait-after-switchover-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "ha"
-        },
-        {
-          "name": "sync-cluster-state",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/sync-state",
-          "json": {},
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "ha"
-        },
-        {
-          "name": "wait-after-sync-cluster-state",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "ha"
         },
         {
           "name": "patch-minor-version",
@@ -5089,7 +5089,7 @@
       "service": "database/epas",
       "enabled": true,
       "heavy": true,
-      "_note": "2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': epas-cluster-subops-full의 config/백업/아카이브/로그export 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of epas-cluster-subops-guarded: provisions a dedicated epas cluster (create bodies/wait/teardown copied VERBATIM from the live-proven heavy-shared-dbaas (full-heavy 2026-06-20)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
+      "_note": "2026-07-15 시간-균형 재배분(run-f5a9 실측): B ops가 A의 2.5~5배 비대칭(mariadb 22.5m vs 4.3m)이라 restart·stop/start·sync-state·switchover를 B→A 이동 → max(A,B) ≈ 27분 기대. cachestore는 이미 균형이라 제외. 2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': epas-cluster-subops-full의 config/백업/아카이브/로그export 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of epas-cluster-subops-guarded: provisions a dedicated epas cluster (create bodies/wait/teardown copied VERBATIM from the live-proven heavy-shared-dbaas (full-heavy 2026-06-20)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
       "steps": [
         {
           "name": "create-vpc",
@@ -6404,6 +6404,215 @@
           "group": "sg-rules"
         },
         {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-restart-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "stop-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-stop-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "start-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-start-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
           "name": "pre-delete-sync-state",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
@@ -6572,7 +6781,7 @@
       "service": "database/epas",
       "enabled": true,
       "heavy": true,
-      "_note": "2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': epas-cluster-subops-full의 상태전이/헤비(restart·stop/start·upgrade·resize) 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of epas-cluster-subops-guarded: provisions a dedicated epas cluster (create bodies/wait/teardown copied VERBATIM from the live-proven heavy-shared-dbaas (full-heavy 2026-06-20)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
+      "_note": "2026-07-15 시간-균형 재배분(run-f5a9 실측): B ops가 A의 2.5~5배 비대칭(mariadb 22.5m vs 4.3m)이라 restart·stop/start·sync-state·switchover를 B→A 이동 → max(A,B) ≈ 27분 기대. cachestore는 이미 균형이라 제외. 2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': epas-cluster-subops-full의 상태전이/헤비(restart·stop/start·upgrade·resize) 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of epas-cluster-subops-guarded: provisions a dedicated epas cluster (create bodies/wait/teardown copied VERBATIM from the live-proven heavy-shared-dbaas (full-heavy 2026-06-20)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
       "steps": [
         {
           "name": "create-vpc",
@@ -6904,215 +7113,6 @@
             }
           },
           "_note": "repointed to $.contents[1].name 2026-07-04 (HB1 repair, mariadb-analogous fix): this step previously re-captured index[0] — the SAME server type epas-create already used for the instance group, so resize-instance-group's same-type request is expected to hard-fail (see mariadb's identical note; same InstanceGroupResizeRequest DTO). index[1] gives a genuinely different target type. UNVERIFIED LIVE — apply + observe in HB1b/HB2b."
-        },
-        {
-          "name": "restart-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/restart",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-restart-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "stop-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/stop",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-stop-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "STOPPED",
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "start-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/start",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-start-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "sync-cluster-state",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/sync-state",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-sync-cluster-state",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
         },
         {
           "name": "patch-minor-version",
@@ -9450,7 +9450,7 @@
       "service": "database/mariadb",
       "enabled": true,
       "heavy": true,
-      "_note": "2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': mariadb-cluster-subops-full의 config/백업/아카이브/로그export 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of mariadb-cluster-subops-guarded: provisions a dedicated mariadb cluster (create bodies/wait/teardown copied VERBATIM from the live-proven heavy-shared-dbaas (full-heavy 2026-06-20)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
+      "_note": "2026-07-15 시간-균형 재배분(run-f5a9 실측): B ops가 A의 2.5~5배 비대칭(mariadb 22.5m vs 4.3m)이라 restart·stop/start·sync-state·switchover를 B→A 이동 → max(A,B) ≈ 27분 기대. cachestore는 이미 균형이라 제외. 2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': mariadb-cluster-subops-full의 config/백업/아카이브/로그export 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of mariadb-cluster-subops-guarded: provisions a dedicated mariadb cluster (create bodies/wait/teardown copied VERBATIM from the live-proven heavy-shared-dbaas (full-heavy 2026-06-20)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
       "steps": [
         {
           "name": "create-vpc",
@@ -10718,6 +10718,215 @@
           "group": "sg-rules"
         },
         {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-restart-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "stop-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-stop-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "start-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-start-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
           "name": "pre-delete-sync-state",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
@@ -10886,7 +11095,7 @@
       "service": "database/mariadb",
       "enabled": true,
       "heavy": true,
-      "_note": "2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': mariadb-cluster-subops-full의 상태전이/헤비(restart·stop/start·upgrade·resize) 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of mariadb-cluster-subops-guarded: provisions a dedicated mariadb cluster (create bodies/wait/teardown copied VERBATIM from the live-proven heavy-shared-dbaas (full-heavy 2026-06-20)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
+      "_note": "2026-07-15 시간-균형 재배분(run-f5a9 실측): B ops가 A의 2.5~5배 비대칭(mariadb 22.5m vs 4.3m)이라 restart·stop/start·sync-state·switchover를 B→A 이동 → max(A,B) ≈ 27분 기대. cachestore는 이미 균형이라 제외. 2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': mariadb-cluster-subops-full의 상태전이/헤비(restart·stop/start·upgrade·resize) 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of mariadb-cluster-subops-guarded: provisions a dedicated mariadb cluster (create bodies/wait/teardown copied VERBATIM from the live-proven heavy-shared-dbaas (full-heavy 2026-06-20)), runs the guarded sub-op steps against it, then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (a live-cluster window) — dispatched alone it records reachability 4xx/5xx, never the real 2xx needed for promotion (observed run 28595785223). heavy:true + billable: ~40min cluster. Guarded variant kept unchanged for window-style runs. The replica/restore groups are EXCLUDED here — against a live cluster those creates can succeed with no capture/cleanup (untracked billable clusters); they belong to gen-heavy-*-replica/-restore.",
       "steps": [
         {
           "name": "create-vpc",
@@ -11196,215 +11405,6 @@
           "optional": true,
           "group": "param-read",
           "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — mysql/epas/postgresql cover this path via their capture-param-id step but mariadb never had one (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
-        },
-        {
-          "name": "restart-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/restart",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-restart-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "stop-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/stop",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-stop-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "STOPPED",
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "start-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/start",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-start-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "sync-cluster-state",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/sync-state",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-sync-cluster-state",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
         },
         {
           "name": "patch-minor-version",
@@ -17317,7 +17317,7 @@
       "service": "database/postgresql",
       "enabled": true,
       "heavy": true,
-      "_note": "2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': postgresql-cluster-subops-full의 config/백업/아카이브/로그export 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of postgresql-cluster-subops-guarded: provisions a dedicated postgresql cluster (create bodies/wait/teardown copied VERBATIM from the live-proven database-postgresql-cluster (scenarios.json; create 2xx in verified_endpoints.json), PG-specific init_config_option: database_encoding/database_locale + boolean audit_enabled), runs the guarded sub-op steps against it with a settle-poll (wait-after-<op>, give_up_status [400,404]) after EVERY mutating sub-op (ExistInprogress pacing, knowledge/validated-facts.md 2026-07-02), then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (window-only; run 28595785223 banked nothing). heavy:true + billable. RISK: pg create is SLOW (~40min observed) and FLAKY — 500 ContactAdminForAssistance 2026-06-19 (known_issues.json) + one failure 2026-06-29 — so dispatch this engine ALONE (do not gate other engines behind it). The replica/restore groups (create-replica, create-other-region-replica, promote-replica, reset-replica, sync-replica-state, create-restore) are EXCLUDED here — leak-unsafe without capture/cleanup; they belong to gen-heavy-pg-replica/-restore. switchover-cluster kept (mysql-full precedent): no resource creation, expected 4xx-reject on a non-HA cluster. Guarded variant kept unchanged for window-style runs.",
+      "_note": "2026-07-15 시간-균형 재배분(run-f5a9 실측): B ops가 A의 2.5~5배 비대칭(mariadb 22.5m vs 4.3m)이라 restart·stop/start·sync-state·switchover를 B→A 이동 → max(A,B) ≈ 27분 기대. cachestore는 이미 균형이라 제외. 2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': postgresql-cluster-subops-full의 config/백업/아카이브/로그export 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of postgresql-cluster-subops-guarded: provisions a dedicated postgresql cluster (create bodies/wait/teardown copied VERBATIM from the live-proven database-postgresql-cluster (scenarios.json; create 2xx in verified_endpoints.json), PG-specific init_config_option: database_encoding/database_locale + boolean audit_enabled), runs the guarded sub-op steps against it with a settle-poll (wait-after-<op>, give_up_status [400,404]) after EVERY mutating sub-op (ExistInprogress pacing, knowledge/validated-facts.md 2026-07-02), then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (window-only; run 28595785223 banked nothing). heavy:true + billable. RISK: pg create is SLOW (~40min observed) and FLAKY — 500 ContactAdminForAssistance 2026-06-19 (known_issues.json) + one failure 2026-06-29 — so dispatch this engine ALONE (do not gate other engines behind it). The replica/restore groups (create-replica, create-other-region-replica, promote-replica, reset-replica, sync-replica-state, create-restore) are EXCLUDED here — leak-unsafe without capture/cleanup; they belong to gen-heavy-pg-replica/-restore. switchover-cluster kept (mysql-full precedent): no resource creation, expected 4xx-reject on a non-HA cluster. Guarded variant kept unchanged for window-style runs.",
       "steps": [
         {
           "name": "create-vpc",
@@ -18604,6 +18604,267 @@
           "group": "sg-rules"
         },
         {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-restart-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "stop-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-stop-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "start-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-start-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "lifecycle"
+        },
+        {
+          "name": "switchover-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/switchover",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "wait-after-switchover-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "ha"
+        },
+        {
           "name": "pre-delete-sync-state",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
@@ -18766,7 +19027,7 @@
       "service": "database/postgresql",
       "enabled": true,
       "heavy": true,
-      "_note": "2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': postgresql-cluster-subops-full의 상태전이/헤비(restart·stop/start·upgrade·resize) 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of postgresql-cluster-subops-guarded: provisions a dedicated postgresql cluster (create bodies/wait/teardown copied VERBATIM from the live-proven database-postgresql-cluster (scenarios.json; create 2xx in verified_endpoints.json), PG-specific init_config_option: database_encoding/database_locale + boolean audit_enabled), runs the guarded sub-op steps against it with a settle-poll (wait-after-<op>, give_up_status [400,404]) after EVERY mutating sub-op (ExistInprogress pacing, knowledge/validated-facts.md 2026-07-02), then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (window-only; run 28595785223 banked nothing). heavy:true + billable. RISK: pg create is SLOW (~40min observed) and FLAKY — 500 ContactAdminForAssistance 2026-06-19 (known_issues.json) + one failure 2026-06-29 — so dispatch this engine ALONE (do not gate other engines behind it). The replica/restore groups (create-replica, create-other-region-replica, promote-replica, reset-replica, sync-replica-state, create-restore) are EXCLUDED here — leak-unsafe without capture/cleanup; they belong to gen-heavy-pg-replica/-restore. switchover-cluster kept (mysql-full precedent): no resource creation, expected 4xx-reject on a non-HA cluster. Guarded variant kept unchanged for window-style runs.",
+      "_note": "2026-07-15 시간-균형 재배분(run-f5a9 실측): B ops가 A의 2.5~5배 비대칭(mariadb 22.5m vs 4.3m)이라 restart·stop/start·sync-state·switchover를 B→A 이동 → max(A,B) ≈ 27분 기대. cachestore는 이미 균형이라 제외. 2026-07-14 오너 'subops 체인을 클러스터 2개로 쪼개': postgresql-cluster-subops-full의 상태전이/헤비(restart·stop/start·upgrade·resize) 절반 — 자기 클러스터에서 해당 계열 sub-op만 수행 후 삭제. A/B 병렬 → 벽시계 ≈ 절반 (클러스터-시간 합산 ≈ +25%). 두 체인 op 합집합 = 원본 전체 (커버리지 불변). SELF-SUFFICIENT depth variant of postgresql-cluster-subops-guarded: provisions a dedicated postgresql cluster (create bodies/wait/teardown copied VERBATIM from the live-proven database-postgresql-cluster (scenarios.json; create 2xx in verified_endpoints.json), PG-specific init_config_option: database_encoding/database_locale + boolean audit_enabled), runs the guarded sub-op steps against it with a settle-poll (wait-after-<op>, give_up_status [400,404]) after EVERY mutating sub-op (ExistInprogress pacing, knowledge/validated-facts.md 2026-07-02), then deletes it. Exists because the guarded variant only soft-captures an EXISTING cluster (window-only; run 28595785223 banked nothing). heavy:true + billable. RISK: pg create is SLOW (~40min observed) and FLAKY — 500 ContactAdminForAssistance 2026-06-19 (known_issues.json) + one failure 2026-06-29 — so dispatch this engine ALONE (do not gate other engines behind it). The replica/restore groups (create-replica, create-other-region-replica, promote-replica, reset-replica, sync-replica-state, create-restore) are EXCLUDED here — leak-unsafe without capture/cleanup; they belong to gen-heavy-pg-replica/-restore. switchover-cluster kept (mysql-full precedent): no resource creation, expected 4xx-reject on a non-HA cluster. Guarded variant kept unchanged for window-style runs.",
       "steps": [
         {
           "name": "create-vpc",
@@ -19074,267 +19335,6 @@
             "param_id": "$.contents[0].id",
             "param_old_value": "$.contents[0].applied_value"
           }
-        },
-        {
-          "name": "restart-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/restart",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-restart-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "stop-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/stop",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-stop-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "STOPPED",
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "start-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/start",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-start-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "sync-cluster-state",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/sync-state",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "lifecycle"
-        },
-        {
-          "name": "wait-after-sync-cluster-state",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "lifecycle"
-        },
-        {
-          "name": "switchover-cluster",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/switchover",
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "ha"
-        },
-        {
-          "name": "wait-after-switchover-cluster",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 900,
-            "interval": 20,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          },
-          "group": "ha"
         },
         {
           "name": "patch-minor-version",
