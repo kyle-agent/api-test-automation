@@ -215,6 +215,27 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   집계 + 가드 소스 계약) + 관측 0 **실빌드**로 index "판정 불가"/skip-write 확인
   · tests_offline 33/33.
 
+## 홈 커버리지 = 미니 사다리 (오너 공동 설계 2026-07-15, 블록 ②)
+
+블록 단위 공동 설계 계속 — 오너 확정: "① 배너 OK · ② 미니 사다리 + 잔존 OK ·
+그 아래(파이프라인·최근 RUN)는 재논의" (이번 커밋은 ② 만, 아래 블록 불변).
+
+- **커버리지 타일 4장 + 신규 fail 타일 → 미니 사다리 1장** (`home.html` +
+  base.html `.lad.mini`/`.tiles.cov`): 대시보드·Reporting 과 같은 그림(C3 green ·
+  C2 amber · C1 blue, 정의 툴팁 동일 — 한 번 배우면 세 화면이 같이 읽힘).
+  - 판정 행(history)에 이미 있는 재료 사용: cov_c3 · tested/total(C2) ·
+    reachable_pct(C1) · **gap_write·gap_getid** → "남은 실질 gap N — write X ·
+    id-bound GET Y · waiver W 제외" + [사다리·서비스별 상세 → 대시보드].
+  - 발견 기록: 구 타일의 "write-op 커버리지 (cov_op)" 라벨은 **오표기**였다 —
+    cov_op = 전체 1,372 대비 검증율(write 전용 아님; write 전용은 cov_write 별도).
+  - 신규 fail 타일 제거 — 판정 배너와 순수 중복. 잔존 자원 타일 유지(라이브
+    비용·안전 신호는 이 화면에서 유일).
+- **배너 보강 (오너 실문 "오늘 아침에도 돌렸는데 왜 21시간 전?")**: 시각 라벨을
+  "MM-DD HH:MM **공식 런**"으로(툴팁: 판정은 CI 발행 런 기준 — 콘솔 로컬 런
+  미반영) + 판정 이후 로컬 런이 있으면 "**이후 로컬 런 N건 미반영**" 주석
+  (`app.py local_after` — 구 D2 칩의 정보를 칩/링크 없이 배너 문장으로).
+- 검증: 렌더 9항목 전수 + `test_home_mini_ladder` · tests_offline 34/34.
+
 ## 대시보드 정비 (오너 지시 2026-07-14)
 
 - **서비스별 Platform 링크 제거** ("대시보드에 platform 링크들이 모든 서비스마다

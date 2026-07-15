@@ -145,6 +145,15 @@ def home(request: Request):
     # 미발행 동안 index 배너 폴백(capped). best-effort: 실패는 빈 목록(미리보기만
     # 생략, 판정·건수는 history 기준 그대로). (구 D2 칩 local_since_publish 는
     # 칩 제거로 함께 정리.)
+    # 판정 이후 이 서버 로컬 런 수 (오너 2026-07-15 "오늘 아침에도 돌렸는데 왜
+    # 21시간 전?"): 배너의 '이후 로컬 런 N건 미반영' 주석용 — 판정(공식 CI 런)과
+    # 콘솔 로컬 런의 관계를 화면이 직접 설명한다. gh_run_id 'local-' 접두 = 로컬,
+    # ts 는 양쪽 다 "%Y-%m-%dT%H:%M:%SZ" 라 문자열 비교 안전. limit=50 창 하한값.
+    snap_ts = str((coverage or {}).get("ts") or "")
+    local_after = sum(
+        1 for r in runs
+        if str(r["gh_run_id"] or "").startswith("local-")
+        and (r["finished_at"] or "") > snap_ts) if snap_ts else 0
     fail_svcs, fail_svcs_capped = [], False
     if coverage and (coverage.get("fail_new") or 0) > 0:
         try:
@@ -163,6 +172,7 @@ def home(request: Request):
                    runs=runs[:5], running=running,
                    stale_running=stale_running, runs_today=runs_today,
                    fail_svcs=fail_svcs, fail_svcs_capped=fail_svcs_capped,
+                   local_after=local_after,
                    schedules=db.list_schedules(),
                    coverage=coverage,
                    # D8: 잔존 자원 홈 승격 — 마지막 캐시만 읽고 스캔은 트리거하지

@@ -729,6 +729,28 @@ def test_regression_verdict_banner(monkeypatch):
     assert i_guard < src.index('os.path.join(outdir, "fail_new.json")')
 
 
+def test_home_mini_ladder():
+    """홈 커버리지 = 미니 사다리 1장 (오너 공동 설계 2026-07-15): 커버리지 타일
+    4장(write-op 오표기 포함)+신규 fail 타일을 대시보드/Reporting 과 같은 그림의
+    C3→C2→C1 사다리로 대체. '남은 실질 gap'(gap_write·gap_getid)이 다음 걸음,
+    상세는 발행 대시보드 링크. 잔존 자원 타일은 유지, 파이프라인·최근 RUN 은
+    재논의 보류(불변). 배너 시각은 '공식 런' 라벨(로컬 런과의 관계 명시)."""
+    from controlplane import dashdata
+    if not dashdata.latest_coverage():
+        return                                   # 발행본 없으면 empty-state 경로
+    home = client.get("/").text
+    assert home.count('class="lad mini"') == 3   # C3 · C2 · C1
+    assert home.index(">C3<") < home.index(">C2<") < home.index(">C1<")
+    assert "남은 실질 gap" in home and "사다리·서비스별 상세" in home
+    assert 'href="/dashboard/index.html"' in home
+    # 구 타일 5장 제거 (오표기 라벨 포함) — 사다리·배너가 대체
+    for gone in ("write-op 커버리지", "GET 커버리지 (cov_get)",
+                 "C1 static reachable", ">신규 fail<"):
+        assert gone not in home, gone
+    assert "잔존 자원" in home                    # 유지 (D8)
+    assert "공식 런" in home                      # 판정 시각 = CI 발행 런 명시
+
+
 def test_v2_shell_header_and_global_search():
     """v2 접목 6a (오너 지시 2026-07-11) — v2 셸의 상단 디자인 이식.
 
