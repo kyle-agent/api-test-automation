@@ -48,11 +48,25 @@ import time
 _NOTICE_SHOWN = False
 
 
-def _cfg():
-    """Resolve endpoint/bucket/credentials from env (None = disabled)."""
+def _cfg(keys: str = "oplog"):
+    """Resolve endpoint/bucket/credentials from env (None = disabled).
+
+    ``keys`` — 자격 선택 (2026-07-15 테스트 계정 교체, 오너 (b) 결정):
+      * "oplog"(기본): SCP_OPLOG_ACCESS_KEY/SECRET_KEY 우선, 없으면 SCP_* 폴백
+        — **미러/자동수리 버킷**(apitest-oplog-permanent)용. 계정 교체 후에도
+        구 계정 키를 SCP_OPLOG_*로 유지해 미러 히스토리 연속성을 보존한다.
+      * "test": SCP_ACCESS_KEY/SECRET_KEY만 — **logsink 버킷**(apitest-logsink)
+        용. logsink는 network-logging/loggingaudit 시나리오가 '테스트 계정
+        안에서' 참조하는 픽스처라, oplog 키(구 계정)로 ensure하면 새 계정
+        시나리오가 자기 계정에 없는 버킷을 가리켜 실패한다.
+    """
     bucket = os.getenv("SCP_OPLOG_BUCKET", "apitest-oplog-permanent").strip()
-    access = (os.getenv("SCP_OPLOG_ACCESS_KEY") or os.getenv("SCP_ACCESS_KEY") or "").strip()
-    secret = (os.getenv("SCP_OPLOG_SECRET_KEY") or os.getenv("SCP_SECRET_KEY") or "").strip()
+    if keys == "test":
+        access = (os.getenv("SCP_ACCESS_KEY") or "").strip()
+        secret = (os.getenv("SCP_SECRET_KEY") or "").strip()
+    else:
+        access = (os.getenv("SCP_OPLOG_ACCESS_KEY") or os.getenv("SCP_ACCESS_KEY") or "").strip()
+        secret = (os.getenv("SCP_OPLOG_SECRET_KEY") or os.getenv("SCP_SECRET_KEY") or "").strip()
     endpoint = os.getenv("SCP_OPLOG_S3_ENDPOINT", "").strip()
     if not endpoint:
         # per-service host convention; override via SCP_OPLOG_S3_ENDPOINT with
@@ -71,9 +85,9 @@ def _cfg():
             "access": access, "secret": secret}
 
 
-def _client():
+def _client(keys: str = "oplog"):
     global _NOTICE_SHOWN
-    cfg = _cfg()
+    cfg = _cfg(keys)
     if not cfg:
         if not _NOTICE_SHOWN:
             print("[oplog] disabled (no credentials/bucket configured)")
@@ -168,7 +182,9 @@ LOGSINK_BUCKET = "apitest-logsink"  # shared pre-existing OBS sink for
 
 
 def ensure_logsink() -> bool:
-    c, cfg = _client()
+    # logsink는 테스트-계정 픽스처 — 항상 테스트 키로 (oplog 키가 구 계정을
+    # 가리키는 (b) 구성에서 구 계정에 ensure되는 오배치 방지, 2026-07-15).
+    c, cfg = _client(keys="test")
     if not c:
         return False
     try:

@@ -3202,3 +3202,16 @@ state='ERROR'(대문자 확정) — create는 202 접수 후 CREATING으로 폴 
 "생성 실패인데 200"은 비동기 실패가 HTTP로 안 드러나는 202-accepted 패턴
 (상태 필드로만 노출). ERROR 잔존은 owner-prefix 스윕 회수 대상(거부되면 stuck
 보고).
+
+## 테스트 계정 교체 — oplog 자격 분리 (2026-07-15, 오너 (b) 결정)
+
+새 테스트 계정으로 교체하되 미러 히스토리는 보존: 로컬 .env에
+`SCP_ACCESS_KEY/SECRET_KEY`=새 계정, `SCP_OPLOG_ACCESS_KEY/SECRET_KEY`=구 계정.
+- **미러/자동수리 버킷**(apitest-oplog-permanent): oplog 키(구 계정) — 연속성.
+- **logsink 버킷**(apitest-logsink): 시나리오(network-logging/loggingaudit,
+  wave4)가 '테스트 계정 안에서' 참조하는 픽스처 → `ensure_logsink()`가 항상
+  테스트 키로 동작하게 분리 수리 (`_cfg(keys="test")`). 새 계정 첫 사용 전
+  `python -m core.oplog ensure-logsink` 1회 필요.
+- 잔여 갱신처: GitHub repo secrets(CI), 원격 세션 env(모니터링). 새 계정은
+  쿼터/entitlement가 다를 수 있어 smoke 먼저 + waiver/베이스라인 재검.
+- 구 계정 잔존(DB 10·VPC 5·ERROR 서브넷 등)은 교체 전 구 키로 정리.
