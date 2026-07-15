@@ -199,6 +199,7 @@
             "keypair_name": "regrvakey{unique}",
             "product_category": "compute",
             "product_offering": "virtual_server",
+            "zone": "{region}-b",
             "networks": [
               {
                 "subnet_id": "{subnet_id}"
@@ -229,7 +230,7 @@
             "path": "/v1/servers/{server_id}",
             "service": "virtualserver"
           },
-          "_note": "Body verbatim from the VALIDATED compute-virtualserver-full create (array capture envelope $.servers[0].id, boot volume type SSD size 104 delete_on_termination true) EXCEPT server_type_id is pinned to the smallest standard s1v1m2 so the resize target is deterministically different (the full lifecycle's dynamic first-s-type capture would make 'different from current' inexpressible)."
+          "_note": "Body verbatim from the VALIDATED compute-virtualserver-full create (array capture envelope $.servers[0].id, boot volume type SSD size 104 delete_on_termination true) EXCEPT server_type_id is pinned to the smallest standard s1v1m2 so the resize target is deterministically different (the full lifecycle's dynamic first-s-type capture would make 'different from current' inexpressible). SPEC-DIFF-20260715 §2① (ServerCreateRequestV1Dot4): zone became REQUIRED (without it: 400 ValidationError 'Field zone is invalid. Example: kr-west1-a', req-c7986e34). zone convention '{region}-b' — LIVE 2026-07-15: this account/region has exactly ONE availability zone 'kr-west1-b' (volume create with the docs-example 'kr-west1-a' 400d Volume.InvalidAvailabilityZone (must be one of availability zones: ['kr-west1-b'], req-e8a99e6e)); the docs example kr-west1-a is NOT valid here. Schema pass LIVE-PROVEN 2026-07-15: server body with zone kr-west1-b moved the 400 to VirtualServer.InvalidSecurityGroup (resource stage, req-6f96b524) — zone accepted."
         },
         {
           "name": "wait-server-active",

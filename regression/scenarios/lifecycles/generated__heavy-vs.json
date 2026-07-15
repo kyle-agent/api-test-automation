@@ -79,8 +79,10 @@
             "volume_type": "SSD_Provisioned",
             "max_iops": 10000,
             "max_throughput": 500,
+            "zone": "{region}-b",
             "tags": []
           },
+          "_note": "SPEC-DIFF-20260715 §2① (VolumeCreateRequestV1Dot4): zone became REQUIRED (without it: 400 ValidationError 'Field zone is invalid', req-c7986e34). zone convention '{region}-b' — LIVE 2026-07-15: this account/region has exactly ONE availability zone 'kr-west1-b' (volume create with the docs-example 'kr-west1-a' 400d Volume.InvalidAvailabilityZone (must be one of availability zones: ['kr-west1-b'], req-e8a99e6e)); the docs example kr-west1-a is NOT valid here. LIVE-PROVEN 2026-07-15: probe volume (size 8, SSD, zone kr-west1-b) returned 202 (response echoes zone), reached state available, DELETE 202, post-delete GET 404 confirmed (id a072b758).",
           "expect_status": [
             200,
             201,
@@ -240,6 +242,7 @@
             "keypair_name": "regrkey{unique}",
             "product_category": "compute",
             "product_offering": "virtual_server",
+            "zone": "{region}-b",
             "networks": [
               {
                 "subnet_id": "{subnet_id}"
@@ -298,7 +301,8 @@
           "json": {
             "name": "regrfsvm{unique}",
             "protocol": "NFS",
-            "type_name": "HDD"
+            "type_name": "HDD",
+            "zone": "{region}-b"
           },
           "expect_status": [
             200,
@@ -313,7 +317,7 @@
             "path": "/v1/volumes/{fs_volume_id}",
             "service": "filestorage"
           },
-          "_note": "REPAIR 2026-07-13 (owner-directed: filestorage setaccessrule needs a real VM dependency): this lifecycle already provisions an ACTIVE VM ({server_id}, wait-server above), so a filestorage NFS volume created here can bind a REAL VM in its access rule — the ONLY path to a 2xx on filestoragesetaccessrule (the standalone storage__filestorage.json step 404s VirtualServerNotFound because that lifecycle is VPC/VM-free; account has 0 VMs). Volume body {name,protocol:NFS,type_name:HDD} + $.volume_id envelope are LIVE-PROVEN (storage__filestorage.json create-volume, 2026-06-24). service=filestorage is REQUIRED on every step here — the /v1/volumes path collides with virtualserver's block-volume host, so the service tag routes it to the filestorage host. Billable NFS volume, torn down via cleanup; group-isolated so a filestorage hiccup never fails the proven VM chain."
+          "_note": "SPEC-DIFF-20260715 §2① (filestorage VolumeCreateRequestV1Dot2): zone became REQUIRED — LIVE 2026-07-15: without zone 400 ValidationError 'Field required' (req-7ad382a4); zone kr-west1-a 400 filestorage.BadRequest.Invalid.zone (req-ddb38f98, no volume created) — matches the compute finding that this account/region's only AZ is kr-west1-b, hence convention '{region}-b' (fs 2xx with -b not yet proven, next heavy run will; step is optional+grouped). The old region field is REMOVED from the model — this body never sent it, no removal needed. REPAIR 2026-07-13 (owner-directed: filestorage setaccessrule needs a real VM dependency): this lifecycle already provisions an ACTIVE VM ({server_id}, wait-server above), so a filestorage NFS volume created here can bind a REAL VM in its access rule — the ONLY path to a 2xx on filestoragesetaccessrule (the standalone storage__filestorage.json step 404s VirtualServerNotFound because that lifecycle is VPC/VM-free; account has 0 VMs). Volume body {name,protocol:NFS,type_name:HDD} + $.volume_id envelope are LIVE-PROVEN (storage__filestorage.json create-volume, 2026-06-24). service=filestorage is REQUIRED on every step here — the /v1/volumes path collides with virtualserver's block-volume host, so the service tag routes it to the filestorage host. Billable NFS volume, torn down via cleanup; group-isolated so a filestorage hiccup never fails the proven VM chain."
         },
         {
           "name": "fs-wait-volume",

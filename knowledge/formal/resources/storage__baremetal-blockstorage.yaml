@@ -18,7 +18,7 @@ resources:
         size_gb: 10
         qos: {iops: 5000, throughput: 250}
         attachments: []
-        zone: kr-west1-a
+        zone: kr-west1-b
         tags: []
     capture: {volume_id: "$.result.id"}
     ready: {field: "$.result.state", until: [AVAILABLE, available, IN_USE, ACTIVE],
@@ -53,7 +53,7 @@ resources:
       body:
         name: "regrbsvg{unique}"
         volume_ids: ["{bm-block-volume.volume_id}"]
-        zone: kr-west1-a
+        zone: kr-west1-b
         tags: []
     capture: {volume_group_id: "$.result.id"}
     ready: {field: "$.result.state", until: [AVAILABLE, available, ACTIVE],

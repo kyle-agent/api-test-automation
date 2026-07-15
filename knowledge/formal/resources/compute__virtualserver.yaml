@@ -106,6 +106,11 @@ resources:
         keypair_name: "regrkey{unique}"
         product_category: compute
         product_offering: virtual_server
+        # SPEC-DIFF-20260715 §2① (ServerCreateRequestV1Dot4): zone became
+        # REQUIRED — convention "{region}-b". LIVE 2026-07-15: the account's
+        # ONLY AZ is kr-west1-b (docs example kr-west1-a 400s
+        # InvalidAvailabilityZone "must be one of ['kr-west1-b']").
+        zone: "{region}-b"
         networks:
           - {subnet_id: "{subnet.subnet_id}"}
         security_groups: ["{security-group.sg_id}"]
@@ -156,7 +161,12 @@ resources:
       endpoint: "POST /v1/volumes"
       body: {name: "regrvol{unique}", description: "API regression suite",
              size: 104, volume_type: SSD_Provisioned, max_iops: 10000,
-             max_throughput: 500, tags: []}
+             max_throughput: 500, zone: "{region}-b", tags: []}
+      # SPEC-DIFF-20260715 §2① (VolumeCreateRequestV1Dot4): zone became
+      # REQUIRED — convention "{region}-b". LIVE 2026-07-15: probe volume
+      # (size 8, SSD, zone kr-west1-b) 202 -> available -> DELETE -> 404;
+      # docs-example kr-west1-a 400s InvalidAvailabilityZone (only AZ is
+      # kr-west1-b in this account/region, req-e8a99e6e).
       # block_storage_vm userguide (overview + how_to_guides, 2026-06-14):
       # volume_type ∈ {SSD, HDD, SSD_Provisioned, SSD_KMS/HDD_KMS,
       # SSD_MultiAttach/HDD_MultiAttach}. SSD_Provisioned는 IOPS/Throughput
@@ -354,10 +364,17 @@ resources:
     requires: [launch-configuration, subnet, security-group]
     create:
       endpoint: "POST /v1/auto-scaling-groups"
-      # AutoScalingGroupCreateRequestV1Dot2 (api_docs): 필수 = name/launch_
-      # configuration_id/desired·min·max_server_count/desired_server_count_
-      # editable/server_name_prefix/state_check_delay_time/use_lb_state_check/
-      # subnet_ids(배열). 이전 body(subnet_id/security_groups)는 DTO 불일치.
+      # AutoScalingGroupCreateRequestV1Dot4 (api_docs, SPEC-DIFF-20260715 §2①):
+      # 필수 = name/launch_configuration_id/desired·min·max_server_count/
+      # desired_server_count_editable/server_name_prefix/state_check_delay_time/
+      # use_lb_state_check/subnet_ids(배열) + v1.4 신설 placement_strategy
+      # (string, docs example 'balanced') + zones(배열, docs example
+      # kr-west1-a/-b — 단수 zone이 아님). zone 규약: "{region}-b" — LIVE
+      # 2026-07-15: 이 계정/리전의 유일한 AZ는 kr-west1-b (docs 예시 kr-west1-a는
+      # InvalidAvailabilityZone 400). placement_strategy=balanced+zones 포함 시
+      # 400이 리소스 단계(InvalidAutoScalingGroupLaunchConfigurationId,
+      # req-4f363bfe)로 이동 — 스키마 통과 실증.
+      # 이전 body(subnet_id/security_groups)는 DTO 불일치.
       # owner 2026-06-13: desired/min 0 시도 — 0이면 billable VM 없이 ASG
       # 21 ops 전부 검증 가능
       body:
@@ -370,6 +387,8 @@ resources:
         server_name_prefix: "regrasg{ualpha}"
         state_check_delay_time: 300
         use_lb_state_check: false
+        placement_strategy: balanced
+        zones: ["{region}-b"]
         subnet_ids: ["{subnet.subnet_id}"]
         security_group_ids: ["{security-group.sg_id}"]
         tags: []

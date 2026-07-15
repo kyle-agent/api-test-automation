@@ -201,7 +201,7 @@
         },
         {
           "name": "create-auto-scaling-group",
-          "_note": "HEAVY: creates ASG with desired_server_count=0 so no billable VMs are spun up. min=0, max=1. Captures $.id (flat, not nested). security_group_ids array (not security_groups). subnet_ids array.",
+          "_note": "HEAVY: creates ASG with desired_server_count=0 so no billable VMs are spun up. min=0, max=1. Captures $.id (flat, not nested). security_group_ids array (not security_groups). subnet_ids array. SPEC-DIFF-20260715 §2① (v1.4): placement_strategy(required, docs example 'balanced') + zones(required array) added; zone convention '{region}-b' — LIVE 2026-07-15: this account/region has exactly ONE availability zone 'kr-west1-b' (volume create with the docs-example 'kr-west1-a' 400d Volume.InvalidAvailabilityZone (must be one of availability zones: ['kr-west1-b'], req-e8a99e6e)); the docs example kr-west1-a is NOT valid here. Without them: 400 ValidationError naming BOTH placement_strategy (Example: balanced) and zones (req-a10e06f4). With placement_strategy=balanced + zones=['kr-west1-b'] the 400 moved to the resource stage (InvalidAutoScalingGroupLaunchConfigurationId, req-4f363bfe) — schema pass LIVE-PROVEN 2026-07-15.",
           "method": "POST",
           "path": "/v1/auto-scaling-groups",
           "service": "virtualserver",
@@ -215,6 +215,8 @@
             "server_name_prefix": "regrvm{ualpha}",
             "state_check_delay_time": 300,
             "use_lb_state_check": false,
+            "placement_strategy": "balanced",
+            "zones": ["{region}-b"],
             "subnet_ids": ["{asg_subnet_id}"],
             "security_group_ids": ["{asg_sg_id}"],
             "tags": []

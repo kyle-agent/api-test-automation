@@ -242,6 +242,10 @@
             "server_name_prefix": "regrasg{ualpha}",
             "state_check_delay_time": 300,
             "use_lb_state_check": false,
+            "placement_strategy": "balanced",
+            "zones": [
+              "{region}-b"
+            ],
             "subnet_ids": [
               "{subnet_id}"
             ],
@@ -250,6 +254,7 @@
             ],
             "tags": []
           },
+          "_note": "SPEC-DIFF-20260715 §2① (AutoScalingGroupCreateRequestV1Dot4): placement_strategy(required) + zones(required array) added; zone convention '{region}-b' — LIVE 2026-07-15: this account/region has exactly ONE availability zone 'kr-west1-b' (volume create with the docs-example 'kr-west1-a' 400d Volume.InvalidAvailabilityZone (must be one of availability zones: ['kr-west1-b'], req-e8a99e6e)); the docs example kr-west1-a is NOT valid here. Schema pass LIVE-PROVEN 2026-07-15 (see compute__virtualserver-autoscaling.json create-auto-scaling-group note; req-4f363bfe).",
           "expect_status": [
             200,
             201,

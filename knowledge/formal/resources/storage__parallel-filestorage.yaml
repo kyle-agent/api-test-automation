@@ -27,7 +27,7 @@ resources:
     requires: []
     create:
       endpoint: "POST /v1/volumes"
-      body: {name: "regrpfs{ualpha}", capacity_tb: 1, zone: kr-west1-a, tags: []}
+      body: {name: "regrpfs{ualpha}", capacity_tb: 1, zone: kr-west1-b, tags: []}
       optional: true
       expect_status: [200, 201, 202, 400, 403, 404, 409, 422]
       note: "reachability-only (owner): access-tested, 4xx tolerated, no real creation expected. body VolumeCreateRequest (docs), capture $.id UNPROVEN."

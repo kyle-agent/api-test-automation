@@ -116,7 +116,7 @@
         },
         {
           "name": "create-auto-scaling-group",
-          "_note": "HEAVY/VPC-BLOCKED (cannot reach 2xx in this lifecycle — see 2026-06-18 live): an ASG needs a REAL subnet_ids (the account has 0 subnets; this lifecycle is deliberately VPC-FREE) and spins up REAL billable VMs, so it stays coverage-only. Body now matches AutoScalingGroupCreateRequestV1Dot2 required fields (desired_server_count_editable / server_name_prefix / subnet_ids[array] / use_lb_state_check / state_check_delay_time, and security_group_ids not security_groups) so the failure is a resource 4xx (bad launch_configuration / subnet), NOT a ValidationError on body shape. To make this 2xx you would have to provision a VPC+subnet and let it create VMs — out of scope (heavy/billable).",
+          "_note": "HEAVY/VPC-BLOCKED (cannot reach 2xx in this lifecycle — see 2026-06-18 live): an ASG needs a REAL subnet_ids (the account has 0 subnets; this lifecycle is deliberately VPC-FREE) and spins up REAL billable VMs, so it stays coverage-only. Body now matches AutoScalingGroupCreateRequestV1Dot4 required fields (desired_server_count_editable / server_name_prefix / subnet_ids[array] / use_lb_state_check / state_check_delay_time / placement_strategy / zones[array], and security_group_ids not security_groups) so the failure is a resource 4xx (bad launch_configuration / subnet), NOT a ValidationError on body shape. SPEC-DIFF-20260715 §2①: v1.4 added REQUIRED placement_strategy (string, docs example 'balanced') + zones (array of AZ names, docs example kr-west1-a/-b); zone convention '{region}-b' — LIVE 2026-07-15: this account/region has exactly ONE availability zone 'kr-west1-b' (volume create with the docs-example 'kr-west1-a' 400d Volume.InvalidAvailabilityZone (must be one of availability zones: ['kr-west1-b'], req-e8a99e6e)); the docs example kr-west1-a is NOT valid here. Schema pass LIVE-PROVEN 2026-07-15: this exact required-field set + placement_strategy=balanced + zones=['kr-west1-b'] moved the 400 from ValidationError to AutoScalingGroup.InvalidAutoScalingGroupLaunchConfigurationId (resource stage, req-4f363bfe). To make this 2xx you would have to provision a VPC+subnet and let it create VMs — out of scope (heavy/billable).",
           "method": "POST",
           "path": "/v1/auto-scaling-groups",
           "json": {
@@ -131,6 +131,8 @@
             "security_group_ids": ["00000000-0000-0000-0000-000000000000"],
             "use_lb_state_check": false,
             "state_check_delay_time": 300,
+            "placement_strategy": "balanced",
+            "zones": ["{region}-b"],
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
