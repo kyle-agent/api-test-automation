@@ -12,8 +12,10 @@
           "path": "/v1/resource-groups",
           "json": {
             "name": "regr-rg-{unique}",
-            "description": "created by API regression suite"
+            "description": "created by API regression suite",
+            "resource_types": ["resourcemanager:resource-group"]
           },
+          "_note": "SPEC TIGHTENING 2026-07-15 (run fe88): 400 'The resource_types field cannot be null' without it (scp-resourcemanager.resource-group.value-error, req-4a28ed92-98a0-4ae1-8318-0870b2b1a637; correct pin resourcemanager 1.0 — not 406-class). docs still mark it optional (docs-vs-server divergence). With field: LIVE 201 (2026-07-15).",
           "expect_status": [
             200,
             201,

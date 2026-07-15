@@ -12,7 +12,8 @@
           "path": "/v1/resource-groups",
           "json": {
             "name": "regrtagrg{unique}",
-            "description": "API regression tag-coverage probe"
+            "description": "API regression tag-coverage probe",
+            "resource_types": ["resourcemanager:resource-group"]
           },
           "expect_status": [200, 201, 202],
           "capture": {
@@ -26,7 +27,7 @@
             "path": "/v1/resource-groups/{rg_id}",
             "service": "resourcemanager"
           },
-          "_note": "Real, cheap, reversible global resource. Provides the srn + id used as the tag-addressing key. Torn down by the final delete-rg step (and the registry cleanup on any failure)."
+          "_note": "Real, cheap, reversible global resource. Provides the srn + id used as the tag-addressing key. Torn down by the final delete-rg step (and the registry cleanup on any failure). SPEC TIGHTENING 2026-07-15 (run fe88): server now 400s without resource_types — 'The resource_types field cannot be null' (scp-resourcemanager.resource-group.value-error, req-4a28ed92-98a0-4ae1-8318-0870b2b1a637, confirmed at correct pin resourcemanager 1.0 — NOT the 406 version-pin class). docs model resourcegroupcreaterequest still says optional (docs-vs-server divergence, conformance candidate). With field: LIVE 201 (2026-07-15)."
         },
         {
           "name": "b64-encode-srn",

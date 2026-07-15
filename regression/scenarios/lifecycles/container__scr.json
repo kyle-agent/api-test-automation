@@ -5,7 +5,7 @@
       "service": "container/scr",
       "enabled": true,
       "heavy": false,
-      "_note": "LIVE-PROVEN 2026-06-24. Borrows the existing account registry (quota=1, slot occupied) by listing registries and capturing registry_id, then creates a uniquely-named temporary repository on it to cover all 7 repo-CRUD endpoints (createrepository/updaterepositorydescription/updaterepositorylockpolicy/updaterepositorypullpolicy/updaterepositoryscanpolicy/updaterepositorylifecyclepolicy/deleterepository) + 3 registry-ACL PUTs (updateprivateacl/updatepublicacl/updatepublicendpointenabled) in a single non-VPC run. All ACL PUTs use safe idempotent no-op values (disabled=false, empty resource lists). Teardown: DELETE /v1/repositories/{repo_id} confirmed 202. No registry create/delete needed. NOT gated on SCP_RUN_HEAVY (non-billable).",
+      "_note": "LIVE-PROVEN 2026-06-24; REDESIGNED 2026-07-15 (run fe88): the account registry no longer exists — GET /v1/container-registries returned 200 {count:0, registries:[]} live, so the old HARD capture $.registries[0].id failed in ~2s with 0 resources (NOT the 406 version-pin class). Now BORROW-OR-CREATE: borrow is a soft capture; when no registry exists, create-registry-fallback provisions our own (LIVE 2026-07-15: create 201 -> Running in ~160s; delete 202 -> 404 in ~110s; repo create/update/delete on it 201/200/202), and ONLY the self-created registry is deleted at the end (created_registry_id — never the borrowed/owner fixture, Hard Rule 3). Covers the 7 repo-CRUD endpoints + 3 registry-ACL PUTs + createregistry/deleteregistry when in fallback mode. ACL PUTs use safe idempotent no-op values. NOT gated on SCP_RUN_HEAVY (registry slot is free; storage-billed only when images are pushed — we push none).",
       "steps": [
         {
           "name": "list-registries-borrow",
@@ -14,9 +14,64 @@
           "expect_status": [
             200
           ],
-          "capture": {
+          "capture_soft": {
             "registry_id": "$.registries[0].id"
-          }
+          },
+          "_note": "Soft since 2026-07-15: empty registries list is a legitimate state (new account, fixture not yet restored) — fall through to create-registry-fallback."
+        },
+        {
+          "name": "create-registry-fallback",
+          "method": "POST",
+          "path": "/v1/container-registries",
+          "json": {
+            "name": "regr{unique}",
+            "private_acl_enabled": false,
+            "private_acl_resources": [],
+            "public_acl_enabled": false,
+            "public_acl_resources": [],
+            "public_visible_enabled": false,
+            "public_endpoint_enabled": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "scr-registry-create",
+          "capture_soft": {
+            "registry_id": "$.id",
+            "created_registry_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/container-registries/{created_registry_id}",
+            "service": "scr"
+          },
+          "_note": "Fires only usefully when borrow missed (registry quota=1: with a registry present this 4xxes on quota/duplication, capture_soft misses, borrowed registry_id survives). Body per container/scr/containerregistrycreaterequest (name/private_acl_enabled/private_acl_resources/public_acl_resources/public_visible_enabled required; name pattern ^[a-z][a-z0-9]*$ — regr{unique} fits, {unique} is 8 lowercase hex). LIVE 201 2026-07-15 ({id, message, state:Creating}). created_registry_id marks OUR registry so teardown never touches a borrowed one."
+        },
+        {
+          "name": "wait-registry-running",
+          "method": "GET",
+          "path": "/v1/container-registries/{registry_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.registry.state",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE"
+            ],
+            "timeout": 420,
+            "interval": 15
+          },
+          "_note": "Freshly created registry stays Creating ~160s (LIVE 2026-07-15) — repo create before Running would 4xx. Borrowed registry is already Running (immediate pass). If registry_id is still unresolved (no registry, create failed) the engine skips the poll and create-repo fails hard, which is correct."
         },
         {
           "name": "create-repo",
@@ -261,6 +316,28 @@
           ],
           "retries": 3,
           "retry_interval": 10
+        },
+        {
+          "name": "delete-created-registry",
+          "method": "DELETE",
+          "path": "/v1/container-registries/{created_registry_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404,
+            422
+          ],
+          "optional": true,
+          "group": "scr-registry-create",
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15,
+          "_note": "Deletes ONLY the self-created fallback registry ({created_registry_id} stays a literal placeholder in borrow mode -> harmless 4xx, borrowed/owner registry untouched). LIVE 2026-07-15: DELETE 202 -> GET 404 after ~110s. 409 retried while the repo delete settles."
         }
       ]
     },

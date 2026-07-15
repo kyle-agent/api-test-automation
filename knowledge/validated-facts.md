@@ -3414,3 +3414,26 @@ api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 �
 시도하지 않음(실자원이 없으므로), 태그 스코프 축소는 원래 실컬렉션 나열로
 수렴하므로 안전. live-watcher 등 /v1/resources 총량을 진행 신호로 쓰는
 관측자도 이 사실을 전제로 해석해야 한다.
+
+## heavy 런 fe88 실패 12건 — 최종 원인 분류 (2026-07-16)
+
+- **406 버전핀 클래스 (자체 회귀, http_client에서 해소)**: gen-wave2-scf(metrics
+  1.3), filestorage-volume(/v1/replications/regions), gen-heavy-vs-netops의
+  후행 GET(/v1/servers/{id}/ips) — 과거-2xx 엔드포인트의 406이 baseline 회귀로
+  lifecycle을 실패시켰다. 시나리오 수정 불필요 (엔드포인트별 핀 + 406 폴백).
+- **zone 필수 누락 (수리됨)**: networking-vpn-gateway-tunnel(publicip),
+  gen-heavy-backup(server), gen-heavy-vs-netops(publicip) + 선제 2곳
+  (aimlops/cloudml filestorage volume).
+- **`resource_types` 필수화 (RM 3건 — resourcemanager-resource-group ·
+  resourcemanager-tag-lifecycle · gen-wave4-rmtags)**: POST /v1/resource-groups가
+  `resource_types` 없이 400 "The resource_types field cannot be null"
+  (scp-resourcemanager.resource-group.value-error, 정상 핀 1.0에서 —
+  406 클래스 아님). **docs 모델(resourcegroupcreaterequest)은 여전히
+  optional로 표기** — docs-vs-server 괴리, conformance 후보.
+  `resource_types: ["resourcemanager:resource-group"]`로 라이브 201 → 3건
+  엔진 재실행 전부 passed.
+- **scr-repo-borrow-coverage**: 신규 계정에 빌릴 registry 부재 (borrow 전제
+  깨짐) → borrow-miss 시 자체 registry 생성 폴백으로 재저작, 라이브 passed
+  (레지스트리 비동기 삭제로 정리).
+- lb-members·asg·wave5-fw는 런 종료 후 검증 트랙(에이전트 B)에서 확정 예정
+  (406 클래스 유력 — lb/asg 후행 GET들).
