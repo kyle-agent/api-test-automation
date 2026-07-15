@@ -463,9 +463,33 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
     net_standing = 2 if any((s.get("adopt") or "") in ("vpc#a", "vpc#b")
                             for lc in items for s in lc.get("steps", [])) else 0
     n_v = max(1, int(vpc_slots) - net_standing)
-    wfree = [0.0] * n_w
-    vfree = [0.0] * n_v
+    # 공유 인프라 사전작업(prework) 모델 (오너 2026-07-15: "매번 사전 VPC 작업에서
+    # subnet 생성이 5분 정도 소요되던데 예측은 제일 앞에 있어서 비교가 안 됨 —
+    # 사전작업도 예측에 넣자"): 선택에 adopter가 있으면 러너가 lifecycle들보다
+    # 먼저 공유 VPC+서브넷을 세우고 ACTIVE를 기다린다. 관측 창: VPC ACTIVE
+    # ~75s + 서브넷 ACTIVE ~240s (run-543a: 백엔드가 같은 VPC 서브넷 전이를
+    # 직렬화해 4~5분) + IGW/TGW 필요 시 가산. SCP_SIM_PREWORK_S 로 강제 가능.
+    # 실측 대응: native_runner 가 lifecycle="shared-infra" start/end 이벤트를
+    # 쏘므로 '예측 vs 실제' 패널에서 같은 행으로 겹쳐 보인다.
+    from regression.scenarios import shared_infra as _shared
+    _needs = _shared.shared_needs(only_ids=set(ids))
+    prework = 0.0
+    if _needs["any"]:
+        try:
+            prework = float(os.environ.get("SCP_SIM_PREWORK_S", "") or 0)
+        except ValueError:
+            prework = 0.0
+        if prework <= 0:
+            prework = (75.0 + 240.0
+                       + (60.0 if _needs["igw"] else 0.0)
+                       + (120.0 if _needs["tgw"] else 0.0))
+    wfree = [prework] * n_w
+    vfree = [prework] * n_v
     bars = []
+    if prework > 0:
+        bars.append({"id": "shared-infra", "w": 0, "s": 0.0,
+                     "e": round(prework, 1), "vpc": True, "measured": False,
+                     "prework": True})
     for lc in items:
         d = _dur(lc)
         wi = min(range(n_w), key=lambda i: wfree[i])

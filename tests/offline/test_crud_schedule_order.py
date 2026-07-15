@@ -250,9 +250,12 @@ def test_simulate_schedule_pins_priority_first_at_t0():
            "vpc-subnet-vip-nat", "networking-vpc-subnet"]
     sim = simulate_schedule(ids, workers=4, vpc_slots=2)
     byid = {b["id"]: b for b in sim["bars"]}
-    assert byid["vpc-subnet-vip-nat"]["s"] == 0.0          # 핀 (슬롯 0)
-    assert byid["networking-vpc-subnet"]["s"] == 0.0       # 핀 (슬롯 1 선점)
-    assert byid["vpc-peering"]["s"] == 0.0                  # vpc#a/b adopt — 슬롯 0
+    # 사전작업(shared-infra prework) 도입(2026-07-15) 후 첫 웨이브 = prework
+    # 종료 시각 — 핀 규칙은 '첫 웨이브 선두'라는 상대 순서다.
+    t0 = byid["shared-infra"]["e"] if "shared-infra" in byid else 0.0
+    assert byid["vpc-subnet-vip-nat"]["s"] == t0           # 핀 (슬롯 0)
+    assert byid["networking-vpc-subnet"]["s"] == t0        # 핀 (슬롯 1 선점)
+    assert byid["vpc-peering"]["s"] == t0                   # vpc#a/b adopt — 슬롯 0
     assert byid["heavy-shared-networking"]["s"] >= byid["networking-vpc-subnet"]["e"]
 
 
@@ -340,3 +343,33 @@ def test_sessionfinish_folds_into_local_overlay_not_committed(tmp_path, monkeypa
     # 옛 커밋본을 시드하면 커밋본 재구축을 낡은 오버레이가 가려버린다.
     assert folded["x"]["n"] == 1 and folded["x"]["last_s"] == 30.0
     assert list(folded) == ["x"]
+
+
+def test_simulate_schedule_prepends_shared_infra_prework(monkeypatch):
+    """오너 2026-07-15: '사전 VPC/subnet 작업(~5분)이 예측에 없어 예측 vs 실제
+    비교가 안 됨 — 사전작업도 예측에 넣자.' adopter가 있는 선택은 t=0에
+    shared-infra 고스트 행이 서고 모든 시나리오 예측이 그 뒤로 밀린다;
+    adopter가 없는(self-create 전용) 선택은 prework 없이 t=0 시작."""
+    from regression.scenarios.local_run import simulate_schedule
+
+    # adopter 있는 선택 — vpc-subnet-vip-nat은 vpc#a adopt
+    sim = simulate_schedule(["vpc-subnet-vip-nat"], workers=2, vpc_slots=2)
+    byid = {b["id"]: b for b in sim["bars"]}
+    assert "shared-infra" in byid, sorted(byid)
+    pre = byid["shared-infra"]
+    assert pre["s"] == 0.0 and pre["e"] > 0 and pre.get("prework")
+    assert byid["vpc-subnet-vip-nat"]["s"] >= pre["e"], \
+        "시나리오 예측은 사전작업 종료 이후에 시작해야"
+    assert sim["makespan_s"] >= pre["e"]
+
+    # adopter 없는 선택 — networking-vpc-subnet은 adopt 마커 0 (self-create)
+    sim2 = simulate_schedule(["networking-vpc-subnet"], workers=2, vpc_slots=2)
+    ids2 = {b["id"] for b in sim2["bars"]}
+    assert "shared-infra" not in ids2
+    assert min(b["s"] for b in sim2["bars"]) == 0.0
+
+    # env로 예측 시간 강제 가능
+    monkeypatch.setenv("SCP_SIM_PREWORK_S", "600")
+    sim3 = simulate_schedule(["vpc-subnet-vip-nat"], workers=2, vpc_slots=2)
+    pre3 = next(b for b in sim3["bars"] if b["id"] == "shared-infra")
+    assert pre3["e"] == 600.0

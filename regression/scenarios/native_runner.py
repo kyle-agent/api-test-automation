@@ -188,6 +188,13 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
     if not needs["any"]:
         log("[native] 공유 인프라 스킵 — 선택에 adopt 시나리오 없음 (self-create 전용)")
     else:
+        # 사전작업을 이벤트로 표면화 (오너 2026-07-15): '예측 vs 실제' 타임라인이
+        # lifecycle-start/end 이벤트를 행으로 그리므로, 공유 인프라 프로비저닝도
+        # lifecycle="shared-infra" 로 감싸면 schedule-sim의 동명 prework 고스트와
+        # 같은 행에서 예측·실측이 겹쳐 보인다.
+        from core import console_events as _cev
+        _cev.emit("lifecycle-start", lifecycle="shared-infra", service="vpc",
+                  heavy=False, n_steps=0)
         try:
             res = engine.provision_shared_vpc(
                 client, cfg, need_db_subnet=needs["db"],
@@ -204,6 +211,10 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
     # 검증: 이게 없으면 서브넷 CREATING 중 adopt → wait-subnet 타임아웃 → VM ERROR).
     if shared_ctx:
         _wait_shared_subnets_active(client, shared_ctx, log)
+    if needs["any"]:
+        from core import console_events as _cev
+        _cev.emit("lifecycle-end", lifecycle="shared-infra", service="vpc",
+                  status="passed" if shared_ctx else "skipped")
 
     budget = _budgets.Budget()          # **공유** (스레드-안전) — 계정-전역 쿼터 조율
     # VPC 세마포어 시드 (2026-07-13 오너 "세마포어로 b"; 2026-07-14 수정). 상주
