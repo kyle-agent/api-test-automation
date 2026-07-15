@@ -2003,8 +2003,11 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
             # 'regrsub'-prefixed so the reconciler's subnet sweep reclaims them).
             "name": name, "description": desc,
             # 2026-07-15: subnet type enum changed server-side to
-            # (PUBLIC, PRIVATE, LOCAL, VPC_ENDPOINT) — GENERAL now 400s.
-            "cidr": cidr, "type": "PUBLIC", "vpc_id": vpc_id, "tags": [],
+            # (PUBLIC, PRIVATE, LOCAL, VPC_ENDPOINT) — GENERAL now 400s —
+            # and the 400 detail also carried a second "Field required":
+            # category (owner set PRIMARY via the planning editor).
+            "cidr": cidr, "type": "PUBLIC", "category": "PRIMARY",
+            "vpc_id": vpc_id, "tags": [],
         }, axis="regression")
         create = {"name": step_name, "method": "POST", "service": "vpc"}
         resp = _run_step(client, create, _SUBNET_CREATE_PATH, body, "vpc", {})

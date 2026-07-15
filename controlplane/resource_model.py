@@ -376,7 +376,10 @@ def parse_form(form) -> tuple[dict, list[str]]:
             except ValueError:
                 errors.append(f"verify {endpoint!r}: expect_status {c!r}는 정수여야 합니다")
         if nums:
-            step["expect_status"] = nums[0] if len(nums) == 1 else nums
+            # 항상 리스트로 — 단일 코드를 스칼라로 축약하면 formal 검증기
+            # ("verify expect_status must be a list of ints")가 저장을 거부한다
+            # (2026-07-15 실측: 단일 200 verify 행이 있는 모든 노드 저장 불가).
+            step["expect_status"] = nums
         if vcol(v_note, i):
             step["note"] = vcol(v_note, i)
         verify.append(step)

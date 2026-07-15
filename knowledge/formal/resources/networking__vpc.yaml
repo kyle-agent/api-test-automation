@@ -42,7 +42,8 @@ resources:
     create:
       endpoint: "POST /v1/subnets"
       body: {name: "regrsub{unique}", description: "API regression suite",
-             cidr: "{opt.cidr}", type: PUBLIC, vpc_id: "{vpc.vpc_id}", tags: []}
+             cidr: "{opt.cidr}", type: PUBLIC, category: "PRIMARY",
+             vpc_id: "{vpc.vpc_id}", tags: []}
       options:
         cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr,
                note: "VPC cidr의 하위 /24 (composer가 부모 블록에서 8+j번째 /24를 절단)"}

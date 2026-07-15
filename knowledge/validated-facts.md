@@ -3257,14 +3257,18 @@ stderr 리다이렉트로 보존. 실패는 best-effort(해당 시나리오가 4
 계정이 보는 API 버전 차이일 가능성 있음. 스위트 전체(엔진 shared subnet,
 scenarios.json, lifecycles/*.json 52곳, formal yaml)를 PUBLIC으로 전환함.
 
-**미해결**: detail의 두 번째 항목 `"Field required"`는 어떤 필드가 새로
-필수가 됐는지 미상 (enum 외 추가 필수 필드일 수 있음 — PUBLIC/PRIVATE 분화와
-함께 IGW/라우팅 관련 필드가 생겼을 개연성). PUBLIC 전환 후에도 400이 지속되면
-응답 detail을 다시 채집하고 spec-intel로 `data/api_docs.json`
-(subnetcreaterequest) 리프레시 필요 — 스냅샷은 아직 구 enum(GENERAL·LOCAL·
-VPC_ENDPOINT)을 담고 있다. `GET /v1/subnets?type=` 쿼리 enum도 함께 바뀌었는지
-미검증 (reconciler는 bare list + `?type=VPC_ENDPOINT`만 사용, PF-47 — VPC_ENDPOINT는
-신구 enum 모두에 존재해 즉각 영향 없음).
+**후속 확인(같은 날)**: detail의 두 번째 항목 `"Field required"`는 신설 필수
+필드 **`category`** — 오너가 planning 편집기로 subnet 노드에
+`category: "PRIMARY"` 추가(로컬 커밋 973865e). 실행 경로 전체(엔진 shared
+subnet, scenarios.json/lifecycles 52곳, formal yaml)에 전파함 — **라이브 2xx는
+아직 미검증** (PRIMARY 외 enum 값 존재 여부·VPC_ENDPOINT/endpoint-subnet
+바디에도 category가 필수인지 미상; endpoint-subnet은 일부러 안 건드림, 그쪽
+400이 나면 그때 값 확인). 여전히 400이면 응답 detail을 채집하고 spec-intel로
+`data/api_docs.json`(subnetcreaterequest) 리프레시 필요 — 스냅샷은 아직 구
+enum(GENERAL·LOCAL·VPC_ENDPOINT)이고 category 필드도 없다. `GET
+/v1/subnets?type=` 쿼리 enum도 함께 바뀌었는지 미검증 (reconciler는 bare list
++ `?type=VPC_ENDPOINT`만 사용, PF-47 — VPC_ENDPOINT는 신구 enum 모두에 존재해
+즉각 영향 없음).
 
 ## 플랫폼 자동명명 IGW 스윕 갭 + 파생 방화벽 (2026-07-15, 신규계정 첫 런 실측)
 

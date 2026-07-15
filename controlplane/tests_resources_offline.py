@@ -294,6 +294,26 @@ def test_parse_form_reports_errors():
     assert any("provenance" in e for e in errors), errors
 
 
+def test_parse_form_verify_single_status_stays_list():
+    """단일 expect_status(예: '200')도 리스트로 저장돼야 한다 — 종전 스칼라
+    축약(nums[0])은 knowledge/formal 검증기('verify expect_status must be a
+    list of ints')가 저장을 거부하게 만들었다 (2026-07-15 실측: read-vips 등
+    단일 200 verify 행이 있는 모든 노드가 폼 저장 불가)."""
+    base = [("service", "networking/vpc"), ("provenance", "docs")]
+    node, errors = resource_model.parse_form(FormData(base + [
+        ("verify_name", "read-vips"),
+        ("verify_endpoint", "GET /v1/subnets/{subnet_id}/vips"),
+        ("verify_expect", "200"), ("verify_note", ""), ("verify_extra", "")]))
+    assert errors == [], errors
+    assert node["verify"][0]["expect_status"] == [200], node["verify"]
+    # 콤마 다중 코드는 종전과 동일하게 리스트
+    node, errors = resource_model.parse_form(FormData(base + [
+        ("verify_name", ""), ("verify_endpoint", "GET /v1/things"),
+        ("verify_expect", "200, 202"), ("verify_note", ""),
+        ("verify_extra", "")]))
+    assert node["verify"][0]["expect_status"] == [200, 202], node["verify"]
+
+
 def test_layout_errors_local_c1_checks():
     node = {"service": "networking/vpc", "provenance": "docs",
             "requires": ["no-such-node", {"ref": "vpc", "count": 0}],
@@ -501,6 +521,7 @@ TESTS = [
     test_form_page_new_node_mode,
     test_form_roundtrip_produces_schema_correct_yaml,
     test_parse_form_reports_errors,
+    test_parse_form_verify_single_status_stays_list,
     test_layout_errors_local_c1_checks,
     test_save_roundtrips_through_authoring_pipeline,
     test_new_node_goes_to_service_derived_file,
