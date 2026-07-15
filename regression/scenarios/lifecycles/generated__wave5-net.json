@@ -1808,10 +1808,12 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "_note": "2026-07-15: 400 추가 — delete-lb-static-nat(204, async detach) 1.2s 뒤 발사되면 not-deletable-state(ATTACHED) 400. 재시도 사다리가 detach 전파를 흡수(run-8de6 실측, lb-server-group delete와 동일 패턴)."
         },
         {
           "name": "delete-internet-gateway",

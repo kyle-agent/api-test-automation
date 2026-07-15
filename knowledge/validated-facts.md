@@ -2982,3 +2982,9 @@ diff의 old는 커밋된 카탈로그 그대로 사용.
   불변 (tests/offline/test_cleanup_walltime.py 12종이 잠금; 전체 오프라인 620 pass).
 - 미구현 제안(콘솔 영역): run-end 스윕 수행 시 +0 재스캔 스킵 또는 reconciler가
   사이드카(last_sweep_leftovers.json)를 쓰고 +0이 신선하면 소비.
+
+## 반복 런 실패 2건 수리 (2026-07-15, run-8de6 실측 근거)
+
+- **gen-heavy-lb-members `delete-public-ip` 400**: `delete-lb-static-nat`(204)는 async detach인데 1.2초 뒤 IP 삭제 발사 → `publicip.not-deletable-state(ATTACHED)`. `retry_on_status`에 400 추가([409]→[400,409], 사다리 40×30s)로 detach 전파 흡수 — lb-server-group delete와 동일 검증 패턴.
+- **heavy-shared-networking `wait-subnet` 타임아웃**: subnet이 CREATING 305.9s 유지 vs 폴 예산 300s — 아슬아슬 초과로 실패. 누적 op-timings상 createsubnet p90 4:20/max 5:27(327s)이므로 300s는 관측 최대치 미만 → 600s로 확대. (주의: 이 lifecycle의 until은 ACTIVE만 수용; DBaaS 계열 wait-subnet은 CREATED/RUNNING도 수용해 180s로도 미실패 — 건드리지 않음.)
+- **eventstreams es-wait FAILED**: 백엔드 프로비저닝 실패(202 접수 후 state FAILED, teardown 정상). 구버전 선택(es-prefer-older-version)이 원인인지 최신 버전 실험은 오너 대기 중.
