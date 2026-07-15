@@ -3018,3 +3018,21 @@ opt-out: poll.interval_start=interval. 429 영향: 폴당 최대 +4 GET(초기 3
 ([API|settle|idle 갭] 분해 + 폴 횟수). console2 타이밍 탭(op별 합산)의 시간순
 보완. 남은 레버(미구현): subops 체인을 2 클러스터로 분할(벽시계 반감, 과금 2배
 — 오너 결정 사안).
+
+## DBaaS subops 2-클러스터 분할 (2026-07-14, 오너 "subops 체인을 클러스터 2개로 쪼개")
+
+5개 엔진(mysql·epas·mariadb·cachestore·postgresql)의 `<eng>-cluster-subops-full`
+(51~77스텝 직렬, 실측 27~42분)을 `-subops-a`/`-subops-b` 두 lifecycle로 분할:
+- **A** = config/백업/아카이브/로그export/커맨드/보안그룹 계열 (CRUD성 sub-op)
+- **B** = 상태전이/헤비 계열 (restart·stop/start·switchover·patch·upgrade-kernel·
+  resize-ig·block-storages)
+- 공통 = 각자 자기 클러스터 create/wait + 캡처 + pre-delete-sync + delete/gone
+  (probe-reads·show-request는 A만 — read 중복 제거)
+- **커버리지 불변**: A∪B의 (method,path) 집합 == 원본 (5엔진 전부 검증 통과)
+- 원본은 enabled:false + _status:stale + _replaced_by 로 보존 (롤백 용이)
+- 효과: A/B 병렬 → 벽시계 ≈ create 고정비 + ops/2 (적응형 폴 ladder와 합산 시
+  40분 → ~20분대 기대). 과금은 클러스터-시간 합산 ≈ +25% (2×full 아님 — 각
+  클러스터 수명이 절반이라).
+- 메타: adopt_edges full 5개 제거→a/b 10개 추가([subnet#db,vpc] 동일), durations
+  0.6×full 시드(source: split-estimate), DAG 194 enabled 통과, validate 0 error.
+- 주의: eventstreams-cluster-subops-full은 별도 파일(플랫폼 PF 조사 중)이라 미분할.

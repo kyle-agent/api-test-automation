@@ -92,7 +92,11 @@
     }
   },
   "adopt_edges": {
-    "cachestore-cluster-subops-full": [
+    "cachestore-cluster-subops-a": [
+      "subnet#db",
+      "vpc"
+    ],
+    "cachestore-cluster-subops-b": [
       "subnet#db",
       "vpc"
     ],
@@ -112,7 +116,11 @@
       "subnet#db",
       "vpc"
     ],
-    "epas-cluster-subops-full": [
+    "epas-cluster-subops-a": [
+      "subnet#db",
+      "vpc"
+    ],
+    "epas-cluster-subops-b": [
       "subnet#db",
       "vpc"
     ],
@@ -158,9 +166,6 @@
       "tgw",
       "vpc"
     ],
-    "heavy-shared-networking": [
-      "tgw"
-    ],
     "gen-vpc-endpoint": [
       "vpc"
     ],
@@ -168,17 +173,34 @@
       "subnet",
       "vpc"
     ],
+    "gen-wave5-fw": [
+      "vpc#b"
+    ],
     "heavy-asg-full-coverage": [
       "subnet",
       "vpc"
     ],
-    "mariadb-cluster-subops-full": [
+    "heavy-shared-networking": [
+      "tgw"
+    ],
+    "mariadb-cluster-subops-a": [
       "subnet#db",
       "vpc"
     ],
-    "mysql-cluster-subops-full": [
+    "mariadb-cluster-subops-b": [
       "subnet#db",
       "vpc"
+    ],
+    "mysql-cluster-subops-a": [
+      "subnet#db",
+      "vpc"
+    ],
+    "mysql-cluster-subops-b": [
+      "subnet#db",
+      "vpc"
+    ],
+    "networking-direct-connect-routing": [
+      "vpc#b"
     ],
     "networking-dns-hosted-zone-private": [
       "vpc"
@@ -187,13 +209,21 @@
       "vpc",
       "igw"
     ],
-    "postgresql-cluster-subops-full": [
+    "postgresql-cluster-subops-a": [
+      "subnet#db",
+      "vpc"
+    ],
+    "postgresql-cluster-subops-b": [
       "subnet#db",
       "vpc"
     ],
     "vpc-endpoint": [
       "subnet",
       "vpc"
+    ],
+    "vpc-peering": [
+      "vpc#a",
+      "vpc#b"
     ],
     "vpc-privatelink-endpoint": [
       "subnet",
@@ -203,21 +233,11 @@
       "subnet",
       "vpc"
     ],
-    "vpc-transit-gateway-children": [
-      "vpc"
-    ],
-    "vpc-peering": [
-      "vpc#a",
-      "vpc#b"
-    ],
     "vpc-subnet-vip-nat": [
       "vpc#a"
     ],
-    "networking-direct-connect-routing": [
-      "vpc#b"
-    ],
-    "gen-wave5-fw": [
-      "vpc#b"
+    "vpc-transit-gateway-children": [
+      "vpc"
     ],
     "vs-server-actions-verify": [
       "subnet",
