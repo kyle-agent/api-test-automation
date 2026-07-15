@@ -3548,3 +3548,15 @@ api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 �
   정리 경로 부재 / 실패 시 500 클래스.
 - 잔존 볼륨 fba72ab6…: pending이 **구계정**에 있어 구계정 콘솔에서 거절(또는
   수락 후 사본 삭제)해야 풀릴 것으로 추정 — 오너 액션 필요할 수 있음.
+
+## VolumeForSharingImageDelete 고아 플래그 = 백엔드 버그 확정 (2026-07-16, 양계정 API 대조)
+
+oplog 키가 구계정(ec11538a… — access-keys/vpcs 응답으로 정체 검증) API 자격이라
+양쪽을 모두 조회: 구계정 pending-images 0 · 비공개 이미지 0 · 볼륨 0, 신계정
+pending 0 · 비공개 0. 그런데 신계정의 공유용 임시 볼륨(fba72ab6…)은 여전히
+DELETE 400 `Volume.VolumeForSharingImageDelete` ("try again later") — 참조하는
+공유 작업이 **어느 계정에도 API 관측상 존재하지 않는다**. 원본 이미지를
+파이프라인 도중 삭제하면서 공유 작업은 소멸했으나 볼륨 측 플래그만 잔존한
+백엔드 고아 상태. 콘솔 삭제도 거부되면 서포트 티켓 대상. conformance:
+비가역 async 공유 + 취소 API 부재 + 고아 플래그 정리 경로 부재 3종 세트.
+(oplog 키 = 구계정 API 자격이라는 사실 자체도 유용 — 구계정 대조 조회 가능.)
