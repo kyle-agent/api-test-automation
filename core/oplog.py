@@ -50,6 +50,7 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
 
 _NOTICE_SHOWN = False
 
@@ -220,6 +221,63 @@ def put_text(key: str, text: str, content_type: str = "text/plain") -> bool:
             continue
     print(f"[oplog] put_text {key} failed")
     return False
+
+
+IMAGE_ASSET_KEY = "assets/regr-minimal.qcow2"
+_IMAGE_ASSET_URL: list = [None]   # 프로세스당 1회 계산 캐시
+
+
+def ensure_image_asset() -> str | None:
+    """createimage/importimage용 상비 qcow2 자산을 보장하고 public URL을 반환.
+
+    오너 2026-07-15: "테스트용 이미지는 git에 넣어두고, 이것도 최초 1회는
+    obj(버킷) 만들고 넣는 걸로." 원본은 repo의 ``assets/regr-minimal.qcow2``
+    (수제 qcow2 v3 헤더+refcount+L1, 262,144B — tests/offline이 구조 검증).
+    최초 1회: oplog 버킷 ensure(_ensure_oplog_once, _client 경유 자동) →
+    head_object → 없으면 git 원본을 public-read로 업로드(put_text와 같은 ACL
+    폴백). URL은 RGW tenant-path(``<account_id>:<bucket>``) — account_id는
+    SCP_ACCOUNT_ID env 우선, 없으면 get_bucket_acl Owner ID에서 유도(구 계정
+    id 하드코딩이 신규 계정에서 404 나던 문제의 근본 해소). 모든 실패는
+    None (best-effort — 해당 시나리오 스텝이 4xx로 표면화)."""
+    if _IMAGE_ASSET_URL[0]:
+        return _IMAGE_ASSET_URL[0]
+    c, cfg = _client()
+    if not c:
+        return None
+    try:
+        c.head_object(Bucket=cfg["bucket"], Key=IMAGE_ASSET_KEY)
+    except Exception:
+        src = Path(__file__).resolve().parent.parent / IMAGE_ASSET_KEY
+        try:
+            body = src.read_bytes()
+        except OSError as exc:
+            print(f"[oplog] image asset source missing ({exc})")
+            return None
+        for kw in ({"ACL": "public-read"}, {}):
+            try:
+                c.put_object(Bucket=cfg["bucket"], Key=IMAGE_ASSET_KEY,
+                             Body=body,
+                             ContentType="application/octet-stream", **kw)
+                break
+            except Exception:
+                continue
+        else:
+            print(f"[oplog] image asset upload failed ({IMAGE_ASSET_KEY})")
+            return None
+    account = (os.getenv("SCP_ACCOUNT_ID") or "").strip()
+    if not account:
+        try:
+            owner = c.get_bucket_acl(Bucket=cfg["bucket"])["Owner"]["ID"]
+            account = str(owner).split("$")[0].strip()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[oplog] image asset: account id unresolved ({exc}) — "
+                  "SCP_ACCOUNT_ID로 지정 가능")
+            return None
+    if not account:
+        return None
+    url = f"{cfg['endpoint'].rstrip('/')}/{account}:{cfg['bucket']}/{IMAGE_ASSET_KEY}"
+    _IMAGE_ASSET_URL[0] = url
+    return url
 
 
 LOGSINK_BUCKET = "apitest-logsink"  # shared pre-existing OBS sink for

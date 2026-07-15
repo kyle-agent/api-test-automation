@@ -179,6 +179,11 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
     # 계약) 세운다. 종전엔 무조건 main+DB 서브넷을 만들었다.
     from regression.scenarios import shared_infra as _shared
     shared_ctx, shared_teardown = {}, (lambda: None)
+    # 상비 qcow2 자산 (오너 2026-07-15): 선택이 {env:SCP_QCOW2_ASSET_URL}을
+    # 쓰면 최초 1회 버킷+객체 ensure 후 env로 노출 — 엔진 _fill이 소비.
+    if any("SCP_QCOW2_ASSET_URL" in str(s.get("json", ""))
+           for lc in lcs for s in lc.get("steps", [])):
+        _shared._ensure_image_asset_env()
     needs = _shared.shared_needs(only_ids=idset)
     if not needs["any"]:
         log("[native] 공유 인프라 스킵 — 선택에 adopt 시나리오 없음 (self-create 전용)")

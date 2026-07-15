@@ -562,7 +562,7 @@
             "name": "regrimgsh{ualpha}",
             "os_distro": "ubuntu",
             "protected": false,
-            "url": "https://object-store.kr-west1.e.samsungsdscloud.com/ec11538abf8f46d2953539521f745366:apitest-oplog-permanent/assets/regr-minimal.qcow2"
+            "url": "{env:SCP_QCOW2_ASSET_URL}"
           },
           "capture_soft": {
             "pending_image_id": "$.id"
@@ -697,7 +697,7 @@
           "method": "POST",
           "path": "/v1/images/{pending_image_id}/import",
           "json": {
-            "url": "https://object-store.kr-west1.e.samsungsdscloud.com/ec11538abf8f46d2953539521f745366:apitest-oplog-permanent/assets/regr-minimal.qcow2"
+            "url": "{env:SCP_QCOW2_ASSET_URL}"
           },
           "expect_status": [
             200,

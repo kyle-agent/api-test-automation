@@ -190,6 +190,45 @@ def _needs_logsink() -> bool:
         return True
 
 
+def _needs_image_asset() -> bool:
+    """선택에 ``{env:SCP_QCOW2_ASSET_URL}`` 토큰을 쓰는 스텝이 있으면 True —
+    createimage/importimage용 상비 qcow2 자산 (오너 2026-07-15: 이미지는 git에
+    상비, 최초 1회 버킷+객체 자동 생성). Fail-open: 판정 오류 → True (ensure는
+    멱등이라 무해)."""
+    import os
+    try:
+        only = {x.strip() for x in os.environ.get("SCP_CRUD_IDS", "").split(",")
+                if x.strip()}
+        for lc in engine.active_lifecycles():
+            if only and lc.get("id") not in only:
+                continue
+            for s in lc.get("steps", []):
+                if "SCP_QCOW2_ASSET_URL" in str(s.get("json", "")):
+                    return True
+        return False
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _ensure_image_asset_env() -> None:
+    """상비 qcow2 자산을 ensure하고 그 public URL을 SCP_QCOW2_ASSET_URL env로
+    노출한다 — 엔진 _fill의 {env:...} 토큰이 소비. 실패는 best-effort (해당
+    스텝이 4xx로 표면화, 원인은 stderr에)."""
+    import contextlib
+    import os
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            from core import oplog as _oplog
+            url = _oplog.ensure_image_asset()
+        if url:
+            os.environ["SCP_QCOW2_ASSET_URL"] = url
+        else:
+            _eprint("[shared_infra] image asset ensure 실패(계속) — "
+                    "createimage/importimage 스텝은 4xx로 표면화")
+    except Exception as exc:  # noqa: BLE001
+        _eprint(f"[shared_infra] image asset ensure 오류(계속): {exc}")
+
+
 def _needs_shared_igw() -> bool:
     """선택에 ``{"adopt": "igw"}`` 스텝이 하나라도 있으면 True — 메인 공유 VPC에
     IGW 1개 상주 필요 (오너 2026-07-14). 없으면 공유 IGW는 순수 낭비. Fail-open:
@@ -232,6 +271,12 @@ def provision():
                 _oplog.ensure_logsink()
         except Exception as exc:  # noqa: BLE001 — best-effort bootstrap
             _eprint(f"[shared_infra] logsink ensure 실패(계속): {exc}")
+    if _needs_image_asset():
+        _ensure_image_asset_env()
+        _img_url = os.environ.get("SCP_QCOW2_ASSET_URL", "")
+        if _img_url:
+            # KEY=VALUE 계약: CI 경로에서 pytest 워커들이 $GITHUB_ENV로 받게.
+            print(f"SCP_QCOW2_ASSET_URL={_img_url}")
     if not needs["any"]:
         # 오너 2026-07-15: adopt 마커 없는 self-create 전용 선택이 공유 인프라를
         # 세우는 낭비 — 아무도 adopt하지 않으면 프로비저닝 자체를 스킵한다.

@@ -3306,8 +3306,12 @@ best-effort, 실패해도 런 지속 — logsink와 동일 규약, `_ensure_oplo
 오버라이드(레거시 분리 구성; 한쪽만 설정은 키쌍이 갈라지므로 무시하고 테스트
 키로). logsink(`keys="test"`)는 종전대로 항상 테스트 키 — 오버라이드를 절대
 따라가지 않는다.
-- **이관 미해결**: 구 계정 버킷의 미러 히스토리·`assets/regr-minimal.qcow2`
-  (createimage/importimage가 public tenant-path URL로 참조)는 자동 이관되지
-  않는다 — 히스토리가 중요하면 한시적으로 SCP_OPLOG_* 오버라이드 유지 또는
-  1회 객체 복사 + qcow2 재업로드(URL의 account-id 갱신) 필요. CI repo
-  secrets/원격 세션 env의 SCP_OPLOG_*를 비워야 새 원칙이 적용된다.
+- **이관 미해결(→ qcow2는 해소, 2026-07-15 오너)**: 구 계정 버킷의 미러
+  히스토리는 자동 이관되지 않는다 — 중요하면 한시적으로 SCP_OPLOG_* 오버라이드
+  유지 또는 1회 객체 복사. CI repo secrets/원격 세션 env의 SCP_OPLOG_*를
+  비워야 새 원칙이 적용된다. **qcow2 자산은 git 상비로 전환**: 원본이
+  `assets/regr-minimal.qcow2`(repo)에 있고 `oplog.ensure_image_asset()`이
+  최초 1회 버킷+객체를 자동 생성, public URL(현 계정 tenant-path — account_id는
+  SCP_ACCOUNT_ID env 우선, 없으면 bucket ACL Owner에서 유도)을
+  `SCP_QCOW2_ASSET_URL` env로 노출하며 시나리오는 `{env:SCP_QCOW2_ASSET_URL}`
+  토큰으로 소비한다 (구 계정 id 하드코딩 URL 2곳 제거, generated__heavy-vs).
