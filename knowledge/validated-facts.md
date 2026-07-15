@@ -3189,3 +3189,16 @@ read_only면 게이트 전부 OFF + rec.read_only. (3) _run_worker — read_only
 동일 의미)로 전환: 자원 생성 0, run-end 스윕도 resource-tracked 0 게이트로 자동
 생략. (4) _preflight — read_only면 과금/자원/peak 0 + 안내 워닝. **서버 재시작 +
 브라우저 새로고침 필요** (JS+서버 모두 변경).
+
+## 서브넷 동시다발 ERROR — 플랫폼 프로비저닝 장애 신호 (2026-07-15 저녁, 실측)
+
+계정에 서브넷 6개(GENERAL 4 + VPC_ENDPOINT 2, 서로 다른 CIDR/VPC)가 같은 날
+state='ERROR'(대문자 확정) — create는 202 접수 후 CREATING으로 폴 캡(240s)을
+넘기고 그 뒤 ERROR로 전이. 개별 시나리오 문제가 아니라 **플랫폼측 서브넷
+프로비저닝 장애**(당일 저녁 API 변경 롤아웃과 시기 일치 — 인과는 미확정) 신호.
+엔진 동작은 정확: wait-subnet not-ready 게이트가 lifecycle을 실패로 분류
+(terminal-bad는 폴 도중 ERROR를 봐야 fast-exit — 이번엔 캡 안엔 CREATING이라
+타임아웃 경로). API 칩의 'ok'는 개별 HTTP 상태(202/200) 기준이라 정상 표기 —
+"생성 실패인데 200"은 비동기 실패가 HTTP로 안 드러나는 202-accepted 패턴
+(상태 필드로만 노출). ERROR 잔존은 owner-prefix 스윕 회수 대상(거부되면 stuck
+보고).
