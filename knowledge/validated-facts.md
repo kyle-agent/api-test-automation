@@ -3492,3 +3492,21 @@ api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 �
   실컬렉션 우선 (기존 규칙 재확인).
 - 오너 16건 잔존 체크리스트 전량 소거 확인(각 404), f04764b66c9c 는 VPC가
   아니라 **IGW id** — rule→IGW→FW 연쇄 소멸 체인 재실증.
+
+## 신규 전체런(a690) 조기 실패 2건 — listener settle 변종 + publicip zone 누락 (2026-07-16)
+
+- **createlblistener도 202 비동기** — 직후 PUT set이 400
+  scp-loadbalancer.listeners.NotUpdatableState("status: 'CREATING'").
+  lb-health-check(agent-B)와 동일 클래스의 listener 변종 → create→set 사이
+  `wait-lb-listener` ACTIVE settle 폴 신설 (gen-heavy-lb-members). LB 계열
+  create는 전부 settle-후-set으로 볼 것.
+- **createpublicip(v1.3) zone 필수** 재확인 — 7/15 zone 웨이브가
+  networking__vpn.json 의 create-publicip 하나를 놓쳤다 (grep은 POST
+  /v1/publicips 전수로 돌 것; 스텝 이름이 제각각이라 이름 기반 수색은 샌다).
+  라이브 검증: zone 없이 400 ValidationError "Field required", zone=kr-west1-b
+  로 201→delete 204→404. networking-vpn-gateway-tunnel 이 fe88/a690 모두 2초
+  사망한 원인 — 400이 UI에서 '중복(이번 런)' soft로 접혀 hard-fail 0으로
+  보였다 (실패 집계는 lifecycle-end 기준으로 읽을 것).
+- **gen-cloudml-chain waiver** (오너 지시): 전체런에서 계속 '대기중' —
+  9-노드 클로저(ske 선행 + SCP_SCR_* requires_env)가 스케줄만 점유.
+  enabled:false + _status=blocked-owner. SKE 안정화 후 재활성화 검토.

@@ -1235,6 +1235,25 @@
           "group": "lb-listener"
         },
         {
+          "name": "wait-lb-listener",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-listeners/{listener_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.listener.status",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "group": "lb-listener",
+          "_note": "settle 신설 (2026-07-16 신규 전체런 실측): createlblistener 202 비동기 — 직후 PUT set이 400 scp-loadbalancer.listeners.NotUpdatableState(\"status: 'CREATING'\"). lb-health-check와 동일 클래스(agent-B 발견)의 listener 변종. ACTIVE settle 후 set — 동기 경로 무해."
+        },
+        {
           "name": "verify-lb-listener-set",
           "service": "loadbalancer",
           "method": "PUT",
