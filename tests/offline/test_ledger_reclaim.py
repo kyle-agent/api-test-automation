@@ -82,9 +82,12 @@ def test_404_counts_as_reclaimed_and_prunes(tmp_path):
     assert not (tmp_path / "old.jsonl").exists()   # pruned (confirmed gone)
 
 
-def test_skips_unresolved_placeholder(tmp_path):
-    """A record whose delete_path still holds a {token} can't be addressed —
-    never issue a DELETE with a literal brace, and keep the shard for audit."""
+def test_unresolved_placeholder_parked_in_audit_not_shard(tmp_path):
+    """A record whose delete_path still holds a {token} can never be addressed —
+    never issue a DELETE with a literal brace. 2026-07-16 (오너 "아래것들을 왜
+    조회하는거야?"): keeping it IN the shard made the shard immortal, so every
+    gone-confirmed sibling was re-probed forever. It now moves to the
+    unreclaimable audit file and the shard is pruned."""
     _shard(tmp_path, "bad.jsonl", [
         {"service": "queueservice", "delete_path": "/v1/queues/{queue_id}",
          "resource_id": "", "kind": "queue"},
@@ -92,7 +95,34 @@ def test_skips_unresolved_placeholder(tmp_path):
     c = FakeClient()
     n = recon._pass_ledger_reclaim(c)
     assert n == 0 and c.calls == []
-    assert (tmp_path / "bad.jsonl").exists()       # kept (not all gone)
+    assert not (tmp_path / "bad.jsonl").exists()   # shard no longer immortal
+    audit = (tmp_path / "unreclaimable-audit.log").read_text()
+    assert "/v1/queues/{queue_id}" in audit and "bad.jsonl" in audit
+
+
+def test_gone_confirmed_record_pruned_even_with_survivor(tmp_path):
+    """THE 2026-07-16 waste: shard = [ghost(403-gone), survivor(409)]. Old
+    all-or-nothing pruning kept BOTH, re-probing the ghost every sweep. Now the
+    ghost is dropped from the rewritten shard; only the survivor remains."""
+    p = _shard(tmp_path, "mix.jsonl", [
+        {"service": "vpc", "resource_id": "vpc9",
+         "delete_path": "/v1/vpcs/vpc9"},          # 409 — real survivor
+        {"service": "apigateway", "resource_id": "a1",
+         "delete_path": "/v1/apis/a1"},            # ghost: DELETE+GET 403
+    ])
+    c = GetAwareClient(delete_status={"/v1/apis/a1": 403,
+                                      "/v1/vpcs/vpc9": 409},
+                       get_status={"/v1/apis/a1": 403,
+                                   "/v1/vpcs/vpc9": 200})
+    recon._pass_ledger_reclaim(c)
+    assert p.exists()
+    kept = [json.loads(ln) for ln in p.read_text().splitlines() if ln.strip()]
+    assert [r["resource_id"] for r in kept] == ["vpc9"], kept
+    # 2nd sweep: the ghost must NOT be probed again
+    c2 = GetAwareClient(delete_status={"/v1/vpcs/vpc9": 409},
+                        get_status={"/v1/vpcs/vpc9": 200})
+    recon._pass_ledger_reclaim(c2)
+    assert all("/v1/apis/a1" not in path for _, path in c2.calls), c2.calls
 
 
 def test_skips_recent_shard_active_run(tmp_path, monkeypatch):

@@ -1742,7 +1742,8 @@ def _pass_ledger_reclaim(c) -> int:
     deleted = 0
     for shard in shards:
         try:
-            if now - shard.stat().st_mtime < _LEDGER_MIN_AGE_S:
+            _mtime = shard.stat().st_mtime
+            if now - _mtime < _LEDGER_MIN_AGE_S:
                 continue  # active/recent run's shard — do not touch (Hard Rule 4)
             lines = shard.read_text().splitlines()
         except OSError:
@@ -1756,24 +1757,43 @@ def _pass_ledger_reclaim(c) -> int:
                 recs.append(json.loads(ln))
             except ValueError:
                 continue
+        # PER-RECORD pruning (2026-07-16 오너: "아래것들을 왜 조회하는거야?" —
+        # gone 확정을 찍고도 샤드 단위 all-or-nothing 프룬이라, 처리불가 레코드
+        # 하나가 샤드를 불멸로 만들어 이미 사라진 apigateway/scf 항목을 매 스윕
+        # DELETE+GET 재시도하던 낭비 수리). 처리된 레코드는 그 자리에서 샤드에서
+        # 빠지고, 재시도 가치가 있는 것(실존 200 / unknown 5xx)만 남는다.
+        drop: set[int] = set()
         # newest-first == children before parents (create order is parent→child)
-        all_gone = True
-        for rec in reversed(recs):
+        for idx in range(len(recs) - 1, -1, -1):
+            rec = recs[idx]
             dp = rec.get("delete_path") or ""
             svc = rec.get("service") or ""
             if not dp or "{" in dp or not rec.get("resource_id"):
-                all_gone = False   # can't address it — keep the shard for audit
+                # can never be addressed via the API — park it in the audit file
+                # (NOT the shard: keeping it made the shard immortal) and drop.
+                try:
+                    with (_REGISTRY_DIR / "unreclaimable-audit.log").open(
+                            "a", encoding="utf-8") as f:
+                        f.write(json.dumps(
+                            {"shard": shard.name, **rec}, ensure_ascii=False)
+                            + "\n")
+                except OSError:
+                    pass
+                drop.add(idx)
                 continue
             st = _delete(c, svc, dp)
             if st is None:
-                # dedup (already 2xx this sweep) or a transport error — treat as
-                # progress-neutral; 404 comes back as a real status below.
+                # None = 이번 스윕 이미 2xx(dedup) 또는 blocked/transport 오류.
+                # dedup은 gone이므로 프룬, 나머지는 unknown이라 보수적으로 유지.
+                if (svc, dp, "[]") in _DELETED_THIS_SWEEP:
+                    drop.add(idx)
                 continue
             if 200 <= st < 300:
                 deleted += 1
+                drop.add(idx)
                 print(f"  ledger-reclaim {svc} {dp} -> {st}")
             elif st == 404:
-                pass  # already gone — confirmed reclaimed
+                drop.add(idx)  # already gone — confirmed reclaimed
             else:
                 # 403/400 거절 — '없는 리소스'에 404 대신 403을 주는 서비스가
                 # 있다 (apigateway 실측 2026-07-15: 삭제완료된 API의 GET/DELETE
@@ -1789,17 +1809,27 @@ def _pass_ledger_reclaim(c) -> int:
                 except Exception:  # noqa: BLE001 — 확인 실패 = unknown, 유지
                     pass
                 if _g_st in (403, 404, 410):
+                    drop.add(idx)
                     print(f"  ledger-reclaim {svc} {dp} -> {st} "
                           f"(GET {_g_st}: 실존 안함 — gone 확정, 프룬)")
                 else:
-                    all_gone = False
                     print(f"  ledger-reclaim {svc} {dp} -> {st} "
                           f"(GET {_g_st}: retry next round)")
-        if all_gone:
-            try:
-                shard.unlink()  # every record gone → prune so we stop re-scanning
-            except OSError:
-                pass
+        if not drop:
+            continue
+        kept = [r for i, r in enumerate(recs) if i not in drop]
+        try:
+            if not kept:
+                shard.unlink()  # every record resolved → stop re-scanning
+            else:
+                shard.write_text(
+                    "\n".join(json.dumps(r, ensure_ascii=False) for r in kept)
+                    + "\n", encoding="utf-8")
+                # rewrite resets mtime → the min-age gate would mistake this old
+                # shard for an ACTIVE run's and skip retries for 15 min. Restore.
+                os.utime(shard, (now, _mtime))
+        except OSError:
+            pass
     return deleted
 
 
@@ -2081,19 +2111,23 @@ def _pass_servicewatch(c) -> int:
     if _lg_listed:
         print(f"  /v1/log-groups: {len(_lg_listed)} listed / "
               f"{len(_lg_picked)} deletable (부산물 전량 — 오너 2026-07-16)")
-    for it in _lg_picked:
+    # 로그그룹은 서로 독립(부산물) — 직렬로 돌면 50개 × (스트림 GET + DELETE
+    # ×2) ≈ 수 분이 걸리던 게 이 패스의 최대 벽시계 낭비였다 (오너 2026-07-16
+    # "여전히 너무 느리다"). 그룹별 작업을 스윕 풀로 병렬화한다; _STUCK /
+    # _DELETE_ISSUED 는 GIL-원자적 set/dict 연산만 쓴다 (_delete 는 자체 락).
+    def _reap_log_group(it) -> int:
         gid = it.get("id")
         if not gid:
-            continue
+            return 0
         if _converge_enabled() and str(gid) in _STUCK:
-            continue  # known-stuck (e.g. IAM-gated stream) — don't retry
+            return 0  # known-stuck (e.g. IAM-gated stream) — don't retry
         if _converge_enabled() and str(gid) in _DELETE_ISSUED:
             # we deleted it a prior round yet it persists → IAM-gated / un-reapable
-            _STUCK[str(gid)] = "log-group persists after delete (IAM-gated child "
-            _STUCK[str(gid)] += "log-stream: needs the log-stream IAM action)"
+            _STUCK[str(gid)] = ("log-group persists after delete (IAM-gated child "
+                               "log-stream: needs the log-stream IAM action)")
             print(f"  stuck: {gid} ({_name_of(it)}) — log-group still listed "
                   f"after delete (IAM-gated child stream); not retrying")
-            continue
+            return 0
         try:
             streams = _items(c.get(
                 f"/v1/log-groups/{gid}/log-streams",
@@ -2116,9 +2150,11 @@ def _pass_servicewatch(c) -> int:
         if _converge_enabled():
             _DELETE_ISSUED.add(str(gid))
         if _note_progress(st, it):
-            deleted += 1
-        else:
-            print(f"  log-group {gid} delete -> {st}")
+            return 1
+        print(f"  log-group {gid} delete -> {st}")
+        return 0
+
+    deleted += sum(_map_parallel(_reap_log_group, _lg_picked))
     return deleted
 
 

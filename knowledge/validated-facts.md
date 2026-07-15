@@ -3448,3 +3448,24 @@ api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 �
 - **servicewatch 로그그룹은 전량 부산물**: 전용 테스트 계정에서 로그그룹은
   전부 플랫폼 자동 파생물이므로 이름/태그 게이트 없이 **리스트 전량 삭제**
   (오너 확정). IAM-gated stuck 수렴 가드는 유지.
+
+## ledger-reclaim 샤드 불멸 버그 + 로그그룹 병렬 삭제 (2026-07-16, 오너 "왜 조회하는거야/너무 느리다")
+
+- **버그**: ledger-reclaim 프룬이 샤드 단위 all-or-nothing이라, 처리불가 레코드
+  (미해석 `{token}`) 하나가 샤드를 불멸로 만들어 gone 확정(GET 403/404/410)된
+  apigateway/scf 유령 항목을 **매 스윕 DELETE+GET 재프로브**했다 (오너 관측:
+  ledger-reclaim 403 로그 15줄). → **레코드 단위 프룬**으로 수리: gone/2xx/404/
+  dedup은 즉시 샤드에서 제거, 처리불가는 `reports/registry/unreclaimable-audit.log`
+  로 이동(샤드에 안 남김), 잔존 200·unknown 5xx만 유지. 샤드 재작성 시 mtime
+  복원(os.utime) — 리라이트가 min-age 게이트(900s)를 오발동해 재시도를 15분
+  미루는 것 방지.
+- **servicewatch 로그그룹 삭제 병렬화**: 그룹당 스트림 GET + DELETE×2가 직렬로
+  50+개 돌며 수 분을 태우던 것을 `_map_parallel`(SCP_SWEEP_PARALLEL, 기본 6)로
+  병렬화. stuck/issued 게이트는 그대로.
+- **테스트 위생**: tests/offline/test_sweep_prescan.py 의 run_sweep 패리티
+  테스트가 진짜 reports/registry 를 읽어 FakeClient 가짜 204로 **실제 원장
+  샤드를 프룬**했었다 (첫 실행만 실패하고 재실행 통과하는 플레이크의 원인).
+  _hermetic fixture 에서 _REGISTRY_DIR 를 tmp 로 격리.
+- 스윕 구조 재확인(오너 "tag로 조회하고 남은것 다 지우면"): 그게 현재 구조다 —
+  tag 인벤토리로 컬렉션 축소 + 부산물 전량 나열 + ledger 는 리스트 사각지대
+  (queueservice)용. 남던 낭비는 위 유령 재프로브였다.

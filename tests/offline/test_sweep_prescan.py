@@ -10,6 +10,7 @@ max(지연) 하나로 줄어든다. 삭제 순서(역방향 패스 순서)·소�
 from __future__ import annotations
 
 import re
+import tempfile
 import time
 from pathlib import Path
 
@@ -27,6 +28,11 @@ def _hermetic(monkeypatch):
     monkeypatch.setattr(recon.time, "sleep", lambda *a, **k: None)
     monkeypatch.setattr(recon, "_wait_gone", lambda *a, **k: True)
     monkeypatch.setattr(recon, "_wait_all_gone", lambda *a, **k: True)
+    # run_sweep은 ledger-reclaim 패스를 포함 — 진짜 reports/registry를 읽게
+    # 두면 FakeClient의 가짜 204가 실제 원장 샤드를 '회수됨'으로 프룬해버린다
+    # (2026-07-16 실측: 프리스캔 패리티 테스트가 첫 실행에서만 실패한 원인).
+    monkeypatch.setattr(recon, "_REGISTRY_DIR",
+                        Path(tempfile.mkdtemp(prefix="regr-ledger-")))
     yield
 
 
