@@ -2780,7 +2780,7 @@
             "image_os": "ubuntu",
             "image_os_version": "22.04",
             "keypair_name": "regrkey{unique}",
-            "volume_size": "13",
+            "volume_size": "104",
             "volume_type_name": "SSD",
             "is_auto_recovery": "false",
             "is_auto_scale": "false",
@@ -2799,7 +2799,7 @@
             "path": "/v1/nodepools/{nodepool_id}",
             "service": "ske"
           },
-          "_note": "CONSOLE-MIRROR REPAIR 2026-07-16: 오너가 콘솔에서 동일 클러스터에 노드풀 생성 성공한 조합을 그대로 미러링 — zone=kr-west1-b(콘솔 필수 입력), server_type s1v1m2(1vCPU/2G; 종전 캡처값 s1v10m120은 노드풀 비적격 가능), volume SSD 13GB(종전 SSD_Provisioned 104GB + max_iops/throughput 제거), is_auto_recovery=false. 종전 바디는 500 ContactAdminForAssistance (req-87752221…) — 어느 필드가 방아쇠인지 미분리, 매칭 실패에 500을 주는 백엔드는 conformance 후보. 다음 SKE 런 판정."
+          "_note": "REPAIR v3 2026-07-16: 콘솔-미러 후 500→400 전환 성공 (zone/s1v1m2/SSD 중 하나가 500의 방아쇠였음 — 이제 정상 검증 경로). 400 scp-kubernetes.nodepool.invalid-storage-size 'between 104 and 12288' 실측 (req-d2cf2f74…) — 콘솔의 13은 GB가 아니라 Units(×8GB=104GB)이고 API volume_size는 GB 단위 최소 104. 104로 복원. || CONSOLE-MIRROR REPAIR 2026-07-16: 오너가 콘솔에서 동일 클러스터에 노드풀 생성 성공한 조합을 그대로 미러링 — zone=kr-west1-b(콘솔 필수 입력), server_type s1v1m2(1vCPU/2G; 종전 캡처값 s1v10m120은 노드풀 비적격 가능), volume SSD 13GB(종전 SSD_Provisioned 104GB + max_iops/throughput 제거), is_auto_recovery=false. 종전 바디는 500 ContactAdminForAssistance (req-87752221…) — 어느 필드가 방아쇠인지 미분리, 매칭 실패에 500을 주는 백엔드는 conformance 후보. 다음 SKE 런 판정."
         },
         {
           "name": "wait-nodepool",
