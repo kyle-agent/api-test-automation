@@ -1043,6 +1043,15 @@ def _preflight(sel: dict) -> dict:
                "per_lifecycle": {}, "error": str(exc)[:120]}
 
     warnings: list[str] = []
+    # read-only(smoke) suite: 실행은 tests/smoke(조회 전용)로 전환되므로 자원
+    # 생성/과금이 0이다 — 선택 그래프에서 역산한 heavy 수를 그대로 보여주면
+    # 오탐 (오너 2026-07-15: "smoke인데 왜 과금이 있다고 하지?").
+    if sel.get("read_only"):
+        resources = []
+        peak_quota = {"vpc": 0}
+        billable_count = 0
+        warnings.append("read-only 런 — tests/smoke(조회 전용)로 실행됩니다: "
+                        "자원 생성/변경/삭제 없음, 과금 0 (~15분)")
     if est.get("basis") == "default":
         warnings.append("예상 시간이 전부 기본값입니다 (측정 이력 없음)")
     elif est.get("basis") == "mixed":
@@ -2236,11 +2245,15 @@ def _run_worker(rec: dict) -> None:
                     f"heavy={rec['heavy']}  parallel={n}\n")
             f.flush()
             from regression.scenarios import local_run as _lr
+            # read-only(smoke) 런: 자원을 만들지 않으므로 공유 VPC provision도
+            # 불필요 — 통째로 스킵 (아래 pytest 타깃도 tests/smoke로 전환).
+            _read_only = bool(rec.get("read_only"))
             # adopt:vpc 선택은 non-heavy여도 공유 VPC가 필요하다 (2026-07-10
             # run-adfd: heavy-게이트 탓에 private-nat/apigw-privatelink IB-049 스킵)
-            shared = (_provision_shared(env, f)
-                      if rec["heavy"] or _lr.selection_needs_shared_vpc(
-                          rec["lifecycle_ids"]) else {})
+            shared = ({} if _read_only else
+                      (_provision_shared(env, f)
+                       if rec["heavy"] or _lr.selection_needs_shared_vpc(
+                           rec["lifecycle_ids"]) else {}))
             if shared.get("SCP_SHARED_VPC_ID"):
                 # run-keyed shared-VPC ownership: the capacity view uses this to
                 # keep the shared VPC under '내 실행' (신규10), never '기존'.
@@ -2261,7 +2274,13 @@ def _run_worker(rec: dict) -> None:
                 # opt-in: SCP_NATIVE_RUNNER=true면 목적특화 스케줄러(native_runner)
                 # — 동적 LPT·공유 쿼터 조율·no-shutdown(꼬리 붕괴 제거). 별도 프로세스
                 # (start_new_session)라 중단 버튼으로 kill 동일. (2026-07-13 오너 지시)
-                if os.environ.get("SCP_NATIVE_RUNNER", "").strip().lower() == "true":
+                if rec.get("read_only"):
+                    # 조회 전용 생존 확인 — CI smoke job과 동일 의미 (path-param
+                    # 없는 GET 실호출 + read-chains). 자원 생성 0, 게이트 전부 OFF.
+                    _cmd = [sys.executable, "-m", "pytest", "tests/smoke",
+                            "-m", "smoke", "-n", n, "--dist=load",
+                            "-o", "addopts=", "-q"]
+                elif os.environ.get("SCP_NATIVE_RUNNER", "").strip().lower() == "true":
                     _cmd = [sys.executable, "-m", "regression.scenarios.native_runner"]
                 else:
                     _cmd = [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
@@ -2965,8 +2984,14 @@ class Handler(BaseHTTPRequestHandler):
             if not ids:
                 return self._json(400, {"error": "no lifecycles selected"})
             mode = b.get("mode", "live")
-            heavy = _selection_is_heavy(ids)
-            peak = _run_peak_vpcs(ids)
+            # read-only 런 (오너 2026-07-15 실측: smoke suite를 골라도 콘솔이
+            # 게이트를 버리고 전 카탈로그 LIVE CRUD를 돌렸다 — "smoke 인데도
+            # vpc tgw 등은 다 만들고 있네"). suite request의 mutations:false를
+            # UI가 read_only로 보존해 보내면: 게이트 전부 OFF + 러너를
+            # tests/smoke(조회 전용)로 전환 — 자원 생성/변경/삭제 0.
+            read_only = bool(b.get("read_only"))
+            heavy = False if read_only else _selection_is_heavy(ids)
+            peak = 0 if read_only else _run_peak_vpcs(ids)
             if mode == "live":
                 act = _active_live_run()
                 if act:
@@ -2984,7 +3009,10 @@ class Handler(BaseHTTPRequestHandler):
                 # opt-in (Hard Rule 1) is the selection itself + the client's
                 # pre-flight confirm — not a separate toggle.
                 rec = _new_rec("lifecycle", mode="live", lifecycle_ids=ids,
-                               heavy=heavy, mutations=True, destructive=True)
+                               heavy=heavy, mutations=not read_only,
+                               destructive=not read_only)
+                if read_only:
+                    rec["read_only"] = True
                 worker = _run_worker
             else:
                 # simulate stays a server capability (no UI toggle): no cloud calls,

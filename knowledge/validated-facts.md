@@ -3169,3 +3169,23 @@ stop, 픽 리포트 0-LIST, stuck 1회 보고)인데 NOWAIT(배리어 0)에서 1
 35.2→27.9) · SKE 33분 통과 · eventstreams 첫 완주가 50.8분 신규 critical path
 (→ 차기 분할 후보 1순위, 안정화 확인 후) · 테스트 55.4/정리 25.7/총 81.0분
 (eventstreams 커버리지 신규 추가분 포함으로 기준선과 동시간).
+
+## console2 suite 게이트 소실 — smoke가 풀 CRUD로 돌던 버그 (2026-07-15, 오너 실측)
+
+**증상**: 콘솔에서 smoke suite를 골라 실행하면 VPC/TGW/DB까지 전부 생성 (오너:
+"smoke인데도 vpc tgw 등은 다 만들고 있네", "db도 만드는데?"). pre-flight의 과금
+경고는 오탐이 아니라 정확했던 것.
+
+**원인**: `applySuite()`가 suite를 '선택 프리셋'으로만 취급 — scope 없는
+whole-catalog suite(smoke/full)는 전 카탈로그 lifecycle을 targets로 펼치고,
+request 게이트(mutations:false)는 폐기("No axis mapping — gates derive from
+selection"). /api/run은 live 런에 mutations=destructive=true 하드코딩 + heavy를
+선택에서 역산 → smoke 선택 = 전 카탈로그 LIVE CRUD.
+
+**수리**: (1) UI — suite request.mutations===false면 `suiteReadOnly` 보존(수동
+선택 변경 시 해제), selectionPayload에 `read_only:true` 동봉. (2) 서버 /api/run —
+read_only면 게이트 전부 OFF + rec.read_only. (3) _run_worker — read_only 런은
+공유 VPC provision 스킵 + pytest 타깃을 `tests/smoke -m smoke`(CI smoke job과
+동일 의미)로 전환: 자원 생성 0, run-end 스윕도 resource-tracked 0 게이트로 자동
+생략. (4) _preflight — read_only면 과금/자원/peak 0 + 안내 워닝. **서버 재시작 +
+브라우저 새로고침 필요** (JS+서버 모두 변경).

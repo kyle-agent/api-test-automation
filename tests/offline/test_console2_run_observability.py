@@ -569,3 +569,21 @@ def test_post_run_rescans_plus0_kept_when_sweep_skipped(tmp_path):
                          sleep=lambda s: None)
     assert len(calls) == 1, "스윕 미수행이면 +0 유지"
     assert rec["rescans"][0]["total"] == 0
+
+
+def test_preflight_read_only_zeroes_billables(monkeypatch):
+    """read-only(smoke) suite 프리플라이트: 선택 그래프의 heavy에서 역산하던
+    과금/자원을 0으로 — 실행이 tests/smoke(조회 전용)로 전환되므로 (오너
+    2026-07-15: "smoke인데 왜 과금이 있다고 하지?" / "db도 만드는데?")."""
+    monkeypatch.setattr(C2, "_plan", lambda ids: {"runnable": ids or ["x"],
+                                                  "peak_vpcs": 3})
+    monkeypatch.setattr(C2, "_graph", lambda sel: {"nodes": [
+        {"id": "n1", "service": "mysql", "heavy": True}], "peak_quota": {"vpc": 3}})
+    monkeypatch.setattr(C2, "_model", lambda: {"lifecycles": {}, "nodes": {}})
+    pf = C2._preflight({"lifecycle_ids": ["a"], "read_only": True})
+    assert pf["billable_count"] == 0, "read-only는 과금 0"
+    assert pf["resources"] == [] and pf["peak_quota"]["vpc"] == 0
+    assert any("read-only" in w for w in pf["warnings"])
+    # 동일 선택이라도 read_only 없으면 종전대로 heavy가 과금으로 잡힘
+    pf2 = C2._preflight({"lifecycle_ids": ["a"]})
+    assert pf2["billable_count"] == 1

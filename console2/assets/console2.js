@@ -719,7 +719,13 @@ function drawSvcTree() {
 }
 
 // any selection change: re-render the tree (state), readout, and re-fetch the DAG
+// read-only suite 게이트 보존 (2026-07-15): smoke처럼 request.mutations:false인
+// suite를 적용하면 켜지고, 사용자가 선택을 수동으로 바꾸면 해제된다 — 실행/
+// 프리플라이트 페이로드에 read_only로 실려 서버가 tests/smoke 러너로 전환.
+let suiteReadOnly = false;
+let _applyingSuite = false;
 function selectionChanged() {
+  if (!_applyingSuite) suiteReadOnly = false;   // 수동 선택 변경 = suite 의미 해제
   persistSelection();       // survive iframe reloads (신규6)
   if (screen === "build") drawSvcTree();
   selReadout();
@@ -1147,7 +1153,10 @@ function applySuite(s) {
     addIf(() => true);                       // whole-catalog suite (smoke/full/…)
   }
   closeSuiteMenu();
-  selectionChanged();
+  _applyingSuite = true;
+  try { selectionChanged(); } finally { _applyingSuite = false; }
+  suiteReadOnly = (req.mutations === false);   // smoke류 read-only 게이트 보존
+  if (suiteReadOnly) toast("read-only suite — 조회 전용(tests/smoke)으로 실행됩니다", "ok");
 }
 function currentSuitePayload(id, label) {
   const node_ids = [...targets];
@@ -3945,7 +3954,9 @@ function pvaHtml(sim) {
 // node_ids 범위 그대로 (서비스 전체로 부풀리지 않음).
 function selectionPayload() {
   const services = allSelectableServices().filter(s => svcState(s) === "on");
-  return { node_ids: [...targets], services };
+  const p = { node_ids: [...targets], services };
+  if (suiteReadOnly) p.read_only = true;   // suite 게이트 보존 → 서버 smoke 러너
+  return p;
 }
 
 function legend(items) {
