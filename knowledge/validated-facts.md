@@ -3036,3 +3036,12 @@ opt-out: poll.interval_start=interval. 429 영향: 폴당 최대 +4 GET(초기 3
 - 메타: adopt_edges full 5개 제거→a/b 10개 추가([subnet#db,vpc] 동일), durations
   0.6×full 시드(source: split-estimate), DAG 194 enabled 통과, validate 0 error.
 - 주의: eventstreams-cluster-subops-full은 별도 파일(플랫폼 PF 조사 중)이라 미분할.
+## DBaaS 최소 사이즈 전환 — capture min_by (2026-07-15, 오너 "제일 작은 사이즈로 전부")
+
+**문제**: DB형 엔진들의 서버타입 캡처가 전부 "목록 첫 항목"이라 mysql/pg/epas/mariadb는 `db1v10m120`(10vCPU/120G), cachestore는 `css1v10m160`(10vCPU/160G), ES는 `ess1v16m32`(16vCPU/32G)×3를 매 런 생성 — 목록 정렬에 크기 의존.
+
+**엔진 확장**: `_capture`에 `min_by`(숫자 필드 오름차순 최소 선택, 복수 필드 tie-break) + `nth`(0=최소, 1=차소 — 리사이즈 대상용, 초과시 클램프) 추가. where_prefix와 합성 가능, min_by 없으면 종전 첫-매치 그대로(하위호환). 오프라인 테스트 tests/offline/test_capture_min_by.py 6종.
+
+**적용 30곳**: scenarios.json 6(mysql/pg db_server_type, pg alt→nth1, heavy-shared maria/epas/cache) + subops-full 10(5엔진 + *_stype2/server_type_name/db_server_type2→nth1) + eventstreams 2(es_stype/es_stype2 — prefix 하드코딩 제거) + heavy-dbaas 9 + heavy-pg 3. 버전/파라미터그룹 캡처(engine_version_id 등)는 크기 개념이 아니라 불변.
+
+**관찰 항목(다음 런)**: (1) 실제 잡힌 최소 타입명(오너 추정 2vCPU/4G) — events의 find-* resp로 확인, (2) 생성시간 변화 — op_timings store의 createcluster p50 대비 last_s (기준: mysql 9:24 / pg 8:54 / ES는 종전 FAILED).

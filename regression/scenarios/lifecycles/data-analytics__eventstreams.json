@@ -432,18 +432,21 @@
           "capture": {
             "es_stype": {
               "list": "$.contents",
-              "where_prefix": {
-                "name": "ess1v2m"
-              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           },
           "capture_soft": {
             "es_stype2": {
               "list": "$.contents",
-              "where_prefix": {
-                "name": "ess1v4m"
-              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
               "get": "name"
             }
           },

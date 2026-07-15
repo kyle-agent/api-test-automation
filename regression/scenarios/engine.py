@@ -422,9 +422,16 @@ def _jsonpath_get(obj, expr: str):
 
 def _capture(body, expr):
     """Capture a value from a response. `expr` is a JSONPath string or a filter
-    object selecting the first list element matching field prefixes:
+    object selecting a list element matching field prefixes:
         {"list": "$.server_types", "where_prefix": {"id": "s"},
-         "where_not_prefix": {"id": "g"}, "get": "id"}"""
+         "where_not_prefix": {"id": "g"}, "get": "id"}
+    Optional smallest-first selection (2026-07-15, owner "제일 작은 사이즈"):
+        {"list": "$.contents", "min_by": ["cpu_core", "memory_gb"],
+         "get": "name", "nth": 0}
+    ``min_by`` sorts the filtered items ascending by the named numeric
+    field(s) — non-numeric/missing sort last — and returns the ``nth``
+    (default 0 = smallest; 1 = second-smallest, for resize targets).
+    Without ``min_by`` the first filtered item wins (legacy order-dependent)."""
     if body is None:
         return None
     if isinstance(expr, str):
@@ -432,6 +439,7 @@ def _capture(body, expr):
     items = _jsonpath_get(body, expr["list"]) or []
     where = expr.get("where_prefix", {})
     wnot = expr.get("where_not_prefix", {})
+    kept = []
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -443,9 +451,28 @@ def _capture(body, expr):
             if any(str(item.get(k, "")).startswith(p) for p in prefixes):
                 excluded = True
                 break
-        if not excluded:
-            return item.get(expr["get"])
-    return None
+        if excluded:
+            continue
+        if not expr.get("min_by"):
+            return item.get(expr["get"])   # legacy: first match wins
+        kept.append(item)
+    if not kept:
+        return None
+    fields = expr["min_by"]
+    fields = [fields] if isinstance(fields, str) else list(fields)
+
+    def _key(it):
+        vals = []
+        for f in fields:
+            try:
+                vals.append(float(it.get(f)))
+            except (TypeError, ValueError):
+                vals.append(float("inf"))
+        return tuple(vals)
+
+    kept.sort(key=_key)
+    nth = min(int(expr.get("nth", 0)), len(kept) - 1)
+    return kept[nth].get(expr["get"])
 
 
 def _apply_b64_fields(step: dict, body):

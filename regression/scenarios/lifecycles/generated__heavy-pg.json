@@ -48,6 +48,10 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -656,6 +660,10 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -1077,6 +1085,10 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
