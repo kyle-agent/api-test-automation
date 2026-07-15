@@ -2971,7 +2971,7 @@
           "method": "PUT",
           "path": "/v1/nodepools/{nodepool_id}/upgrade",
           "json": {
-            "os_version": "22.04"
+            "os_version": "24.04"
           },
           "expect_status": [
             200,
@@ -2984,7 +2984,7 @@
           ],
           "retries": 8,
           "retry_interval": 60,
-          "_note": "Body is NodepoolUpgradeSetRequestV1Dot4 {os_version} — an OS version, NOT kubernetes_version: nodes follow the control plane (api_docs; the retired probe sent kubernetes_version, contradicting docs, and was never proven). 8x60s 409-retry covers a control plane still settling after wait-cluster-upgraded's known premature-pass caveat."
+          "_note": "OS-IMAGE REPAIR 2026-07-16 (run 실측 400 scp-kubernetes.nodepool.invalid-os-image 'ubuntu 22.04 (None)', req-f7438c27…): 노드풀 업그레이드는 클러스터의 업그레이드된 k8s 버전(kube_ver_next=v1.35.5)을 따라가는데, 이 계정의 v1.35.5 plain ubuntu 이미지는 24.04뿐 (22.04는 v1.34.3까지 — 이미지 33종 인벤토리 실측). os_version=24.04로 업그레이드하며 OS도 전환. 이미지 매트릭스가 바뀌면(다음 버전업) 이 값 재확인 필요."
         },
         {
           "name": "wait-nodepool-upgraded",
