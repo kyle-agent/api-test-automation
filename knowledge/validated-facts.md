@@ -3131,3 +3131,17 @@ B 잔류: patch·upgrade-kernel·resize-ig·add/resize-block-storages(+capture-s
 **run-f5a9 수리 검증**: gen-heavy-lb-members delete-public-ip **통과**(400 retry 유효). 동일 클래스 잔존 5곳(vpn-gateway-tunnel<-이번 런 실패, vpc-publicip, networking-vpc-publicip, heavy-shared publicip-delete, pilot) 전부 [400,409]로 정렬 — publicip DELETE는 detach 전파 지연으로 ATTACHED 400이 구조적, **모든 publicip delete에 400 retry가 규약**.
 
 **ske scale-up 400 (신규)**: upgrade-nodepool 후 **nodepool은 Running인데 cluster는 UPDATING** — 노드풀 폴만으로 게이트 불충분. scale-up-nodepool 앞에 wait-cluster-before-scale-up($.cluster.status Running, 900s) 삽입. 클러스터-자원 이중 상태는 각각 게이트해야 함.
+
+## teardown 최소화 감사 마무리 (2026-07-15)
+
+- **dbaas 재-DELETE 인질 가드**: 스윕 dbaas 패스가 이미 DELETING인 클러스터
+  (라이프사이클이 방금 삭제, mariadb drain ~90분)에 재-DELETE를 발행 → 2xx로
+  접수되면 900s dbaas 배리어가 그 drain을 인질로 최대 15분 정지. TGW 패스와
+  동일하게 async-deleting 스킵(_select의 in-progress 집계는 유지).
+- **run-end 단계별 소요 계측**: console2 로그에 teardown shared/reap/스윕 각
+  소요(s)를 남김 — 다음 런부터 "정리 N분 = 어느 단계 몇 분"이 로그로 확정.
+- 최소 프로파일 기대(모든 수리 적용 시): teardown_shared ~3-5분(병렬 4체인,
+  서브넷 drain이 바닥) + reap ~1-2분(버킷 배리어) + 스윕 ~2-4분(클린 계정
+  1라운드 + leaf-drain stop + 유령 프룬) ≈ **총 7-11분** (종전 27-29분).
+- 적용 조건: shared_infra/reconciler는 서브프로세스라 pull만으로 적용;
+  reap 배리어·+0 스킵·단계 계측은 **console2 서버 재시작 필요**.

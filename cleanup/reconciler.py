@@ -1877,7 +1877,17 @@ def run_sweep(client) -> int:
         try:
             for it in _select(c, svc, "/v1/clusters", name_prefixes=("regr",)):
                 cid = it.get("id")
-                if cid and _delete(c, svc, f"/v1/clusters/{cid}"):
+                if not cid:
+                    continue
+                # 이미 DELETING인 클러스터에 재-DELETE 금지 (2026-07-15 teardown
+                # 최소화 감사): 라이프사이클이 방금 지운 클러스터(drain ~90분,
+                # mariadb)가 여기 걸리는데, 재-DELETE가 2xx로 접수되면 아래
+                # dbaas 배리어(900s)가 그 drain을 인질로 잡아 최대 15분을 선다.
+                # _select가 이미 in-progress로 집계했으므로(라운드 유예 근거)
+                # 스킵만 하면 된다 — TGW 패스의 동일 가드와 같은 규약.
+                if _is_async_deleting(it):
+                    continue
+                if _delete(c, svc, f"/v1/clusters/{cid}"):
                     out.append((svc, cid))
         except Exception as exc:  # isolate one engine's failure
             print(f"  dbaas {svc} pass error: {exc}")

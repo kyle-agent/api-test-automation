@@ -2148,10 +2148,12 @@ def _provision_shared(env: dict, f) -> dict:
 def _teardown_shared(env: dict, shared: dict, f) -> None:
     if not shared.get("SCP_SHARED_VPC_ID"):
         return
+    _td0 = time.time()
     f.write("\n=== teardown shared VPC (precise, by id) ===\n")
     f.flush()
     subprocess.run([sys.executable, "-m", "regression.scenarios.shared_infra", "--teardown"],
                    cwd=str(ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT)
+    f.write(f"=== teardown shared: {time.time() - _td0:.0f}s ===\n")
 
 
 def _pytest_did_not_run(rc: int, pytest_out: str) -> bool:
@@ -2339,12 +2341,14 @@ def _run_worker(rec: dict) -> None:
                 # related_resources) 포함. 계정 전체가 아니라 이 런의 대장만.
                 f.write("\n=== per-run cleanup: run-scoped reap (이 런의 잔존만) ===\n")
                 f.flush()
+                _rp0 = time.time()
                 try:
                     from cleanup.run_scoped import reap_run_leftovers
                     reap_run_leftovers(rec["events"],
                                        log=lambda m: (f.write(m + "\n"), f.flush()))
                 except Exception as exc:  # noqa: BLE001 — best-effort tail
                     f.write(f"  run-scoped reap 실패(무시): {exc}\n")
+                f.write(f"  (reap 소요 {time.time() - _rp0:.0f}s)\n")
                 f.flush()
                 # 런 종료 자동 클린업 (owner 2026-07-10: "끝나면 cleanup 해서
                 # 0으로 만드는 걸 미리 반영해둬"): run-scoped 리퍼가 못 보는
@@ -2379,6 +2383,7 @@ def _run_worker(rec: dict) -> None:
                         f.write("\n=== 런 종료 자동 클린업: owner-tag 강제 스윕 "
                                 "(IGNORE_TTL) — 잔존 0 수렴 ===\n")
                         f.flush()
+                        _sw0 = time.time()
                         subprocess.run(
                             [sys.executable, "-m", "cleanup.reconciler"],
                             cwd=str(ROOT),
@@ -2387,6 +2392,7 @@ def _run_worker(rec: dict) -> None:
                                  "SCP_SWEEP_IGNORE_TTL": "true",
                                  "SCP_SWEEP_NOWAIT": "true"},
                             stdout=f, stderr=subprocess.STDOUT)
+                        f.write(f"  (스윕 소요 {time.time() - _sw0:.0f}s)\n")
                         with _LOCK:
                             rec["end_sweep_ran"] = True   # +0 재스캔 중복 스킵 근거
                         f.write("  자동 클린업 완료 — 늦출현(스냅샷류 ~20분 지연)은 "

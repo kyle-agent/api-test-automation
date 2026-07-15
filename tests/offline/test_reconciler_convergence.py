@@ -805,3 +805,16 @@ def test_unowned_items_never_selected():
     assert not any("win" in p or "someones-volume" in p or "/x" in p
                    for p in deleted), \
         "un-owned resources must never be deleted (ownership guard intact)"
+
+
+def test_dbaas_deleting_cluster_not_redeleted_no_barrier_hostage():
+    """teardown 최소화(2026-07-15): 이미 DELETING인 클러스터(라이프사이클이
+    방금 삭제, drain ~90분)에 재-DELETE를 발행하면 902s dbaas 배리어가 그
+    drain을 인질로 잡는다 — 스킵하고 in-progress 집계(_select)에만 맡긴다."""
+    cl = _owned("regr-maria", id="cl-1", state="DELETING")
+    client = FakeClient(lists={"/v1/clusters": [cl]})
+    recon._INPROGRESS_THIS_ROUND[0] = 0
+    recon.run_sweep(client)
+    assert not any(p == "/v1/clusters/cl-1" for p in _delete_paths(client)), \
+        "DELETING 클러스터 재-DELETE 금지 (배리어 인질 방지)"
+    assert recon._INPROGRESS_THIS_ROUND[0] >= 1, "in-progress 집계는 유지"
