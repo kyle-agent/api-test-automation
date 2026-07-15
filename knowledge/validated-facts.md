@@ -3103,3 +3103,7 @@ queueservice가 원형)이 404만 gone 확정으로 봐서, 이미 지워진 api
 **수리**: DELETE 거절(403/400 등) 시 GET 실존확인 — GET 403/404/410 = 이
 자격증명으로 관측 불가 = gone 확정(샤드 프룬), GET 200 = 진짜 잔존(재시도
 유지), GET 5xx/429 = unknown(보수적 유지). offline 3종.
+
+## ES 전용 subnet 실험 (2026-07-15, 오너 승인)
+
+콘솔 성공(ess1v2m4·combined 3노드·Running) vs API 실패(동일 조합인데 202 후 provision FAILED, run-9c64)의 잔여 격차 후보 = **네트워크 배치**: 콘솔은 전용 VPC/subnet(regrvpcd6d5f60l), API는 공유 VPC의 공유 db-subnet(10.124.7.0/24). 실험: eventstreams-cluster-subops-full의 subnet adopt 해제 → 공유 VPC 내 전용 /24 **10.124.12.0/24** 자체 생성/삭제(waits 600/900s, teardown 스텝 기존재). VPC는 공유 유지. 공유 VPC(10.124.0.0/20) /24 사용 맵: 0=공유, 7=db, 8·9·10=타 lifecycle — 신규는 1~6·11~15에서 고를 것.
