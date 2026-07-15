@@ -187,6 +187,34 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   링크 유지) + tests_offline 32/32 (">Published" 라벨 카운트 == 1 계약 추가 —
   class 카운트는 ci 배지가 badge-published 스타일을 재사용해 부적합).
 
+## 회귀 판정 배너 재설계 + 관측 0 마스킹 수리 (오너 공동 설계 2026-07-15)
+
+오너와 블록 단위 공동 설계: "메인 = 성공/실패 · 몇 건 · 언제 + 실패 상세 링크".
+결정 3건 — **1-a** 내역 미리보기는 서비스별 카운트 · **2** 통과도 배너 유지 ·
+**3** 48h+ 에 [지금 실행] 버튼 (콘솔로 — pre-flight 게이트, 자동 실행 아님).
+
+- **홈 배너 4상태** (`home.html` + `app.py fail_svcs` 집계):
+  - 실패: "회귀 테스트 실패 — 신규 실패 N건 · MM-DD HH:MM 런 (상대) · suite ·
+    알려진 실패 M건 추적 중" + **내역: 서비스별 카운트**(발행 fail_new.json →
+    results_data, 폴백 시 '상한 6건 기준' 명시) + [→ Triage에서 상세·분류].
+  - 통과: 같은 형식 초록 배너. 오래됨(48h+): "마지막 회귀 테스트가 N 전 — 당시
+    판정 …" + [▶ 지금 실행 →]. 판정 기준(known_issues 베이스라인, 직전 런 대비
+    아님)은 헤드라인 툴팁.
+  - (구 D2 칩 잔재 `local_since_publish` 계산 제거 — 칩 삭제로 사장.)
+- **결함 ① 관측 0 판정 마스킹** (오너 스크린샷으로 발견): 0-call 재발행이
+  `fail_new==0` 을 타고 발행 index 에 "HEALTHY — 배포 안전"을 자동 선언 (홈은
+  history 의 has_results 가드로 25건 유지 → 두 표면 모순). 수리(`build.py
+  render`): `has_results` 없으면 **NO NEW OBSERVATIONS** 필 + "판정 불가 —
+  직전 실측 판정 유지: …(ts 런 기준)" 배너 + 신규 회귀 카드 '—' (0 위장 금지).
+- **결함 ② fail_new.json 발행 누락**: build 는 쓰는데 **두 발행 경로(api-test.yml
+  ·publish_dashboard.sh) 모두 copy 목록에 없어** 정공법 파일이 발행된 적 없음
+  (results_data 가 계속 배너-파싱 폴백으로 살던 이유). copy 추가 + build 는 관측
+  0 이면 skip-write (cp 부재 = 직전 발행본 보존 — 0-call 이 상세 목록을 지우던
+  것도 방지).
+- 검증: `test_regression_verdict_banner` (실패/통과/오래됨 3상태 렌더 + 내역
+  집계 + 가드 소스 계약) + 관측 0 **실빌드**로 index "판정 불가"/skip-write 확인
+  · tests_offline 33/33.
+
 ## 대시보드 정비 (오너 지시 2026-07-14)
 
 - **서비스별 Platform 링크 제거** ("대시보드에 platform 링크들이 모든 서비스마다

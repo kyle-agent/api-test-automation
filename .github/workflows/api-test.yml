@@ -1103,6 +1103,11 @@ jobs:
           # verified_endpoints / endpoint_status are cumulative-merged in Build
           cp dashboard/verified_endpoints.json "$dd"/ 2>/dev/null || true
           cp dashboard/endpoint_status.json "$dd"/ 2>/dev/null || true
+          # regression DETAIL lists (Reporting 개선 A의 정공법 파일 — 이 copy 가
+          # 빠져 있어 소비자(results_data)가 계속 배너-파싱 폴백으로 살았다).
+          # build 는 관측 0 발행에서 이 파일을 skip-write 하므로, cp 실패(부재)
+          # = 직전 발행본 보존 (관측 0 가드와 짝).
+          cp dashboard/fail_new.json "$dd"/ 2>/dev/null || true
           # IB-041 per-endpoint 2xx EVIDENCE (distinct file from the C3 key-set
           # above): the accumulated masked-defect-safe promotion evidence. Named
           # *_evidence.json so it never clobbers build.py's verified_endpoints.json.
