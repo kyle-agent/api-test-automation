@@ -3362,3 +3362,23 @@ breaking 12조합/48스텝 수리 + 신규 45 엔드포인트 착수에서 라�
 미수리 잔여 큐: aimlops/baremetal/multinodegpucluster zone(중첩), servicewatch
 create-alert dimension, natgw publicip_ids 라이브 관측, SQL Server DR·KMS ACL·
 DBaaS instance-ops 라이브 검증(heavy 게이트).
+
+## VPC당 PRIMARY 서브넷 캡 3 — v1.3 category 모델의 숨은 제약 (2026-07-16 heavy 런 실측)
+
+`POST /v1/subnets` 400 `scp-network.subnet.exceed-max-count`: "The maximum
+number of Primary subnets for the Public, Private, Local type in this VPC
+(if Primary) or Subnet (if Secondary) (3) has been exceeded" — **VPC당
+PRIMARY(PUBLIC·PRIVATE·LOCAL 계열) 서브넷 최대 3개, PRIMARY 서브넷당
+SECONDARY 최대 3개**로 읽힌다 (VPC_ENDPOINT 풀은 별도로 보임 — 미검증).
+구(GENERAL) 시절 계정 서브넷 6개 동시 관측 기록과 달리 v1.3부터 조인 제약.
+
+**공유 VPC 서브넷 예산**: 메인 공유 subnet + DB 레인 subnet = 2 슬롯 상시
+→ **라이프사이클 자체생성 서브넷 슬롯은 1개뿐**. heavy 런에서 SKE가 4번째
+서브넷으로 400 (soft, 건너뜀). 조치: container-ske-cluster-nodepool은
+`adopt: subnet`(공유 메인), eventstreams-cluster-subops-full은
+`adopt: subnet#db`(DB 레인)로 전환 — 남은 1슬롯은
+compute-virtualserver-full의 create-port-subnet(포트 테스트용 2nd 서브넷)이
+사용, 캡 3 정확히 소진. **새 시나리오가 공유 VPC 아래 서브넷을 자체생성하면
+안 된다** — adopt하거나 자기 VPC를 만들 것. vip-nat(vpc#a)·vpc-endpoint류
+(VPC_ENDPOINT 타입)는 각각 다른 VPC/풀이라 무관. SECONDARY(+
+primary_subnet_id)로 우회하는 선택지는 시맨틱스 미검증 — 후속 실험 감.

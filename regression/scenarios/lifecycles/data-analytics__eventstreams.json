@@ -346,6 +346,7 @@
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
+          "adopt": "subnet#db",
           "path": "/v1/subnets",
           "json": {
             "name": "regressub{unique}",
