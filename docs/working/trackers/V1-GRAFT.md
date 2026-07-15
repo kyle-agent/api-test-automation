@@ -236,6 +236,20 @@ basis: V2-WRAP-AND-PIVOT.md (branch claude/v2-redesign-planning-aufboo — 오�
   (`app.py local_after` — 구 D2 칩의 정보를 칩/링크 없이 배너 문장으로).
 - 검증: 렌더 9항목 전수 + `test_home_mini_ladder` · tests_offline 34/34.
 
+## 홈 파이프라인 스트립 제거 (오너 확정 2026-07-15, 블록 ③) — 홈 재설계 완결
+
+블록 분해의 결론: 세 카드 전부 **중복이거나 관객 부재** — Modeling 168/275 는
+에이전트 저작 지표(Modeling 화면 소관) · Testing "진행 중 N" 은 최근 RUN 표와
+중복 · Reporting % 는 미니 사다리와 중복 · 점프는 상단 네비와 중복. 오너 확정:
+"파이프라인 제거, **최근 런은 유지**".
+
+- `home.html` 스트립 + `base.html` `.pipe/.pstage` CSS + `app.py` 홈 전용 전달
+  (scenario/catalog/model_stats — 헬퍼는 타 라우트가 계속 사용) 제거.
+- `test_ia_catalog_absorbed_into_modeling` 의 구 계약("3단계 현황" 존재)을
+  스트립 **부재** 계약으로 개정.
+- **최종 홈 = ① 회귀 판정 배너 · ② 미니 사다리 + 잔존 자원 · ③ 최근 RUN** —
+  "오늘 처리할 것 / 목표 진척 / 방금 돌린 것" 세 질문에 1:1 대응.
+
 ## 대시보드 정비 (오너 지시 2026-07-14)
 
 - **서비스별 Platform 링크 제거** ("대시보드에 platform 링크들이 모든 서비스마다

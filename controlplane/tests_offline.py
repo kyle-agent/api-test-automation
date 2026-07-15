@@ -231,13 +231,16 @@ def test_reporting_subtabs_single_include():
 
 def test_ia_catalog_absorbed_into_modeling():
     """2026-07-07 IA 개정 — Catalog는 네비 단계에서 우측 유틸 링크(📖 카탈로그)로,
-    Modeling이 서비스별 카탈로그 엔드포인트를 인라인(집계 + lazy 드로어)으로 품는다."""
+    Modeling이 서비스별 카탈로그 엔드포인트를 인라인(집계 + lazy 드로어)으로 품는다.
+
+    개정 (오너 확정 2026-07-15, 블록 ③): 홈 파이프라인 스트립 자체가 제거됨 —
+    세 카드 전부 중복(진행 중=최근 RUN, %=사다리, 점프=네비)이거나 관객 부재
+    (Modeling 저작 지표는 에이전트용). 스트립 부재를 계약으로 고정."""
     home = client.get("/").text
     assert "📖 카탈로그" in home                       # 유틸 링크
     assert '<a href="/catalog" class=' in home         # 딥링크 유지
-    assert "3단계 현황" in home                        # 파이프라인 4칸 → 3칸
-    assert 'class="pl">Catalog<' not in home           # Catalog 칸 제거
-    assert "API의 테스트 모델 저작" in home            # Modeling 칸의 흡수 표기
+    assert "3단계 현황" not in home and "pstage" not in home   # 스트립 제거 확정
+    assert 'class="pipe"' not in home
 
     # /catalog 는 남고(참조용) 머리에 통합 안내 1줄
     cat = client.get("/catalog")

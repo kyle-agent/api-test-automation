@@ -177,10 +177,9 @@ def home(request: Request):
                    coverage=coverage,
                    # D8: 잔존 자원 홈 승격 — 마지막 캐시만 읽고 스캔은 트리거하지
                    # 않는다(홈 열 때 자동 수집 금지). 잔존은 라이브 이 서버 관측.
-                   owned_kpi=resources.owned_summary(),
-                   scenario_stats=_scenario_stats(),
-                   catalog_count=_catalog_count(),
-                   model_stats=_model_stats())
+                   # (파이프라인 스트립 제거로 scenario/catalog/model_stats 전달도
+                   # 정리 — 헬퍼 함수들은 다른 라우트가 계속 사용.)
+                   owned_kpi=resources.owned_summary())
 
 
 # --- Planning ------------------------------------------------------------------
