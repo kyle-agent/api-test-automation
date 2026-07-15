@@ -61,6 +61,8 @@ cp dashboard/history.jsonl           "$dd"/ 2>/dev/null || true
 rm -rf "$dd"/services; cp -r dashboard/services "$dd"/services 2>/dev/null || true
 cp dashboard/verified_endpoints.json "$dd"/ 2>/dev/null || true
 cp dashboard/endpoint_status.json    "$dd"/ 2>/dev/null || true
+# 회귀 상세 목록 (정공법 — 부재 시 직전 발행본 보존: build 가 관측 0 이면 skip-write)
+cp dashboard/fail_new.json           "$dd"/ 2>/dev/null || true
 cp data/baselines/verified_endpoints.json "$dd"/verified_endpoints_evidence.json 2>/dev/null || true
 cp reports/dashboard/ops.html        "$dd"/ops.html 2>/dev/null || cp dashboard/ops.html "$dd"/ 2>/dev/null || true
 cp dashboard/op_timings.html         "$dd"/op_timings.html 2>/dev/null || true

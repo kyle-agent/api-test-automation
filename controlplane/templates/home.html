@@ -7,32 +7,37 @@
   {% set fail_new = coverage.get('fail_new') or 0 %}
   {% set fail_known = coverage.get('fail_known') or 0 %}
   {% set snap_is_stale = snap_stale is defined and snap_stale %}
-  {# P2C-12: 48h+ 지난 스냅샷의 빨간 REGRESSIONS 배너가 '지금' 깨진 것처럼 읽혔다
-     (노후 칩만으로 부족). snap_stale(공통 컨텍스트, common.snapshot_age 재사용)이면
-     경고 톤 대신 기존 중립 회색 톤(.verdict.none)으로 낮추고, "N일 전 스냅샷 기준"을
-     배너 본문 맨 앞에 병기한다. 신선한 스냅샷의 빨강/초록 판정은 그대로. #}
-  <div class="verdict {{ 'none' if snap_is_stale else ('bad' if fail_new else '') }}">
-    <span class="pip"></span>
-    <div>
-      {% if snap_is_stale %}<b>{{ snap_age or '48시간 이상 전' }} 스냅샷 기준 —</b>
-      {% endif %}
-      {% if fail_new %}
-      <b>REGRESSIONS — 신규 fail {{ fail_new }}건.</b>
-      마지막 스냅샷에서 새로 깨진 5xx/auth가 있습니다 —
-      <a href="/reporting?tab=triage">Report › Triage에서 분류 확인 →</a>
-      {% else %}
-      <b>HEALTHY — 신규 회귀 0건.</b>
-      마지막 스냅샷에서 새로 깨진 5xx/auth 없음, known-red {{ fail_known }}.
-      다음 레버: 쓰기 커버리지(cov_op {{ coverage.get('cov_op','-') }}%).
-      {% endif %}
-      <span class="muted small">— 스냅샷 {{ coverage.get('ts','') }}{% if snap_age is defined and snap_age %}
-        <b>({{ snap_age }})</b>{% endif %}</span>
-      {# 출처 배지·D2 칩 제거 (오너 2026-07-14 재검수 "이런 표현이 필요한가"):
-         기본 출처(발행 스냅샷)는 헤더 Published 배지 + ctxbar 가 이미 선언 —
-         배너·타일에서의 반복은 노이즈. 판정 이후 로컬 런은 아래 최근 RUN 표
-         (source 열)로 충분. 노후 시각 정보는 위 '(N시간 전)' 텍스트가 담당. #}
-    </div>
+  {# 회귀 판정 배너 — 오너 공동 설계 (2026-07-15): 메인 정보 = 통과/실패 · 몇 건 ·
+     언제(절대+상대) · 실패 시 서비스별 내역 미리보기(결정 1-a) + Triage 링크.
+     48h+ 는 시각을 앞세운 중립 배너 + [지금 실행](결정 3 — 콘솔로, pre-flight 가
+     게이트라 자동 실행 아님). 통과도 배너 유지(결정 2). 판정 기준은 툴팁. #}
+  {% set crit_tip = '판정 기준: 신규 = 알려진-버그 베이스라인(data/baselines/known_issues.json)에 없는 5xx/auth 실패. 직전 런 대비가 아니라, Triage에서 등재(알려진 실패로 이동)하거나 수리해야 사라집니다.' %}
+  {% set when_txt %}{{ snap_ts_label or coverage.get('ts','') }} 런{% if snap_age is defined and snap_age %} ({{ snap_age }}){% endif %}{% if coverage.get('run_type') %} · {{ coverage.get('run_type') }} suite{% endif %}{% endset %}
+  {% if snap_is_stale %}
+  <div class="verdict none"><span class="pip"></span>
+    <div><b>⚠ 마지막 회귀 테스트가 {{ snap_age or '48시간 이상' }} 전입니다</b>
+      — 당시 판정: {% if fail_new %}<b style="color:var(--red)" title="{{ crit_tip }}">실패 · 신규 {{ fail_new }}건</b>
+        · <a href="/reporting?tab=triage">Triage →</a>{% else %}<span title="{{ crit_tip }}">통과 (신규 0건)</span>{% endif %}
+      <span class="muted small">· {{ when_txt }}</span>
+      · <a class="chip s-verified" href="/testing/embed"
+           title="실행 콘솔로 — 선택 후 pre-flight 확인을 거쳐 실행합니다 (자동 실행 아님)">▶ 지금 실행 →</a></div>
   </div>
+  {% elif fail_new %}
+  <div class="verdict bad"><span class="pip"></span>
+    <div><b title="{{ crit_tip }}">회귀 테스트 실패 — 신규 실패 {{ fail_new }}건</b>
+      <span class="muted small">· {{ when_txt }}{% if fail_known %} · 알려진 실패 {{ fail_known }}건은 추적 중{% endif %}</span><br>
+      {% if fail_svcs is defined and fail_svcs %}<span class="small">내역:
+        {% for s, n in fail_svcs[:6] %}<b>{{ s }}</b> {{ n }}{{ ' · ' if not loop.last }}{% endfor %}
+        {%- if fail_svcs|length > 6 %} · 외 {{ fail_svcs|length - 6 }}개 서비스{% endif %}
+        {%- if fail_svcs_capped %} <span class="muted small" title="발행 상세 파일이 아직 없어 index 배너(상한 6건)에서 집계 — 전체는 Triage에서">(상한 6건 기준)</span>{% endif %}</span>
+      · {% endif %}<a href="/reporting?tab=triage"><b>→ Triage에서 상세·분류</b></a></div>
+  </div>
+  {% else %}
+  <div class="verdict"><span class="pip"></span>
+    <div><b title="{{ crit_tip }}">회귀 테스트 통과 — 신규 실패 0건</b>
+      <span class="muted small">· {{ when_txt }}{% if fail_known %} · 알려진 실패 {{ fail_known }}건 추적 중{% endif %}</span></div>
+  </div>
+  {% endif %}
 
   {# v2 접목 1: 타일 전부 발행본(S1) 출처 — 카드마다 배지 1개(계약 §0-4
      "한 카드의 기본값은 한 출처") + 노후 시 is-stale 로 수치 회색화(원칙 1-4). #}

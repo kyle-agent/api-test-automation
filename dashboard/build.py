@@ -1165,9 +1165,19 @@ def _bar_color(pct: float) -> str:
 def render(d, hist, meta, services):
     called = d["ok"] + d["soft"] + d["fail_new"] + d["fail_known"]
     pass_rate = (d["ok"] / called * 100) if called else 0
-    healthy = d["fail_new"] == 0
-    pill = ('<span class="pill"><span class="d"></span>HEALTHY</span>' if healthy
-            else f'<span class="pill bad"><span class="d"></span>{d["fail_new"]} NEW REGRESSION(S)</span>')
+    # 관측 0 가드 (오너 발견 2026-07-15): 결과 없는 재발행(0 calls)이 fail_new==0
+    # 을 타고 HEALTHY '배포 안전'을 자동 선언하던 결함 — "관측 없음 ≠ 0" 규율
+    # 위반. 관측이 없으면 판정을 유보하고 직전 실측 판정(history 마지막 행,
+    # append 는 has_results 가드라 실측 런만 있음)을 인용한다.
+    no_obs = not d.get("has_results")
+    prev = hist[-1] if (no_obs and hist) else None
+    healthy = d["fail_new"] == 0 and not no_obs
+    if no_obs:
+        pill = '<span class="pill" style="background:#f0f2f5;color:#57606a">NO NEW OBSERVATIONS</span>'
+    elif healthy:
+        pill = '<span class="pill"><span class="d"></span>HEALTHY</span>'
+    else:
+        pill = f'<span class="pill bad"><span class="d"></span>{d["fail_new"]} NEW REGRESSION(S)</span>'
 
     # ---- category aggregates (verified ops / total ops, services as source)
     cat_agg = {}
@@ -1186,7 +1196,20 @@ def render(d, hist, meta, services):
                    for c, a in cat_agg.items()), key=lambda x: x["pct"])
 
     # ---- action banner ----
-    if healthy:
+    if no_obs:
+        # 판정 유보 — "배포 안전"도 "회귀"도 주장하지 않는다. 직전 실측 판정 인용.
+        if prev:
+            pf = prev.get("fail_new", 0)
+            pv = (f'<b style="color:var(--red,#cf222e)">실패 · 신규 {pf}건</b>'
+                  if pf else "통과 (신규 0건)")
+            action = (f'<div class="action"><div><b>판정 불가 — 이번 발행에는 테스트 관측이 없습니다'
+                      f' (0 calls).</b> 직전 실측 판정 유지: {pv}'
+                      f' <span class="hint">({html.escape(str(prev.get("ts", "")))} 런 기준)</span>. '
+                      f'수치 없는 갱신(스펙/문서)일 뿐 회귀가 해소된 것이 아닙니다.</div></div>')
+        else:
+            action = ('<div class="action"><div><b>판정 불가 — 테스트 관측이 없습니다.</b> '
+                      '아직 실측 런이 발행되지 않았습니다 (관측 없음 ≠ 회귀 0).</div></div>')
+    elif healthy:
         low = ", ".join(f'<b>{c["name"]} {c["pct"]}%</b>({c["cov"]}/{c["tot"]})'
                         for c in cats[:3])
         action = (f'<div class="action"><div><b>새 회귀 {d["fail_new"]}건 — 배포 안전.</b> '
@@ -1204,7 +1227,10 @@ def render(d, hist, meta, services):
         return (f'<div class="card hc{" ok" if ok else ""}"><div class="n {vcls}">{value}</div>'
                 f'<div class="t">{label}</div><div class="s">{sub}</div></div>')
     run_scope = "full CRUD" if d.get("crud_ran") else "read-only"
-    cards = (card(d["fail_new"], "g" if healthy else "r", "신규 회귀", "vs known baseline", ok=healthy)
+    # no_obs 면 '0'이 아니라 '—' — 관측 없음을 0으로 위장하지 않는다 (위 가드와 짝).
+    cards = (card("—" if no_obs else d["fail_new"], "g" if healthy else "r",
+                  "신규 회귀", "관측 없음 — 직전 판정 참조" if no_obs else "vs known baseline",
+                  ok=healthy)
              + card(f"{pass_rate:.1f}%", "", "Pass rate", f'{d["ok"]} ok / {called} calls')
              + card(f'{d.get("cov_c3", 0):.1f}%', "a", "C3 검증 커버리지",
                     f'{d.get("c3_verified", 0)} / {d.get("c3_denom", d["total"])} · 목표 100%')
@@ -1916,14 +1942,18 @@ def build(
     # banner (capped at [:6]) — consumers had to parse presentation HTML (the
     # v2 session's results_data did exactly that, flagged as a fragile stopgap).
     # Full lists, machine-readable, same publish cycle as the headline counts.
-    with open(os.path.join(outdir, "fail_new.json"), "w") as fh:
-        json.dump({
-            "new": [{"key": k, "status": st, "path": p}
-                    for k, st, p in d.get("new_regressions", [])],
-            "known": [{"key": k, "status": st, "path": p}
-                      for k, st, p in d.get("known_red", [])],
-            "updated": meta["when"], "run_type": run_type,
-        }, fh)
+    # 관측 0 발행은 fail_new.json 을 덮지 않는다 (관측 0 가드와 짝): 발행 잡이
+    # 파일별 cp 오버레이라 skip-write 하면 dashboard-data 의 직전 상세 목록이
+    # 살아남는다 — 0-call 재발행이 25건 상세를 빈 목록으로 지우던 것 방지.
+    if d.get("has_results"):
+        with open(os.path.join(outdir, "fail_new.json"), "w") as fh:
+            json.dump({
+                "new": [{"key": k, "status": st, "path": p}
+                        for k, st, p in d.get("new_regressions", [])],
+                "known": [{"key": k, "status": st, "path": p}
+                          for k, st, p in d.get("known_red", [])],
+                "updated": meta["when"], "run_type": run_type,
+            }, fh)
 
     # Write per-service drill-down pages
     sdir = os.path.join(outdir, "services")

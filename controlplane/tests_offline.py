@@ -671,6 +671,64 @@ def test_run_op_timings_api():
         os.unlink(evp.name)
 
 
+def test_regression_verdict_banner(monkeypatch):
+    """회귀 판정 배너 — 오너 공동 설계 (2026-07-15): 통과/실패 · 몇 건 · 언제
+    (절대+상대·suite) · 실패 시 서비스별 내역 미리보기(1-a) + Triage 링크 ·
+    48h+ 중립 배너 + [지금 실행](3) · 기준 툴팁(known_issues 베이스라인).
+
+    + 발행 index 의 관측 0 가드 (오너 발견): 0-call 재발행이 HEALTHY '배포 안전'
+    을 자동 선언하지 않는다 — build.py 소스 계약 + fail_new.json skip-write."""
+    import time as _time
+
+    from controlplane import dashdata, results_data
+
+    def cov(ts, fail_new):
+        return {"ts": ts, "fail_new": fail_new, "fail_known": 2,
+                "run_type": "full", "cov_op": 60, "cov_get": 70,
+                "cov_c3": 80, "reachable_pct": 99, "total": 1372}
+
+    fresh = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(_time.time() - 3600))
+    stale = "2026-01-01T00:00:00Z"
+    regs = {"items": [{"service_label": "database/mysql"},
+                      {"service_label": "database/mysql"},
+                      {"service_label": None, "lifecycle": "gen-x"}],
+            "capped": False, "source": "file"}
+    monkeypatch.setattr(results_data, "get_new_regressions", lambda: regs)
+
+    # 1) 실패 (신선): 판정+건수+시각+suite+내역(서비스별 집계)+Triage 링크+기준 툴팁
+    monkeypatch.setattr(dashdata, "latest_coverage", lambda: cov(fresh, 3))
+    home = client.get("/").text
+    assert "회귀 테스트 실패 — 신규 실패 3건" in home
+    assert "full suite" in home and "시간 전" in home       # 절대 시각은 KST 라벨
+    assert "내역:" in home
+    assert "<b>database/mysql</b> 2" in home and "<b>gen-x</b> 1" in home
+    assert 'href="/reporting?tab=triage"' in home
+    assert "known_issues.json" in home                       # 판정 기준 툴팁
+    assert "알려진 실패 2건은 추적 중" in home
+
+    # 2) 통과 (신선): 배너 유지(결정 2) — 통과 문구 + 시각
+    monkeypatch.setattr(dashdata, "latest_coverage", lambda: cov(fresh, 0))
+    home = client.get("/").text
+    assert "회귀 테스트 통과 — 신규 실패 0건" in home
+
+    # 3) 오래됨 (48h+): 시각을 앞세운 중립 배너 + 당시 판정 + [지금 실행](결정 3)
+    monkeypatch.setattr(dashdata, "latest_coverage", lambda: cov(stale, 3))
+    home = client.get("/").text
+    assert "마지막 회귀 테스트가" in home and "전입니다" in home
+    assert "당시 판정" in home and "신규 3건" in home
+    assert "지금 실행" in home and 'href="/testing/embed"' in home
+
+    # 4) 발행 index 관측 0 가드 — build.py 소스 계약 (실빌드 검증은 수동 수행)
+    src = (Path(__file__).resolve().parent.parent / "dashboard" / "build.py"
+           ).read_text(encoding="utf-8")
+    assert 'no_obs = not d.get("has_results")' in src
+    assert "판정 불가" in src and "NO NEW OBSERVATIONS" in src
+    assert 'healthy = d["fail_new"] == 0 and not no_obs' in src
+    # fail_new.json 은 관측 있을 때만 발행 (skip-write = 직전 발행본 보존)
+    i_guard = src.index('if d.get("has_results"):')
+    assert i_guard < src.index('os.path.join(outdir, "fail_new.json")')
+
+
 def test_v2_shell_header_and_global_search():
     """v2 접목 6a (오너 지시 2026-07-11) — v2 셸의 상단 디자인 이식.
 
