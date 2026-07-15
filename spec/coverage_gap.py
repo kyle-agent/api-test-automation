@@ -41,6 +41,11 @@ def norm_path(p: str) -> str:
 
 def load_catalog(path: str = CATALOG):
     cat = json.load(open(path))
+    # Catalog entries whose doc page failed to resolve (e.g. a live 404 on the
+    # docs site) carry http_path=None; they have no route to analyse for
+    # coverage, so skip them here rather than crash (spec.summary already
+    # surfaces them separately as "unresolved").
+    cat = [e for e in cat if e.get("http_path")]
     for e in cat:
         e["_norm"] = norm_path(e["http_path"])
     return cat

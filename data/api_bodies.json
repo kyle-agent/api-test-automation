@@ -402,6 +402,9 @@
     "volume_type_name": "SSD_Provisioned",
     "zone": "kr-west1-a"
   },
+  "container/ske/setnodepoolpreferredips": {
+    "preferred_ips": "192.168.0.0-192.168.0.255,192.168.99.0"
+  },
   "data-analytics/data-flow/createdataflow": {
     "account": {
       "account_id": "",
@@ -735,6 +738,9 @@
     "tags": [],
     "timezone": ""
   },
+  "data-analytics/searchengine/searchenginemanualbackup": {
+    "_raw": "{cluster_id}"
+  },
   "data-analytics/vertica/verticacreatecluster": {
     "allowable_ip_addresses": [],
     "dbaas_engine_version_id": "",
@@ -898,6 +904,9 @@
     "vip_public_ip_id": "",
     "virtual_ip_address": ""
   },
+  "database/epas/epasmanualbackup": {
+    "_raw": "{cluster_id}"
+  },
   "database/mariadb/mariadbcreatecluster": {
     "allowable_ip_addresses": [],
     "dbaas_engine_version_id": "5828d309085e4094808614ce0694e8c6",
@@ -949,6 +958,13 @@
     "timezone": "Asia/Seoul",
     "vip_public_ip_id": null,
     "virtual_ip_address": null
+  },
+  "database/mariadb/mariadbmanualbackup": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbupgrademajorversion": {
+    "dbaas_engine": "",
+    "software_version": ""
   },
   "database/mysql/mysqlcreatecluster": {
     "allowable_ip_addresses": [],
@@ -1002,6 +1018,13 @@
     "timezone": "Asia/Seoul",
     "vip_public_ip_id": null,
     "virtual_ip_address": null
+  },
+  "database/mysql/mysqlmanualbackup": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlupgrademajorversion": {
+    "dbaas_engine": "",
+    "software_version": ""
   },
   "database/postgresql/postgresqlcreatecluster": {
     "allowable_ip_addresses": [],
@@ -1061,6 +1084,18 @@
     "timezone": "Asia/Seoul",
     "vip_public_ip_id": "",
     "virtual_ip_address": ""
+  },
+  "database/postgresql/postgresqlmanualbackup": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserveradddrsecondary": {
+    "ad_user_id": "aduser123",
+    "ad_user_password": "test123!",
+    "license": "",
+    "name": "",
+    "region": "",
+    "service_ip_address": "",
+    "subnet_id": ""
   },
   "database/sqlserver/sqlservercreatecluster": {
     "allowable_ip_addresses": [],
@@ -1138,6 +1173,15 @@
     "timezone": "Asia/Seoul",
     "vip_public_ip_id": "",
     "virtual_ip_address": ""
+  },
+  "database/sqlserver/sqlservermanualbackup": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserverpromotedrsecondary": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserversyncdrsecondarystate": {
+    "_raw": "{cluster_id}"
   },
   "management/iam-identity-center/createaccountassignment": {
     "accounts": [
@@ -1892,6 +1936,15 @@
       }
     ]
   },
+  "management/servicewatch/createloggroupexporttask": {
+    "bucket_name": "",
+    "end_at": "",
+    "log_group_id": "",
+    "log_stream_ids": [
+      ""
+    ],
+    "start_at": ""
+  },
   "management/servicewatch/createloggrouplogstream": {
     "name": "testls01"
   },
@@ -1989,6 +2042,13 @@
   },
   "management/servicewatch/setalertdescription": {
     "description": "Alert1 Description"
+  },
+  "management/servicewatch/setalertnotifications": {
+    "user_ids": [
+      "1234da92-634a-4f8c-932e-9d650599ab1b",
+      "1234da92-634a-4f8c-932e-9d650599ab1a",
+      "1234da92-634a-4f8c-932e-9d650599ab1c"
+    ]
   },
   "management/servicewatch/setdashboard": {
     "name": "Renamed-Dashboard",
@@ -2326,12 +2386,75 @@
       "x_forwarded_proto": ""
     }
   },
+  "networking/loadbalancer/setlblistenercertificate": {
+    "listener": {
+      "sni_certificate": [
+        {
+          "domain_name": "",
+          "sni_cert_id": ""
+        }
+      ],
+      "ssl_certificate": {
+        "client_cert_id": "",
+        "client_cert_level": "",
+        "server_cert_level": ""
+      }
+    }
+  },
+  "networking/loadbalancer/setlblistenerresource": {
+    "listener": {
+      "description": "",
+      "hsts_config": {
+        "include_sub_domains": "",
+        "max_age": ""
+      },
+      "idle_timeout": "",
+      "insert_client_ip": "",
+      "persistence": "",
+      "response_timeout": "",
+      "session_duration_time": "",
+      "support_http2": "",
+      "x_forwarded_for": "",
+      "x_forwarded_port": "",
+      "x_forwarded_proto": ""
+    }
+  },
+  "networking/loadbalancer/setlblistenerrule": {
+    "listener": {
+      "condition_type": "URL_PATH",
+      "https_redirection": {
+        "port": "",
+        "protocol": "",
+        "response_code": ""
+      },
+      "server_group_id": "",
+      "url_handler": "",
+      "url_redirection": ""
+    }
+  },
   "networking/loadbalancer/setlbservergroup": {
     "lb_server_group": {
       "description": "this is an lb server group",
       "lb_health_check_id": "46c681018e33453085ca7c8db54e0076",
       "lb_method": "ROUND_ROBIN"
     }
+  },
+  "networking/security-group/addaddressgroupcidrs": {
+    "addresses": [
+      "10.1.1.1/32",
+      "10.1.2.0/24",
+      "10.1.3.0/24"
+    ]
+  },
+  "networking/security-group/createaddressgroup": {
+    "addresses": [
+      "10.1.1.1/32",
+      "10.1.2.0/24",
+      "10.1.3.0/24"
+    ],
+    "description": "Example Description for Address Group",
+    "name": "ExampleAG1",
+    "tags": []
   },
   "networking/security-group/createsecuritygrouprule": {
     "description": "Example Description for Security Group Rule",
@@ -2344,6 +2467,16 @@
     "remote_group_id": "06e5d676-f330-485a-94e9-47ac91cce09a",
     "remote_ip_prefix": "1.1.1.1/32",
     "security_group_id": "06e5d676-f330-485a-94e9-47ac91cce09a"
+  },
+  "networking/security-group/removeaddressgroupcidrs": {
+    "addresses": [
+      "10.1.1.1/32",
+      "10.1.2.0/24",
+      "10.1.3.0/24"
+    ]
+  },
+  "networking/security-group/setaddressgroup": {
+    "description": "Example Description for Address Group"
   },
   "networking/vpc/approvalvpcpeering": {
     "type": "CREATE_APPROVE"
@@ -2544,6 +2677,17 @@
   },
   "security/kms/hmac": {
     "input": "dGVzdCBpbnB1dA=="
+  },
+  "security/kms/kmssetaclcidr": {
+    "acl_cidr": "192.168.1.1/24, 10.0.0.1/16"
+  },
+  "security/kms/kmssetprivateacl": {
+    "private_acl_enabled": true,
+    "private_acl_resources": [
+      {
+        "resource_id": "vs-xxxxx"
+      }
+    ]
   },
   "security/kms/rewrapdata": {
     "ciphertext": "vault:v283:YiUpW1bpF2fMY0VR33aQpik781Ul2gFPsfdwsypwouccHtPSfRaE40wTHHl4a5AK"

@@ -95,7 +95,9 @@ def fetch_bodies(
     target_methods = {method_filter.upper()} if method_filter else WRITE_METHODS
     todo = [
         e for e in cat
-        if e["method"].upper() in target_methods
+        if e.get("method")  # skip catalog entries with unresolved method (e.g. a
+        # doc page that 404s live but still has a placeholder catalog row)
+        and e["method"].upper() in target_methods
         and key_substr in e["key"]
         and e["key"] not in out
     ]
