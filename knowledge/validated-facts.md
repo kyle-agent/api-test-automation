@@ -3154,3 +3154,18 @@ B 잔류: patch·upgrade-kernel·resize-ig·add/resize-block-storages(+capture-s
 - vs-full delete-server 409 `LbServerGroupAttached`: lb-members가 이 VM을 서버그룹에 차용 — 반납(+738~789s)이 delete 사다리 소진(+732s)보다 몇 초 늦음. 교차-lifecycle 레이스이므로 사다리 연장(6×20s→30×30s=15분)으로 흡수.
 - pg create-cluster 500: **런의 첫 /v1/clusters POST만 3런 연속 500 ContactAdmin**(1~2s 뒤 병렬 4건은 202, body 동일 실측) — 백엔드 콜드스타트 추정, [500]×2/60s 재시도 실험. 동일명 재발사라 중복생성 위험 없음(이름충돌로 거부됨).
 - subnet ACTIVE-폴 예산 전수 스윕: 42곳 timeout<600 → 600 (vip-nat 240s에 243.8s 실측 등 — createsubnet max 5:27 상회 필수).
+
+## run-ddbf 정리 단계 분해 + 스윕 비용 계측 (2026-07-15)
+
+**단계 실측(계측 라인)**: teardown shared 334s(병렬 체인 — 서브넷 drain 바닥,
+목표선) · reap 35s(버킷 배리어 효과, 종전 수 분) · **스윕 1117s(18.6분 — 유일한
+잔여 병목)** · +0 재스캔 스킵 작동. 스윕 구조는 이미 최적(2라운드, leaf-drain
+stop, 픽 리포트 0-LIST, stuck 1회 보고)인데 NOWAIT(배리어 0)에서 18.6분 —
+시간이 리스팅/삭제/슬립 어디에 있는지 로그로 특정 불가 → **라운드별 [cost]
+계측 추가**: 라운드 wall + 컬렉션별 리스팅 누적(top 6) + delete 총 시간/건수.
+다음 런 로그의 `[cost]` 라인이 마지막 병목을 확정한다.
+
+**run-ddbf 성과 확정**: DB A/B 재배분 적중(전 엔진 max 24~28분, mariadb
+35.2→27.9) · SKE 33분 통과 · eventstreams 첫 완주가 50.8분 신규 critical path
+(→ 차기 분할 후보 1순위, 안정화 확인 후) · 테스트 55.4/정리 25.7/총 81.0분
+(eventstreams 커버리지 신규 추가분 포함으로 기준선과 동시간).

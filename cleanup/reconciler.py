@@ -181,13 +181,43 @@ def _name_of(it):
     return ""
 
 
+# 스윕 비용 계측 (2026-07-15 teardown 최소화 — run-ddbf: NOWAIT·2라운드인데
+# 스윕 1117s. 배리어 0인데 시간이 리스팅/삭제/슬립 어디에 숨었는지 라운드별
+# 집계·요약해 다음 병목을 로그만으로 특정한다). _STATE_LOCK 하에 갱신.
+_COST_LIST: dict = {}     # (service, path) -> seconds (이번 라운드 누적)
+_COST_DELETE = [0.0, 0]   # [seconds, count]
+
+
+def _cost_reset() -> None:
+    with _STATE_LOCK:
+        _COST_LIST.clear()
+        _COST_DELETE[0] = 0.0
+        _COST_DELETE[1] = 0
+
+
+def _cost_report() -> None:
+    with _STATE_LOCK:
+        lists = sorted(_COST_LIST.items(), key=lambda kv: -kv[1])
+        lt = sum(v for _, v in lists)
+        dt, dn = _COST_DELETE
+    top = ", ".join(f"{p}={s:.0f}s" for (_, p), s in lists[:6] if s >= 2)
+    print(f"  [cost] listing {lt:.0f}s ({len(lists)} collections"
+          + (f"; top: {top}" if top else "")
+          + f") · deletes {dt:.0f}s/{dn}건", flush=True)
+
+
 def _list_all(client, service, path):
     """Return all items from a collection (no ownership filter)."""
+    _t0 = time.monotonic()
     try:
         r = client.get(path, service=service)
     except Exception as exc:
         print(f"  list {path} error: {exc}")
         return []
+    finally:
+        with _STATE_LOCK:
+            _COST_LIST[(service, path)] = _COST_LIST.get((service, path), 0.0) \
+                + (time.monotonic() - _t0)
     if not r.ok:
         print(f"  list {path} -> {r.status}")
         return []
@@ -587,6 +617,7 @@ def _delete_resp(client, service, path, json=None):
 
 def _delete(client, service, path, json=None):
     key = (service, path, str(sorted((json or {}).items())))
+    _t0 = time.monotonic()
     try:
         r = client.delete(path, service=service, json=json)
         if r.status and 200 <= r.status < 300:
@@ -603,6 +634,10 @@ def _delete(client, service, path, json=None):
     except Exception as exc:
         print(f"  delete {path} error: {exc}")
         return None
+    finally:
+        with _STATE_LOCK:
+            _COST_DELETE[0] += time.monotonic() - _t0
+            _COST_DELETE[1] += 1
 
 
 def _wait_gone(client, service, path, timeout=150, interval=10):
@@ -2350,7 +2385,12 @@ def main() -> int:
         print(f"--- sweep round {rnd} ---", flush=True)
         _PROGRESS_THIS_ROUND[0] = 0          # reset genuine-teardown counter
         _INPROGRESS_THIS_ROUND[0] = 0        # reset async-in-flight counter
+        _cost_reset()
+        _rnd_t0 = time.monotonic()
         reported = run_sweep(client)
+        print(f"  [cost] round {rnd} wall {time.monotonic() - _rnd_t0:.0f}s",
+              flush=True)
+        _cost_report()
         genuine = _PROGRESS_THIS_ROUND[0]
         inprog = _INPROGRESS_THIS_ROUND[0]
         # Machine-readable genuine tally per round: consumers (console2 클린업
