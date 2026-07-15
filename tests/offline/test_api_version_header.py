@@ -27,7 +27,7 @@ import core.http_client as hc
 from core.config import Settings
 from core.http_client import ApiClient, api_version_header
 
-ACCESS, SECRET = "AKTESTACCESSKEY", "sk-test-secret"
+ACCESS, SECRET = "AKTESTACCESSKEY", "fake-test-credential"  # 스캐너 오탐 방지: 실자격 아님
 
 
 @pytest.fixture
