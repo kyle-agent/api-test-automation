@@ -3437,3 +3437,14 @@ api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 �
   (레지스트리 비동기 삭제로 정리).
 - lb-members·asg·wave5-fw는 런 종료 후 검증 트랙(에이전트 B)에서 확정 예정
   (406 클래스 유력 — lb/asg 후행 GET들).
+
+## 런 종료 정리 순서 재배열 + 로그그룹 전량 부산물 (2026-07-16, 오너)
+
+- **순서**: run-scoped reap(이 런의 잔존 자식) → 공유 teardown → 계정 스윕.
+  종전(teardown 먼저)은 잔존 자식이 공유 서브넷/VPC를 잡아 409 사다리를
+  태웠다 (run fe88: net-B VPC 409×5 → 스윕 이월, 메인 VPC 409×5 — 341s 낭비).
+  "시나리오가 안 지운 자원들을 먼저 지우고 그 다음 subnet/VPC" — console2·
+  local_run 양 경로 반영.
+- **servicewatch 로그그룹은 전량 부산물**: 전용 테스트 계정에서 로그그룹은
+  전부 플랫폼 자동 파생물이므로 이름/태그 게이트 없이 **리스트 전량 삭제**
+  (오너 확정). IAM-gated stuck 수렴 가드는 유지.

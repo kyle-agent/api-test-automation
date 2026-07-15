@@ -2072,12 +2072,15 @@ def _pass_servicewatch(c) -> int:
     # stuck → report once, skip. Un-deletable (IAM-gated) items are reported, not
     # forced. Ownership is untouched (_is_deletable/_regr_log_group still gate).
     _lg_listed = _list_all(c, "servicewatch", "/v1/log-groups")
-    _lg_picked = [it for it in _lg_listed
-                  if _is_deletable(it, name_prefixes=("regrlg",))
-                  or _regr_log_group(it)]
+    # 오너 2026-07-16: "서비스와치 로그그룹은 그냥 리스트 조회해보고 다 지워 —
+    # 부산물들." 전용 테스트 계정에서 로그그룹은 전부 플랫폼 자동 파생물
+    # (/scp/<svc>/... — 이름에 우리 흔적이 없는 것도 우리 리소스의 부산물)이라
+    # 이름/태그 게이트 없이 전량 삭제한다. Hard Rule 3의 name-guessing 금지는
+    # '남의 것일 수 있는 자원'용인데, 이 컬렉션은 오너가 전량 부산물로 확정.
+    _lg_picked = [it for it in _lg_listed if isinstance(it, dict)]
     if _lg_listed:
         print(f"  /v1/log-groups: {len(_lg_listed)} listed / "
-              f"{len(_lg_picked)} deletable (incl. auto-created /scp/*/regr*)")
+              f"{len(_lg_picked)} deletable (부산물 전량 — 오너 2026-07-16)")
     for it in _lg_picked:
         gid = it.get("id")
         if not gid:

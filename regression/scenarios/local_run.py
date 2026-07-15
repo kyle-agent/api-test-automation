@@ -336,14 +336,11 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
             f.write("\n⚠ pytest runner missing — no tests ran; skipping teardown/sweep "
                     "(nothing was created).\n")
         else:
-            teardown_shared(env, shared, f)
-            f.write("\n=== per-run cleanup: teardown-scoped ===\n"
-                    "  this run's resources were deleted by the lifecycle teardown above.\n"
-                    "  account-wide reaping = the manual 강제 클린업 (POST /api/cleanup).\n")
-            # Run-scoped leftover reap (owner 2026-07-09): tracked−deleted of THIS
-            # run, deleted with the proven ladders — filestorage cross-region
-            # (pause→delete→snapmirror→volume) + hidden VPC holders (409 hints).
-            f.write("\n=== per-run cleanup: run-scoped reap (이 런의 잔존만) ===\n")
+            # 순서 재배열 (오너 2026-07-16): 이 런의 잔존 자식(원장 reap)을
+            # 먼저 걷어야 공유 서브넷/VPC teardown이 409 사다리를 안 태운다
+            # (run fe88: teardown→reap 순서로 net-B VPC 5회 409 낭비 실측).
+            f.write("\n=== per-run cleanup: run-scoped reap (이 런의 잔존만 · "
+                    "공유 teardown보다 먼저) ===\n")
             f.flush()
             try:
                 from cleanup.run_scoped import reap_run_leftovers
@@ -351,6 +348,10 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
                                    log=lambda m: (f.write(m + "\n"), f.flush()))
             except Exception as exc:  # noqa: BLE001 — best-effort tail
                 f.write(f"  run-scoped reap 실패(무시): {exc}\n")
+            teardown_shared(env, shared, f)
+            f.write("\n=== per-run cleanup: teardown-scoped ===\n"
+                    "  reap → 공유 teardown 순서로 수행 완료.\n"
+                    "  account-wide reaping = the manual 강제 클린업 (POST /api/cleanup).\n")
             # 런 종료 자동 클린업 (owner 2026-07-10) — CLI 경로는 단일 런이라
             # 동시성 가드 불요. 끄기: SCP_RUN_END_SWEEP=false.
             # 자원-생성 게이트 (svc-opt #3 실측 2026-07-11): 3초짜리 read-only

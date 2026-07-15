@@ -2338,27 +2338,14 @@ def _run_worker(rec: dict) -> None:
                         "  생성된 자원이 없으므로 teardown/sweep 을 건너뜁니다.\n")
                 f.flush()
             else:
-                _teardown_shared(env, shared, f)
-                # Per-run cleanup is teardown-scoped: the lifecycle teardown above
-                # already deleted what THIS run created. We deliberately do NOT run
-                # the account-wide reconciler sweep here (it can't be scoped to one
-                # run and would reap unrelated OLD leftovers, flooding this run's
-                # log). Account-wide reaping = the manual 강제 클린업 button
-                # (POST /api/cleanup).
-                # honest wording (신규1): teardown was ATTEMPTED — async creations
-                # can still materialize later, so the measured re-scans below are
-                # the actual verdict, not this line.
-                f.write("\n=== per-run cleanup: teardown-scoped ===\n"
-                        "  teardown 시도 완료 — 이 실행이 만든 자원의 라이프사이클 teardown 을 "
-                        "수행했습니다. 실측 재스캔 예약됨 (+0 · +5m · +15m; 비동기 생성물 감시).\n"
-                        "  계정 전체 스윕은 아래 '런 종료 자동 클린업' 단계가 수행합니다 "
-                        "(다른 실행 진행/대기 중이면 생략 — 그때만 '강제 클린업' 버튼 수동 실행).\n")
-                f.flush()
-                # Run-scoped leftover reap (owner 2026-07-09): this run's
-                # tracked−deleted 자원을 사다리로 마저 삭제 — filestorage 교차리전
-                # 절차(pause→delete→snapmirror→volume) + VPC 홀더(409
-                # related_resources) 포함. 계정 전체가 아니라 이 런의 대장만.
-                f.write("\n=== per-run cleanup: run-scoped reap (이 런의 잔존만) ===\n")
+                # 순서 재배열 (오너 2026-07-16: "시나리오가 안 지운 자원들을
+                # 먼저 지우고 그 다음 subnet/VPC를 지워야 하는 것 아닌가"):
+                # 이 런의 잔존(원장 reap)이 공유 서브넷/VPC를 잡는 자식들이므로
+                # reap을 FIRST → 공유 teardown이 409 사다리(최대 75s×2)를 태우지
+                # 않고 한 번에 지워진다. (종전엔 teardown→reap 순서라 net-B VPC가
+                # 5회 409 후 스윕으로 넘어가는 낭비가 매 런 반복 — run fe88 실측.)
+                f.write("\n=== per-run cleanup: run-scoped reap (이 런의 잔존만 · "
+                        "공유 teardown보다 먼저) ===\n")
                 f.flush()
                 _rp0 = time.time()
                 try:
@@ -2368,6 +2355,23 @@ def _run_worker(rec: dict) -> None:
                 except Exception as exc:  # noqa: BLE001 — best-effort tail
                     f.write(f"  run-scoped reap 실패(무시): {exc}\n")
                 f.write(f"  (reap 소요 {time.time() - _rp0:.0f}s)\n")
+                f.flush()
+                _teardown_shared(env, shared, f)
+                # Per-run cleanup is teardown-scoped: the reap above removed this
+                # run's leftover children, then the shared teardown deleted the
+                # session infra. We deliberately do NOT run the account-wide
+                # reconciler sweep here (it can't be scoped to one run). Account-
+                # wide reaping = the '런 종료 자동 클린업' step below / manual
+                # 강제 클린업 (POST /api/cleanup).
+                # honest wording (신규1): teardown was ATTEMPTED — async creations
+                # can still materialize later, so the measured re-scans below are
+                # the actual verdict, not this line.
+                f.write("\n=== per-run cleanup: teardown-scoped ===\n"
+                        "  teardown 시도 완료 (reap → 공유 teardown 순서) — 이 실행이 만든 "
+                        "자원의 라이프사이클 teardown 을 수행했습니다. 실측 재스캔 예약됨 "
+                        "(+0 · +5m · +15m; 비동기 생성물 감시).\n"
+                        "  계정 전체 스윕은 아래 '런 종료 자동 클린업' 단계가 수행합니다 "
+                        "(다른 실행 진행/대기 중이면 생략 — 그때만 '강제 클린업' 버튼 수동 실행).\n")
                 f.flush()
                 # 런 종료 자동 클린업 (owner 2026-07-10: "끝나면 cleanup 해서
                 # 0으로 만드는 걸 미리 반영해둬"): run-scoped 리퍼가 못 보는
