@@ -3560,3 +3560,16 @@ DELETE 400 `Volume.VolumeForSharingImageDelete` ("try again later") — 참조�
 백엔드 고아 상태. 콘솔 삭제도 거부되면 서포트 티켓 대상. conformance:
 비가역 async 공유 + 취소 API 부재 + 고아 플래그 정리 경로 부재 3종 세트.
 (oplog 키 = 구계정 API 자격이라는 사실 자체도 유용 — 구계정 대조 조회 가능.)
+
+## 공유이미지 웨지 — oplog 실측 타임라인 확정 (2026-07-16, run a690 artifact/events.jsonl)
+
+- 18:03:36Z createimage(커스텀, regrimgmkhlknao) 202 → image_id 64e520d5-8f32-49ad-bff3-d47a76d9aa1a
+- 18:03:37Z createsharingimage 202, req_body {"account_id": "ec11538a…"(구계정)}, **응답 빈 바디 {}** — 추적 핸들 없음
+- 18:04:35Z 플랫폼이 공유 사본용 임시 볼륨 fba72ab6… 파생 (hex-이름, 104GB)
+- 18:05:53Z deleteimage(원본) **204 허용** — 공유 복사 진행 중인데 원본 삭제가 통과 (가드 부재)
+- 결과: 사본은 pending 등재 전에 소멸(구계정 pending 0 실측), 임시 볼륨의
+  VolumeForSharingImageDelete 플래그만 잔존 → API 삭제 영구 거부.
+- conformance 4종 체인: 취소 API 부재 / 202 빈 바디(핸들 부재) / 진행 중 원본
+  삭제 허용 / 고아 플래그 정리 경로 부재.
+- **artifact/events.jsonl** (a690부터 생김)에 스텝 단위 req_body/resp_snippet가
+  실린다 — 실패 원인 분석은 res 이벤트보다 이걸 먼저 볼 것.
