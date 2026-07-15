@@ -2776,16 +2776,14 @@
             "desired_node_count": "1",
             "min_node_count": "1",
             "max_node_count": "2",
-            "server_type_id": "{server_type_id}",
+            "server_type_id": "s1v1m2",
             "image_os": "ubuntu",
             "image_os_version": "22.04",
             "keypair_name": "regrkey{unique}",
-            "volume_size": "104",
-            "volume_type_name": "SSD_Provisioned",
-            "is_auto_recovery": "true",
+            "volume_size": "13",
+            "volume_type_name": "SSD",
+            "is_auto_recovery": "false",
             "is_auto_scale": "false",
-            "volume_max_iops": "10000",
-            "volume_max_throughput": "500",
             "zone": "{region}-b"
           },
           "expect_status": [
@@ -2801,7 +2799,7 @@
             "path": "/v1/nodepools/{nodepool_id}",
             "service": "ske"
           },
-          "_note": "ZONE REPAIR 2026-07-16 (SKE 단독 재런 실측: POST /v1/nodepools → 500 ContactAdminForAssistance, req-87752221-eaa8-45d5-83a7-6e28fc13f7a0. 클러스터는 RUNNING 정상 도달 — 노드풀만 사망, 이전 전체런 1076s 실패와 동일 지점. ubuntu-22.04-kube-v1.34.3 이미지는 존재하므로 이미지 부재 아님. nodepoolcreaterequestv1dot5에 zone(optional) 신설 + 이 계정은 kr-west1-a 불가 단일 AZ — zone 미지정 시 기본 zone(a) 배치 시도의 내부 오류로 추정, zone={region}-b 주입. 미검증 — 다음 SKE 런 판정. 매칭 실패에 400 대신 500 ContactAdminForAssistance를 주는 것은 백엔드 결함(conformance 후보)."
+          "_note": "CONSOLE-MIRROR REPAIR 2026-07-16: 오너가 콘솔에서 동일 클러스터에 노드풀 생성 성공한 조합을 그대로 미러링 — zone=kr-west1-b(콘솔 필수 입력), server_type s1v1m2(1vCPU/2G; 종전 캡처값 s1v10m120은 노드풀 비적격 가능), volume SSD 13GB(종전 SSD_Provisioned 104GB + max_iops/throughput 제거), is_auto_recovery=false. 종전 바디는 500 ContactAdminForAssistance (req-87752221…) — 어느 필드가 방아쇠인지 미분리, 매칭 실패에 500을 주는 백엔드는 conformance 후보. 다음 SKE 런 판정."
         },
         {
           "name": "wait-nodepool",
