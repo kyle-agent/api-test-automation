@@ -207,7 +207,19 @@ def _cost_report() -> None:
 
 
 def _list_all(client, service, path):
-    """Return all items from a collection (no ownership filter)."""
+    """Return all items from a collection (no ownership filter).
+
+    라운드 시작 프리스캔(``_prescan``)이 채운 1회용 캐시가 있으면 그걸 소비한다
+    (pop — 같은 컬렉션의 패스 중간 재나열은 종전대로 라이브). TTL을 넘긴
+    엔트리는 버리고 라이브로 간다: 배리어 뒤에 소비되는 늦은 패스가 state 필드
+    (async-deleting/PF-09 판정)의 과도한 staleness를 보지 않게."""
+    key = (id(client), service, path)
+    with _STATE_LOCK:
+        cached = _LIST_CACHE.pop(key, None)
+    if cached is not None:
+        ts, items = cached
+        if time.monotonic() - ts <= _PRESCAN_TTL_S:
+            return items
     _t0 = time.monotonic()
     try:
         r = client.get(path, service=service)
@@ -222,6 +234,112 @@ def _list_all(client, service, path):
         print(f"  list {path} -> {r.status}")
         return []
     return [it for it in _items(r.body) if isinstance(it, dict)]
+
+
+# --------------------------------------------------------------------------- #
+# 라운드 시작 병렬 프리스캔 (오너 2026-07-15: "클린업이 너무너무 느리다 —
+# 전체 리소스 리스트 조회(병렬)하고 있는놈만 역방향 순서 생각해서 지우면
+# 될 것 같은데"). 스윕 패스들은 역방향(자식→부모) 순서로 직렬 실행되는데,
+# 각 패스가 자기 컬렉션을 그때그때 LIST하므로 라운드 wall-time에 컬렉션 수 ×
+# LIST 지연이 직렬로 쌓인다 — 특히 거의-빈 계정의 런 종료 스윕은 나열이
+# 시간의 대부분이다. 프리스캔은 라운드 시작 시 (수렴 안 된) 전 컬렉션을
+# 병렬로 미리 나열해 1회용 캐시에 담고, 각 패스의 첫 _list_all이 이를
+# 소비한다 → 직렬 나열 합계가 max(지연) 하나로 줄어든다. 삭제 순서(역방향
+# 패스 순서)와 소유권 게이트는 전혀 건드리지 않는다.
+# --------------------------------------------------------------------------- #
+# 스윕 패스들이 _list_all로 나열하는 컬렉션의 레지스트리. 여기 없는 컬렉션은
+# 프리스캔만 안 될 뿐 종전대로 라이브 나열된다 (fail-safe). 신규 패스 추가 시
+# 여기도 추가 — tests/offline/test_sweep_prescan.py가 소스를 파싱해 드리프트를
+# 잡는다.
+_SWEEP_COLLECTIONS: tuple = (
+    ("apigateway", "/v1/apis"),
+    ("cdn", "/v1/cdns"),
+    ("certificatemanager", "/v1/certificatemanager"),
+    ("direct-connect", "/v1/direct-connects"),
+    ("dns", "/v1/hosted-zones"),
+    ("dns", "/v1/private-dns"),
+    ("filestorage", "/v1/volumes"),
+    ("iam", "/v1/groups"),
+    ("iam", "/v1/policies"),
+    ("kms", "/v1/kms/transit"),
+    ("loadbalancer", "/v1/loadbalancers"),      # holder 탐지(_HOLDER_COLLS)
+    ("queueservice", "/v1/queues"),
+    ("resourcemanager", "/v1/resource-groups"),
+    ("scf", "/v1/cloud-functions"),
+    ("scr", "/v1/container-registries"),
+    ("scr", "/v1/repositories"),
+    ("secretsmanager", "/v1/secrets"),
+    ("security-group", "/v1/security-groups"),
+    ("servicewatch", "/v1/log-groups"),
+    ("ske", "/v1/clusters"),
+    ("virtualserver", "/v1/images"),
+    ("virtualserver", "/v1/keypairs"),
+    ("virtualserver", "/v1/launch-configurations"),
+    ("virtualserver", "/v1/server-groups"),
+    ("virtualserver", "/v1/servers"),
+    ("virtualserver", "/v1/snapshots"),
+    ("virtualserver", "/v1/volumes"),
+    ("vpc", "/v1/internet-gateways"),
+    ("vpc", "/v1/nat-gateways"),                # holder 탐지(_HOLDER_COLLS)
+    ("vpc", "/v1/ports"),
+    ("vpc", "/v1/publicips"),
+    ("vpc", "/v1/subnets"),
+    ("vpc", "/v1/subnets?type=VPC_ENDPOINT"),   # PF-47 숨은 서브넷
+    ("vpc", "/v1/transit-gateways"),
+    ("vpc", "/v1/vpc-endpoints"),
+    ("vpc", "/v1/vpc-peerings"),
+    ("vpc", "/v1/vpcs"),
+    # dbaas 엔진들 — 같은 path, 서비스 호스트만 다르다 (_dbaas_engine)
+    ("mysql", "/v1/clusters"),
+    ("postgresql", "/v1/clusters"),
+    ("mariadb", "/v1/clusters"),
+    ("epas", "/v1/clusters"),
+    ("cachestore", "/v1/clusters"),
+    ("eventstreams", "/v1/clusters"),
+    ("searchengine", "/v1/clusters"),
+    ("sqlserver", "/v1/clusters"),
+    ("vertica", "/v1/clusters"),
+)
+_LIST_CACHE: dict = {}     # (id(client), service, path) -> (monotonic_ts, items)
+_PRESCAN_TTL_S = 120.0     # 배리어 뒤 늦은 소비의 state-staleness 상한
+
+
+def _prescan_enabled() -> bool:
+    return os.environ.get("SCP_SWEEP_NO_PRESCAN", "").lower() != "true"
+
+
+def _prescan(client) -> None:
+    """`_SWEEP_COLLECTIONS` 중 아직 수렴 안 된 컬렉션을 병렬 LIST해서
+    ``_LIST_CACHE``를 채운다. 실패한 컬렉션은 캐시에 안 담겨 해당 패스가
+    종전대로 라이브 나열한다 (fail-open — 프리스캔이 스윕 실패의 원인이
+    되면 안 됨)."""
+    if not _prescan_enabled() or _sweep_workers() <= 1:
+        return
+    pairs = [(svc, path) for svc, path in _SWEEP_COLLECTIONS
+             if not (_converge_enabled() and (svc, path) in _CONVERGED)]
+    if not pairs:
+        return
+    _t0 = time.monotonic()
+
+    def _one(pair):
+        svc, path = pair
+        try:
+            items = _list_all(client, svc, path)
+        except Exception:  # noqa: BLE001 — 실패 = 캐시 미적재 = 라이브 폴백
+            return 0
+        with _STATE_LOCK:
+            _LIST_CACHE[(id(client), svc, path)] = (time.monotonic(), items)
+        return 1
+
+    # LIST 전용이라 삭제 풀(_sweep_workers, 기본 6)보다 넓게 돌려도 안전 —
+    # 읽기 46개를 순간 병렬로 흘리는 정도는 xdist 테스트 런이 이미 더 세게
+    # 미는 수준이다.
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(16, len(pairs)),
+                            thread_name_prefix="prescan") as ex:
+        warmed = sum(ex.map(_one, pairs))
+    print(f"  prescan: {warmed}/{len(pairs)} collection(s) listed in parallel "
+          f"({time.monotonic() - _t0:.1f}s)")
 
 
 # Per-campaign convergence cache (Task C, change 1). A (service, path) pass that
@@ -269,6 +387,7 @@ def _reset_campaign_state() -> None:
     _STUCK.clear()
     _REGION_CLIENTS.clear()
     _LAST_PICKED.clear()
+    _LIST_CACHE.clear()
     _PROGRESS_THIS_ROUND[0] = 0
     _INPROGRESS_THIS_ROUND[0] = 0
 
@@ -1840,6 +1959,12 @@ def run_sweep(client) -> int:
                                      thread_name_prefix="sweep-ske")
         ske_future = _ske_ex.submit(_run_passes, (("ske", _pass_ske),), c)
         _ske_ex.shutdown(wait=False)
+
+    # 0b. 병렬 프리스캔 — 이 라운드의 (미수렴) 컬렉션 전체를 미리 나열해
+    # 각 패스의 첫 _list_all이 소비할 캐시를 채운다. 직렬 나열 wall-time
+    # 제거 (오너 2026-07-15). SKE 퓨처 뒤: 최장 극인 SKE teardown을 먼저
+    # 굴려 놓고 나열을 겹친다.
+    _prescan(c)
 
     # 1. servers (virtualserver) — issue every delete, then ONE barrier until
     # all are gone (frees subnet/sg). Server teardown drains concurrently
