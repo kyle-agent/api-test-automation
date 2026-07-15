@@ -1372,8 +1372,26 @@ def _pass_ledger_reclaim(c) -> int:
             elif st == 404:
                 pass  # already gone — confirmed reclaimed
             else:
-                all_gone = False
-                print(f"  ledger-reclaim {svc} {dp} -> {st} (retry next round)")
+                # 403/400 거절 — '없는 리소스'에 404 대신 403을 주는 서비스가
+                # 있다 (apigateway 실측 2026-07-15: 삭제완료된 API의 GET/DELETE
+                # 모두 403, LIST 0건 — 콘솔에도 없음). 404만 gone으로 치면 이
+                # 유령 항목을 매 라운드·매 런 영원히 재시도한다 (오너: "console
+                # 에는 자원 남은거 안보이는데 왜 삭제 시도를 하는거지?").
+                # GET으로 실존 확인: 200이면 진짜 잔존(재시도 유지), 403/404/410
+                # 이면 이 자격증명으로는 관측 불가 = gone 확정(프룬). 5xx/429는
+                # unknown이라 보수적으로 유지.
+                _g_st = None
+                try:
+                    _g_st = getattr(c.get(dp, service=svc), "status", None)
+                except Exception:  # noqa: BLE001 — 확인 실패 = unknown, 유지
+                    pass
+                if _g_st in (403, 404, 410):
+                    print(f"  ledger-reclaim {svc} {dp} -> {st} "
+                          f"(GET {_g_st}: 실존 안함 — gone 확정, 프룬)")
+                else:
+                    all_gone = False
+                    print(f"  ledger-reclaim {svc} {dp} -> {st} "
+                          f"(GET {_g_st}: retry next round)")
         if all_gone:
             try:
                 shard.unlink()  # every record gone → prune so we stop re-scanning

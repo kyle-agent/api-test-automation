@@ -3087,3 +3087,19 @@ ran)은 서버 프로세스 코드라 재시작 필요. offline: test_shared_inf
 run-eac8 잔존 3건의 성격(오너 질문 "시나리오 실패해서?"): 아니다 — children
 TGW 409(EDITING drain)·vs-full/vpc-endpoint 서브넷(자식 drain)은 전부 비동기
 drain 타이밍 클래스로 reap/스윕 백스톱이 정상 회수. 실패 시나리오 잔존은 별도.
+
+## apigateway 403-on-gone + ledger-reclaim 실존확인 (2026-07-15, 오너 로그 실측)
+
+**PF 확인**: apigateway는 존재하지 않는 리소스에 404 대신 **403**을 반환한다 —
+삭제완료된 API의 GET/DELETE 모두 403, LIST /v1/apis는 0건 (콘솔에도 없음).
+"404 대신 403" AI-usability 결함 클래스 (resource-기반 인가가 미해석 리소스를
+권한거부로 뭉갬).
+
+**영향**: ledger-reclaim(생성 원장 재생 패스 — 목록에 안 잡히는 자원 회수용,
+queueservice가 원형)이 404만 gone 확정으로 봐서, 이미 지워진 apigateway 유령
+항목 9건을 매 라운드·매 런 영원히 재시도 (오너: "console에는 자원 남은거
+안보이는데 왜 삭제 시도를 하는거지?").
+
+**수리**: DELETE 거절(403/400 등) 시 GET 실존확인 — GET 403/404/410 = 이
+자격증명으로 관측 불가 = gone 확정(샤드 프룬), GET 200 = 진짜 잔존(재시도
+유지), GET 5xx/429 = unknown(보수적 유지). offline 3종.

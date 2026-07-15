@@ -135,3 +135,55 @@ def test_retryable_status_keeps_shard(tmp_path):
     n = recon._pass_ledger_reclaim(c)
     assert n == 0
     assert (tmp_path / "keep.jsonl").exists()
+
+
+class GetAwareClient(FakeClient):
+    """DELETE 상태 + GET 상태를 별도 제어 — 403-on-gone(실존확인) 테스트용."""
+
+    def __init__(self, delete_status=None, get_status=None):
+        super().__init__(delete_status)
+        self.get_status = get_status or {}
+
+    def get(self, path, service=None, **kw):
+        self.calls.append(("GET", path))
+        return _Resp(self.get_status.get(path, 200))
+
+
+def test_403_on_gone_confirmed_by_get_prunes_shard(tmp_path):
+    """apigateway 실측(2026-07-15): 삭제완료된 API의 DELETE·GET 모두 403(404
+    대신), LIST 0건. GET 403/404/410 = 실존 안함 → gone 확정, 샤드 프룬 —
+    유령 항목을 매 라운드 재시도하던 로그 오염 제거 (오너: "console에는 자원
+    남은거 안보이는데 왜 삭제 시도를 하는거지?")."""
+    p = _shard(tmp_path, "20260713.jsonl", [
+        {"service": "apigateway", "resource_id": "a1",
+         "delete_path": "/v1/apis/a1"},
+    ])
+    c = GetAwareClient(delete_status={"/v1/apis/a1": 403},
+                       get_status={"/v1/apis/a1": 403})
+    recon._pass_ledger_reclaim(c)
+    assert not p.exists(), "GET 403 확인된 유령 샤드는 프룬돼야"
+
+
+def test_403_with_get_200_is_kept_for_retry(tmp_path):
+    """DELETE 403인데 GET 200 = 진짜 존재(권한/상태 이상) → 재시도 유지,
+    샤드 보존 — gone-확정은 관측 불가일 때만."""
+    p = _shard(tmp_path, "20260713.jsonl", [
+        {"service": "apigateway", "resource_id": "a2",
+         "delete_path": "/v1/apis/a2"},
+    ])
+    c = GetAwareClient(delete_status={"/v1/apis/a2": 403},
+                       get_status={"/v1/apis/a2": 200})
+    recon._pass_ledger_reclaim(c)
+    assert p.exists(), "실존하는 자원의 샤드는 유지돼야 (재시도)"
+
+
+def test_delete_5xx_with_get_5xx_is_kept(tmp_path):
+    """GET 5xx/429 = unknown — 보수적으로 유지 (잘못된 프룬 방지)."""
+    p = _shard(tmp_path, "20260713.jsonl", [
+        {"service": "queueservice", "resource_id": "q1",
+         "delete_path": "/v1/queues/q1"},
+    ])
+    c = GetAwareClient(delete_status={"/v1/queues/q1": 500},
+                       get_status={"/v1/queues/q1": 500})
+    recon._pass_ledger_reclaim(c)
+    assert p.exists(), "unknown(5xx)은 프룬하면 안 됨"
