@@ -278,79 +278,131 @@ def teardown():
     db_subnet_id = os.environ.get(engine._ENV_SHARED_DB_SUBNET, "").strip()
     net_a_id = os.environ.get(engine._ENV_SHARED_NET_VPC_A, "").strip()
     net_b_id = os.environ.get(engine._ENV_SHARED_NET_VPC_B, "").strip()
-    if not any((vpc_id, subnet_id, db_subnet_id, net_a_id, net_b_id)):
+    # 공유 TGW/IGW (2026-07-15 실측 수리): 이 CLI 경로가 console2 run-end의 실제
+    # teardown인데 종전엔 둘 다 안 읽어서 — 공유 TGW는 통째로 스윕行, 공유 IGW는
+    # 메인 VPC DELETE를 409×5로 막고 VPC까지 스윕行이었다 (run-eac8 직렬 관측:
+    # 서브넷 240s 대기 동안 TGW/net-A/B 미착수). engine closure의 병렬 체인과
+    # 동일 구조로 수리: [main: 서브넷→IGW→VPC] · [tgw] · [net-a] · [net-b] 병렬.
+    igw_id = os.environ.get(engine._ENV_SHARED_IGW, "").strip()
+    tgw_id = os.environ.get(engine._ENV_SHARED_TGW, "").strip()
+    if not any((vpc_id, subnet_id, db_subnet_id, net_a_id, net_b_id,
+                igw_id, tgw_id)):
         _eprint("[shared_infra] no SCP_SHARED_VPC_ID / SCP_SHARED_SUBNET_ID set — "
                 "nothing to tear down.")
         return 0
-    # subnets THEN vpc (children before parent). Subnet delete is ASYNC
-    # (DELETING lingers 30s~3min); firing the VPC delete immediately gets a 409
-    # and the shared VPC survives every aborted run (관측 2026-07-12: 두 런
-    # 연속 VPC만 잔존 → 다음 런이 admission 큐에 걸림). So: issue both subnet
-    # deletes, WAIT for them to be gone, then delete the VPC with a short
-    # 409-retry ladder. Budget ≤ ~5min total; on timeout the sweep reclaims.
-    issued: list[str] = []
-    for sid, label in ((db_subnet_id, "DB subnet"), (subnet_id, "subnet")):
-        if not sid:
-            continue
-        try:
-            r = client.request("DELETE", f"{engine._SUBNET_CREATE_PATH}/{sid}",
-                               service="vpc")
-            st = getattr(r, "status", None)
-            if st in (200, 202, 204, 404):
-                issued.append(sid)
-                _eprint(f"[shared_infra] shared {label} {sid} delete -> {st}")
-            else:
-                _eprint(f"[shared_infra] shared {label} {sid} delete -> {st}; "
-                        f"sweep will reclaim")
-        except Exception as exc:
-            _eprint(f"[shared_infra] shared {label} {sid} delete failed "
-                    f"({exc}); sweep will reclaim")
-    if vpc_id and issued:
-        deadline = time.time() + 240
-        pending = list(issued)
-        while pending and time.time() < deadline:
-            still = []
-            for sid in pending:
-                try:
-                    g = client.get(f"{engine._SUBNET_CREATE_PATH}/{sid}",
-                                   service="vpc")
-                    if getattr(g, "status", None) != 404:
-                        still.append(sid)
-                except Exception:
-                    pass  # read hiccup — treat as gone next round decides
-            pending = still
-            if pending:
-                _eprint(f"[shared_infra] waiting subnet(s) gone: {pending}")
-                time.sleep(10)
-    def _vpc_delete_ladder(vid: str, label: str) -> None:
-        """VPC 삭제 + 409 사다리 (5×15s) — 자식의 비동기 소멸(DELETING 30s~3min)
-        을 흡수한다. 실패는 스윕이 회수."""
-        for attempt in range(5):
+    # 병렬 teardown (2026-07-15): 독립 체인 4개 — [main: 서브넷→gone-wait→IGW→
+    # VPC] · [tgw] · [net-a] · [net-b]. 체인 내부는 자식→부모 순서 그대로, 체인
+    # 사이만 병렬 → wall ≈ 최장 체인 1개 (종전 직렬 합산 최악 ~8분+). 실패는
+    # 어느 체인이든 스윕이 회수(종전과 동일한 백스톱).
+    def _ladder(path: str, rid: str, label: str, attempts: int = 5) -> None:
+        """DELETE + 409/4xx 사다리 (attempts×15s) — 자식의 비동기 소멸을 흡수."""
+        for attempt in range(attempts):
             try:
-                r = client.request("DELETE", f"{engine._VPC_CREATE_PATH}/{vid}",
-                                   service="vpc")
+                r = client.request("DELETE", f"{path}/{rid}", service="vpc")
                 st = getattr(r, "status", None)
             except Exception as exc:
-                _eprint(f"[shared_infra] {label} {vid} delete failed ({exc}); "
+                _eprint(f"[shared_infra] {label} {rid} delete failed ({exc}); "
                         f"sweep will reclaim")
                 return
             if st in (200, 202, 204, 404):
-                _eprint(f"[shared_infra] {label} {vid} delete -> {st}")
+                _eprint(f"[shared_infra] {label} {rid} delete -> {st}")
                 return
-            _eprint(f"[shared_infra] {label} {vid} delete -> {st} "
-                    f"(attempt {attempt + 1}/5); retrying in 15s")
+            _eprint(f"[shared_infra] {label} {rid} delete -> {st} "
+                    f"(attempt {attempt + 1}/{attempts}); retrying in 15s")
             time.sleep(15)
-        _eprint(f"[shared_infra] {label} {vid} still not deleted; "
+        _eprint(f"[shared_infra] {label} {rid} still not deleted; "
                 f"sweep will reclaim")
 
-    if vpc_id:
-        _vpc_delete_ladder(vpc_id, "shared VPC")
-    # net-VPC A/B: 자식(vip-nat 서브넷·IGW·DC)은 lifecycle이 지웠고, 비동기
-    # 소멸 잔재는 사다리가 흡수한다.
+    def _chain_main() -> None:
+        # subnets THEN vpc (children before parent). Subnet delete is ASYNC
+        # (DELETING lingers 30s~3min); firing the VPC delete immediately gets a
+        # 409 (관측 2026-07-12: 두 런 연속 VPC만 잔존 → 다음 런 admission 블록).
+        issued: list[str] = []
+        for sid, label in ((db_subnet_id, "DB subnet"), (subnet_id, "subnet")):
+            if not sid:
+                continue
+            try:
+                r = client.request("DELETE",
+                                   f"{engine._SUBNET_CREATE_PATH}/{sid}",
+                                   service="vpc")
+                st = getattr(r, "status", None)
+                if st in (200, 202, 204, 404):
+                    issued.append(sid)
+                    _eprint(f"[shared_infra] shared {label} {sid} delete -> {st}")
+                else:
+                    _eprint(f"[shared_infra] shared {label} {sid} delete -> {st}; "
+                            f"sweep will reclaim")
+            except Exception as exc:
+                _eprint(f"[shared_infra] shared {label} {sid} delete failed "
+                        f"({exc}); sweep will reclaim")
+        if vpc_id and issued:
+            deadline = time.time() + 240
+            pending = list(issued)
+            while pending and time.time() < deadline:
+                still = []
+                for sid in pending:
+                    try:
+                        g = client.get(f"{engine._SUBNET_CREATE_PATH}/{sid}",
+                                       service="vpc")
+                        if getattr(g, "status", None) != 404:
+                            still.append(sid)
+                    except Exception:
+                        pass  # read hiccup — next round decides
+                pending = still
+                if pending:
+                    _eprint(f"[shared_infra] waiting subnet(s) gone: {pending}")
+                    time.sleep(10)
+        # 공유 IGW는 메인 VPC의 자식 — VPC보다 먼저 (attached면 VPC DELETE 409;
+        # 종전엔 이 경로가 IGW를 몰라 VPC가 409×5 후 통째로 스윕行).
+        if igw_id:
+            _ladder(engine._IGW_CREATE_PATH, igw_id, "shared IGW")
+        if vpc_id:
+            _ladder(engine._VPC_CREATE_PATH, vpc_id, "shared VPC")
+
+    def _chain_tgw() -> None:
+        # account-level — VPC와 독립. adopter의 vpc-connection 잔재로 EDITING일
+        # 수 있어 짧은 settle 대기 후 사다리 (engine closure와 동일 근거).
+        deadline = time.time() + 300
+        while time.time() < deadline:
+            try:
+                g = client.get(f"{engine._TGW_CREATE_PATH}/{tgw_id}",
+                               service="vpc")
+                if getattr(g, "status", None) == 404:
+                    return
+                stt = str((getattr(g, "body", None) or {})
+                          .get("transit_gateway", {}).get("state", "")).upper()
+                if stt in ("", "ACTIVE", "RUNNING", "CREATED", "AVAILABLE",
+                           "ERROR"):
+                    break
+            except Exception:  # noqa: BLE001 — read hiccup; try the delete
+                break
+            _eprint(f"[shared_infra] shared TGW {tgw_id} state={stt} — "
+                    f"settle 대기 후 삭제")
+            time.sleep(10)
+        _ladder(engine._TGW_CREATE_PATH, tgw_id, "shared TGW")
+
+    chains = [("main", _chain_main)]
+    if tgw_id:
+        chains.append(("tgw", _chain_tgw))
     if net_a_id:
-        _vpc_delete_ladder(net_a_id, "shared net VPC A")
+        chains.append(("net-a", lambda: _ladder(engine._VPC_CREATE_PATH,
+                                                net_a_id, "shared net VPC A")))
     if net_b_id:
-        _vpc_delete_ladder(net_b_id, "shared net VPC B")
+        chains.append(("net-b", lambda: _ladder(engine._VPC_CREATE_PATH,
+                                                net_b_id, "shared net VPC B")))
+    if len(chains) == 1:
+        _chain_main()
+        return 0
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=len(chains),
+                            thread_name_prefix="shared-td") as ex:
+        futs = [(name, ex.submit(fn)) for name, fn in chains]
+        for name, fut in futs:
+            try:
+                fut.result()
+            except Exception as exc:  # noqa: BLE001 — sweep backstop per chain
+                _eprint(f"[shared_infra] teardown chain {name} failed ({exc}); "
+                        f"sweep will reclaim")
     return 0
 
 

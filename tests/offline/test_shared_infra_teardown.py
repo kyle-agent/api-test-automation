@@ -100,3 +100,95 @@ def test_vpc_only_env_still_deletes_vpc(monkeypatch, _fast):
     monkeypatch.delenv(engine._ENV_SHARED_DB_SUBNET, raising=False)
     assert si.teardown() == 0
     assert ("DELETE", f"{engine._VPC_CREATE_PATH}/vpcX") in c.calls
+
+
+# --------------------------------------------------------------------------- #
+# 병렬 체인 + IGW/TGW (2026-07-15 오너 실측 수리 — run-eac8):
+# (1) 완전 직렬이라 서브넷 gone-wait 240s 동안 TGW/net-A/B 미착수 (오너:
+#     "그거 지워질 때까지 아래쪽에 다른 작업을 안하네?")
+# (2) 공유 IGW/TGW를 몰라 IGW가 메인 VPC DELETE를 409×5로 막고 VPC·TGW 스윕行.
+# --------------------------------------------------------------------------- #
+class _ParClient:
+    """스레드-세이프 콜 레코더. subnet GET은 gone_after회부터 404, TGW GET은
+    ACTIVE 바디."""
+
+    def __init__(self, gone_after=2):
+        import threading
+        self.calls: list[tuple[str, str]] = []
+        self._lock = threading.Lock()
+        self._sub_reads = 0
+        self._gone_after = gone_after
+
+    def request(self, method, path, service=None, **kw):
+        with self._lock:
+            self.calls.append((method, path))
+        return _Resp(204)
+
+    def get(self, path, service=None, **kw):
+        with self._lock:
+            self.calls.append(("GET", path))
+            if path.startswith(engine._SUBNET_CREATE_PATH):
+                self._sub_reads += 1
+                return _Resp(404 if self._sub_reads >= self._gone_after else 200)
+        if path.startswith(engine._TGW_CREATE_PATH):
+            r = _Resp(200)
+            r.body = {"transit_gateway": {"state": "ACTIVE"}}
+            return r
+        return _Resp(200)
+
+
+def _setup_full_env(monkeypatch, client):
+    cfg = types.SimpleNamespace(allow_destructive=True)
+    monkeypatch.setattr(si, "_build_client", lambda: (cfg, client))
+    monkeypatch.setattr(si.time, "sleep", lambda s: None)
+    monkeypatch.setenv(engine._ENV_SHARED_VPC, "vpc-main")
+    monkeypatch.setenv(engine._ENV_SHARED_SUBNET, "sub-1")
+    monkeypatch.setenv(engine._ENV_SHARED_DB_SUBNET, "sub-db")
+    monkeypatch.setenv(engine._ENV_SHARED_NET_VPC_A, "vpc-a")
+    monkeypatch.setenv(engine._ENV_SHARED_NET_VPC_B, "vpc-b")
+    monkeypatch.setenv(engine._ENV_SHARED_IGW, "igw-1")
+    monkeypatch.setenv(engine._ENV_SHARED_TGW, "tgw-1")
+
+
+def test_teardown_deletes_igw_and_tgw_and_igw_before_vpc(monkeypatch):
+    """종전 갭 잠금: 공유 IGW·TGW도 삭제 대상이고, IGW는 attach된 메인 VPC보다
+    먼저 (안 지우면 VPC DELETE 409×5 → 통째로 스윕行이던 실측 패턴)."""
+    c = _ParClient()
+    _setup_full_env(monkeypatch, c)
+    assert si.teardown() == 0
+    dels = [p for m, p in c.calls if m == "DELETE"]
+    assert f"{engine._IGW_CREATE_PATH}/igw-1" in dels
+    assert f"{engine._TGW_CREATE_PATH}/tgw-1" in dels
+    for v in ("vpc-main", "vpc-a", "vpc-b"):
+        assert f"{engine._VPC_CREATE_PATH}/{v}" in dels
+    assert dels.index(f"{engine._IGW_CREATE_PATH}/igw-1") < \
+        dels.index(f"{engine._VPC_CREATE_PATH}/vpc-main")
+
+
+def test_teardown_independent_chains_not_blocked_by_subnet_wait(monkeypatch):
+    """서브넷이 끝내 안 사라져도(gone-wait 타임아웃 → 스윕 백스톱) 독립 체인
+    (TGW·net-A/B)은 전부 발행돼야 한다 — 직렬 회귀 방지."""
+    c = _ParClient(gone_after=10_000)          # 서브넷이 영원히 200
+    _setup_full_env(monkeypatch, c)
+    t = [0.0]
+    monkeypatch.setattr(si.time, "time",
+                        lambda: t.__setitem__(0, t[0] + 5.0) or t[0])
+    assert si.teardown() == 0
+    dels = [p for m, p in c.calls if m == "DELETE"]
+    assert f"{engine._TGW_CREATE_PATH}/tgw-1" in dels
+    assert f"{engine._VPC_CREATE_PATH}/vpc-a" in dels
+    assert f"{engine._VPC_CREATE_PATH}/vpc-b" in dels
+
+
+def test_teardown_without_optional_ids_keeps_legacy_shape(monkeypatch):
+    """IGW/TGW/net env가 없으면(구 프로비저너) 종전 main-only 동작 — 무회귀."""
+    c = _ParClient()
+    _setup_full_env(monkeypatch, c)
+    for k in (engine._ENV_SHARED_IGW, engine._ENV_SHARED_TGW,
+              engine._ENV_SHARED_NET_VPC_A, engine._ENV_SHARED_NET_VPC_B):
+        monkeypatch.delenv(k, raising=False)
+    assert si.teardown() == 0
+    dels = [p for m, p in c.calls if m == "DELETE"]
+    assert f"{engine._VPC_CREATE_PATH}/vpc-main" in dels
+    assert not any("internet-gateways" in p or "transit-gateways" in p
+                   for p in dels)

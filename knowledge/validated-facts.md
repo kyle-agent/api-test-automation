@@ -3068,3 +3068,22 @@ run_scoped 배리어)은 console2 **서버 프로세스 안**에서 실행된다
 **발견**: `/v1/server-types`(DBaaS 계열 공통)의 항목엔 `purpose`(general|zookeeper|akhq|sentinel)와 `type`(Standard-1|Standard-2) 축이 있다. 무필터 min_by가 ES에서 절대최소 `ess1v1m2`(**zookeeper 전용**)를 집어 create가 **400 "The server type is invalid"** (run 실측). 콘솔 성공본의 ess1v2m4는 purpose=general의 최소형.
 
 **규약**: 서버타입 min_by 캡처는 반드시 `where_prefix {purpose:"general", type:"Standard-1"}`을 합성한다(48곳 적용). cachestore는 css/redis 두 패밀리가 동률이라 `name:"css"`도 고정. 라이브 시뮬레이션 결과: mysql/pg/epas=db1v2m4(→db1v2m8), mariadb=db1v1m2(→db1v2m4), cachestore=css1v1m2(→css1v2m4), ES=ess1v2m4(→ess1v2m8). mariadb/cachestore의 1vCPU general 타입은 미검증 — create 400 시 cpu_core 하한 추가가 다음 수순.
+
+## shared_infra --teardown 병렬화 + IGW/TGW 갭 수리 (2026-07-15, run-eac8 실측)
+
+**console2 run-end의 실제 teardown 경로는 `shared_infra --teardown`(서브프로세스
+CLI)이지 engine closure가 아니다** — 2026-07-14 wall-time 최적화(engine closure
+병렬화)가 이 경로를 못 탄 이유. run-eac8 실측: (1) 완전 직렬 — 서브넷 gone-wait
+240s 동안 TGW/net-A/B 미착수 (오너: "그거 지워질 때까지 아래쪽에 다른 작업을
+안하네?"), (2) 공유 IGW/TGW를 아예 안 읽음 → IGW가 메인 VPC DELETE를 409×5로
+막고 VPC·TGW 통째로 스윕行 (스윕이 29분씩 일하던 큰 지분).
+
+수리: engine closure와 동일한 4체인 병렬([main: 서브넷→IGW→VPC]·[tgw]·[net-a]·
+[net-b]) + SCP_SHARED_IGW_ID/TGW_ID 판독 + TGW settle 후 삭제. **서브프로세스라
+git pull만으로 다음 런 적용(서버 재시작 불필요)**. 단 +0 재스캔 스킵(end_sweep_
+ran)은 서버 프로세스 코드라 재시작 필요. offline: test_shared_infra_teardown.py
++3종(IGW-before-VPC·독립체인 비차단·구 env 무회귀).
+
+run-eac8 잔존 3건의 성격(오너 질문 "시나리오 실패해서?"): 아니다 — children
+TGW 409(EDITING drain)·vs-full/vpc-endpoint 서브넷(자식 drain)은 전부 비동기
+drain 타이밍 클래스로 reap/스윕 백스톱이 정상 회수. 실패 시나리오 잔존은 별도.
