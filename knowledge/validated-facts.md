@@ -3469,3 +3469,26 @@ api_endpoint_versions.json도 함께 재생성해야 한다 (spec-intel 후속 �
 - 스윕 구조 재확인(오너 "tag로 조회하고 남은것 다 지우면"): 그게 현재 구조다 —
   tag 인벤토리로 컬렉션 축소 + 부산물 전량 나열 + ledger 는 리스트 사각지대
   (queueservice)용. 남던 낭비는 위 유령 재프로브였다.
+
+## fe88 실패 3건(캐파군) 최종 판정 — 버전 핀 semantics 분기 실측 (2026-07-16, agent-B)
+
+- **createfirewallrule 버전별 semantics 분기 (라이브 A/B 실측)**: 핀 `firewall 1.1`
+  = **202 + 빈 바디 `{}`** (id 캡처 불가 — gen-wave5-fw 사망 원인, rule 미등록
+  → IGW delete 409 연쇄), 엔드포인트핀 1.0 = **201 + 전체 바디**. 문서는
+  1.0/201만 기술 — 1.1의 202 semantics 미문서 (conformance). 캡처 스텝은 버전
+  핀과 한 몸이다. 엔드포인트별 핀 복귀로 해소 — **수리 후 라이브 재검증 PASS**.
+- **createlbhealthcheck**: 핀 1.4 = 202 비동기(CREATING 중 set → 400
+  InvalidState), 무핀/1.3 = 201 동기. settle-필수 클래스에 추가 — create→set
+  사이 ACTIVE 폴 신설 (gen-wave5-net + formal yaml ready). 동기 경로 무해.
+- **setlblistener (PUT /v1/lb-listeners/{id})**: 1.4·1.3 핀 모두 406
+  NoSuchVersion, **무핀만 수락** — 버전 협상 결함 (conformance). 현행 406
+  무핀 폴백이 흡수하므로 시나리오 수리 불요.
+- **ASG notification user_ids는 계정 스코프** — 하드코딩 금지. 구계정 사용자
+  id(f2b627e6…)가 계정 교체로 무효 → heavy-asg 사망. 같은 lifecycle의 ASG
+  create 응답 `$.created_by`(호출 주체, 항상 유효)를 캡처해 주입하는 패턴
+  권장. IAM 유저 목록은 403이라 사전조회 불가.
+- **RM /v1/resources 인덱스는 삭제 반영에 수 분 lag** — 유령 대부분은 일시적
+  (지속 유령 0 실측, regrsubb81b6b19 도 수 분 내 자동 소거). 잔존 판정은
+  실컬렉션 우선 (기존 규칙 재확인).
+- 오너 16건 잔존 체크리스트 전량 소거 확인(각 404), f04764b66c9c 는 VPC가
+  아니라 **IGW id** — rule→IGW→FW 연쇄 소멸 체인 재실증.
