@@ -1,0 +1,5 @@
+{# 자격 검증 결과 fragment (htmx target) — 값은 절대 싣지 않는다, 판정 문구만 #}
+<div class="verdict {{ 'good' if ok else 'bad' }}" style="padding:9px 13px;font-size:12.5px">
+  <span class="pip"></span>
+  <span>{% if ok %}<b>검증 성공</b>{% else %}<b>검증 실패</b>{% endif %} — {{ message }}</span>
+</div>

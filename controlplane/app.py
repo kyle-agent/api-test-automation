@@ -88,6 +88,10 @@ app.mount("/testing/console",
 from controlplane import catalog_routes, reporting_routes  # noqa: E402
 app.include_router(catalog_routes.router)
 app.include_router(reporting_routes.router)
+# 설정(⚙) — 환경/계정(.env) 입력 화면 (오너 지시 2026-07-15: 테스터 인수인계 시
+# 환경·계정이 달라질 수 있으니 화면에서 입력) — settings_routes.py
+from controlplane import settings_routes  # noqa: E402
+app.include_router(settings_routes.router)
 # shared scene renderer (controlplane/static/resource_graph.js) for the graph faces —
 # Modeling's model-map and Reporting's coverage-map load it from /static/.
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}설정 — SCP API Regression Test Platform{% endblock %}
+{% block content %}
+
+<h2>⚙ 환경 · 계정 설정
+  <span class="hint">테스터 인수인계용 — 화면에서 입력하면 로컬 <code>{{ env_file }}</code> 를 갱신합니다</span>
+</h2>
+
+{% if msg %}<div class="banner">{{ msg }}</div>{% endif %}
+
+{% if not gitignore_ok %}
+<div class="banner" style="background:var(--red-bg);border-color:#ecc4c4;color:var(--red)">
+  경고: 대상 파일 <code>{{ env_file }}</code> 이 .gitignore 로 보호되지 않습니다 —
+  저장 전에 .gitignore 를 확인하세요 (Hard Rule 2: 시크릿은 git 에 절대 커밋 금지).
+</div>
+{% endif %}
+
+<div class="banner">
+  저장 = 기존 <code>{{ env_file }}</code> 의 다른 키·주석은 그대로 두고 입력한 키만
+  갱신하는 <b>머지</b>입니다 (파일 권한 0600). 빈 칸은 <b>변경 없음</b>.
+  새 값은 <b>다음 실행(라이브 런)부터</b> 적용됩니다 — 잔존 자원 스캔·단일 삭제 등
+  이 서버 프로세스 내부 기능과 상단 env 표시는 <b>서버 재기동 후</b> 반영됩니다
+  (.env 는 서버 시작 시 1회 로드).
+</div>
+
+<form method="post" action="/settings/save">
+  <div class="grid2" style="align-items:start">
+
+    <div class="card pad">
+      <h2 style="margin-top:0">환경 정보 <span class="hint">region · env · 엔드포인트</span></h2>
+      {% for f in fields if f.group == 'env' %}
+      <div class="picker" style="margin-bottom:11px">
+        <label for="{{ f.key }}">{{ f.label }} <code class="muted small">{{ f.key }}</code></label>
+        <input type="text" id="{{ f.key }}" name="{{ f.key }}" value="{{ f.value }}"
+               placeholder="{{ f.placeholder }}" autocomplete="off" spellcheck="false">
+        <div class="note">{{ f.help }}{% if not f.is_set and f.placeholder %} · 미설정{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card pad">
+      <h2 style="margin-top:0">계정 정보 <span class="hint">자격증명 — 표시는 끝 4자리만</span></h2>
+      {% for f in fields if f.group == 'account' %}
+      <div class="picker" style="margin-bottom:11px">
+        <label for="{{ f.key }}">{{ f.label }} <code class="muted small">{{ f.key }}</code></label>
+        {% if f.secret %}
+        <input type="password" id="{{ f.key }}" name="{{ f.key }}" value=""
+               placeholder="{{ f.masked if f.is_set else '미설정 — 새 값 입력' }}"
+               autocomplete="new-password" spellcheck="false">
+        <div class="note">{{ f.help }} ·
+          {% if f.is_set %}현재 <code>{{ f.masked }}</code> — 비워두면 기존 값 유지{% else %}미설정{% endif %}</div>
+        {% else %}
+        <input type="text" id="{{ f.key }}" name="{{ f.key }}" value="{{ f.value }}"
+               placeholder="{{ f.placeholder }}" autocomplete="off" spellcheck="false">
+        <div class="note">{{ f.help }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <div id="verify-result" style="margin:10px 0"></div>
+      <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="ghost"
+                hx-post="/settings/verify" hx-include="closest form"
+                hx-target="#verify-result" hx-swap="innerHTML">자격 검증 (read-only)</button>
+        <button type="submit">저장</button>
+        <span class="note">검증은 vpc 목록 GET 1회 — 실패해도 저장할 수 있습니다.</span>
+      </div>
+    </div>
+
+  </div>
+</form>
+
+<div class="note" style="margin-top:14px">
+  여기에 없는 고급 키(SCP_GLOBAL_SERVICES · HMAC 헤더명 · 안전 게이트 등)는
+  <code>{{ env_file }}</code> 를 직접 편집하세요 — 이 화면은 해당 키들을 건드리지 않습니다.
+</div>
+
+{% endblock %}
