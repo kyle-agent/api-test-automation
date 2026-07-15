@@ -1437,6 +1437,10 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -2427,6 +2431,10 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -2825,7 +2833,15 @@
           ],
           "optional": true,
           "capture_soft": {
-            "server_type_name": "$.contents[1].name"
+            "server_type_name": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           },
           "_note": "completeness-audit 2026-07-08 (supports the mysqlsetservertype 편입 below): captures the SECOND server-types entry as the resize target — resizing to the SAME type used at create is an intentional hard 400 (see the epas/mariadb capture-server-type / resize notes in this file, HB1 repair 2026-07-04). Separate optional capture_soft step (epas pattern) so a single-entry server-types list can never fail mysql's strict find-server-type."
         },
@@ -5167,6 +5183,10 @@
           "capture": {
             "epas_stype": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -6642,6 +6662,10 @@
           "capture": {
             "epas_stype": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -6829,7 +6853,15 @@
           ],
           "optional": true,
           "capture_soft": {
-            "server_type_name": "$.contents[1].name"
+            "server_type_name": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           },
           "_note": "repointed to $.contents[1].name 2026-07-04 (HB1 repair, mariadb-analogous fix): this step previously re-captured index[0] — the SAME server type epas-create already used for the instance group, so resize-instance-group's same-type request is expected to hard-fail (see mariadb's identical note; same InstanceGroupResizeRequest DTO). index[1] gives a genuinely different target type. UNVERIFIED LIVE — apply + observe in HB1b/HB2b."
         },
@@ -9492,9 +9524,21 @@
           "capture": {
             "maria_stype": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             },
-            "maria_stype2": "$.contents[1].name"
+            "maria_stype2": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           }
         },
         {
@@ -10908,9 +10952,21 @@
           "capture": {
             "maria_stype": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             },
-            "maria_stype2": "$.contents[1].name"
+            "maria_stype2": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           }
         },
         {
@@ -13351,9 +13407,21 @@
           "capture": {
             "cache_stype": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             },
-            "cache_stype2": "$.contents[1].name"
+            "cache_stype2": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           }
         },
         {
@@ -14440,9 +14508,21 @@
           "capture": {
             "cache_stype": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             },
-            "cache_stype2": "$.contents[1].name"
+            "cache_stype2": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           }
         },
         {
@@ -17255,9 +17335,21 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             },
-            "db_server_type2": "$.contents[1].name"
+            "db_server_type2": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           }
         },
         {
@@ -18684,9 +18776,21 @@
           "capture": {
             "db_server_type": {
               "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             },
-            "db_server_type2": "$.contents[1].name"
+            "db_server_type2": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name"
+            }
           }
         },
         {
