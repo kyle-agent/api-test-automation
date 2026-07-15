@@ -754,6 +754,63 @@ def test_home_mini_ladder():
     assert "공식 런" in home                      # 판정 시각 = CI 발행 런 명시
 
 
+def test_runs_table_view(monkeypatch):
+    """최근 RUN 표 개편 (오너 '전부 반영' 2026-07-15) — _runs_view 계약:
+    ① status 요약(lifecycle n/m 실패 — _local_run_summary 재사용·캐시)
+    ② KST '시작·소요' 1열 (UTC ISO 2열 대체) ③ profile 열 제거(템플릿)
+    ④ 연속 실패 스트릭(진행 중 건너뜀, done 에서 종료+마지막 성공 시각)."""
+    from controlplane import app as cp_app
+    from tools import console2_server as c2
+
+    monkeypatch.setattr(c2, "_local_run_summary", lambda gid: {
+        "lifecycles": {"total": 118, "passed": 115, "failed": 3,
+                       "skipped": 0, "unfinished": 0, "failed_ids": []}})
+    cp_app._RUN_SUM_CACHE.clear()
+    rows = [  # 최신순: failed·failed·(running 건너뜀)·failed·done
+        {"gh_run_id": "local-a", "status": "failed", "suite": "console2",
+         "trigger": "local", "requested_at": "2026-07-14T05:25:01Z",
+         "finished_at": "2026-07-14T06:43:19Z"},
+        {"gh_run_id": "local-b", "status": "failed", "suite": "console2",
+         "trigger": "local", "requested_at": "2026-07-14T02:21:13Z",
+         "finished_at": "2026-07-14T03:49:03Z"},
+        {"gh_run_id": "local-r", "status": "running", "suite": "console2",
+         "trigger": "local", "requested_at": "2026-07-14T01:00:00Z",
+         "finished_at": None},
+        {"gh_run_id": "local-c", "status": "failed", "suite": "console2",
+         "trigger": "local", "requested_at": "2026-07-13T23:50:03Z",
+         "finished_at": "2026-07-14T01:17:53Z"},
+        {"gh_run_id": "local-ok", "status": "done", "suite": "console2",
+         "trigger": "local", "requested_at": "2026-07-13T11:40:14Z",
+         "finished_at": "2026-07-13T13:01:38Z"},
+    ]
+    v = cp_app._runs_view(rows, display=2)
+    assert len(v["runs"]) == 2                       # 표시분만 보강
+    r0 = v["runs"][0]
+    assert r0["when_label"] == "07-14 14:25"         # UTC 05:25 → KST
+    assert r0["dur_label"] == "1시간 18분"
+    assert r0["summary"] == "lifecycle 3/118 실패"
+    # 스트릭: failed 3 (running 은 건너뜀), done 에서 멈추고 마지막 성공 시각
+    assert v["fail_streak"] == 3
+    assert v["last_ok_when"] == "07-13 20:40"        # UTC 11:40 → KST
+    # 진행 중 런의 소요 라벨
+    assert cp_app._run_dur_label("2026-07-14T01:00:00Z", "", "running") == "진행 중"
+    # 통과 런 요약 문구
+    monkeypatch.setattr(c2, "_local_run_summary", lambda gid: {
+        "lifecycles": {"total": 10, "passed": 10, "failed": 0}})
+    cp_app._RUN_SUM_CACHE.clear()
+    ok = cp_app._runs_view([{"gh_run_id": "local-z", "status": "done",
+                             "suite": "s", "trigger": "local",
+                             "requested_at": "2026-07-13T11:40:14Z",
+                             "finished_at": "2026-07-13T11:41:00Z"}])
+    assert ok["runs"][0]["summary"] == "lifecycle 10/10 통과"
+    # 템플릿 계약: profile 열 없음 · KST 1열 헤더 · 스트릭 경고 마크업 존재
+    part = client.get("/partials/runs").text
+    assert ">profile</th>" not in part and "시작 · 소요" in part
+    tpl = (Path(__file__).resolve().parent / "templates" / "_runs_table.html"
+           ).read_text(encoding="utf-8")
+    assert "연속 실패" in tpl and "fail_streak" in tpl
+
+
 def test_v2_shell_header_and_global_search():
     """v2 접목 6a (오너 지시 2026-07-11) — v2 셸의 상단 디자인 이식.
 
