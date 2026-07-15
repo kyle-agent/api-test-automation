@@ -1,9 +1,18 @@
 {% from "_badges.html" import badge %}
+{# 최근 RUN 표 개편 (오너 '전부 반영' 2026-07-15): ① status 에 lifecycle 결과
+   요약 병기(로컬 종료 런 — 런 상세와 같은 소스) ② UTC ISO 2열 → KST '시작 ·
+   소요' 1열(배너와 같은 시간 언어) ③ 항상 '-' 이던 profile 열 제거 ④ 3건+
+   연속 실패면 경고 한 줄. 행 데이터는 app._runs_view 가 보강 (모든 라우트 공통). #}
+{% if fail_streak is defined and fail_streak >= 3 %}
+<p class="small" style="margin:6px 0 2px;color:var(--red)"><b>⚠ 최근 {{ fail_streak }}건 연속 실패</b>{%
+  if last_ok_when %} — 마지막 성공 {{ last_ok_when }}{% endif %}
+  <span class="muted">· 반복 원인은 run 상세(행 클릭)에서</span></p>
+{% endif %}
 <table>
   {# v2 접목 1 (계약 §2.1 병합 런 타임라인): 행별 출처 배지 — gh_run_id 의
      'local-' 접두 = 이 서버에서 실행된 런, 숫자 = CI(GitHub Actions) 런. #}
-  <thead><tr><th>source</th><th>run</th><th>suite</th><th>profile</th><th>trigger</th><th>status</th>
-      <th>requested</th><th>finished</th></tr></thead>
+  <thead><tr><th>source</th><th>run</th><th>suite</th><th>trigger</th><th>status</th>
+      <th title="시작 시각(KST) · 소요 시간 — 배너의 판정 시각과 같은 표기">시작 · 소요</th></tr></thead>
   <tbody>
   {% for r in runs %}
   <tr>
@@ -11,18 +20,17 @@
     <td>{% if r['gh_run_id'] %}<a href="/runs/{{ r['gh_run_id'] }}"><code>{{ r['gh_run_id'] }}</code></a>
         {% else %}<span class="muted">#{{ r['id'] }} (대기)</span>{% endif %}</td>
     <td>{{ r['suite'] or '-' }}</td>
-    <td>{{ r['profile'] or '-' }}</td>
     <td>{{ r['trigger'] }}</td>
-    <td><span class="status {{ r['status'] }}">{{ r['status'] }}</span></td>
-    <td class="muted">{{ r['requested_at'] or '' }}</td>
-    <td class="muted">{{ r['finished_at'] or '' }}</td>
+    <td><span class="status {{ r['status'] }}">{{ r['status'] }}</span>{%
+      if r.get('summary') %} <span class="muted small">· {{ r['summary'] }}</span>{% endif %}</td>
+    <td class="muted">{{ r.get('when_label') or r['requested_at'] or '' }}{%
+      if r.get('dur_label') %} · {{ r['dur_label'] }}{% endif %}</td>
   </tr>
   {% else %}
   {# empty-state 표준 (계약 §3): "run 없음"이 발행 수치와 모순으로 읽히지 않게
-     — 위 배너/타일의 fail·커버리지는 발행본 기준이라 이 서버의 실행 여부와 무관. #}
-  <tr><td colspan="8" class="muted">이 서버에 run 기록이 없습니다 — 공식 수치
-      (배너·타일의 Published 배지)는 발행본 기준으로, 이 서버의 실행 여부와
-      무관합니다.</td></tr>
+     — 위 배너/사다리의 fail·커버리지는 발행본 기준이라 이 서버의 실행 여부와 무관. #}
+  <tr><td colspan="6" class="muted">이 서버에 run 기록이 없습니다 — 공식 수치
+      (배너·사다리)는 발행본 기준으로, 이 서버의 실행 여부와 무관합니다.</td></tr>
   {% endfor %}
   </tbody>
 </table>

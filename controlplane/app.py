@@ -132,6 +132,79 @@ def _split_stale_running(runs) -> tuple[list, list]:
     return active, stale
 
 
+# ---- 최근 RUN 표 보강 (오너 '전부 반영' 2026-07-15) ---------------------------
+# 표가 "어떻게 됐나"까지 답하게: KST 시작 + 소요 1열(구 UTC ISO 2열 대체 — 배너와
+# 같은 시간 언어) + 로컬 런 lifecycle 결과 요약 + 연속 실패 스트릭. 종료 런 요약은
+# 불변이라 캐시 — 15s 폴링이 이벤트 파일을 매번 다시 읽지 않는다.
+_RUN_SUM_CACHE: dict[str, str | None] = {}
+
+
+def _run_dur_label(a: str, b: str, status: str) -> str:
+    import datetime as _dt
+    try:
+        t0 = _dt.datetime.strptime(a or "", "%Y-%m-%dT%H:%M:%SZ")
+        t1 = _dt.datetime.strptime(b or "", "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return "진행 중" if status in ("running", "dispatched") else ""
+    sec = max(0, int((t1 - t0).total_seconds()))
+    if sec < 60:
+        return f"{sec}초"
+    if sec < 3600:
+        return f"{sec // 60}분"
+    return f"{sec // 3600}시간 {sec % 3600 // 60}분"
+
+
+def _run_summary_label(d: dict) -> str | None:
+    """로컬 종료 런의 'lifecycle n/m 실패|통과' — c2._local_run_summary 재사용
+    (런 상세 페이지와 같은 소스). CI/미종료 런은 None (현행 status 만)."""
+    gid = str(d.get("gh_run_id") or "")
+    if not gid.startswith("local-") or d.get("status") not in ("failed", "done"):
+        return None
+    if gid in _RUN_SUM_CACHE:
+        return _RUN_SUM_CACHE[gid]
+    label = None
+    try:
+        from tools import console2_server as c2
+        s = (c2._local_run_summary(gid) or {}).get("lifecycles") or {}
+        if s.get("total"):
+            label = (f"lifecycle {s['failed']}/{s['total']} 실패" if s.get("failed")
+                     else f"lifecycle {s.get('passed', 0)}/{s['total']} 통과")
+    except Exception:                                   # noqa: BLE001 — 요약은 보너스
+        label = None
+    _RUN_SUM_CACHE[gid] = label
+    return label
+
+
+def _runs_view(rows, display: int | None = None) -> dict:
+    """_runs_table.html 컨텍스트: 보강 행(표시분만) + 연속 실패 스트릭(전체 창).
+
+    스트릭 = 최신 종료 런부터 연속 'failed' 수 (진행/대기 중은 건너뜀) —
+    3건 이상이면 표 위에 경고 한 줄. last_ok_when = 마지막 성공(done) 시각."""
+    n = len(rows) if display is None else display
+    view = []
+    for r in rows[:n]:
+        d = dict(r)
+        d["when_label"] = common.snap_ts_short({"ts": d.get("requested_at")})
+        d["dur_label"] = _run_dur_label(d.get("requested_at") or "",
+                                        d.get("finished_at") or "",
+                                        d.get("status") or "")
+        d["summary"] = _run_summary_label(d)
+        view.append(d)
+    streak, last_ok = 0, None
+    for r in rows:                                      # 최신순 전제 (list_runs)
+        st = r["status"]
+        if st in ("running", "dispatched", "pending", "queued"):
+            continue
+        if st == "failed":
+            streak += 1
+            continue
+        if st == "done":
+            last_ok = common.snap_ts_short({"ts": r["requested_at"]}) \
+                or (r["requested_at"] or "")
+        break
+    return {"runs": view, "fail_streak": streak, "last_ok_when": last_ok}
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     runs = db.list_runs(limit=50)
@@ -168,8 +241,10 @@ def home(request: Request):
                 fail_svcs_capped = bool(reg.get("capped"))
         except Exception:                                  # noqa: BLE001
             fail_svcs = []
+    rv = _runs_view(runs, display=5)
     return _render(request, "home.html", "home",
-                   runs=runs[:5], running=running,
+                   runs=rv["runs"], fail_streak=rv["fail_streak"],
+                   last_ok_when=rv["last_ok_when"], running=running,
                    stale_running=stale_running, runs_today=runs_today,
                    fail_svcs=fail_svcs, fail_svcs_capped=fail_svcs_capped,
                    local_after=local_after,
@@ -557,8 +632,11 @@ def testing(request: Request, suite: str = "", service: str = "",
     # safety gates are never bypassed.
     prefill = {"suite": suite.strip(), "service": service.strip(),
                "profile": profile.strip(), "crud_filter": crud_filter.strip()}
+    rv = _runs_view(runs)
     return _render(request, "testing.html", "testing",
-                   runs=runs, live=live, stale_running=stale_running,
+                   runs=rv["runs"], fail_streak=rv["fail_streak"],
+                   last_ok_when=rv["last_ok_when"],
+                   live=live, stale_running=stale_running,
                    schedules=db.list_schedules(),
                    preview=_run_preview_data(), prefill=prefill)
 
@@ -573,7 +651,7 @@ def testing_embed(request: Request):
 @app.get("/partials/runs", response_class=HTMLResponse)
 def runs_partial(request: Request, limit: int = 15):
     return templates.TemplateResponse(request, "_runs_table.html",
-                                      {"runs": db.list_runs(limit=limit)})
+                                      _runs_view(db.list_runs(limit=limit)))
 
 
 @app.post("/runs/trigger")
