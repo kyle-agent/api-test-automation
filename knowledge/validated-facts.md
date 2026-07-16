@@ -3806,3 +3806,16 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   15s×10 (ACTIVE 도달까지 흡수).
 - 런 전체 fail 탭의 backup-histories PUT / backups DELETE **401 AuthNFailed
   패밀리는 기지 백엔드 결함** (유효 HMAC, 전 엔진) — 신규 아님.
+
+## DBaaS backup 401 패밀리 — 본인인증 가설 조사 중간 기록 (2026-07-16, 오너 가설)
+
+- 오너 가설: 백업 이력 삭제/백업 해제는 콘솔에서 **사용자 본인 확인(문자)** 을
+  거치는 파괴적 작업이라, API 플레인에 그 인증 컨텍스트가 없어 401
+  AuthNFailed일 수 있음.
+- 로컬 스펙 확인: removebackuphistories/unsetbackup 요청 모델에 OTP/연락처
+  필드 없음(backup_history_number 배열뿐), request 예시는 표준 HMAC. 단
+  **응답 코드에 401이 정식 등재** (202/400/401/403) — 사유 미기술.
+  docs 상세 페이지는 사이트 503으로 미확인 (재시도 필요).
+- 판별법: 콘솔에서 백업 이력 삭제 시 본인인증 팝업 여부 — 뜨면 API 한계
+  (waiver + conformance '인증 승격 절차 미문서'), 안 뜨면 백엔드 인증 연동
+  결함(티켓). 오너 확인 대기.
