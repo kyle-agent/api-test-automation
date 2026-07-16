@@ -799,7 +799,8 @@
             422
           ],
           "optional": true,
-          "group": "ha"
+          "group": "ha",
+          "_note": "negative-probe: 의도된 4xx — a690(2026-07-16) 원인규명: create가 ha_enabled:false 단일노드라 standby 부재 → 404 scp-dbaas.switchover-host.not-found (a690 LIVE, mysql-a/postgresql-a). body 없음은 스펙 정합(switchover에 body 모델 없음, api_docs). HA 생성으로만 2xx 가능 — 과금/시간 비용상 비HA 유지, 관용 404 문서화."
         },
         {
           "name": "wait-after-switchover-cluster",
@@ -967,7 +968,7 @@
           ],
           "optional": true,
           "group": "patch",
-          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b. | a690(2026-07-16) 원인규명 판정(2026-07-04 UNVERIFIED 해소): 현재 버전을 그대로 보내면 400 ValidationError 'Unpatchable version : <ver>' (a690 LIVE: mysql 8.4.7 / mariadb 11.4.10 / epas 17.7 / postgresql 'COMMUNITY 17.7'). 계정 카탈로그에 동일 major의 다른 minor가 없어(engine-versions 실측) 패치 타깃이 구조적으로 부재 — 회귀 아님, 환경 제약. SCP가 두 번째 minor를 공개할 때까지 관용 400이 기대 결과."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -1180,7 +1181,13 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀)."
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -1262,7 +1269,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -1299,7 +1307,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -2182,7 +2191,8 @@
             422
           ],
           "optional": true,
-          "group": "ha"
+          "group": "ha",
+          "_note": "negative-probe: 의도된 4xx — a690(2026-07-16) 원인규명: create가 ha_enabled:false 단일노드라 standby 부재 → 404 scp-dbaas.switchover-host.not-found (a690 LIVE, mysql-a/postgresql-a). body 없음은 스펙 정합(switchover에 body 모델 없음, api_docs). HA 생성으로만 2xx 가능 — 과금/시간 비용상 비HA 유지, 관용 404 문서화."
         },
         {
           "name": "wait-after-switchover-cluster",
@@ -2288,7 +2298,13 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀)."
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -2370,7 +2386,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -2407,7 +2424,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -2750,7 +2768,7 @@
           ],
           "optional": true,
           "group": "patch",
-          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b. | a690(2026-07-16) 원인규명 판정(2026-07-04 UNVERIFIED 해소): 현재 버전을 그대로 보내면 400 ValidationError 'Unpatchable version : <ver>' (a690 LIVE: mysql 8.4.7 / mariadb 11.4.10 / epas 17.7 / postgresql 'COMMUNITY 17.7'). 계정 카탈로그에 동일 major의 다른 minor가 없어(engine-versions 실측) 패치 타깃이 구조적으로 부재 — 회귀 아님, 환경 제약. SCP가 두 번째 minor를 공개할 때까지 관용 400이 기대 결과."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -2963,7 +2981,13 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀)."
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -3045,7 +3069,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -3082,7 +3107,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -4683,7 +4709,7 @@
           ],
           "optional": true,
           "group": "patch",
-          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b. | a690(2026-07-16) 원인규명 판정(2026-07-04 UNVERIFIED 해소): 현재 버전을 그대로 보내면 400 ValidationError 'Unpatchable version : <ver>' (a690 LIVE: mysql 8.4.7 / mariadb 11.4.10 / epas 17.7 / postgresql 'COMMUNITY 17.7'). 계정 카탈로그에 동일 major의 다른 minor가 없어(engine-versions 실측) 패치 타깃이 구조적으로 부재 — 회귀 아님, 환경 제약. SCP가 두 번째 minor를 공개할 때까지 관용 400이 기대 결과."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -4938,8 +4964,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "epas"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "epas",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -5026,7 +5058,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -5063,7 +5096,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -6635,8 +6669,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "epas"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "epas",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -6723,7 +6763,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -6760,7 +6801,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -7143,7 +7185,7 @@
           ],
           "optional": true,
           "group": "patch",
-          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b. | a690(2026-07-16) 원인규명 판정(2026-07-04 UNVERIFIED 해소): 현재 버전을 그대로 보내면 400 ValidationError 'Unpatchable version : <ver>' (a690 LIVE: mysql 8.4.7 / mariadb 11.4.10 / epas 17.7 / postgresql 'COMMUNITY 17.7'). 계정 카탈로그에 동일 major의 다른 minor가 없어(engine-versions 실측) 패치 타깃이 구조적으로 부재 — 회귀 아님, 환경 제약. SCP가 두 번째 minor를 공개할 때까지 관용 400이 기대 결과."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -7398,8 +7440,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "epas"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "epas",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -7486,7 +7534,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -7523,7 +7572,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -7867,7 +7917,11 @@
           ],
           "optional": true,
           "group": "param-read",
-          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — mysql/epas/postgresql cover this path via their capture-param-id step but mariadb never had one (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
+          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — mysql/epas/postgresql cover this path via their capture-param-id step but mariadb never had one (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정. | a690(2026-07-16) 원인규명: param_id/param_old_value capture_soft 추가 — set-parameters가 literal id:\"\"로 400 'Parameter ID is invalid. ()' (a690 LIVE). mysql-cluster-subops-a capture-param-id 동일 패턴(a690 202 LIVE-VERIFIED).",
+          "capture_soft": {
+            "param_id": "$.contents[0].id",
+            "param_old_value": "$.contents[0].applied_value"
+          }
         },
         {
           "name": "show-request",
@@ -8179,9 +8233,9 @@
           "json": {
             "parameters": [
               {
-                "id": "",
-                "new_value": "256",
-                "old_value": ""
+                "id": "{param_id}",
+                "new_value": "{param_old_value}",
+                "old_value": "{param_old_value}"
               }
             ]
           },
@@ -8196,7 +8250,8 @@
             422
           ],
           "optional": true,
-          "group": "param"
+          "group": "param",
+          "_note": "a690(2026-07-16) 원인규명 수리: literal id:\"\"→capture 토큰, new_value==old_value==applied_value 무해 no-op — a690 LIVE 근거: mysql-a set-parameters(captured id) 202, eventstreams set-parameter-values(no-op) 202, mariadb/cachestore(literal \"\") 400 'Parameter ID is invalid. ()'. mariadb contents[0]=aria_pagecache_buffer_size(applied '134217728', is_modifiable true) — a690 list-parameter-values 200 실측. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-set-parameters",
@@ -9048,7 +9103,7 @@
           ],
           "optional": true,
           "group": "patch",
-          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b. | a690(2026-07-16) 원인규명 판정(2026-07-04 UNVERIFIED 해소): 현재 버전을 그대로 보내면 400 ValidationError 'Unpatchable version : <ver>' (a690 LIVE: mysql 8.4.7 / mariadb 11.4.10 / epas 17.7 / postgresql 'COMMUNITY 17.7'). 계정 카탈로그에 동일 major의 다른 minor가 없어(engine-versions 실측) 패치 타깃이 구조적으로 부재 — 회귀 아님, 환경 제약. SCP가 두 번째 minor를 공개할 때까지 관용 400이 기대 결과."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -9304,8 +9359,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "mariadb"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "mariadb",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -9392,7 +9453,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -9429,7 +9491,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -9776,7 +9839,11 @@
           ],
           "optional": true,
           "group": "param-read",
-          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — mysql/epas/postgresql cover this path via their capture-param-id step but mariadb never had one (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
+          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — mysql/epas/postgresql cover this path via their capture-param-id step but mariadb never had one (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정. | a690(2026-07-16) 원인규명: param_id/param_old_value capture_soft 추가 — set-parameters가 literal id:\"\"로 400 'Parameter ID is invalid. ()' (a690 LIVE). mysql-cluster-subops-a capture-param-id 동일 패턴(a690 202 LIVE-VERIFIED).",
+          "capture_soft": {
+            "param_id": "$.contents[0].id",
+            "param_old_value": "$.contents[0].applied_value"
+          }
         },
         {
           "name": "show-request",
@@ -10088,9 +10155,9 @@
           "json": {
             "parameters": [
               {
-                "id": "",
-                "new_value": "256",
-                "old_value": ""
+                "id": "{param_id}",
+                "new_value": "{param_old_value}",
+                "old_value": "{param_old_value}"
               }
             ]
           },
@@ -10105,7 +10172,8 @@
             422
           ],
           "optional": true,
-          "group": "param"
+          "group": "param",
+          "_note": "a690(2026-07-16) 원인규명 수리: literal id:\"\"→capture 토큰, new_value==old_value==applied_value 무해 no-op — a690 LIVE 근거: mysql-a set-parameters(captured id) 202, eventstreams set-parameter-values(no-op) 202, mariadb/cachestore(literal \"\") 400 'Parameter ID is invalid. ()'. mariadb contents[0]=aria_pagecache_buffer_size(applied '134217728', is_modifiable true) — a690 list-parameter-values 200 실측. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-set-parameters",
@@ -10953,8 +11021,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "mariadb"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "mariadb",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -11041,7 +11115,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -11078,7 +11153,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -11416,7 +11492,11 @@
           ],
           "optional": true,
           "group": "param-read",
-          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — mysql/epas/postgresql cover this path via their capture-param-id step but mariadb never had one (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
+          "_note": "completeness-audit 2026-07-08 gap 편입 (mariadblistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — mysql/epas/postgresql cover this path via their capture-param-id step but mariadb never had one (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정. | a690(2026-07-16) 원인규명: param_id/param_old_value capture_soft 추가 — set-parameters가 literal id:\"\"로 400 'Parameter ID is invalid. ()' (a690 LIVE). mysql-cluster-subops-a capture-param-id 동일 패턴(a690 202 LIVE-VERIFIED).",
+          "capture_soft": {
+            "param_id": "$.contents[0].id",
+            "param_old_value": "$.contents[0].applied_value"
+          }
         },
         {
           "name": "patch-minor-version",
@@ -11438,7 +11518,7 @@
           ],
           "optional": true,
           "group": "patch",
-          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b. | a690(2026-07-16) 원인규명 판정(2026-07-04 UNVERIFIED 해소): 현재 버전을 그대로 보내면 400 ValidationError 'Unpatchable version : <ver>' (a690 LIVE: mysql 8.4.7 / mariadb 11.4.10 / epas 17.7 / postgresql 'COMMUNITY 17.7'). 계정 카탈로그에 동일 major의 다른 minor가 없어(engine-versions 실측) 패치 타깃이 구조적으로 부재 — 회귀 아님, 환경 제약. SCP가 두 번째 minor를 공개할 때까지 관용 400이 기대 결과."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -11694,8 +11774,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "mariadb"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "mariadb",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -11782,7 +11868,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -11819,7 +11906,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -11955,6 +12043,9 @@
               "list": "$.contents",
               "get": "id"
             }
+          },
+          "capture_soft": {
+            "cache_target_version": "$.contents[0].software_version"
           }
         },
         {
@@ -12136,7 +12227,8 @@
           "optional": true,
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
-            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id",
+            "cache_engine": "$.dbaas_engine"
           }
         },
         {
@@ -12148,7 +12240,11 @@
           ],
           "optional": true,
           "group": "param-read",
-          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestorelistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — cachestore has set-parameters/sync-parameters but never read the values back (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
+          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestorelistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — cachestore has set-parameters/sync-parameters but never read the values back (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정. | a690(2026-07-16) 원인규명: param_id/param_old_value capture_soft 추가 — set-parameters가 literal id:\"\"로 400 'Parameter ID is invalid. ()' (a690 LIVE). mysql-cluster-subops-a capture-param-id 동일 패턴(a690 202 LIVE-VERIFIED).",
+          "capture_soft": {
+            "param_id": "$.contents[0].id",
+            "param_old_value": "$.contents[0].applied_value"
+          }
         },
         {
           "name": "show-request",
@@ -12459,9 +12555,9 @@
           "json": {
             "parameters": [
               {
-                "id": "",
-                "new_value": "256",
-                "old_value": ""
+                "id": "{param_id}",
+                "new_value": "{param_old_value}",
+                "old_value": "{param_old_value}"
               }
             ]
           },
@@ -12476,7 +12572,8 @@
             422
           ],
           "optional": true,
-          "group": "param"
+          "group": "param",
+          "_note": "a690(2026-07-16) 원인규명 수리: literal id:\"\"→capture 토큰, new_value==old_value==applied_value 무해 no-op — a690 LIVE 근거: mysql-a set-parameters(captured id) 202, eventstreams set-parameter-values(no-op) 202, mariadb/cachestore(literal \"\") 400 'Parameter ID is invalid. ()'. cachestore contents[0]=appendonly(applied 'yes', is_modifiable true) — a690 list-parameter-values 200 실측. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-set-parameters",
@@ -12621,15 +12718,34 @@
           "group": "param"
         },
         {
+          "name": "capture-command-id",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/commands",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "commands",
+          "capture_soft": {
+            "cmd_id": "$.contents[0].id",
+            "cmd_name": "$.contents[0].name",
+            "cmd_value": "$.contents[0].applied_value"
+          },
+          "_note": "a690(2026-07-16) 원인규명: set-commands용 modifiable command capture (cachestorelistcommands를 RUNNING 클러스터에서 기록하는 부수 효과 포함 — read-coverage의 동일 GET은 a690에서 400 InvalidState). contents[0] 무필터: CommandListResponse.contents[*]={id,name,modifiable,applied_value} (api_docs). 미검증 — 다음 런 판정."
+        },
+        {
           "name": "set-commands",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/commands",
           "json": {
             "commands": [
               {
-                "id": "",
-                "name": "maxmemory-policy",
-                "new_value": "allkeys-lru"
+                "id": "{cmd_id}",
+                "name": "{cmd_name}",
+                "new_value": "{cmd_value}"
               }
             ]
           },
@@ -12644,7 +12760,8 @@
             422
           ],
           "optional": true,
-          "group": "commands"
+          "group": "commands",
+          "_note": "a690(2026-07-16) 원인규명 수리(스펙 버전업 회귀): cachestore 엔진이 Redis→Valkey Sentinel 9.0.4로 교체됨(a690 cluster detail dbaas_engine='Valkey Sentinel' LIVE) — Redis 명령 'maxmemory-policy'는 400 'not a modifiable command in the database' (a690 LIVE). 목록에서 capture한 첫 command의 no-op(new_value=applied_value)으로 교체. new_value min length 3(api_docs modifycommanditem) 미달 값이면 여전히 400 가능 — 관용 유지. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-set-commands",
@@ -13015,7 +13132,11 @@
             422
           ],
           "optional": true,
-          "group": "ha"
+          "group": "ha",
+          "json": {
+            "switch_host_name": ""
+          },
+          "_note": "a690(2026-07-16) 원인규명 수리: body 누락으로 400 ValidationError value_error (a690 LIVE) — 모델 redisswitchovertargetrequest는 switch_host_name(required, api_docs). ha_enabled:false 단일노드라 유효 스위치 대상이 구조적으로 없음 → negative-probe: 의도된 4xx (semantic 400/404 기대). 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-switchover-cluster",
@@ -13057,8 +13178,8 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/patch",
           "json": {
-            "dbaas_engine": "redis",
-            "software_version": "7.2.11"
+            "dbaas_engine": "{cache_engine}",
+            "software_version": "{cache_target_version}"
           },
           "expect_status": [
             200,
@@ -13071,7 +13192,8 @@
             422
           ],
           "optional": true,
-          "group": "patch"
+          "group": "patch",
+          "_note": "a690(2026-07-16) 원인규명 수리(스펙 버전업 회귀): literal redis/7.2.11 → 400 Dbaas.ValidationError.InvalidParameter(dbaas_engine) (a690 LIVE) — 엔진이 Valkey Sentinel 9.0.4로 교체됨(cluster detail dbaas_engine='Valkey Sentinel', engine-versions contents[0].software_version=9.0.4, a690 LIVE). capture 토큰으로 교체; dbaas_engine의 유효 문자열(표시명 'Valkey Sentinel' vs 코드값)은 UNDOCUMENTED — detail 노출값을 1차 후보로 사용. target==현재 버전이면 타 엔진처럼 400 'Unpatchable version' 예상(관용 유지). 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -13217,8 +13339,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "cachestore"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "cachestore",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -13305,7 +13433,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -13342,7 +13471,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -13481,6 +13611,9 @@
               "list": "$.contents",
               "get": "id"
             }
+          },
+          "capture_soft": {
+            "cache_target_version": "$.contents[0].software_version"
           }
         },
         {
@@ -13662,7 +13795,8 @@
           "optional": true,
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
-            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id",
+            "cache_engine": "$.dbaas_engine"
           }
         },
         {
@@ -13674,7 +13808,11 @@
           ],
           "optional": true,
           "group": "param-read",
-          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestorelistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — cachestore has set-parameters/sync-parameters but never read the values back (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
+          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestorelistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — cachestore has set-parameters/sync-parameters but never read the values back (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정. | a690(2026-07-16) 원인규명: param_id/param_old_value capture_soft 추가 — set-parameters가 literal id:\"\"로 400 'Parameter ID is invalid. ()' (a690 LIVE). mysql-cluster-subops-a capture-param-id 동일 패턴(a690 202 LIVE-VERIFIED).",
+          "capture_soft": {
+            "param_id": "$.contents[0].id",
+            "param_old_value": "$.contents[0].applied_value"
+          }
         },
         {
           "name": "show-request",
@@ -13985,9 +14123,9 @@
           "json": {
             "parameters": [
               {
-                "id": "",
-                "new_value": "256",
-                "old_value": ""
+                "id": "{param_id}",
+                "new_value": "{param_old_value}",
+                "old_value": "{param_old_value}"
               }
             ]
           },
@@ -14002,7 +14140,8 @@
             422
           ],
           "optional": true,
-          "group": "param"
+          "group": "param",
+          "_note": "a690(2026-07-16) 원인규명 수리: literal id:\"\"→capture 토큰, new_value==old_value==applied_value 무해 no-op — a690 LIVE 근거: mysql-a set-parameters(captured id) 202, eventstreams set-parameter-values(no-op) 202, mariadb/cachestore(literal \"\") 400 'Parameter ID is invalid. ()'. cachestore contents[0]=appendonly(applied 'yes', is_modifiable true) — a690 list-parameter-values 200 실측. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-set-parameters",
@@ -14147,15 +14286,34 @@
           "group": "param"
         },
         {
+          "name": "capture-command-id",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/commands",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "commands",
+          "capture_soft": {
+            "cmd_id": "$.contents[0].id",
+            "cmd_name": "$.contents[0].name",
+            "cmd_value": "$.contents[0].applied_value"
+          },
+          "_note": "a690(2026-07-16) 원인규명: set-commands용 modifiable command capture (cachestorelistcommands를 RUNNING 클러스터에서 기록하는 부수 효과 포함 — read-coverage의 동일 GET은 a690에서 400 InvalidState). contents[0] 무필터: CommandListResponse.contents[*]={id,name,modifiable,applied_value} (api_docs). 미검증 — 다음 런 판정."
+        },
+        {
           "name": "set-commands",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/commands",
           "json": {
             "commands": [
               {
-                "id": "",
-                "name": "maxmemory-policy",
-                "new_value": "allkeys-lru"
+                "id": "{cmd_id}",
+                "name": "{cmd_name}",
+                "new_value": "{cmd_value}"
               }
             ]
           },
@@ -14170,7 +14328,8 @@
             422
           ],
           "optional": true,
-          "group": "commands"
+          "group": "commands",
+          "_note": "a690(2026-07-16) 원인규명 수리(스펙 버전업 회귀): cachestore 엔진이 Redis→Valkey Sentinel 9.0.4로 교체됨(a690 cluster detail dbaas_engine='Valkey Sentinel' LIVE) — Redis 명령 'maxmemory-policy'는 400 'not a modifiable command in the database' (a690 LIVE). 목록에서 capture한 첫 command의 no-op(new_value=applied_value)으로 교체. new_value min length 3(api_docs modifycommanditem) 미달 값이면 여전히 400 가능 — 관용 유지. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-set-commands",
@@ -14333,8 +14492,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "cachestore"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "cachestore",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -14421,7 +14586,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -14458,7 +14624,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -14594,6 +14761,9 @@
               "list": "$.contents",
               "get": "id"
             }
+          },
+          "capture_soft": {
+            "cache_target_version": "$.contents[0].software_version"
           }
         },
         {
@@ -14769,7 +14939,8 @@
           "optional": true,
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
-            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id",
+            "cache_engine": "$.dbaas_engine"
           }
         },
         {
@@ -14781,7 +14952,11 @@
           ],
           "optional": true,
           "group": "param-read",
-          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestorelistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — cachestore has set-parameters/sync-parameters but never read the values back (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정."
+          "_note": "completeness-audit 2026-07-08 gap 편입 (cachestorelistparametervalues, class b): explicit strict-200 read on the cluster this lifecycle creates — cachestore has set-parameters/sync-parameters but never read the values back (probe_reads auto-seed is non-guaranteed). optional + own group; semantics UNVERIFIED live — 라이브가 정정. | a690(2026-07-16) 원인규명: param_id/param_old_value capture_soft 추가 — set-parameters가 literal id:\"\"로 400 'Parameter ID is invalid. ()' (a690 LIVE). mysql-cluster-subops-a capture-param-id 동일 패턴(a690 202 LIVE-VERIFIED).",
+          "capture_soft": {
+            "param_id": "$.contents[0].id",
+            "param_old_value": "$.contents[0].applied_value"
+          }
         },
         {
           "name": "restart-cluster",
@@ -15007,7 +15182,11 @@
             422
           ],
           "optional": true,
-          "group": "ha"
+          "group": "ha",
+          "json": {
+            "switch_host_name": ""
+          },
+          "_note": "a690(2026-07-16) 원인규명 수리: body 누락으로 400 ValidationError value_error (a690 LIVE) — 모델 redisswitchovertargetrequest는 switch_host_name(required, api_docs). ha_enabled:false 단일노드라 유효 스위치 대상이 구조적으로 없음 → negative-probe: 의도된 4xx (semantic 400/404 기대). 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-switchover-cluster",
@@ -15049,8 +15228,8 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/patch",
           "json": {
-            "dbaas_engine": "redis",
-            "software_version": "7.2.11"
+            "dbaas_engine": "{cache_engine}",
+            "software_version": "{cache_target_version}"
           },
           "expect_status": [
             200,
@@ -15063,7 +15242,8 @@
             422
           ],
           "optional": true,
-          "group": "patch"
+          "group": "patch",
+          "_note": "a690(2026-07-16) 원인규명 수리(스펙 버전업 회귀): literal redis/7.2.11 → 400 Dbaas.ValidationError.InvalidParameter(dbaas_engine) (a690 LIVE) — 엔진이 Valkey Sentinel 9.0.4로 교체됨(cluster detail dbaas_engine='Valkey Sentinel', engine-versions contents[0].software_version=9.0.4, a690 LIVE). capture 토큰으로 교체; dbaas_engine의 유효 문자열(표시명 'Valkey Sentinel' vs 코드값)은 UNDOCUMENTED — detail 노출값을 1차 후보로 사용. target==현재 버전이면 타 엔진처럼 400 'Unpatchable version' 예상(관용 유지). 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -15209,8 +15389,14 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀).",
-          "group": "cachestore"
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "group": "cachestore",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -15297,7 +15483,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -15334,7 +15521,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -16874,7 +17062,8 @@
             422
           ],
           "optional": true,
-          "group": "ha"
+          "group": "ha",
+          "_note": "negative-probe: 의도된 4xx — a690(2026-07-16) 원인규명: create가 ha_enabled:false 단일노드라 standby 부재 → 404 scp-dbaas.switchover-host.not-found (a690 LIVE, mysql-a/postgresql-a). body 없음은 스펙 정합(switchover에 body 모델 없음, api_docs). HA 생성으로만 2xx 가능 — 과금/시간 비용상 비HA 유지, 관용 404 문서화."
         },
         {
           "name": "wait-after-switchover-cluster",
@@ -16931,7 +17120,7 @@
           ],
           "optional": true,
           "group": "patch",
-          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b. | a690(2026-07-16) 원인규명 판정(2026-07-04 UNVERIFIED 해소): 현재 버전을 그대로 보내면 400 ValidationError 'Unpatchable version : <ver>' (a690 LIVE: mysql 8.4.7 / mariadb 11.4.10 / epas 17.7 / postgresql 'COMMUNITY 17.7'). 계정 카탈로그에 동일 major의 다른 minor가 없어(engine-versions 실측) 패치 타깃이 구조적으로 부재 — 회귀 아님, 환경 제약. SCP가 두 번째 minor를 공개할 때까지 관용 400이 기대 결과."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -17187,7 +17376,13 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀)."
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -17269,7 +17464,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -17306,7 +17502,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -18849,7 +19046,8 @@
             422
           ],
           "optional": true,
-          "group": "ha"
+          "group": "ha",
+          "_note": "negative-probe: 의도된 4xx — a690(2026-07-16) 원인규명: create가 ha_enabled:false 단일노드라 standby 부재 → 404 scp-dbaas.switchover-host.not-found (a690 LIVE, mysql-a/postgresql-a). body 없음은 스펙 정합(switchover에 body 모델 없음, api_docs). HA 생성으로만 2xx 가능 — 과금/시간 비용상 비HA 유지, 관용 404 문서화."
         },
         {
           "name": "wait-after-switchover-cluster",
@@ -18902,7 +19100,13 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀)."
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -18984,7 +19188,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -19021,7 +19226,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
@@ -19380,7 +19586,7 @@
           ],
           "optional": true,
           "group": "patch",
-          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b."
+          "_note": "software_version capture_soft added 2026-07-04 (HB1 repair): patch-minor-version 400'd 'Software version is not MARIA_DB' / ValidationError sending an empty string (HB1 run 2026-07-04; MinorPatchRequest.software_version has no enum/example in api_docs — schema is a bare 'string'). GET /v1/clusters/{cluster_id} (ClusterDetailResponse, api_docs showcluster response_example) exposes the cluster's OWN current 'software_version' field directly — capturing and re-sending that SAME value at least sends a validly-FORMATTED version string (closing the format-class 400); whether patching to the cluster's own current version is accepted or rejected as 'already at that version' is UNVERIFIED LIVE — there is no discovery endpoint for the list of upgrade-eligible target versions (only /v1/engine-versions and /v1/engine-versions/{id}/properties, neither scoped to a specific cluster's upgrade path). Apply + observe in HB1b/HB2b. | a690(2026-07-16) 원인규명 판정(2026-07-04 UNVERIFIED 해소): 현재 버전을 그대로 보내면 400 ValidationError 'Unpatchable version : <ver>' (a690 LIVE: mysql 8.4.7 / mariadb 11.4.10 / epas 17.7 / postgresql 'COMMUNITY 17.7'). 계정 카탈로그에 동일 major의 다른 minor가 없어(engine-versions 실측) 패치 타깃이 구조적으로 부재 — 회귀 아님, 환경 제약. SCP가 두 번째 minor를 공개할 때까지 관용 400이 기대 결과."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -19636,7 +19842,13 @@
             422
           ],
           "optional": true,
-          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀)."
+          "_note": "REPAIR 2026-07-13 (UNKNOWN-before-delete 복구): 마지막 mid-lifecycle sync 이후의 subop(patch/kernel-upgrade/resize/add-block-storages)이 service_state를 UNKNOWN으로 떨어뜨리면 delete-cluster가 400 InvalidState가 되고, DELETE 전용 재시도 사다리(retry_on_status 400 x20)로는 UNKNOWN을 절대 복구 못 함 — sync-state만 복구함(LIVE: sync 202→SYNCHRONIZING→RUNNING, run-923a/c373). 콘솔의 synchronize-then-delete 절차를 자동화에 이식. 건강한 클러스터엔 무해(잠깐 SYNCHRONIZING 후 복귀). | a690(2026-07-16) 원인규명: -b 변형들이 400 Dbaas.ValidationError.ExistInprogress('request in progress', 직전 patch/resize 비동기 잔여)로 soft-400 (a690 LIVE) — retry_on_status[400,409]x8@30s 사다리로 잔여 요청이 끝나면 202 sync가 실제로 실행되게 함. InvalidState('not in [RUNNING, UNKNOWN]')도 전이 상태면 해소; 아니면 기존 관용 400 그대로.",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-pre-delete-settle",
@@ -19718,7 +19930,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-subnet",
@@ -19755,7 +19968,8 @@
             "timeout": 900,
             "interval": 15
           },
-          "adopt": "subnet#db"
+          "adopt": "subnet#db",
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상."
         },
         {
           "name": "delete-vpc",
