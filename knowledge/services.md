@@ -633,6 +633,12 @@ lifecycle `heavy-asg-full-coverage` in
 
 ## container / scr (registry)
 
+**2026-07-16 (svccov-scr, 신규 계정) 20/39 · 39/39 reached · PF-37 계정무관 재확정:**
+- 신규 계정은 registry quota 슬롯이 비어 create 201/delete 202 즉시 성공 — quota-1 블로커는 계정 상태 문제였음.
+- `checkregistrynameduplication`(name만, registry 불요)·`listconnectableresources`(무파라미터, authserver 1건 반환) 둘 다 200 — 사상 첫 배선.
+- **PF-37 재확정**: registry v2 토큰 서버가 유효 HMAC access/secret Basic auth를 401 invalid credentials 거부 — scope 올바른 형식은 `repository:<repo>/<image>:pull,push` (bare repo는 400 "specify image", registry-prefix는 400 "repository not found"). DNS/네트워크 소거 완료(Running 상태에서 공인 DoH resolve 확인). 콘솔 발급 자격 필요 추정 — 이미지 1 push로 잔여 19키 일괄 해제.
+- **PF 후보**: 비 hex 형식 id의 id-바인딩 read → 404 아닌 **500 ContactAdmin** (well-formed 32-hex 부재 id는 정상 404). 이 500이 공유 그룹을 연쇄 스킵시키던 구조 결함은 스텝별 그룹 격리로 수리.
+
 - **Host:** regional. registry/repository id `$.id`, registry poll `$.state` →
   `Running`. **Registry DELETE 500-races** for minutes after create — retry on 500.
 - **Quota = 1 registry** (`CONTAINER_REGISTRY.NON_VISIBILITY.MAX.COUNT applied_value: 1EA`);
@@ -908,6 +914,12 @@ lifecycle `heavy-asg-full-coverage` in
 
 ## management / iam
 
+**2026-07-16 (svccov-iam, 신규 계정) — accesskey 4종 + saml 4종 전부 라이브 2xx:**
+- `accesskeycreate` POST /v1/access-keys: 바디에 `account_id`(자기 계정) 필수 + access_key_type/description. 응답은 `$.access_key.id` 래핑(flat 아님). secret_key는 생성 시 1회만 반환 — 절대 로그/영속 금지.
+- 쿼터 **IAM.USER.ACCESS_KEY.MAX.COUNT=2EA**: 3번째 PERMANENT 생성 403 `iam.quota.value.exceeded`. 테스트는 항상 ≤2 유지(순차 create→disable→delete).
+- 삭제는 **단건/벌크 모두 `is_enabled:false` 선행 필수** (400 `Iam.AccessKeyEnabled`). 벌크 성공은 **200**(삭제 키 에코), 204 아님. 재현: `iam-access-key-full`(non-heavy 신설).
+- `create/setsamlprovider`는 **진짜 multipart/form-data** (JSON 전송은 필드 다 있어도 400 "Field required"). 실 X.509 cert(자가서명 가능)를 담은 SAML 2.0 IdP metadata XML이 file 파트로 필요 — 쓰레기 XML은 400 `Iam.InvalidFile`. **file 파트 자체를 생략하면 500 ContactAdmin(PF 후보 — 문서상 optional)**. update는 file 없이 description-only 가능(200). 응답 봉투는 flat. core.http_client가 multipart 미지원이라 lifecycle 자동화는 엔진 백로그(IB 참조) — 증거 관측은 svccov-iam-1784209944.
+
 - **Host:** global-ish (management). 62 endpoints. Cross-link
   `validated-facts.md`.
 - **Coverage 2026-06-24: 41 / 62 (66%)**
@@ -1127,6 +1139,10 @@ lifecycle `heavy-asg-full-coverage` in
 
 ## management / organization
 
+**2026-07-16 (svccov-org, 신규 계정) 12 read 전수 재실측 — 403 뿌리 특정:**
+- 10키는 계정 부착 **"delegation policy(organization)"** 가 파라미터/id 검증 전에 차단(에러 메시지가 정책을 명시, caused_auths b64). 계정은 여전히 org MEMBER(마스터 아님).
+- `showorganization`/`showorganizationunit`만 정책 통과 후 비즈니스 로직 도달(AccountNotIncludeOrganization/UnitNotFoundError) — 권한은 있고 **실 org_id/unit_id만 부재** (listorganizations는 빈 목록이라 자가발견 불가). 마스터 승격 시 즉시 회수 가능.
+
 - **Host:** global (`organization.e.samsungsdscloud.com` — no region segment).
   37 endpoints covering the full org-tree: organizations, org-units (OUs), member
   accounts, service-control-policies (SCPs), policy-bindings, delegation-policies,
@@ -1206,6 +1222,14 @@ lifecycle `heavy-asg-full-coverage` in
   All 37 endpoints reached (32 canonical soft/ok + 5 newly probed id-bound).
 
 ---
+
+## management / loggingaudit
+
+**2026-07-16 (svccov-logaudit, 신규 계정) 3→10/10 GAP 0:**
+- trail은 `account_id` + 실 OBS 버킷(bucket_name+bucket_region 필수) 전제. account_id는 **`GET /v1/access-keys` → `$.access_keys[0].account_id`로 자가발견**(콘솔 불요). 버킷은 상비 `apitest-logsink`(core.oplog.LOGSINK_BUCKET — 구 do-not-delete-apitest는 계정 교체로 404). bucket_region은 실 리전 문자열(`kr-west1`), 문서의 RegionOne 아님.
+- `service_watch_yn:"Y"`는 iam_role_id+log_group_name 동반 필수 — 단독 Y는 400 "invalid service watch values". 일반 trail은 N.
+- create 201→show→set 202→start→stop→delete 202 전 체인 라이브 검증, probe_reads로 showtrail/showlog 카탈로그 키 귀속.
+- 계정 컷오버(2026-07-15/16) 이후 하드코딩된 account_id/버킷명은 전부 stale 취급하고 재파생할 것.
 
 ## management / cloudmonitoring
 
@@ -1376,6 +1400,14 @@ lifecycle `heavy-asg-full-coverage` in
 
 ---
 
+## security / configinspection
+
+**2026-07-16 (svccov-confinsp) 3/8 — 잔여 5키 단일 뿌리 확정:**
+- `POST /diagnosis/save`는 실 `auth_key_id`(사전 등록된 대상 계정 자격) 필수 — **이 자격의 create/list API가 카탈로그 1,416키 어디에도 없음**(전수 스캔). 콘솔 전용 상품 활성화 단계(plan_type STANDARD). 실 account_id로도 동일 404 ConfigAccessKeyNotFoundError → 계정 소유 원인 소거. 404(403 아님) → entitlement 아님.
+- 하류 4키(request/detail×2/terminate)는 diagnosis_id 부재의 연쇄 — save만 뚫리면 기존 체인으로 일괄 해제(배선 완료).
+- `GET /v1/configinspection/diagnosis/list`의 links[].href self-link가 호출자 실 account_id를 안전 노출.
+- `getchecklistversion` 200: SCP 자체 행은 csp_type=NURI(SCP 아님).
+
 ## security / kms
 
 - **Host:** regional (`kms.<region>.<env>...`). 20 endpoints (18 user-managed + 2 managed-kms).
@@ -1415,6 +1447,12 @@ lifecycle `heavy-asg-full-coverage` in
 - **Coverage 2026-06-23:** 14/15 CONFIRMED 2xx. Only gap: `createsecretsmanagerkmskey` (404, endpoint not routed). Lifecycle `security-secretsmanager-writes` covers 11 write endpoints 2xx + 3 read 2xx from smoke = 14 total.
 
 ## management / servicewatch
+
+**2026-07-16 (svccov-svcwatch) 17→34/37:**
+- `createalert`/`setalert`(v1.4): **dimension {key,value} 런타임 필수** (문서는 optional — 400 "At least one dimension must be set"). 실측 쌍은 `POST /v1/metrics`({} 바디) → `namespaces[0].dimensions[0].metrics[0].dimensions[0]`.
+- `createcustommetricmetas`: 차원 배열에 리터럴 키 `"resource_id"` 필수 (임의명은 400). **custom metric meta는 삭제 API 없음** → 이름은 고정값 사용({unique} 금지 — 매 런 영구·과금물 적립, 프리티어 10/월).
+- `downloadmetricdataimage`: height≥500, width≥1000 검증 최소치.
+- 잔여 3: createcustommetrics(400 SWT_CUSTOM_NAMESPACE — OTLP 라우팅 키 미공개, 등록 namespace 일치도 반증) · createloggroupexporttask(계정에 archivestorage HMAC 카탈로그 미등록 401) · setalertnotifications(실 IAM user 필요; **user_ids:[]는 500 ContactAdmin — 보내지 말 것**, PF 후보).
 
 - **Host:** regional (`servicewatch.<region>.<env>...`). 31 endpoints (alerts, dashboards, event-rules, log-groups/streams, metrics, custom ingest).
 - **Metric catalog lookup:** `POST /v1/metrics` with `{}` body (listmetricinfos) returns `{count, namespaces[{id, name, dimensions[{metrics[{id, name, namespace_id, ...}]}]}]}`. This is a POST-as-read (no mutation, no teardown). Use to get real `namespace_id` = `$.namespaces[0].id` and `metric_id` = `$.namespaces[0].dimensions[0].metrics[0].id`. Required for `createalert` — fake doc-sample IDs cause 400.
@@ -1512,6 +1550,11 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - **Fragment:** `regression/scenarios/lifecycles/financial-management__budget.json` (lifecycle `budget-account-budget`).
 
 ## financial-management / billingplan
+
+**2026-07-16 (svccov-billing, 신규 계정) 재검증:**
+- read floor 5키 전부 200 재확인. **`listplannedcomputeservertypes`는 수리됨(200)** — 2026-06-01자 500 PF 기준선 stale, known_issues에서 제거(2026-07-16).
+- `listplannedcomputeinstances`: start/end_date **yyyy-mm-dd 엄격**(YYYY-MM은 400 ValidationError). 형식 수리 후에도 실데이터 구간 500 ContactAdmin(PF 유지), 미계약 구간은 400 "within the contracted date range".
+- `createplannedcomputes`/`updateplannedcompute` = **owner-decision**: 해지 시 잔여기간 이용액 50%가 해지 2개월 후 청구(자유취소 불가) — 실구매 사이클은 오너 명시 승인 필요. `showcancellationfee`는 합성 id 프로브 안전(400 not-associated, 과금 없음).
 
 **10 endpoints.** LIGHT-READY (5 of 10 are bare GET returning 200 without any resource). LIVE-VERIFIED 2026-06-29.
 

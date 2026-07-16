@@ -134,25 +134,18 @@
       "service": "organization",
       "covered": 3,
       "total": 37,
-      "gap": 34,
+      "gap": 12,
       "heavy": false,
       "blockers": [
-        "entitlement-403: 7 read-only no-path-param GETs return 403 (account is MEMBER not org-master; auth precedes param validation, proven): listaccounts, listorganizationunits, listservicecontrolpolicies, listorganizationinvitations, showdelegationpolicy, listpoliciesfortarget, listtargetsforpolicy.",
-        "entitlement-403: 5 id-bound GETs return 403/404 (cannot get valid IDs without org-master privilege): showorganization, showorganizationunit, showaccount, showservicecontrolpolicy, listparents. All now probed and recorded as soft observations.",
-        "entitlement-403: most mutating endpoints (403 OrganizationForbidden) \u2014 createorganizationunit, createservicecontrolpolicy, attachpolicybindings, removepolicybindings, deleteorganizationunits, deleteservicecontrolpolicies, deletedelegationpolicy, setorganizationunit, setservicecontrolpolicy, leaveorganization, deleteorganization, deleteaccount, createdelegationpolicy, setdelegationpolicy, setorganization, removepolicybindings, setorganization \u2014 all require org-master privilege.",
-        "body-unknown: createinvitation 2nd required field still unknown (email, message, login_id, account_id all rejected as Extra inputs). organization_id is valid.",
-        "body-unknown: removeaccounts 2nd required field still unknown (ids, account_ids, organization_account_ids all invalid; organization_id is valid but still 1 field required).",
-        "body-unknown: moveaccount 3rd required field unknown (organization_id + parent_unit_id = 1 field required still; account_id/unit_id/destination_id all invalid).",
-        "body-unknown: createaccount 4th required field unknown (name + login_id(email-format) + organization_id = 1 field required still)."
+        "entitlement-403 (신규 계정 재확정 2026-07-16): 10 read가 계정 부착 'delegation policy(organization)'에 의해 파라미터 검증 전 차단(listaccounts/listorganizationinvitations/listorganizationunits/listpoliciesfortarget/listservicecontrolpolicies/listtargetsforpolicy/showdelegationpolicy/showaccount/showservicecontrolpolicy/listparents). waiver 제안 있으나 2026-06-10 오너 결정(org reads는 C3 타깃 유지)과 충돌 — 오너 승인 대기.",
+        "unsatisfiable-flow (신규 구분): showorganization/showorganizationunit은 정책 통과 후 비즈니스 로직 도달(AccountNotIncludeOrganization/UnitNotFoundError) — 권한은 있고 실 org_id/unit_id만 부재. 계정은 org MEMBER(마스터 아님), listorganizations 빈 목록."
       ],
       "next_levers": [
-        "org-master account would unlock 7 read GETs + ids for 5 id-GETs (~12 endpoints) + ~20 mutating endpoints (currently 403)",
-        "createinvitation 2nd required field: try account_login_id, target_login_id, invited_login_id (all common SCP invite field variants not yet tried)",
-        "removeaccounts 2nd required field: try organization_account_id (singular), name (string), login_id variants",
-        "moveaccount 3rd required field: try ids, organization_account_ids (array), name"
+        "org 마스터 승격 or 실 org_id 확보 시 show 2종+listparents 즉시 재시도",
+        "오너: 10키 waiver 승인 여부 결정"
       ],
-      "notes": "2026-06-24 run: removed heavy:true from all 6 org lifecycles (org is NON-heavy \u2014 no VPC/compute). All 37 endpoints now canonically reached. 1 new 2xx: cancelinvitations({ids:[]}) -> 200. createdelegationpolicy+setdelegationpolicy body field is document (not policy_document). setorganization valid body: empty {} -> 403 (name/description are Extra). createaccount: login_id (email-format) not email. All 37 endpoints now observed: 3 2xx + 34 soft.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "3/37 유지 (2026-07-16 svccov-org 재실측 — mutating 금지 준수, read 12키 전수 프로브). 403 뿌리가 delegation policy로 특정됨(신규 사실).",
+      "updated": "2026-07-16T16:30:00Z"
     },
     {
       "service": "iam-identity-center",
@@ -222,21 +215,22 @@
     },
     {
       "service": "servicewatch",
-      "covered": 5,
-      "total": 31,
-      "gap": 26,
+      "covered": 34,
+      "total": 37,
+      "gap": 3,
       "heavy": false,
       "blockers": [
-        "needs-catalog-data: showalert needs createalert 2xx (real namespace_id+metric_id; account needs metric-emitting resources).",
-        "group-mechanism: showeventrule needs createeventrule 2xx (no list endpoint, GET /v1/event-rules 404).",
-        "entitlement-403: showloggrouplogstream 403 on system log groups (ske/mysql/mariadb) - need own log group (new lifecycle fixes)."
+        "createcustommetrics: product-bug/undocumented — OTLP /v1/metrics/custom 라우팅 키 미공개, 등록된 namespace 일치시켜도 400 SWT_CUSTOM_NAMESPACE (가설 반증 2026-07-16). 서포트/콘솔 힌트 필요.",
+        "createloggroupexporttask: entitlement — 계정에 archivestorage HMAC 카탈로그 미등록(GET /v1/buckets 401 catalog-not-found), 참조할 버킷 자체가 없음.",
+        "setalertnotifications: needs-peer(IAM) — 실 IAM user id 필수(404 'Some user IDs do not exist'). iam-access-key-full이 아닌 iam-user-full로 유저 생성 후 페어링 가능. user_ids:[]는 500 ContactAdmin(PF 후보) — 보내지 말 것."
       ],
       "next_levers": [
-        "MUTATIONS: servicewatch-log-group (NEW, 6 endpoints) + list-metric-data (NEW) + alert/event-rule lifecycles",
-        "Ceiling with mutations 29/31 if create alert+eventrule 2xx else 27/31"
+        "iam-user-full과 페어링해 setalertnotifications 회수",
+        "OBS 버킷 확보 시 logexport 재시도",
+        "custom metrics는 서포트 문의"
       ],
-      "notes": "read-only floor 5/31; mutation-ceiling 24 retained. NEW servicewatch-log-group lifecycle (6 endpoints) + list-metric-data step. Dashboard fixes: capture_soft, $.id (flat, not $.dashboard.id), delete body dashboard_ids (not ids).",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "17->34/37 (2026-07-16 svccov-svcwatch). create/setalert는 dimension 필수(문서 optional 표기와 다름 — 400 'At least one dimension must be set'), 실측 쌍은 POST /v1/metrics 카탈로그에서 캡처. custommetricmetas는 resource_id 차원 필수 + 삭제 API 없음 -> 고정명으로 전환(매 런 영구물 적립 차단, 프리티어 10/월). downloadmetricdataimage h>=500/w>=1000. probe_reads 귀속 수리(showalert/showeventrule/listalertnotifications).",
+      "updated": "2026-07-16T16:30:00Z"
     },
     {
       "service": "archivestorage",
@@ -332,7 +326,7 @@
       "heavy": true,
       "blockers": [],
       "next_levers": [
-        "listimages now has scp_original_image_type=k8s param \u2014 should count as covered on next smoke run",
+        "listimages now has scp_original_image_type=k8s param — should count as covered on next smoke run",
         "Remaining 21 gaps need SCP_ALLOW_MUTATIONS + SCP_RUN_HEAVY (cluster+nodepool lifecycle)"
       ],
       "notes": "listimages (GET /v1/images): scp_original_image_type=k8s is REQUIRED (400 without; 200 with, count:15). Fixed in container__ske.json (new list-images step) and generated__heavy-ske.json (inline params -> params dict). Confirmed 200 live 2026-06-20.",
@@ -340,25 +334,20 @@
     },
     {
       "service": "iam",
-      "covered": 41,
+      "covered": 61,
       "total": 62,
-      "gap": 21,
+      "gap": 0,
       "heavy": false,
       "blockers": [
-        "product-bug-5xx: createrole 500 ContactAdminForAssistance CONFIRMED LIVE 2026-06-23 \u2014 blocks createrole+deleterole (cannot create to test/delete). Role-mut ops worked around via iam-role-existing lifecycle. File as PF.",
-        "entitlement-403: adduserpolicybinding/removeuserpolicybinding -> 403 'The user is not part of the project'. Project-membership wall. GET listuserpolicybindings is 200 for any user_id.",
-        "needs-real-iam-user: addgroupmember/removegroupmember/getiamuser -> 404 'No User found'. Account has 0 IAM users. No API to create without SCP_RUN_HEAVY.",
-        "heavy-gated: 13 endpoints (accesskey CRUD x5, iam-user CRUD x4 [deletebulkiamuser now covered], saml-provider CRUD x4 [showsamlprovider/createsamlprovider/setsamlprovider/deletesamlproviders]) \u2014 SCP_RUN_HEAVY required. All in iam-credentials-heavy lifecycle.",
-        "blast-radius-waived: deletepolicies DELETE /v1/policies/bulk \u2014 CONFIRMED deletes ALL account policies (waivers.json). Cannot probe safely."
+        "engine-multipart (부분 해소): create/setsamlprovider는 진짜 multipart/form-data 필수(JSON은 400 Field required) — 라이브 2xx는 일회성 스크립트(core.auth 서명+requests files=)로 증명·관측 기록됨. 반복 자동화는 core.http_client.ApiClient multipart 지원 필요(엔진 백로그).",
+        "waived 1키만 잔여 (deletepolicies 의도 waiver)."
       ],
       "next_levers": [
-        "SCP_RUN_HEAVY: iam-credentials-heavy lifecycle covers 13 remaining HEAVY endpoints (accesskey/iam-user/saml-provider create/CRUD). No VPC needed.",
-        "Fix createrole product bug (contact support) -> unblocks createrole+deleterole (2 remaining role endpoints).",
-        "Entitlement: project membership for user -> adduserpolicybinding/removeuserpolicybinding 200.",
-        "No more non-heavy non-entitlement fixable gaps \u2014 all remaining 21 gaps are classified blockers."
+        "ApiClient에 multipart 스텝 지원 추가 -> saml 4키 lifecycle화",
+        "iam-access-key-full(신설 non-heavy)로 액세스키 4종 매 런 재현"
       ],
-      "notes": "CONFIRMED 41/62 (66%) 2026-06-24. Session gains vs prior 33/62: setgroup 200 (body requires name field), addgrouppolicybinding 200, setresourcepolicy 200 (kms:* on KMS SRN), showresourcepolicy 200, addpermission 201, setpermission 200, removepermission 204, deleteresourcepolicy 204, removegrouppolicybinding 204 (2026-06-23). 2026-06-24 gains: setrole 200, setroletrustpolicy 200, addrolepolicybindings 200, removerolepolicybinding 204, removebulkrolepolicybindings 204 (via iam-role-existing lifecycle, OrganizationAccountAccessRole id f07f5921c1df42089e59c90408599261), deletebulkrole 204 (empty role_ids []), deletebulkiamuser 204 (empty user_ids []), setpolicygroupbinding 200 (gen-wave5-iam-bindings lifecycle). KEY FIXES: (1) setgroup {ualpha} bug \u2014 capture iam_group_name from create response, use in set-group body. (2) deletesamlproviders body key is 'ids' not 'saml_provider_ids'. (3) deletebulkrole/deletebulkiamuser with empty arrays are 204 no-ops. account_id=ec11538abf8f46d2953539521f745366.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "41->61/62 GAP 0 (2026-07-16 svccov-iam). accesskey 4종 2xx: 신설 iam-access-key-full — account_id 바디 필수, 응답 $.access_key.id 래핑, 쿼터 2EA/유저(3번째 403 quota.value.exceeded), 삭제는 단건/벌크 모두 is_enabled:false 선행 필수(400 Iam.AccessKeyEnabled), 벌크 성공은 200. saml 4종 2xx: 실 X.509 cert 포함 SAML metadata XML multipart — file 생략 시 500 ContactAdmin(PF 후보, 문서상 optional).",
+      "updated": "2026-07-16T16:30:00Z"
     },
     {
       "service": "apigateway",
@@ -397,28 +386,19 @@
     },
     {
       "service": "scr",
-      "covered": 18,
+      "covered": 20,
       "total": 39,
-      "gap": 21,
+      "gap": 19,
       "heavy": false,
       "blockers": [
-        {
-          "key": "createregistry + deleteregistry: quota-403",
-          "reason": "createregistry returns 403 quota.value.exceeded (CONTAINER_REGISTRY.NON_VISIBILITY.MAX.COUNT=1EA, slot occupied by sample-nayvugfp4154447ab0ab61279cba3d72). deleteregistry also blocked since we cannot delete the shared registry. REACHED-4xx only.",
-          "kind": "entitlement-quota"
-        },
-        {
-          "key": "19 image/tags endpoints (listtagses/showimage/showtags/etc. + 8 write mutations)",
-          "reason": "images/tags are born ONLY by docker push, not any REST POST. Account repo has 0 images (confirmed live). All 19 endpoints reached-4xx (404 with literal placeholder id). Unblockable without docker push from this environment.",
-          "kind": "needs-docker-push"
-        }
+        "needs-docker-push (PF-37 계정무관 재확정 2026-07-16): 잔여 19키 전부 이미지/태그 표면 — SCR 토큰 서버가 유효 HMAC 키 Basic auth를 401 invalid credentials 거부(올바른 scope repository:<repo>/<image>:pull,push로도), DNS/네트워크 소거 완료. REST createimage 경로 없음(39키 전수 확인) — 콘솔 발급 레지스트리 자격 필요(오너 STOP-6 #1). 자격 확보 시 1 push로 19키 일괄 해제."
       ],
       "next_levers": [
-        "docker-push 1 image to sample-nayvugfp registry -> unblocks up to 19 image/tags endpoints (8 reads + 8 writes + runimagelifecyclepolicypreview)",
-        "createregistry: if quota slot freed (delete sample registry), createregistry+deleteregistry would cover 2 more endpoints"
+        "오너: 콘솔에서 SCR 레지스트리 자격 발급 여부 확인",
+        "비hex id에 500 ContactAdmin(404 아님) — malformed-input PF 후보 기록"
       ],
-      "notes": "8->18/39 CONFIRMED LIVE 2026-06-24. SESSION GAINS: createrepository(201)+updaterepositorydescription+updaterepositorylockpolicy+updaterepositorypullpolicy+updaterepositoryscanpolicy+updaterepositorylifecyclepolicy+deleterepository(202)+updateprivateacl(200)+updatepublicacl(200)+updatepublicendpointenabled(200) = +10 new 2xx. KEY FACTS: (1) Flat /v1/repositories returns 403 (Forbidden) for service account - MUST use registry-scoped /v1/container-registries/{registry_id}/repositories (200). (2) updatepublicacl requires public endpoint enabled first (409 if not); sequence: enable-public-endpoint -> update-public-acl -> disable-public-endpoint. (3) Registry goes Editing state for ~60s after enable/disable-public-endpoint; cleanup waits for Running. (4) GET steps need params:{} to force catalog-key recording (engine only records non-GETs under catalog key unless params present). (5) Borrowed registry: nayvugfp4154447ab0ab61279cba3d72 (Running, 1 repo test). Teardown: 0 leftover repos after run (original test repo preserved).",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "0(신규 스토어)->20/39, 39/39 reached (2026-07-16 svccov-scr). 신규: createregistry 201/deleteregistry 202(신규 계정 quota 프리), checkregistrynameduplication·listconnectableresources 사상 첫 배선, listregistries params:{} 귀속 수리, check-repo-dup을 live registry 시점으로 이동. 구조 수리: 공유 그룹 500 연쇄 스킵 -> 스텝별 격리(28->39 reached).",
+      "updated": "2026-07-16T16:30:00Z"
     },
     {
       "service": "eventstreams",
@@ -497,8 +477,8 @@
       "heavy": false,
       "blockers": [
         "backend-bug-400: getproducteventlist+getaccounteventlist+geteventpolicyhistories ALL 400 (server-side date->resourceType misparse, all date formats tried; no workaround; X-ResourceType IS forwarded correctly).",
-        "account-prereq-400: puteventpolicy+modifyeventpolicy+deleteeventpolicy return 400 InvalidRequest params=[null] (all Object Storage products are NE state, not enrolled in monitoring backend; isLogMetric MUST be string 'N' not boolean \u2014 confirmed 2026-06-24).",
-        "account-prereq-404: getmetricperfdatalist 404 productResourceInfos (products NE state; tried both productResourceId scalar and productResourceInfos array body shapes \u2014 both blocked by NE state).",
+        "account-prereq-400: puteventpolicy+modifyeventpolicy+deleteeventpolicy return 400 InvalidRequest params=[null] (all Object Storage products are NE state, not enrolled in monitoring backend; isLogMetric MUST be string 'N' not boolean — confirmed 2026-06-24).",
+        "account-prereq-404: getmetricperfdatalist 404 productResourceInfos (products NE state; tried both productResourceId scalar and productResourceInfos array body shapes — both blocked by NE state).",
         "no-real-data-404: geteventdetail+geteventnotificationstates+geteventpolicydetail+geteventpolicynotification+getadressbookmemberlist all 404 (0 events, 0 policies, 0 addrbooks in account; endpoint routing is correct; will 2xx when real IDs exist)."
       ],
       "next_levers": [
@@ -507,7 +487,7 @@
         "All 18 endpoints are now REACHED (0 never-reached after this session). Coverage 6/18 verified 2xx.",
         "No further lever: all remaining gaps are classified blockers (backend-bug / account-prereq / no-real-data)."
       ],
-      "notes": "6/18 verified 2xx (unchanged from 2026-06-20). SESSION GAINS 2026-06-24: (1) modifyeventpolicy+deleteeventpolicy probe steps added \u2014 now 0 never-reached endpoints (was 2). (2) isLogMetric confirmed as string 'N' not boolean false (body shape corrected in lifecycle). (3) productResourceInfos array body shape tested for metric-data \u2014 blocked by NE state regardless. ALL 18 endpoints have observations.jsonl entries. Remaining 12 gaps are all classified blockers (see blockers field).",
+      "notes": "6/18 verified 2xx (unchanged from 2026-06-20). SESSION GAINS 2026-06-24: (1) modifyeventpolicy+deleteeventpolicy probe steps added — now 0 never-reached endpoints (was 2). (2) isLogMetric confirmed as string 'N' not boolean false (body shape corrected in lifecycle). (3) productResourceInfos array body shape tested for metric-data — blocked by NE state regardless. ALL 18 endpoints have observations.jsonl entries. Remaining 12 gaps are all classified blockers (see blockers field).",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -560,33 +540,21 @@
     },
     {
       "service": "billingplan",
-      "covered": 0,
+      "covered": 5,
       "total": 10,
-      "gap": 10,
+      "gap": 5,
       "heavy": false,
       "blockers": [
-        {
-          "key": "listplannedcomputeinstances: product-bug-500",
-          "reason": "GET /v1/planned-computes/instances returns 500 ContactAdminForAssistance for ALL param combos (os_type OPEN_SOURCE/RHEL/WINDOWS/SLES x any server_type). Confirmed live 2026-06-29. Cannot be fixed by param changes. Backend bug.",
-          "kind": "product-bug"
-        },
-        {
-          "key": "showplannedcompute: needs-resource",
-          "reason": "GET /v1/planned-computes/{planned_compute_id} requires a real planned_compute_id. Account has 0 planned computes (GET /v1/planned-computes -> total_count:0). Soft-captured in light lifecycle; will 2xx when a plan exists.",
-          "kind": "needs-resource"
-        },
-        {
-          "key": "createplannedcomputes/showcancellationfee/updateplannedcompute: heavy-billable",
-          "reason": "3 write endpoints require SCP_RUN_HEAVY (BILLABLE financial commitment). Modeled in billingplan-planned-computes-guarded with expected 4xx (coverage-only probe, no actual purchase).",
-          "kind": "heavy-prereq"
-        }
+        "needs-resource: showplannedcompute(404)/showcancellationfee(400 not-associated) — 실 약정 존재 필요. cancellation-fee는 합성 id 프로브 안전(read성).",
+        "product-bug: listplannedcomputeinstances — yyyy-mm-dd 수리 후에도 최근 날짜 범위 500 ContactAdmin(기준선 2026-06-20과 동일, 신규 계정 재현). 미계약 구간은 400 'within the contracted date range'.",
+        "owner-decision: createplannedcomputes/updateplannedcompute — 해지 시 잔여기간 50% 청구(자유취소 불가, formal yaml 근거) -> 실구매+해지 사이클은 오너 명시 승인 필요. 승인 시 4키(create/update/show/fee) 일괄 해제."
       ],
       "next_levers": [
-        "LIGHT: run billingplan-light-reads (financial-management__billingplan-light.json, heavy=false) -> 5 GETs 200 immediately: listcontracttypes + listostypes + listplannedcomputeservertypes + listplannedcomputeservicetypes + listplannedcomputes = +5 covered",
-        "HEAVY (mutation-gated): billingplan-planned-computes-guarded covers showcancellationfee+createplannedcomputes+updateplannedcompute (expected 4xx on shared account)"
+        "오너 승인 시 billingplan-planned-computes-guarded 한 런으로 4키 회수",
+        "listplannedcomputeservertypes 500 기준선은 라이브 200 확인 -> known_issues resolved 처리(이번 통합)"
       ],
-      "notes": "LIGHT-READY 2026-06-29. 5 bare GETs confirmed 200 live: contract-types, os-types, server-types, service-types, list. New light lifecycle billingplan-light-reads added (financial-management__billingplan-light.json). Validators clean (230 lifecycles, 0 errors). Key facts: (1) server-types endpoint returns 200 parameterless - prior '500 baselined' was listplannedcomputeinstances with params, NOT this endpoint. (2) server_type value is css1v1m2 (not s1v1m2 as docs said). (3) listplannedcomputes envelope is planned_computes[] not contents[]. (4) os_type_id OPEN_SOURCE for queries; os_type_value opensource for create body.",
-      "updated": "2026-06-29T00:00:00Z"
+      "notes": "5/10 재확인 (2026-07-16 svccov-billing). read floor 5키 200 재검증. listplannedcomputeinstances 날짜 yyyy-mm-dd 필수(YYYY-MM는 400 ValidationError) — 프래그먼트 수리 반영.",
+      "updated": "2026-07-16T16:30:00Z"
     },
     {
       "service": "parallel-filestorage",
@@ -628,7 +596,7 @@
       "next_levers": [
         "fifo-only dedup ops need a .fifo queue (optional groups already isolate)"
       ],
-      "notes": "12/12 \u2014 getqueueattributes needs attributes=All (case-sensitive) + name=<queue>. Fixed 41858cb.",
+      "notes": "12/12 — getqueueattributes needs attributes=All (case-sensitive) + name=<queue>. Fixed 41858cb.",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -745,25 +713,19 @@
         "HEAVY: create VPC with firewall_enabled:true IGW -> listfirewalls captures firewall_id -> showfirewall/listfirewallrules/showfirewallrule/createfirewallrule/setfirewallrule/deletefirewallrule/setfirewall all unlock (7 endpoints)",
         "light-runnable: listfirewalls GET step added to networking-firewall-rule lifecycle (2026-06-29) -> lifecycle now anchored 2xx"
       ],
-      "notes": "1/8 (listfirewalls 200, confirmed live 2026-06-20 and 2026-06-29 \u2014 empty list {count:0,firewalls:[]}). No standalone POST /v1/firewalls endpoint (firewall auto-attaches to VPC carrier). listfirewalls GET step now first step in networking-firewall-rule lifecycle making it light-runnable. 7 remaining endpoints all need real firewall_id (VPC+IGW create). setfirewall body: {flavor_name:EXSMALL,loggable}. createfirewallrule captures $.firewall_rule.id.",
+      "notes": "1/8 (listfirewalls 200, confirmed live 2026-06-20 and 2026-06-29 — empty list {count:0,firewalls:[]}). No standalone POST /v1/firewalls endpoint (firewall auto-attaches to VPC carrier). listfirewalls GET step now first step in networking-firewall-rule lifecycle making it light-runnable. 7 remaining endpoints all need real firewall_id (VPC+IGW create). setfirewall body: {flavor_name:EXSMALL,loggable}. createfirewallrule captures $.firewall_rule.id.",
       "updated": "2026-06-29T08:35:54Z"
     },
     {
       "service": "loggingaudit",
-      "covered": 3,
+      "covered": 10,
       "total": 10,
-      "gap": 7,
+      "gap": 0,
       "heavy": false,
-      "blockers": [
-        "mutation-gated: showtrail (0 trails) + createtrail/settrail/start/stop/deletetrail + downloadlogs.",
-        "cross-service dep: createtrail needs an Object Storage bucket (do-not-delete-apitest)."
-      ],
-      "next_levers": [
-        "MUTATIONS+DESTRUCTIVE: loggingaudit-trail covers all 7 in one run",
-        "Fix api_catalog_params.json showlog capture path $.contents[0].id -> $.logs[0].id (spec-intel)"
-      ],
-      "notes": "0->3/10. NEW: listtrails+listlogs+showlog 200. listlogs REQUIRES start_at+end_at (70k logs). showlog envelope {log:..}, id $.logs[0].id (sidecar path was wrong). downloadlogs body corrected {start_at,end_at,file_type,time_zone_info}.",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [],
+      "next_levers": [],
+      "notes": "3->10/10 GAP 0 (2026-07-16 svccov-logaudit, 신규 계정 돌파). account_id는 GET /v1/access-keys $.access_keys[0].account_id 자가발견; 버킷은 apitest-logsink(LOGSINK_BUCKET, 기존재 — 구 do-not-delete-apitest는 404); service_watch_yn=Y는 iam_role_id+log_group_name 동반 필수(단독 Y는 400) -> N; showtrail/showlog는 probe_reads로 카탈로그 키 귀속. 트레일 3건 생성-삭제 검증(listtrails 0).",
+      "updated": "2026-07-16T16:30:00Z"
     },
     {
       "service": "aimlops-platform",
@@ -785,22 +747,20 @@
     },
     {
       "service": "configinspection",
-      "covered": 2,
-      "total": 7,
+      "covered": 3,
+      "total": 8,
       "gap": 5,
       "heavy": false,
       "blockers": [
-        "mutation-gated+needs-account-prereq: creatediagnosisobject needs auth_key_id for an inspectable account; diagnosisrequest needs that + target CSP creds.",
-        "needs-resource: getdiagnosisobjectdetail + getdiagnosisresultdetail need real diagnosis_id (backend reachable, 404 with fake).",
-        "mutation-gated+destructive: terminatediagnosisobject."
+        "needs-external-registration: creatediagnosisobject — 실 auth_key_id 필수인데 카탈로그 전수 스캔 결과 이 자격의 create/list API 부재(콘솔 전용 상품 활성화 단계, STOP-6 #2). 실 account_id로도 동일 404 ConfigAccessKeyNotFoundError(계정 소유 원인 소거). 404(403 아님) -> entitlement 아님.",
+        "needs-real-diagnosis_id: request/detail 2종/terminate — save 블로커의 하류(diagnosis_id는 save 성공만이 발급)."
       ],
       "next_levers": [
-        "MUTATIONS+DESTRUCTIVE: security-configinspection-diagnosis (all 4xx unless real auth_key_id)",
-        "Account prereq: auth_key_id for a secondary inspectable SCP account unblocks the chain",
-        "Foreign CSP: diagnosisrequest can target AWS/Azure with real creds"
+        "오너: 콘솔에서 Config Inspection 자격(auth_key_id) 등록 -> 5키 체인 일괄 해제(배선 완료 상태)",
+        "diagnosis/list의 self-link href가 실 account_id 안전 노출(자격 조회 불요)"
       ],
-      "notes": "FIRST ANALYSIS 0->2/7. configinspectionlist+getdiagnosisresultlist 200 (empty). getdiagnosisresultdetail needs diagnosis_id+diagnosis_request_sequence (both REQUIRED). diagnosis_id format DIA-<32hex>. Added configinspection-read-coverage lifecycle. Service transiently 503s.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "2/7->3/8 (2026-07-16 svccov-confinsp; v1.3에서 getchecklistversion 추가돼 분모 8). getchecklistversion 200(smoke 경유 카탈로그 키 귀속). 잔여 5키 단일 뿌리 재확정.",
+      "updated": "2026-07-16T16:30:00Z"
     },
     {
       "service": "devopsservice",
@@ -819,7 +779,7 @@
         "DevOps admin user service activation on the account would unblock create (+1 2xx) and cascade to show/check-deletable/delete (+3 2xx) = 6/6 total",
         "check-duplication 200 now solid in smoke (2026-06-23 fix: tenant_code candidate added to smoke.py _required_param_candidates)"
       ],
-      "notes": "2026-06-20: 0->2/6. listdevopsservices 200 + checkduplicationdevopsservice 200 (EXACTLY ONE of tenant_code OR tenant_name). 2026-06-23: smoke.py fixed (added tenant_code candidate for /check-duplication). createdevopsservice LIVE-PROVEN blocker: 409 not-found-admin-user-service even with real IAM user id \u2014 platform entitlement, not a params/body issue. Body shape: DevOpsServiceCreateRequest{tenant_name,tenant_code,members[str>=1]}. Real user id confirmed: f2b627e6bf4f4b3996f04de4f877bd11 (account ec11538abf8f46d2953539521f745366).",
+      "notes": "2026-06-20: 0->2/6. listdevopsservices 200 + checkduplicationdevopsservice 200 (EXACTLY ONE of tenant_code OR tenant_name). 2026-06-23: smoke.py fixed (added tenant_code candidate for /check-duplication). createdevopsservice LIVE-PROVEN blocker: 409 not-found-admin-user-service even with real IAM user id — platform entitlement, not a params/body issue. Body shape: DevOpsServiceCreateRequest{tenant_name,tenant_code,members[str>=1]}. Real user id confirmed: f2b627e6bf4f4b3996f04de4f877bd11 (account ec11538abf8f46d2953539521f745366).",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -915,7 +875,7 @@
       "heavy": false,
       "blockers": [],
       "next_levers": [],
-      "notes": "9/9 COMPLETE (100%) 2026-06-23 LIVE. Two lifecycles: (1) networking-security-group covers createsecuritygroup+createsecuritygrouprule+showsecuritygroup+showsecuritygrouprule+listsecuritygrouprules+deletesecuritygrouprule+deletesecuritygroup; (2) networking-security-group-update covers setsecuritygroup. KEY FACTS: SGs are account/region-scoped (NO VPC needed). setsecuritygroup (PUT) body fields are {description, loggable} ONLY \u2014 'name' is NOT a valid field (confirmed from API docs). listsecuritygrouprules requires security_group_id as REQUIRED query param (400 without it, 200 with). createsecuritygroup body: {name, description, loggable, tags[]}. createsecuritygrouprule body: {security_group_id, direction, ethertype, protocol, port_range_min, port_range_max, remote_ip_prefix, description}. Teardown: clean 0 leftover SGs or rules (both delete steps confirmed 204).",
+      "notes": "9/9 COMPLETE (100%) 2026-06-23 LIVE. Two lifecycles: (1) networking-security-group covers createsecuritygroup+createsecuritygrouprule+showsecuritygroup+showsecuritygrouprule+listsecuritygrouprules+deletesecuritygrouprule+deletesecuritygroup; (2) networking-security-group-update covers setsecuritygroup. KEY FACTS: SGs are account/region-scoped (NO VPC needed). setsecuritygroup (PUT) body fields are {description, loggable} ONLY — 'name' is NOT a valid field (confirmed from API docs). listsecuritygrouprules requires security_group_id as REQUIRED query param (400 without it, 200 with). createsecuritygroup body: {name, description, loggable, tags[]}. createsecuritygrouprule body: {security_group_id, direction, ethertype, protocol, port_range_min, port_range_max, remote_ip_prefix, description}. Teardown: clean 0 leftover SGs or rules (both delete steps confirmed 204).",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -937,11 +897,11 @@
       "heavy": false,
       "blockers": [
         "entitlement/credential: gettemporarykey (GET /v1/temporarykey/{id}) needs vault-issued Svaccesskey/Svsignature/Svtimestamp/Svclienttype headers NOT derivable from SCP API credentials. Live-confirmed 400 ValidationError even with real vault id. PERMANENT BLOCKER.",
-        "key-in-use: createsecretvault 400 Access key is already in use \u2014 1 auth key per vault; existing vault occupies the key until it auto-deletes after 7-day waiting period (2026-06-30). lifecycle handles gracefully via capture_soft (list captures existing vault for show probe)."
+        "key-in-use: createsecretvault 400 Access key is already in use — 1 auth key per vault; existing vault occupies the key until it auto-deletes after 7-day waiting period (2026-06-30). lifecycle handles gracefully via capture_soft (list captures existing vault for show probe)."
       ],
       "next_levers": [
         "createsecretvault full 2xx lifecycle: wait until 2026-06-30 for existing regrsvtest vault to auto-delete, then re-run security-secretvault-vault lifecycle. Auth key UUID is now correctly captured via fetch-iam-key-id pre-step.",
-        "gettemporarykey 2xx: would need vault-issued vault-token auth headers (Sv*) \u2014 feature request or dedicated vault-token injection mechanism; classify as PERMANENT unless platform provides a mechanism."
+        "gettemporarykey 2xx: would need vault-issued vault-token auth headers (Sv*) — feature request or dedicated vault-token injection mechanism; classify as PERMANENT unless platform provides a mechanism."
       ],
       "notes": "4/5 covered (2026-06-23). LIVE-VALIDATED: create 201, show 200, terminate 200. KEY FACT: access_key_id = IAM key UUID ($.access_keys[0].id), NOT access_key string. Fixed in lifecycle via fetch-iam-key-id pre-step. gettemporarykey PERMANENT blocker (vault-issued headers). See knowledge/services.md security/secretvault section.",
       "updated": "2026-06-24T09:01:02Z"
@@ -1060,7 +1020,7 @@
         "TRUE 2xx: fix IAM createrole 500 -> create self-assumable role with trust policy allowing our account -> assumerole 200 -> objectstoreauthorization 200 chain",
         "Paths are CORRECT: /v1/assume-role, /v1/assume-role-with-saml, /v1/object-store-authorization (confirmed api_docs.json 2026-06-20)"
       ],
-      "notes": "0/3 read-only (all POST). HOST BUG FIXED 2026-06-29: sts is GLOBAL not REGIONAL \u2014 sts.e.samsungsdscloud.com returns JSON API responses; sts.kr-west1.e.samsungsdscloud.com was returning HTML portal. Body shapes correct from api_docs.json: assumerole=role_indicator+role_session_name+duration_seconds; assumerolewithsaml=role_indicator+principal_indicator+saml_assertion+duration_seconds; objectstoreauthorization=method+url+x_amz_content_sha256+x_amz_date+region+service.",
+      "notes": "0/3 read-only (all POST). HOST BUG FIXED 2026-06-29: sts is GLOBAL not REGIONAL — sts.e.samsungsdscloud.com returns JSON API responses; sts.kr-west1.e.samsungsdscloud.com was returning HTML portal. Body shapes correct from api_docs.json: assumerole=role_indicator+role_session_name+duration_seconds; assumerolewithsaml=role_indicator+principal_indicator+saml_assertion+duration_seconds; objectstoreauthorization=method+url+x_amz_content_sha256+x_amz_date+region+service.",
       "updated": "2026-06-29T08:35:54Z"
     }
   ]
