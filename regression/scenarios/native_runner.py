@@ -257,6 +257,18 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
 
     def worker(wid: int):
         nonlocal started
+        # 워커 램프 (오너 2026-07-16 "초반에 요청이 몰리면서 417 난거 같아" —
+        # run 7a26 실측: t=0 병렬 디스패치 첫 런에서 첫 60초에 80개 lifecycle
+        # 동시 출발 → 보안 게이트웨이(WAF)가 417 HTML 'Request Rejected'로
+        # 차단). 워커별 계단식 기동으로 오프닝 버스트를 평탄화 — 기본 0.75s/
+        # 워커(30워커 ≈ 22초 램프, makespan 영향 무시 수준). SCP_WORKER_RAMP_S
+        # 로 조정, 0이면 종전 동작.
+        try:
+            _ramp = float(os.environ.get("SCP_WORKER_RAMP_S", "0.75"))
+        except ValueError:
+            _ramp = 0.75
+        if _ramp > 0 and wid:
+            time.sleep(min(wid * _ramp, 45.0))
         while True:
             with lock:
                 if not queue:
