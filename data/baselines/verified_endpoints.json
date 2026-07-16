@@ -1056,7 +1056,7 @@
     "path": "/v1/baremetals"
   },
   "billingplan-light-reads:list-contract-types": {
-    "count": 5,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -1064,7 +1064,7 @@
     "path": "/v1/planned-computes/contract-types"
   },
   "billingplan-light-reads:list-os-types": {
-    "count": 5,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -1072,7 +1072,7 @@
     "path": "/v1/planned-computes/os-types"
   },
   "billingplan-light-reads:list-planned-computes": {
-    "count": 5,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -1080,7 +1080,7 @@
     "path": "/v1/planned-computes"
   },
   "billingplan-light-reads:list-server-types": {
-    "count": 5,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -1088,7 +1088,7 @@
     "path": "/v1/planned-computes/server-types"
   },
   "billingplan-light-reads:list-service-types": {
-    "count": 5,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -1391,6 +1391,62 @@
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
+  "cachestore-cluster-version-upgrade:capture-cluster-detail": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-version-upgrade:create-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters",
+    "path": "/v1/clusters"
+  },
+  "cachestore-cluster-version-upgrade:find-engine-version": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/engine-versions",
+    "path": "/v1/engine-versions"
+  },
+  "cachestore-cluster-version-upgrade:find-server-type": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/server-types",
+    "path": "/v1/server-types"
+  },
+  "cachestore-cluster-version-upgrade:wait-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-version-upgrade:wait-subnet": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/subnets/*",
+    "path": "/v1/subnets/{subnet_id}"
+  },
+  "cachestore-cluster-version-upgrade:wait-vpc": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
+  },
   "cachestore-read-coverage:get-engine-version-properties": {
     "count": 25,
     "first_run": "27583285457",
@@ -1432,7 +1488,7 @@
     "path": "/v1/parameters"
   },
   "cleanup-ladder-test:create-lb": {
-    "count": 6,
+    "count": 12,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -2448,9 +2504,9 @@
     "path": "/v1/images/{pending_image_id}/members"
   },
   "compute/virtualserver/createkeypair": {
-    "count": 265,
+    "count": 266,
     "first_run": "27583285457",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/keypairs",
     "path": "/v1/keypairs"
@@ -2512,9 +2568,9 @@
     "path": "/v1/snapshots"
   },
   "compute/virtualserver/createvirtualserver": {
-    "count": 98,
+    "count": 99,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/servers",
     "path": "/v1/servers"
@@ -2600,12 +2656,12 @@
     "path": "/v1/images/{pending_image_id}/members/{member_id}"
   },
   "compute/virtualserver/deletekeypair": {
-    "count": 203,
+    "count": 204,
     "first_run": "27583285457",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/keypairs/*",
-    "path": "/v1/keypairs/{asg_keypair_name}"
+    "path": "/v1/keypairs/regrkey{unique}"
   },
   "compute/virtualserver/deletelaunchconfiguration": {
     "count": 40,
@@ -2656,9 +2712,9 @@
     "path": "/v1/snapshots/{snap_id}"
   },
   "compute/virtualserver/deletevirtualserver": {
-    "count": 88,
+    "count": 89,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/servers/*",
     "path": "/v1/servers/{server_id}"
@@ -2984,7 +3040,7 @@
     "path": "/v1/volume-types/default"
   },
   "compute/virtualserver/showimage": {
-    "count": 57,
+    "count": 64,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3048,7 +3104,7 @@
     "path": "/v1/servers/{server_id}/ips/{subnet_id}"
   },
   "compute/virtualserver/showservertype": {
-    "count": 58,
+    "count": 65,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3088,7 +3144,7 @@
     "path": "/v1/servers/{server_id}/console-log"
   },
   "compute/virtualserver/showvolume": {
-    "count": 232,
+    "count": 239,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3112,7 +3168,7 @@
     "path": "/v1/volume-transfer/{transfer_id}"
   },
   "compute/virtualserver/showvolumetype": {
-    "count": 49,
+    "count": 56,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3240,7 +3296,7 @@
     "path": "/v1/volumes/{vol_id}"
   },
   "configinspection-read-coverage:list-checklist-versions": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -3248,7 +3304,7 @@
     "path": "/v1/configinspection/diagnosis/checklist/version"
   },
   "configinspection-read-coverage:list-diagnoses": {
-    "count": 9,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -3256,7 +3312,7 @@
     "path": "/v1/configinspection/diagnosis/list"
   },
   "configinspection-read-coverage:list-diagnosis-results": {
-    "count": 9,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -3560,7 +3616,7 @@
     "path": "/v1/vpcs/{vpc_id}"
   },
   "container/scr/checkregistrynameduplication": {
-    "count": 67,
+    "count": 70,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3568,7 +3624,7 @@
     "path": "/v1/container-registries/check-duplication/name"
   },
   "container/scr/checkrepositorynameduplication": {
-    "count": 54,
+    "count": 55,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "GET",
@@ -3576,7 +3632,7 @@
     "path": "/v1/repositories/check-duplication/name"
   },
   "container/scr/createregistry": {
-    "count": 11,
+    "count": 14,
     "first_run": "20260715-224307-7a40",
     "last_run": "",
     "method": "POST",
@@ -3584,7 +3640,7 @@
     "path": "/v1/container-registries"
   },
   "container/scr/createrepository": {
-    "count": 36,
+    "count": 39,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "POST",
@@ -3592,7 +3648,7 @@
     "path": "/v1/repositories"
   },
   "container/scr/deleteregistry": {
-    "count": 11,
+    "count": 14,
     "first_run": "20260715-224307-7a40",
     "last_run": "",
     "method": "DELETE",
@@ -3600,7 +3656,7 @@
     "path": "/v1/container-registries/{created_registry_id}"
   },
   "container/scr/deleterepository": {
-    "count": 35,
+    "count": 38,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "DELETE",
@@ -3608,7 +3664,7 @@
     "path": "/v1/repositories/{repo_id}"
   },
   "container/scr/listconnectableresources": {
-    "count": 66,
+    "count": 69,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3616,7 +3672,7 @@
     "path": "/v1/container-registries/connectable-resources"
   },
   "container/scr/listimages": {
-    "count": 92,
+    "count": 95,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3624,7 +3680,7 @@
     "path": "/v1/repositories/{repository_id}/images"
   },
   "container/scr/listregistries": {
-    "count": 108,
+    "count": 111,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3632,7 +3688,7 @@
     "path": "/v1/container-registries"
   },
   "container/scr/listrepositories": {
-    "count": 132,
+    "count": 140,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3640,7 +3696,7 @@
     "path": "/v1/container-registries/{registry_id}/repositories"
   },
   "container/scr/showregistry": {
-    "count": 132,
+    "count": 140,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3648,7 +3704,7 @@
     "path": "/v1/container-registries/{registry_id}"
   },
   "container/scr/showrepository": {
-    "count": 92,
+    "count": 95,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -3656,7 +3712,7 @@
     "path": "/v1/repositories/{repository_id}"
   },
   "container/scr/updateprivateacl": {
-    "count": 31,
+    "count": 34,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "PUT",
@@ -3664,7 +3720,7 @@
     "path": "/v1/container-registries/{registry_id}/private-acl"
   },
   "container/scr/updatepublicacl": {
-    "count": 22,
+    "count": 25,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "PUT",
@@ -3672,7 +3728,7 @@
     "path": "/v1/container-registries/{registry_id}/public-acl"
   },
   "container/scr/updatepublicendpointenabled": {
-    "count": 58,
+    "count": 64,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "PUT",
@@ -3680,7 +3736,7 @@
     "path": "/v1/container-registries/{registry_id}/enable-public-endpoint"
   },
   "container/scr/updaterepositorydescription": {
-    "count": 36,
+    "count": 39,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "PUT",
@@ -3688,7 +3744,7 @@
     "path": "/v1/repositories/{repo_id}/description"
   },
   "container/scr/updaterepositorylifecyclepolicy": {
-    "count": 36,
+    "count": 39,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "PUT",
@@ -3696,7 +3752,7 @@
     "path": "/v1/repositories/{repo_id}/lifecycle-policy"
   },
   "container/scr/updaterepositorylockpolicy": {
-    "count": 36,
+    "count": 39,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "PUT",
@@ -3704,7 +3760,7 @@
     "path": "/v1/repositories/{repo_id}/lock-policy"
   },
   "container/scr/updaterepositorypullpolicy": {
-    "count": 36,
+    "count": 39,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "PUT",
@@ -3712,7 +3768,7 @@
     "path": "/v1/repositories/{repo_id}/pull-policy"
   },
   "container/scr/updaterepositoryscanpolicy": {
-    "count": 36,
+    "count": 39,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "PUT",
@@ -4016,7 +4072,7 @@
     "path": "/v1/clusters"
   },
   "data-analytics/eventstreams/eventstreamslistengineversionproperties": {
-    "count": 86,
+    "count": 93,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -4200,7 +4256,7 @@
     "path": "/v1/clusters"
   },
   "data-analytics/searchengine/searchenginelistengineversionproperties": {
-    "count": 61,
+    "count": 66,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -4232,7 +4288,7 @@
     "path": "/v1/clusters"
   },
   "data-analytics/vertica/verticalistengineversionproperties": {
-    "count": 74,
+    "count": 79,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -4888,9 +4944,9 @@
     "path": "/v1/vpcs/{vpc_id}"
   },
   "database/cachestore/cachestorecreatecluster": {
-    "count": 39,
+    "count": 40,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
@@ -4904,9 +4960,9 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/cachestore/cachestorelistbackuphistories": {
-    "count": 31,
+    "count": 32,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/backup-histories",
     "path": "/v1/clusters/{cluster_id}/backup-histories"
@@ -4920,15 +4976,15 @@
     "path": "/v1/clusters"
   },
   "database/cachestore/cachestorelistcommands": {
-    "count": 15,
+    "count": 16,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/commands",
     "path": "/v1/clusters/{cluster_id}/commands"
   },
   "database/cachestore/cachestorelistengineversionproperties": {
-    "count": 92,
+    "count": 98,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -4960,9 +5016,9 @@
     "path": "/v1/parameters"
   },
   "database/cachestore/cachestorelistparametervalues": {
-    "count": 39,
+    "count": 40,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
@@ -5040,12 +5096,20 @@
     "path": "/v1/instance-groups/{instance_group_id}/resize"
   },
   "database/cachestore/cachestoreshowcluster": {
-    "count": 426,
+    "count": 427,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
+  },
+  "database/cachestore/cachestoreshowinstance": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/instances/*",
+    "path": "/v1/clusters/{cluster_id}/instances/{instance_name}"
   },
   "database/cachestore/cachestoreshowrequest": {
     "count": 21,
@@ -5112,9 +5176,9 @@
     "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups"
   },
   "database/epas/epascreatecluster": {
-    "count": 39,
+    "count": 40,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
@@ -5144,9 +5208,9 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/epas/epaslistbackuphistories": {
-    "count": 31,
+    "count": 32,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/backup-histories",
     "path": "/v1/clusters/{cluster_id}/backup-histories"
@@ -5160,7 +5224,7 @@
     "path": "/v1/clusters"
   },
   "database/epas/epaslistengineversionproperties": {
-    "count": 77,
+    "count": 83,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5176,9 +5240,9 @@
     "path": "/v1/engine-versions"
   },
   "database/epas/epaslistlogexportconfigs": {
-    "count": 39,
+    "count": 40,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/log-export-configs",
     "path": "/v1/clusters/{cluster_id}/log-export-configs"
@@ -5200,17 +5264,17 @@
     "path": "/v1/parameters"
   },
   "database/epas/epaslistparametervalues": {
-    "count": 39,
+    "count": 40,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "database/epas/epaslistreplicas": {
-    "count": 27,
+    "count": 28,
     "first_run": "27645841461",
-    "last_run": "20260716-124510-c72e",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/replicas",
     "path": "/v1/clusters/{cluster_id}/replicas"
@@ -5222,6 +5286,22 @@
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
+  },
+  "database/epas/epasmanualbackup": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups/manual",
+    "path": "/v1/clusters/{cluster_id}/backups/manual"
+  },
+  "database/epas/epaspatchminorversion": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/patch",
+    "path": "/v1/clusters/{cluster_id}/patch"
   },
   "database/epas/epaspromotereplicacluster": {
     "count": 1,
@@ -5312,25 +5392,33 @@
     "path": "/v1/instance-groups/{instance_group_id}/resize"
   },
   "database/epas/epasshowarchiveconfig": {
-    "count": 29,
+    "count": 30,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/archive",
     "path": "/v1/clusters/{cluster_id}/archive"
   },
   "database/epas/epasshowcluster": {
-    "count": 536,
+    "count": 537,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
+  "database/epas/epasshowinstance": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/instances/*",
+    "path": "/v1/clusters/{cluster_id}/instances/{instance_name}"
+  },
   "database/epas/epasshowrequest": {
-    "count": 21,
+    "count": 22,
     "first_run": "local-02f524c7",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/requests/*",
     "path": "/v1/requests/{request_id}"
@@ -5408,9 +5496,9 @@
     "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups"
   },
   "database/mariadb/mariadbcreatecluster": {
-    "count": 45,
+    "count": 46,
     "first_run": "27583285457",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
@@ -5424,17 +5512,17 @@
     "path": "/v1/clusters/{cluster_id}/replicas"
   },
   "database/mariadb/mariadbdeletecluster": {
-    "count": 43,
+    "count": 44,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/mariadb/mariadblistbackuphistories": {
-    "count": 35,
+    "count": 36,
     "first_run": "27588002895",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/backup-histories",
     "path": "/v1/clusters/{cluster_id}/backup-histories"
@@ -5448,7 +5536,7 @@
     "path": "/v1/clusters"
   },
   "database/mariadb/mariadblistengineversionproperties": {
-    "count": 75,
+    "count": 81,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5464,9 +5552,9 @@
     "path": "/v1/engine-versions"
   },
   "database/mariadb/mariadblistlogexportconfigs": {
-    "count": 45,
+    "count": 46,
     "first_run": "27588002895",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/log-export-configs",
     "path": "/v1/clusters/{cluster_id}/log-export-configs"
@@ -5488,17 +5576,17 @@
     "path": "/v1/parameters"
   },
   "database/mariadb/mariadblistparametervalues": {
-    "count": 44,
+    "count": 45,
     "first_run": "27588002895",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "database/mariadb/mariadblistreplicas": {
-    "count": 30,
+    "count": 31,
     "first_run": "27588002895",
-    "last_run": "20260716-124510-c72e",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/replicas",
     "path": "/v1/clusters/{cluster_id}/replicas"
@@ -5510,6 +5598,22 @@
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
+  },
+  "database/mariadb/mariadbmanualbackup": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups/manual",
+    "path": "/v1/clusters/{cluster_id}/backups/manual"
+  },
+  "database/mariadb/mariadbpatchminorversion": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/patch",
+    "path": "/v1/clusters/{cluster_id}/patch"
   },
   "database/mariadb/mariadbpromotereplicacluster": {
     "count": 2,
@@ -5600,25 +5704,33 @@
     "path": "/v1/instance-groups/{instance_group_id}/resize"
   },
   "database/mariadb/mariadbshowarchiveconfig": {
-    "count": 35,
+    "count": 36,
     "first_run": "27588002895",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*/archive",
     "path": "/v1/clusters/{cluster_id}/archive"
   },
   "database/mariadb/mariadbshowcluster": {
-    "count": 483,
+    "count": 484,
     "first_run": "27588002895",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
+  "database/mariadb/mariadbshowinstance": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/instances/*",
+    "path": "/v1/clusters/{cluster_id}/instances/{instance_name}"
+  },
   "database/mariadb/mariadbshowrequest": {
-    "count": 21,
+    "count": 22,
     "first_run": "local-02f524c7",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/requests/*",
     "path": "/v1/requests/{request_id}"
@@ -5648,9 +5760,9 @@
     "path": "/v1/clusters/{cluster_id}/archive/sync"
   },
   "database/mariadb/mariadbsyncclusterstate": {
-    "count": 42,
+    "count": 43,
     "first_run": "28602725440",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/clusters/*/sync-state",
     "path": "/v1/clusters/{cluster_id}/sync-state"
@@ -5687,6 +5799,14 @@
     "norm_path": "v1/clusters/*/kernel-upgrade",
     "path": "/v1/clusters/{cluster_id}/kernel-upgrade"
   },
+  "database/mariadb/mariadbupgrademajorversion": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/major-version-upgrade",
+    "path": "/v1/clusters/{cluster_id}/major-version-upgrade"
+  },
   "database/mysql/mysqladdblockstorages": {
     "count": 35,
     "first_run": "20260713-102144-543a",
@@ -5696,7 +5816,7 @@
     "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups"
   },
   "database/mysql/mysqlcreatecluster": {
-    "count": 63,
+    "count": 65,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -5712,7 +5832,7 @@
     "path": "/v1/clusters/{cluster_id}/replicas"
   },
   "database/mysql/mysqldeletecluster": {
-    "count": 62,
+    "count": 64,
     "first_run": "27645841461",
     "last_run": "",
     "method": "DELETE",
@@ -5720,7 +5840,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/mysql/mysqllistbackuphistories": {
-    "count": 32,
+    "count": 34,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5736,7 +5856,7 @@
     "path": "/v1/clusters"
   },
   "database/mysql/mysqllistengineversionproperties": {
-    "count": 95,
+    "count": 102,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5752,7 +5872,7 @@
     "path": "/v1/engine-versions"
   },
   "database/mysql/mysqllistlogexportconfigs": {
-    "count": 63,
+    "count": 65,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5776,7 +5896,7 @@
     "path": "/v1/parameters"
   },
   "database/mysql/mysqllistparametervalues": {
-    "count": 81,
+    "count": 83,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5784,7 +5904,7 @@
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "database/mysql/mysqllistreplicas": {
-    "count": 52,
+    "count": 54,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5800,7 +5920,7 @@
     "path": "/v1/server-types"
   },
   "database/mysql/mysqlmanualbackup": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -5808,7 +5928,7 @@
     "path": "/v1/clusters/{cluster_id}/backups/manual"
   },
   "database/mysql/mysqlpatchminorversion": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -5896,7 +6016,7 @@
     "path": "/v1/instance-groups/{instance_group_id}/resize"
   },
   "database/mysql/mysqlshowarchiveconfig": {
-    "count": 31,
+    "count": 33,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5904,7 +6024,7 @@
     "path": "/v1/clusters/{cluster_id}/archive"
   },
   "database/mysql/mysqlshowcluster": {
-    "count": 605,
+    "count": 607,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -5912,7 +6032,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/mysql/mysqlshowinstance": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -5920,7 +6040,7 @@
     "path": "/v1/clusters/{cluster_id}/instances/{instance_name}"
   },
   "database/mysql/mysqlshowrequest": {
-    "count": 26,
+    "count": 28,
     "first_run": "27803424208",
     "last_run": "",
     "method": "GET",
@@ -5952,7 +6072,7 @@
     "path": "/v1/clusters/{cluster_id}/archive/sync"
   },
   "database/mysql/mysqlsyncclusterstate": {
-    "count": 87,
+    "count": 89,
     "first_run": "27645841461",
     "last_run": "",
     "method": "POST",
@@ -5992,7 +6112,7 @@
     "path": "/v1/clusters/{cluster_id}/kernel-upgrade"
   },
   "database/mysql/mysqlupgrademajorversion": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -6008,9 +6128,9 @@
     "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups"
   },
   "database/postgresql/postgresqlcreatecluster": {
-    "count": 50,
+    "count": 51,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
@@ -6032,9 +6152,9 @@
     "path": "/v1/clusters/{cluster_id}/archive"
   },
   "database/postgresql/postgresqldeletecluster": {
-    "count": 50,
+    "count": 51,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
@@ -6056,7 +6176,7 @@
     "path": "/v1/clusters"
   },
   "database/postgresql/postgresqllistengineversionproperties": {
-    "count": 88,
+    "count": 93,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -6118,6 +6238,14 @@
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
+  },
+  "database/postgresql/postgresqlmanualbackup": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups/manual",
+    "path": "/v1/clusters/{cluster_id}/backups/manual"
   },
   "database/postgresql/postgresqlpromotereplicacluster": {
     "count": 1,
@@ -6256,9 +6384,9 @@
     "path": "/v1/clusters/{cluster_id}/archive/sync"
   },
   "database/postgresql/postgresqlsyncclusterstate": {
-    "count": 73,
+    "count": 74,
     "first_run": "27645841461",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/clusters/*/sync-state",
     "path": "/v1/clusters/{cluster_id}/sync-state"
@@ -6304,7 +6432,7 @@
     "path": "/v1/clusters"
   },
   "database/sqlserver/sqlserverlistengineversionproperties": {
-    "count": 64,
+    "count": 68,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -6607,6 +6735,94 @@
     "norm_path": "v1/clusters/*/parameters/sync",
     "path": "/v1/clusters/{cluster_id}/parameters/sync"
   },
+  "epas-cluster-version-upgrade:capture-cluster-detail": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-version-upgrade:create-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters",
+    "path": "/v1/clusters"
+  },
+  "epas-cluster-version-upgrade:find-engine-version": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/engine-versions",
+    "path": "/v1/engine-versions"
+  },
+  "epas-cluster-version-upgrade:find-server-type": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/server-types",
+    "path": "/v1/server-types"
+  },
+  "epas-cluster-version-upgrade:manual-backup": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups/manual",
+    "path": "/v1/clusters/{cluster_id}/backups/manual"
+  },
+  "epas-cluster-version-upgrade:patch-minor-version": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/patch",
+    "path": "/v1/clusters/{cluster_id}/patch"
+  },
+  "epas-cluster-version-upgrade:show-instance": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/instances/*",
+    "path": "/v1/clusters/{cluster_id}/instances/{instance_name}"
+  },
+  "epas-cluster-version-upgrade:wait-after-minor-patch": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-version-upgrade:wait-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-version-upgrade:wait-subnet": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/subnets/*",
+    "path": "/v1/subnets/{subnet_id}"
+  },
+  "epas-cluster-version-upgrade:wait-vpc": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
+  },
   "epas-read-coverage:get-cluster-replicas": {
     "count": 1,
     "first_run": "27658124753",
@@ -6848,7 +7064,7 @@
     "path": "/v1/volumes/{volume_id}"
   },
   "financial-management/billingplan/listcontracttypes": {
-    "count": 44,
+    "count": 48,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -6856,7 +7072,7 @@
     "path": "/v1/planned-computes/contract-types"
   },
   "financial-management/billingplan/listostypes": {
-    "count": 44,
+    "count": 48,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -6864,7 +7080,7 @@
     "path": "/v1/planned-computes/os-types"
   },
   "financial-management/billingplan/listplannedcomputes": {
-    "count": 44,
+    "count": 48,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -6872,7 +7088,7 @@
     "path": "/v1/planned-computes"
   },
   "financial-management/billingplan/listplannedcomputeservertypes": {
-    "count": 29,
+    "count": 33,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "GET",
@@ -6880,7 +7096,7 @@
     "path": "/v1/planned-computes/server-types"
   },
   "financial-management/billingplan/listplannedcomputeservicetypes": {
-    "count": 44,
+    "count": 48,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -7400,73 +7616,97 @@
     "path": "/v1/vpcs/{vpc_id}"
   },
   "gen-heavy-backup:create-backup-target": {
-    "count": 1,
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/backups/backup-targets",
     "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}"
   },
   "gen-heavy-backup:create-image": {
-    "count": 1,
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/images",
-    "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50"
+    "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&os_distro=ubuntu&limit=50"
   },
   "gen-heavy-backup:create-keypair": {
-    "count": 1,
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/keypairs",
     "path": "/v1/keypairs"
   },
   "gen-heavy-backup:create-security-group": {
-    "count": 1,
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/security-groups",
     "path": "/v1/security-groups"
   },
   "gen-heavy-backup:create-server": {
-    "count": 1,
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/servers",
     "path": "/v1/servers"
   },
   "gen-heavy-backup:create-server-type": {
-    "count": 1,
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
-  "gen-heavy-backup:wait-server": {
+  "gen-heavy-backup:delete-keypair": {
     "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/keypairs/*",
+    "path": "/v1/keypairs/regrkey{unique}"
+  },
+  "gen-heavy-backup:delete-security-group": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/security-groups/*",
+    "path": "/v1/security-groups/{sg_id}"
+  },
+  "gen-heavy-backup:delete-server": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/servers/*",
+    "path": "/v1/servers/{server_id}"
+  },
+  "gen-heavy-backup:wait-server": {
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/servers/*",
     "path": "/v1/servers/{server_id}"
   },
   "gen-heavy-backup:wait-subnet": {
-    "count": 1,
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
   },
   "gen-heavy-backup:wait-vpc": {
-    "count": 1,
+    "count": 2,
     "first_run": "28766151214",
-    "last_run": "28766151214",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -8936,7 +9176,7 @@
     "path": "/v1/network-logging/storages?resource_type=SECURITY_GROUP"
   },
   "gen-newapi-servicewatch-alerts:create-alert": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -8944,7 +9184,7 @@
     "path": "/v1/alerts"
   },
   "gen-newapi-servicewatch-alerts:delete-alerts": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -8952,7 +9192,7 @@
     "path": "/v1/alerts"
   },
   "gen-newapi-servicewatch-alerts:list-alert-notifications": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -8960,7 +9200,7 @@
     "path": "/v1/alerts/{swn_alert_id}/notifications"
   },
   "gen-newapi-servicewatch-alerts:list-alerts": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -8968,7 +9208,7 @@
     "path": "/v1/alerts"
   },
   "gen-newapi-servicewatch-alerts:list-metric-catalog": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -8976,7 +9216,7 @@
     "path": "/v1/metrics"
   },
   "gen-newapi-servicewatch-alerts:list-namespaces-by-alerts": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -8984,7 +9224,7 @@
     "path": "/v1/alerts/namespaces"
   },
   "gen-newapi-servicewatch-alerts:show-alert-level-counts": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -11280,7 +11520,7 @@
     "path": "/v1/cloud-functions/{cloud_function_id}"
   },
   "gen-wave5-swatch-custom-log:create-log-group": {
-    "count": 21,
+    "count": 23,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11288,7 +11528,7 @@
     "path": "/v1/log-groups"
   },
   "gen-wave5-swatch-custom-log:create-log-stream": {
-    "count": 21,
+    "count": 23,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11296,7 +11536,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams"
   },
   "gen-wave5-swatch-custom-log:create-sw-custom-log-collect": {
-    "count": 21,
+    "count": 23,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11304,7 +11544,7 @@
     "path": "/v1/log-groups/log-streams/collect/custom"
   },
   "gen-wave5-swatch-custom-log:delete-log-group": {
-    "count": 21,
+    "count": 23,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -11312,7 +11552,7 @@
     "path": "/v1/log-groups"
   },
   "gen-wave5-swatch-custom-log:delete-log-stream": {
-    "count": 21,
+    "count": 23,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -11320,7 +11560,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams"
   },
   "gen-wave5-swatch-custom-log:verify-sw-custom-log-collect-ingest-events": {
-    "count": 21,
+    "count": 23,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11328,7 +11568,7 @@
     "path": "/v1/log-groups/log-streams/log-events"
   },
   "gen-wave5-swatch-custom-metric:create-sw-custom-metric-meta": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11336,7 +11576,7 @@
     "path": "/v1/metrics/custom/meta"
   },
   "gen-wave5-swatch-custom-metric:verify-sw-custom-metric-meta-data-readback": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11344,7 +11584,7 @@
     "path": "/v1/metrics/data"
   },
   "gen-wave5-swatch-dashboard:create-dashboard": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11352,7 +11592,7 @@
     "path": "/v1/dashboards"
   },
   "gen-wave5-swatch-dashboard:delete-dashboard": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -11360,7 +11600,7 @@
     "path": "/v1/dashboards"
   },
   "gen-wave5-swatch-dashboard:verify-dashboard-read": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -11368,7 +11608,7 @@
     "path": "/v1/dashboards/{dashboard_id}"
   },
   "gen-wave5-swatch-dashboard:verify-dashboard-set": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "PUT",
@@ -11376,7 +11616,7 @@
     "path": "/v1/dashboards/{dashboard_id}"
   },
   "gen-wave5-swatch-event-rule:create-event-rule": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11384,7 +11624,7 @@
     "path": "/v1/event-rules"
   },
   "gen-wave5-swatch-event-rule:delete-event-rule": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -11392,7 +11632,7 @@
     "path": "/v1/event-rules"
   },
   "gen-wave5-swatch-event-rule:verify-event-rule-read": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -11400,7 +11640,7 @@
     "path": "/v1/event-rules/{event_rule_id}"
   },
   "gen-wave5-swatch-metric:create-sw-metric-catalog": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11408,7 +11648,7 @@
     "path": "/v1/metrics"
   },
   "gen-wave5-swatch-metric:verify-sw-metric-catalog-data": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11416,7 +11656,7 @@
     "path": "/v1/metrics/data"
   },
   "gen-wave5-swatch-metric:verify-sw-metric-catalog-image": {
-    "count": 20,
+    "count": 21,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -12048,7 +12288,7 @@
     "path": "/v1/vpcs/{vpc_id}"
   },
   "iam-access-key-full:create-access-key-1": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -12056,7 +12296,7 @@
     "path": "/v1/access-keys"
   },
   "iam-access-key-full:create-access-key-2": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -12064,7 +12304,7 @@
     "path": "/v1/access-keys"
   },
   "iam-access-key-full:delete-access-key-1": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -12072,7 +12312,7 @@
     "path": "/v1/access-keys/{access_key_id_1}"
   },
   "iam-access-key-full:delete-access-keys-bulk": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -12080,7 +12320,7 @@
     "path": "/v1/access-keys/bulk"
   },
   "iam-access-key-full:disable-access-key-2": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -12088,7 +12328,7 @@
     "path": "/v1/access-keys/{access_key_id_2}"
   },
   "iam-access-key-full:seed-account-id": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -12096,7 +12336,7 @@
     "path": "/v1/access-keys"
   },
   "iam-access-key-full:set-access-key-1": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -12520,7 +12760,7 @@
     "path": "/v1/instances"
   },
   "igw-adopt-test:wait-internet-gateway": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -12528,7 +12768,7 @@
     "path": "/v1/internet-gateways/{internet_gateway_id}"
   },
   "igw-seed-filter-test:probe": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -12536,7 +12776,7 @@
     "path": "/v1/internet-gateways/{internet_gateway_id}"
   },
   "igw-selfcreate-test:create-internet-gateway": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -12544,7 +12784,7 @@
     "path": "/v1/internet-gateways"
   },
   "loggingaudit-logs-readonly:list-logs": {
-    "count": 13,
+    "count": 16,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -12552,7 +12792,7 @@
     "path": "/v1/logs"
   },
   "loggingaudit-logs-readonly:show-log": {
-    "count": 13,
+    "count": 16,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -12560,7 +12800,7 @@
     "path": "/v1/logs/{logging_id}"
   },
   "loggingaudit-trail:capture-account-id": {
-    "count": 6,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -12568,7 +12808,7 @@
     "path": "/v1/access-keys"
   },
   "loggingaudit-trail:create-trail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -12576,7 +12816,7 @@
     "path": "/v1/trails"
   },
   "loggingaudit-trail:delete-trail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -12584,7 +12824,7 @@
     "path": "/v1/trails/{trail_id}"
   },
   "loggingaudit-trail:download-logs": {
-    "count": 5,
+    "count": 9,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -12592,7 +12832,7 @@
     "path": "/v1/logs/download"
   },
   "loggingaudit-trail:list-trails": {
-    "count": 22,
+    "count": 26,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -12600,7 +12840,7 @@
     "path": "/v1/trails"
   },
   "loggingaudit-trail:set-trail": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -12608,7 +12848,7 @@
     "path": "/v1/trails/{trail_id}"
   },
   "loggingaudit-trail:show-trail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -12616,7 +12856,7 @@
     "path": "/v1/trails/{trail_id}"
   },
   "loggingaudit-trail:start-trail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -12624,7 +12864,7 @@
     "path": "/v1/trails/{trail_id}/start"
   },
   "loggingaudit-trail:stop-trail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -12712,7 +12952,7 @@
     "path": "/v1/instances"
   },
   "management/iam/accesskeycreate": {
-    "count": 3,
+    "count": 6,
     "first_run": "svccov-iam-1784209944",
     "last_run": "",
     "method": "POST",
@@ -12720,7 +12960,7 @@
     "path": "/v1/access-keys"
   },
   "management/iam/accesskeydelete": {
-    "count": 2,
+    "count": 4,
     "first_run": "svccov-iam-1784209944",
     "last_run": "",
     "method": "DELETE",
@@ -12728,7 +12968,7 @@
     "path": "/v1/access-keys/{access_key_id_1}"
   },
   "management/iam/accesskeydeletebulk": {
-    "count": 2,
+    "count": 4,
     "first_run": "svccov-iam-1784209944",
     "last_run": "",
     "method": "DELETE",
@@ -12752,7 +12992,7 @@
     "path": "/v1/access-keys/send-otp"
   },
   "management/iam/accesskeyset": {
-    "count": 3,
+    "count": 6,
     "first_run": "svccov-iam-1784209944",
     "last_run": "",
     "method": "PUT",
@@ -12760,7 +13000,7 @@
     "path": "/v1/access-keys/{access_key_id_2}"
   },
   "management/iam/accesskeyshow": {
-    "count": 60,
+    "count": 63,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -12840,7 +13080,7 @@
     "path": "/v1/roles"
   },
   "management/iam/createsamlprovider": {
-    "count": 1,
+    "count": 2,
     "first_run": "svccov-iam-1784209944",
     "last_run": "svccov-iam-1784209944",
     "method": "POST",
@@ -12904,7 +13144,7 @@
     "path": "/v1/roles/{role_id}"
   },
   "management/iam/deletesamlproviders": {
-    "count": 1,
+    "count": 2,
     "first_run": "svccov-iam-1784209944",
     "last_run": "svccov-iam-1784209944",
     "method": "DELETE",
@@ -12968,7 +13208,7 @@
     "path": "/v1/policies"
   },
   "management/iam/listpolicybinding": {
-    "count": 159,
+    "count": 162,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -12984,7 +13224,7 @@
     "path": "/v1/roles"
   },
   "management/iam/listrolepolicybindings": {
-    "count": 62,
+    "count": 65,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13128,7 +13368,7 @@
     "path": "/v1/roles/{existing_role_id}/trust-policy"
   },
   "management/iam/setsamlprovider": {
-    "count": 1,
+    "count": 2,
     "first_run": "svccov-iam-1784209944",
     "last_run": "svccov-iam-1784209944",
     "method": "PUT",
@@ -13144,7 +13384,7 @@
     "path": "/v1/groups/{group_id}"
   },
   "management/iam/showpolicy": {
-    "count": 159,
+    "count": 162,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13160,7 +13400,7 @@
     "path": "/v1/resource-policies/{srn}"
   },
   "management/iam/showrole": {
-    "count": 62,
+    "count": 65,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13168,7 +13408,7 @@
     "path": "/v1/roles/{role_id}"
   },
   "management/iam/showsamlprovider": {
-    "count": 1,
+    "count": 2,
     "first_run": "svccov-iam-1784209944",
     "last_run": "svccov-iam-1784209944",
     "method": "GET",
@@ -13176,7 +13416,7 @@
     "path": "/v1/saml-providers/{saml_provider_id}"
   },
   "management/iam/showserviceaccount": {
-    "count": 63,
+    "count": 66,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13200,7 +13440,7 @@
     "path": "/v1/accounts/{account_id}/users/{user_id}/password"
   },
   "management/loggingaudit/createtrail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -13208,7 +13448,7 @@
     "path": "/v1/trails"
   },
   "management/loggingaudit/deletetrail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -13216,7 +13456,7 @@
     "path": "/v1/trails/{trail_id}"
   },
   "management/loggingaudit/downloadlogs": {
-    "count": 5,
+    "count": 9,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -13224,7 +13464,7 @@
     "path": "/v1/logs/download"
   },
   "management/loggingaudit/listlogs": {
-    "count": 32,
+    "count": 35,
     "first_run": "27803424208",
     "last_run": "",
     "method": "GET",
@@ -13232,7 +13472,7 @@
     "path": "/v1/logs"
   },
   "management/loggingaudit/listtrails": {
-    "count": 29,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13240,7 +13480,7 @@
     "path": "/v1/trails"
   },
   "management/loggingaudit/settrail": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -13248,7 +13488,7 @@
     "path": "/v1/trails/{trail_id}"
   },
   "management/loggingaudit/showlog": {
-    "count": 25,
+    "count": 26,
     "first_run": "20260713-102144-543a",
     "last_run": "",
     "method": "GET",
@@ -13256,7 +13496,7 @@
     "path": "/v1/logs/{logging_id}"
   },
   "management/loggingaudit/showtrail": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -13264,7 +13504,7 @@
     "path": "/v1/trails/{trail_id}"
   },
   "management/loggingaudit/starttrail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -13272,7 +13512,7 @@
     "path": "/v1/trails/{trail_id}/start"
   },
   "management/loggingaudit/stoptrail": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -13320,7 +13560,7 @@
     "path": "/v1/invitations/cancel"
   },
   "management/organization/listaccountinvitations": {
-    "count": 39,
+    "count": 41,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13328,7 +13568,7 @@
     "path": "/v1/account-invitations"
   },
   "management/organization/listorganizations": {
-    "count": 39,
+    "count": 41,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13352,7 +13592,7 @@
     "path": "/v1/quota-requests"
   },
   "management/quota/showaccountquota": {
-    "count": 47,
+    "count": 49,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13576,7 +13816,7 @@
     "path": "/v1/tags/bulk"
   },
   "management/servicewatch/createalert": {
-    "count": 43,
+    "count": 51,
     "first_run": "27803424208",
     "last_run": "",
     "method": "POST",
@@ -13584,7 +13824,7 @@
     "path": "/v1/alerts"
   },
   "management/servicewatch/createcustomlogevents": {
-    "count": 52,
+    "count": 54,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13592,7 +13832,7 @@
     "path": "/v1/log-groups/log-streams/log-events"
   },
   "management/servicewatch/createcustomlogstream": {
-    "count": 52,
+    "count": 54,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13600,7 +13840,7 @@
     "path": "/v1/log-groups/log-streams/collect/custom"
   },
   "management/servicewatch/createcustommetricmetas": {
-    "count": 55,
+    "count": 60,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13608,7 +13848,7 @@
     "path": "/v1/metrics/custom/meta"
   },
   "management/servicewatch/createdashboard": {
-    "count": 121,
+    "count": 127,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13616,7 +13856,7 @@
     "path": "/v1/dashboards"
   },
   "management/servicewatch/createeventrule": {
-    "count": 66,
+    "count": 72,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13624,7 +13864,7 @@
     "path": "/v1/event-rules"
   },
   "management/servicewatch/createloggroup": {
-    "count": 104,
+    "count": 116,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13632,7 +13872,7 @@
     "path": "/v1/log-groups"
   },
   "management/servicewatch/createloggrouplogstream": {
-    "count": 104,
+    "count": 116,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13640,7 +13880,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams"
   },
   "management/servicewatch/deletebulkalerts": {
-    "count": 43,
+    "count": 51,
     "first_run": "27803424208",
     "last_run": "",
     "method": "DELETE",
@@ -13648,7 +13888,7 @@
     "path": "/v1/alerts"
   },
   "management/servicewatch/deletebulkdashboards": {
-    "count": 102,
+    "count": 108,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -13656,7 +13896,7 @@
     "path": "/v1/dashboards"
   },
   "management/servicewatch/deleteeventrules": {
-    "count": 66,
+    "count": 72,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -13664,7 +13904,7 @@
     "path": "/v1/event-rules"
   },
   "management/servicewatch/deleteloggrouplogstreams": {
-    "count": 104,
+    "count": 116,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -13672,7 +13912,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams"
   },
   "management/servicewatch/deleteloggroups": {
-    "count": 104,
+    "count": 116,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -13680,7 +13920,7 @@
     "path": "/v1/log-groups"
   },
   "management/servicewatch/downloadmetricdataimage": {
-    "count": 51,
+    "count": 52,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13688,7 +13928,7 @@
     "path": "/v1/metrics/data/download/image"
   },
   "management/servicewatch/listalertnotifications": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -13696,7 +13936,7 @@
     "path": "/v1/alerts/{id}/notifications"
   },
   "management/servicewatch/listalerts": {
-    "count": 6,
+    "count": 12,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -13704,7 +13944,7 @@
     "path": "/v1/alerts"
   },
   "management/servicewatch/listdashboards": {
-    "count": 62,
+    "count": 63,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13712,7 +13952,7 @@
     "path": "/v1/dashboards"
   },
   "management/servicewatch/listloggroups": {
-    "count": 62,
+    "count": 63,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13720,7 +13960,7 @@
     "path": "/v1/log-groups"
   },
   "management/servicewatch/listmetricdata": {
-    "count": 102,
+    "count": 104,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13728,7 +13968,7 @@
     "path": "/v1/metrics/data"
   },
   "management/servicewatch/listmetricinfos": {
-    "count": 130,
+    "count": 145,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -13736,7 +13976,7 @@
     "path": "/v1/metrics"
   },
   "management/servicewatch/listnamespacebyalerts": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -13744,7 +13984,7 @@
     "path": "/v1/alerts/namespaces"
   },
   "management/servicewatch/setalert": {
-    "count": 37,
+    "count": 39,
     "first_run": "27803424208",
     "last_run": "",
     "method": "PATCH",
@@ -13752,7 +13992,7 @@
     "path": "/v1/alerts/{alert_id}"
   },
   "management/servicewatch/setalertactivated": {
-    "count": 38,
+    "count": 41,
     "first_run": "27803424208",
     "last_run": "",
     "method": "PATCH",
@@ -13760,7 +14000,7 @@
     "path": "/v1/alerts/{alert_id}/activated"
   },
   "management/servicewatch/setalertdescription": {
-    "count": 38,
+    "count": 41,
     "first_run": "27803424208",
     "last_run": "",
     "method": "PATCH",
@@ -13768,7 +14008,7 @@
     "path": "/v1/alerts/{alert_id}/description"
   },
   "management/servicewatch/setdashboard": {
-    "count": 61,
+    "count": 67,
     "first_run": "27583285457",
     "last_run": "",
     "method": "PUT",
@@ -13776,7 +14016,7 @@
     "path": "/v1/dashboards/{dashboard_id}"
   },
   "management/servicewatch/seteventrule": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "PATCH",
@@ -13784,7 +14024,7 @@
     "path": "/v1/event-rules/{event_rule_id}"
   },
   "management/servicewatch/setloggroup": {
-    "count": 52,
+    "count": 62,
     "first_run": "27583285457",
     "last_run": "",
     "method": "PATCH",
@@ -13792,7 +14032,7 @@
     "path": "/v1/log-groups/{log_group_id}"
   },
   "management/servicewatch/showagentdownloadlink": {
-    "count": 62,
+    "count": 63,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13800,7 +14040,7 @@
     "path": "/v1/agents/download-link"
   },
   "management/servicewatch/showalert": {
-    "count": 25,
+    "count": 28,
     "first_run": "local-02f524c7",
     "last_run": "",
     "method": "GET",
@@ -13808,7 +14048,7 @@
     "path": "/v1/alerts/{id}"
   },
   "management/servicewatch/showalertlevelcountsbyservice": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -13816,7 +14056,7 @@
     "path": "/v1/alerts/level-counts-by-service"
   },
   "management/servicewatch/showdashboard": {
-    "count": 62,
+    "count": 64,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13824,7 +14064,7 @@
     "path": "/v1/dashboards/{dashboard_id}"
   },
   "management/servicewatch/showeventrule": {
-    "count": 25,
+    "count": 28,
     "first_run": "local-02f524c7",
     "last_run": "",
     "method": "GET",
@@ -13832,7 +14072,7 @@
     "path": "/v1/event-rules/{event_rule_id}"
   },
   "management/servicewatch/showloggroup": {
-    "count": 76,
+    "count": 83,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -13840,7 +14080,7 @@
     "path": "/v1/log-groups/{log_group_id}"
   },
   "management/servicewatch/showloggrouplogstream": {
-    "count": 46,
+    "count": 51,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -14247,6 +14487,158 @@
     "norm_path": "v1/clusters/*/archive/sync",
     "path": "/v1/clusters/{cluster_id}/archive/sync"
   },
+  "mariadb-cluster-version-upgrade:capture-cluster-detail": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-version-upgrade:create-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters",
+    "path": "/v1/clusters"
+  },
+  "mariadb-cluster-version-upgrade:delete-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-version-upgrade:find-engine-version": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/engine-versions",
+    "path": "/v1/engine-versions"
+  },
+  "mariadb-cluster-version-upgrade:find-server-type": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/server-types",
+    "path": "/v1/server-types"
+  },
+  "mariadb-cluster-version-upgrade:list-backup-histories-after": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/backup-histories",
+    "path": "/v1/clusters/{cluster_id}/backup-histories"
+  },
+  "mariadb-cluster-version-upgrade:major-version-upgrade": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/major-version-upgrade",
+    "path": "/v1/clusters/{cluster_id}/major-version-upgrade"
+  },
+  "mariadb-cluster-version-upgrade:manual-backup": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups/manual",
+    "path": "/v1/clusters/{cluster_id}/backups/manual"
+  },
+  "mariadb-cluster-version-upgrade:patch-minor-version": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/patch",
+    "path": "/v1/clusters/{cluster_id}/patch"
+  },
+  "mariadb-cluster-version-upgrade:pre-delete-sync-state": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/sync-state",
+    "path": "/v1/clusters/{cluster_id}/sync-state"
+  },
+  "mariadb-cluster-version-upgrade:show-instance": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/instances/*",
+    "path": "/v1/clusters/{cluster_id}/instances/{instance_name}"
+  },
+  "mariadb-cluster-version-upgrade:verify-after-major-upgrade": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-version-upgrade:wait-after-major-upgrade": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-version-upgrade:wait-after-manual-backup": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-version-upgrade:wait-after-minor-patch": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-version-upgrade:wait-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-version-upgrade:wait-pre-delete-settle": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-version-upgrade:wait-subnet": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/subnets/*",
+    "path": "/v1/subnets/{subnet_id}"
+  },
+  "mariadb-cluster-version-upgrade:wait-vpc": {
+    "count": 4,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
+  },
   "mariadb-read-coverage:get-cluster-replicas": {
     "count": 4,
     "first_run": "27588002895",
@@ -14536,7 +14928,7 @@
     "path": "/v1/clusters"
   },
   "mysql-cluster-version-upgrade:capture-cluster-detail": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14544,7 +14936,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-version-upgrade:create-cluster": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -14552,7 +14944,7 @@
     "path": "/v1/clusters"
   },
   "mysql-cluster-version-upgrade:delete-cluster": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -14560,7 +14952,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-version-upgrade:find-engine-version": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14568,15 +14960,23 @@
     "path": "/v1/engine-versions"
   },
   "mysql-cluster-version-upgrade:find-server-type": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
-  "mysql-cluster-version-upgrade:major-version-upgrade": {
+  "mysql-cluster-version-upgrade:list-backup-histories-after": {
     "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/backup-histories",
+    "path": "/v1/clusters/{cluster_id}/backup-histories"
+  },
+  "mysql-cluster-version-upgrade:major-version-upgrade": {
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -14584,7 +14984,7 @@
     "path": "/v1/clusters/{cluster_id}/major-version-upgrade"
   },
   "mysql-cluster-version-upgrade:manual-backup": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -14592,7 +14992,7 @@
     "path": "/v1/clusters/{cluster_id}/backups/manual"
   },
   "mysql-cluster-version-upgrade:patch-minor-version": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -14600,7 +15000,7 @@
     "path": "/v1/clusters/{cluster_id}/patch"
   },
   "mysql-cluster-version-upgrade:pre-delete-sync-state": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -14608,7 +15008,7 @@
     "path": "/v1/clusters/{cluster_id}/sync-state"
   },
   "mysql-cluster-version-upgrade:show-instance": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14616,7 +15016,7 @@
     "path": "/v1/clusters/{cluster_id}/instances/{instance_name}"
   },
   "mysql-cluster-version-upgrade:verify-after-major-upgrade": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14624,7 +15024,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-version-upgrade:wait-after-major-upgrade": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14632,7 +15032,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-version-upgrade:wait-after-manual-backup": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14640,7 +15040,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-version-upgrade:wait-after-minor-patch": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14648,7 +15048,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-version-upgrade:wait-cluster": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14656,7 +15056,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-version-upgrade:wait-pre-delete-settle": {
-    "count": 1,
+    "count": 3,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14664,7 +15064,7 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-version-upgrade:wait-subnet": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14672,7 +15072,7 @@
     "path": "/v1/subnets/{subnet_id}"
   },
   "mysql-cluster-version-upgrade:wait-vpc": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14864,7 +15264,7 @@
     "path": "/v1/vpcs/{vpc_id}"
   },
   "networking-dns-hosted-zone-private:connect-vpc-to-private-dns": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "PUT",
@@ -14872,7 +15272,7 @@
     "path": "/v1/private-dns/{private_dns_id}"
   },
   "networking-dns-hosted-zone-private:create-a-record": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "POST",
@@ -14880,7 +15280,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}/records"
   },
   "networking-dns-hosted-zone-private:create-hosted-zone": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "POST",
@@ -14888,7 +15288,7 @@
     "path": "/v1/hosted-zones"
   },
   "networking-dns-hosted-zone-private:create-private-dns": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "POST",
@@ -14896,7 +15296,7 @@
     "path": "/v1/private-dns"
   },
   "networking-dns-hosted-zone-private:delete-a-record": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "DELETE",
@@ -14904,7 +15304,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}"
   },
   "networking-dns-hosted-zone-private:delete-hosted-zone": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "DELETE",
@@ -14912,7 +15312,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}"
   },
   "networking-dns-hosted-zone-private:delete-private-dns": {
-    "count": 2,
+    "count": 3,
     "first_run": "28835929967",
     "last_run": "",
     "method": "DELETE",
@@ -14920,7 +15320,7 @@
     "path": "/v1/private-dns/{private_dns_id}"
   },
   "networking-dns-hosted-zone-private:disconnect-vpc-from-private-dns": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "PUT",
@@ -14928,7 +15328,7 @@
     "path": "/v1/private-dns/{private_dns_id}"
   },
   "networking-dns-hosted-zone-private:get-hosted-zone": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -14936,7 +15336,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}"
   },
   "networking-dns-hosted-zone-private:get-hosted-zone-record": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -14944,7 +15344,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}"
   },
   "networking-dns-hosted-zone-private:list-hosted-zone-records": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -14952,7 +15352,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}/records"
   },
   "networking-dns-hosted-zone-private:list-hosted-zones": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14960,7 +15360,7 @@
     "path": "/v1/hosted-zones"
   },
   "networking-dns-hosted-zone-private:list-private-dns": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14968,7 +15368,7 @@
     "path": "/v1/private-dns"
   },
   "networking-dns-hosted-zone-private:list-public-domain-names": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -14976,7 +15376,7 @@
     "path": "/v1/public-domain-names"
   },
   "networking-dns-hosted-zone-private:set-hosted-zone": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -14984,7 +15384,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}"
   },
   "networking-dns-hosted-zone-private:wait-private-dns-active": {
-    "count": 7,
+    "count": 8,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -14992,7 +15392,7 @@
     "path": "/v1/private-dns/{private_dns_id}"
   },
   "networking-dns-hosted-zone-private:wait-private-dns-stable-after-disconnect": {
-    "count": 2,
+    "count": 3,
     "first_run": "28835929967",
     "last_run": "",
     "method": "GET",
@@ -15000,7 +15400,7 @@
     "path": "/v1/private-dns/{private_dns_id}"
   },
   "networking-dns-hosted-zone-private:wait-vpc": {
-    "count": 9,
+    "count": 10,
     "first_run": "27645841461",
     "last_run": "",
     "method": "GET",
@@ -15872,7 +16272,7 @@
     "path": "/v1/direct-connects/{direct_connect_id}"
   },
   "networking/dns/createhostedzone": {
-    "count": 28,
+    "count": 29,
     "first_run": "27658124753",
     "last_run": "",
     "method": "POST",
@@ -15880,7 +16280,7 @@
     "path": "/v1/hosted-zones"
   },
   "networking/dns/createhostedzonerecord": {
-    "count": 28,
+    "count": 29,
     "first_run": "27658124753",
     "last_run": "",
     "method": "POST",
@@ -15888,7 +16288,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}/records"
   },
   "networking/dns/createprivatedns": {
-    "count": 36,
+    "count": 37,
     "first_run": "27593608514",
     "last_run": "",
     "method": "POST",
@@ -15896,7 +16296,7 @@
     "path": "/v1/private-dns"
   },
   "networking/dns/deletehostedzone": {
-    "count": 28,
+    "count": 29,
     "first_run": "27658124753",
     "last_run": "",
     "method": "DELETE",
@@ -15904,7 +16304,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}"
   },
   "networking/dns/deletehostedzonerecord": {
-    "count": 28,
+    "count": 29,
     "first_run": "27658124753",
     "last_run": "",
     "method": "DELETE",
@@ -15912,7 +16312,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}"
   },
   "networking/dns/deleteprivatedns": {
-    "count": 23,
+    "count": 24,
     "first_run": "28835929967",
     "last_run": "",
     "method": "DELETE",
@@ -15920,7 +16320,7 @@
     "path": "/v1/private-dns/{private_dns_id}"
   },
   "networking/dns/listhostedzone": {
-    "count": 49,
+    "count": 50,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -15928,7 +16328,7 @@
     "path": "/v1/hosted-zones"
   },
   "networking/dns/listhostedzonerecords": {
-    "count": 28,
+    "count": 29,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -15936,7 +16336,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}/records"
   },
   "networking/dns/listprivatedns": {
-    "count": 49,
+    "count": 50,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -15944,7 +16344,7 @@
     "path": "/v1/private-dns"
   },
   "networking/dns/listpublicdomainnames": {
-    "count": 49,
+    "count": 50,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -15952,7 +16352,7 @@
     "path": "/v1/public-domain-names"
   },
   "networking/dns/sethostedzone": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -15960,7 +16360,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}"
   },
   "networking/dns/setprivatedns": {
-    "count": 56,
+    "count": 58,
     "first_run": "27658124753",
     "last_run": "",
     "method": "PUT",
@@ -15968,7 +16368,7 @@
     "path": "/v1/private-dns/{private_dns_id}"
   },
   "networking/dns/showhostedzone": {
-    "count": 28,
+    "count": 29,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -15976,7 +16376,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}"
   },
   "networking/dns/showhostedzonerecord": {
-    "count": 28,
+    "count": 29,
     "first_run": "27658124753",
     "last_run": "",
     "method": "GET",
@@ -15984,7 +16384,7 @@
     "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}"
   },
   "networking/dns/showprivatedns": {
-    "count": 63,
+    "count": 66,
     "first_run": "27593608514",
     "last_run": "",
     "method": "GET",
@@ -16168,7 +16568,7 @@
     "path": "/v1/lb-server-groups"
   },
   "networking/loadbalancer/createloadbalancer": {
-    "count": 59,
+    "count": 65,
     "first_run": "27645841461",
     "last_run": "",
     "method": "POST",
@@ -16336,7 +16736,7 @@
     "path": "/v1/loadbalancers/{loadbalancer_id}"
   },
   "networking/loadbalancer/showlbhealthcheck": {
-    "count": 61,
+    "count": 63,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -16408,9 +16808,9 @@
     "path": "/v1/address-groups"
   },
   "networking/security-group/createsecuritygroup": {
-    "count": 323,
+    "count": 324,
     "first_run": "27583285457",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/security-groups",
     "path": "/v1/security-groups"
@@ -16432,12 +16832,12 @@
     "path": "/v1/address-groups/{ag_id}"
   },
   "networking/security-group/deletesecuritygroup": {
-    "count": 270,
+    "count": 271,
     "first_run": "27583285457",
-    "last_run": "20260716-181204-4912",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/security-groups/*",
-    "path": "/v1/security-groups/{asg_sg_id}"
+    "path": "/v1/security-groups/{sg_id}"
   },
   "networking/security-group/deletesecuritygrouprule": {
     "count": 67,
@@ -16552,7 +16952,7 @@
     "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/connection"
   },
   "networking/vpc/createinternetgateway": {
-    "count": 149,
+    "count": 151,
     "first_run": "27593608514",
     "last_run": "",
     "method": "POST",
@@ -16640,7 +17040,7 @@
     "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports"
   },
   "networking/vpc/createtransitgateway": {
-    "count": 62,
+    "count": 64,
     "first_run": "27593608514",
     "last_run": "",
     "method": "POST",
@@ -16688,7 +17088,7 @@
     "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
   },
   "networking/vpc/createvpc": {
-    "count": 215,
+    "count": 217,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -16856,7 +17256,7 @@
     "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}"
   },
   "networking/vpc/deletevpc": {
-    "count": 141,
+    "count": 143,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -16960,7 +17360,7 @@
     "path": "/v1/publicips"
   },
   "networking/vpc/listsapsecondarysubnets": {
-    "count": 81,
+    "count": 83,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -16976,7 +17376,7 @@
     "path": "/v1/subnets"
   },
   "networking/vpc/listsubnetvips": {
-    "count": 81,
+    "count": 83,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -17200,7 +17600,7 @@
     "path": "/v1/publicips/{publicip_id}"
   },
   "networking/vpc/showsubnet": {
-    "count": 694,
+    "count": 695,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -17224,7 +17624,7 @@
     "path": "/v1/transit-gateways/{transit_gateway_id}"
   },
   "networking/vpc/showvpc": {
-    "count": 895,
+    "count": 896,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -17400,7 +17800,7 @@
     "path": "/v1/products"
   },
   "platform/product/showproduct": {
-    "count": 30,
+    "count": 31,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -17408,7 +17808,7 @@
     "path": "/v1/products/{product_id}"
   },
   "platform/product/showproductcategory": {
-    "count": 30,
+    "count": 31,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -17766,6 +18166,142 @@
     "method": "POST",
     "norm_path": "v1/clusters/*/archive/sync",
     "path": "/v1/clusters/{cluster_id}/archive/sync"
+  },
+  "postgresql-cluster-version-upgrade:capture-cluster-detail": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "postgresql-cluster-version-upgrade:capture-log-type-after-register": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/log-export-configs",
+    "path": "/v1/clusters/{cluster_id}/log-export-configs"
+  },
+  "postgresql-cluster-version-upgrade:create-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters",
+    "path": "/v1/clusters"
+  },
+  "postgresql-cluster-version-upgrade:delete-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "postgresql-cluster-version-upgrade:find-engine-version": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/engine-versions",
+    "path": "/v1/engine-versions"
+  },
+  "postgresql-cluster-version-upgrade:find-server-type": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/server-types",
+    "path": "/v1/server-types"
+  },
+  "postgresql-cluster-version-upgrade:list-backup-histories-after": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/backup-histories",
+    "path": "/v1/clusters/{cluster_id}/backup-histories"
+  },
+  "postgresql-cluster-version-upgrade:manual-backup": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups/manual",
+    "path": "/v1/clusters/{cluster_id}/backups/manual"
+  },
+  "postgresql-cluster-version-upgrade:pre-delete-sync-state": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/sync-state",
+    "path": "/v1/clusters/{cluster_id}/sync-state"
+  },
+  "postgresql-cluster-version-upgrade:show-instance": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*/instances/*",
+    "path": "/v1/clusters/{cluster_id}/instances/{instance_name}"
+  },
+  "postgresql-cluster-version-upgrade:wait-after-manual-backup": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "postgresql-cluster-version-upgrade:wait-after-minor-patch": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "postgresql-cluster-version-upgrade:wait-after-register-log-export-config": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "postgresql-cluster-version-upgrade:wait-cluster": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "postgresql-cluster-version-upgrade:wait-pre-delete-settle": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "postgresql-cluster-version-upgrade:wait-subnet": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/subnets/*",
+    "path": "/v1/subnets/{subnet_id}"
+  },
+  "postgresql-cluster-version-upgrade:wait-vpc": {
+    "count": 2,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
   },
   "postgresql-read-coverage:get-cluster-replicas": {
     "count": 1,
@@ -18128,7 +18664,7 @@
     "path": "/v1/repositories/{repository_id}/images"
   },
   "scr-image-write-coverage:seed-registry-id": {
-    "count": 9,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18144,7 +18680,7 @@
     "path": "/v1/container-registries/{registry_id}/repositories"
   },
   "scr-read-coverage:check-registry-name-duplication": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18176,7 +18712,7 @@
     "path": "/v1/repositories/{repository_id}"
   },
   "scr-read-coverage:list-connectable-resources": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18192,7 +18728,7 @@
     "path": "/v1/repositories/{repository_id}/images"
   },
   "scr-read-coverage:list-registries-harvest": {
-    "count": 45,
+    "count": 49,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -18200,7 +18736,7 @@
     "path": "/v1/container-registries"
   },
   "scr-repo-borrow-coverage:check-repository-name-duplication-live": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18208,7 +18744,7 @@
     "path": "/v1/repositories/check-duplication/name"
   },
   "scr-repo-borrow-coverage:create-registry-fallback": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -18216,7 +18752,7 @@
     "path": "/v1/container-registries"
   },
   "scr-repo-borrow-coverage:create-repo": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -18224,7 +18760,7 @@
     "path": "/v1/repositories"
   },
   "scr-repo-borrow-coverage:delete-created-registry": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -18232,7 +18768,7 @@
     "path": "/v1/container-registries/{created_registry_id}"
   },
   "scr-repo-borrow-coverage:delete-repo": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -18240,7 +18776,7 @@
     "path": "/v1/repositories/{repo_id}"
   },
   "scr-repo-borrow-coverage:list-registries-borrow": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18248,7 +18784,7 @@
     "path": "/v1/container-registries"
   },
   "scr-repo-borrow-coverage:registry-disable-public-endpoint": {
-    "count": 10,
+    "count": 13,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18256,7 +18792,7 @@
     "path": "/v1/container-registries/{registry_id}/enable-public-endpoint"
   },
   "scr-repo-borrow-coverage:registry-enable-public-endpoint": {
-    "count": 10,
+    "count": 13,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18264,7 +18800,7 @@
     "path": "/v1/container-registries/{registry_id}/enable-public-endpoint"
   },
   "scr-repo-borrow-coverage:registry-update-private-acl": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18272,7 +18808,7 @@
     "path": "/v1/container-registries/{registry_id}/private-acl"
   },
   "scr-repo-borrow-coverage:registry-update-public-acl": {
-    "count": 10,
+    "count": 13,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18280,7 +18816,7 @@
     "path": "/v1/container-registries/{registry_id}/public-acl"
   },
   "scr-repo-borrow-coverage:repo-update-description": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18288,7 +18824,7 @@
     "path": "/v1/repositories/{repo_id}/description"
   },
   "scr-repo-borrow-coverage:repo-update-lifecycle-policy": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18296,7 +18832,7 @@
     "path": "/v1/repositories/{repo_id}/lifecycle-policy"
   },
   "scr-repo-borrow-coverage:repo-update-lock-policy": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18304,7 +18840,7 @@
     "path": "/v1/repositories/{repo_id}/lock-policy"
   },
   "scr-repo-borrow-coverage:repo-update-pull-policy": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18312,7 +18848,7 @@
     "path": "/v1/repositories/{repo_id}/pull-policy"
   },
   "scr-repo-borrow-coverage:repo-update-scan-policy": {
-    "count": 13,
+    "count": 16,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -18320,7 +18856,7 @@
     "path": "/v1/repositories/{repo_id}/scan-policy"
   },
   "scr-repo-borrow-coverage:wait-registry-public-endpoint": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18328,7 +18864,7 @@
     "path": "/v1/container-registries/{registry_id}"
   },
   "scr-repo-borrow-coverage:wait-registry-running": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18344,7 +18880,7 @@
     "path": "/v1/repositories/{repository_id}/images"
   },
   "scr-tags-write-coverage:seed-registry-id": {
-    "count": 9,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18424,7 +18960,7 @@
     "path": "/v1/certificatemanager"
   },
   "security-configinspection-diagnosis:get-checklist-version": {
-    "count": 1,
+    "count": 2,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -18912,7 +19448,7 @@
     "path": "/v1/certificatemanager/self-sign"
   },
   "security/configinspection/configinspectionlist": {
-    "count": 56,
+    "count": 58,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -18920,7 +19456,7 @@
     "path": "/v1/configinspection/diagnosis/list"
   },
   "security/configinspection/getchecklistversion": {
-    "count": 8,
+    "count": 10,
     "first_run": "20260716-025427-a690",
     "last_run": "",
     "method": "GET",
@@ -18928,7 +19464,7 @@
     "path": "/v1/configinspection/diagnosis/checklist/version"
   },
   "security/configinspection/getdiagnosisresultlist": {
-    "count": 56,
+    "count": 58,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -19024,7 +19560,7 @@
     "path": "/v1/managed-kms/transit"
   },
   "security/kms/listusers": {
-    "count": 106,
+    "count": 107,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -19048,7 +19584,7 @@
     "path": "/v1/kms/transit/{key_id}/rotate"
   },
   "security/kms/showkey": {
-    "count": 103,
+    "count": 104,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -19120,7 +19656,7 @@
     "path": "/v1/secrets"
   },
   "security/secretsmanager/listversion": {
-    "count": 142,
+    "count": 143,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -19176,7 +19712,7 @@
     "path": "/v1/secrets/{secret_id}/label"
   },
   "security/secretsmanager/showsecretsmanager": {
-    "count": 121,
+    "count": 122,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -19232,7 +19768,7 @@
     "path": "/v1/secretvault/{secret_vault_id}/terminated"
   },
   "selfvpc:create-vpc": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -19240,7 +19776,7 @@
     "path": "/v1/vpcs"
   },
   "selfvpc:delete-vpc": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -19248,7 +19784,7 @@
     "path": "/v1/vpcs/{vpc_id}"
   },
   "servicewatch-alert:create-alert": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -19256,7 +19792,7 @@
     "path": "/v1/alerts"
   },
   "servicewatch-alert:delete-alert": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -19264,7 +19800,7 @@
     "path": "/v1/alerts"
   },
   "servicewatch-alert:get-alert": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -19272,7 +19808,7 @@
     "path": "/v1/alerts/{alert_id}"
   },
   "servicewatch-alert:list-metric-catalog": {
-    "count": 5,
+    "count": 9,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -19280,7 +19816,7 @@
     "path": "/v1/metrics"
   },
   "servicewatch-alert:set-alert": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "PATCH",
@@ -19288,7 +19824,7 @@
     "path": "/v1/alerts/{alert_id}"
   },
   "servicewatch-alert:set-alert-activated": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "PATCH",
@@ -19296,7 +19832,7 @@
     "path": "/v1/alerts/{alert_id}/activated"
   },
   "servicewatch-alert:set-alert-description": {
-    "count": 3,
+    "count": 6,
     "first_run": "",
     "last_run": "",
     "method": "PATCH",
@@ -19304,7 +19840,7 @@
     "path": "/v1/alerts/{alert_id}/description"
   },
   "servicewatch-custom-ingest:create-custom-metric-meta": {
-    "count": 4,
+    "count": 8,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -19312,7 +19848,7 @@
     "path": "/v1/metrics/custom/meta"
   },
   "servicewatch-dashboard:create-dashboard": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -19320,7 +19856,7 @@
     "path": "/v1/dashboards"
   },
   "servicewatch-dashboard:delete-dashboard": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -19328,7 +19864,7 @@
     "path": "/v1/dashboards"
   },
   "servicewatch-dashboard:get-dashboard": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -19336,7 +19872,7 @@
     "path": "/v1/dashboards/{dashboard_id}"
   },
   "servicewatch-dashboard:set-dashboard": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "PUT",
@@ -19344,7 +19880,7 @@
     "path": "/v1/dashboards/{dashboard_id}"
   },
   "servicewatch-event-rule:create-event-rule": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -19352,7 +19888,7 @@
     "path": "/v1/event-rules"
   },
   "servicewatch-event-rule:delete-event-rule": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -19360,7 +19896,7 @@
     "path": "/v1/event-rules"
   },
   "servicewatch-event-rule:get-event-rule": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -19368,7 +19904,7 @@
     "path": "/v1/event-rules/{event_rule_id}"
   },
   "servicewatch-event-rule:set-event-rule": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "PATCH",
@@ -19376,7 +19912,7 @@
     "path": "/v1/event-rules/{event_rule_id}"
   },
   "servicewatch-log-group:create-log-group": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -19384,7 +19920,7 @@
     "path": "/v1/log-groups"
   },
   "servicewatch-log-group:create-log-stream": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -19392,7 +19928,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams"
   },
   "servicewatch-log-group:delete-log-group": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -19400,7 +19936,7 @@
     "path": "/v1/log-groups"
   },
   "servicewatch-log-group:delete-log-streams": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "DELETE",
@@ -19408,7 +19944,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams"
   },
   "servicewatch-log-group:get-log-stream": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -19416,7 +19952,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams/{log_stream_id}"
   },
   "servicewatch-log-group:set-log-group": {
-    "count": 6,
+    "count": 11,
     "first_run": "",
     "last_run": "",
     "method": "PATCH",
@@ -19424,7 +19960,7 @@
     "path": "/v1/log-groups/{log_group_id}"
   },
   "servicewatch-loggroup-logstream:create-group": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -19432,7 +19968,7 @@
     "path": "/v1/log-groups"
   },
   "servicewatch-loggroup-logstream:create-stream": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -19440,7 +19976,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams"
   },
   "servicewatch-loggroup-logstream:delete-group": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -19448,7 +19984,7 @@
     "path": "/v1/log-groups"
   },
   "servicewatch-loggroup-logstream:delete-stream": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "DELETE",
@@ -19456,7 +19992,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams"
   },
   "servicewatch-loggroup-logstream:get-group": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -19464,7 +20000,7 @@
     "path": "/v1/log-groups/{log_group_id}"
   },
   "servicewatch-loggroup-logstream:get-stream": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "GET",
@@ -19472,7 +20008,7 @@
     "path": "/v1/log-groups/{log_group_id}/log-streams/{log_stream_id}"
   },
   "servicewatch-loggroup-logstream:list-log-groups": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -19480,7 +20016,7 @@
     "path": "/v1/log-groups"
   },
   "servicewatch-loggroup-logstream:listmetricinfos": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "POST",
@@ -19488,7 +20024,7 @@
     "path": "/v1/metrics"
   },
   "servicewatch-loggroup-logstream:setloggroup": {
-    "count": 25,
+    "count": 30,
     "first_run": "27583285457",
     "last_run": "",
     "method": "PATCH",
@@ -19496,7 +20032,7 @@
     "path": "/v1/log-groups/{log_group_id}"
   },
   "servicewatch-loggroup-logstream:show-agent-download-link": {
-    "count": 5,
+    "count": 10,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -19848,7 +20384,7 @@
     "path": "/v1/volumes"
   },
   "terminal-bad-test:wait-server-active": {
-    "count": 32,
+    "count": 44,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -19856,7 +20392,7 @@
     "path": "/v1/servers/abc123"
   },
   "terminal-bad-test:wait-server-gone": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -19864,7 +20400,7 @@
     "path": "/v1/servers/abc123"
   },
   "tgw-adopt-test:use-tgw": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "GET",
@@ -19872,7 +20408,7 @@
     "path": "/v1/transit-gateways/{transit_gateway_id}"
   },
   "tgw-selfcreate-test:create-transit-gateway": {
-    "count": 2,
+    "count": 4,
     "first_run": "",
     "last_run": "",
     "method": "POST",
