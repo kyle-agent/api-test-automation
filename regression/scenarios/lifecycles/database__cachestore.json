@@ -510,7 +510,8 @@
           "path": "/v1/clusters/{cluster_id}/commands",
           "expect_status": [200, 400, 404],
           "optional": true,
-          "group": "read-cov"
+          "group": "read-cov",
+          "_note": "환경/상태 관용 4xx (a690 원인규명 2026-07-16): commands read는 클러스터가 RUNNING일 때만 200 — read-coverage가 잡는 기존 클러스터가 생성/전이 중이면 400 Dbaas.ResourceStateError.InvalidState 'Resource State is not in RUNNING' (a690 LIVE). GET이 상태 이유로 400을 반환하는 것 자체는 conformance 후보로 보고됨. RUNNING 클러스터에서의 200 증거는 subops-a/-full의 capture-command-id 스텝이 담당."
         },
         {
           "name": "get-engine-version-properties",

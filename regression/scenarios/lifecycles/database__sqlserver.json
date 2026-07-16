@@ -796,7 +796,7 @@
           ],
           "optional": true,
           "group": "c2-backup-histories",
-          "_note": "waiver 이행: 호출 증거(4xx). sqlserverlistbackuphistories is reachability-waived (license-gated engine, no cluster to bind to) — the waiver contract still requires the endpoint to be CALLED; a deliberately non-existent 0000{unique} id guarantees a safe 4xx and can never touch a real resource. LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 404 ResourceNotFound. Tokenized id (searchengine/vertica/idc C2 관례와 통일, 2026-07-08): the {unique} segment norm-maps this call site to its catalog key so the completeness audit can statically SELF-VERIFY the C2-debt contract is implemented — runtime semantics stay a guaranteed 4xx (waived, NOT a 2xx-verify claim; audit still buckets this key as waived)."
+          "_note": "negative-probe: 의도된 4xx — waiver 이행: 호출 증거(4xx). sqlserverlistbackuphistories is reachability-waived (license-gated engine, no cluster to bind to) — the waiver contract still requires the endpoint to be CALLED; a deliberately non-existent 0000{unique} id guarantees a safe 4xx and can never touch a real resource. LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 404 ResourceNotFound. Tokenized id (searchengine/vertica/idc C2 관례와 통일, 2026-07-08): the {unique} segment norm-maps this call site to its catalog key so the completeness audit can statically SELF-VERIFY the C2-debt contract is implemented — runtime semantics stay a guaranteed 4xx (waived, NOT a 2xx-verify claim; audit still buckets this key as waived)."
         },
         {
           "name": "c2-list-parameter-values",
@@ -812,7 +812,7 @@
           ],
           "optional": true,
           "group": "c2-parameter-values",
-          "_note": "waiver 이행: 호출 증거(4xx). sqlserverlistparametervalues is reachability-waived — called with a deliberately non-existent 0000{unique} id for a guaranteed safe 4xx. LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 404 ResourceNotFound. Tokenized 2026-07-08 (se/vt/idc C2 관례 통일 — 정적 자가검증; runtime은 여전히 4xx 계약, 2xx-verify 주장 아님)."
+          "_note": "negative-probe: 의도된 4xx — waiver 이행: 호출 증거(4xx). sqlserverlistparametervalues is reachability-waived — called with a deliberately non-existent 0000{unique} id for a guaranteed safe 4xx. LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 404 ResourceNotFound. Tokenized 2026-07-08 (se/vt/idc C2 관례 통일 — 정적 자가검증; runtime은 여전히 4xx 계약, 2xx-verify 주장 아님)."
         },
         {
           "name": "c2-list-parameters",
@@ -828,7 +828,7 @@
           ],
           "optional": true,
           "group": "c2-parameters",
-          "_note": "waiver 이행: 호출 증거(4xx). sqlserverlistparameters is reachability-waived; dbaas_parameter_group_id is a REQUIRED query param (api_docs — same as the database-mysql-cluster twin's list-parameters step in scenarios.json), supplied as a non-existent LITERAL uuid for a guaranteed safe 4xx. LIVE-VERIFIED this session: 400 Dbaas.BadRequest 'dbaas_parameter_group_id ... not found'. NOTE: unlike the id-bound c2 steps the bare path still maps to the catalog key statically (query params are stripped by _norm), which is fine — the key simply gains static union membership on top of its waiver."
+          "_note": "negative-probe: 의도된 4xx — waiver 이행: 호출 증거(4xx). sqlserverlistparameters is reachability-waived; dbaas_parameter_group_id is a REQUIRED query param (api_docs — same as the database-mysql-cluster twin's list-parameters step in scenarios.json), supplied as a non-existent LITERAL uuid for a guaranteed safe 4xx. LIVE-VERIFIED this session: 400 Dbaas.BadRequest 'dbaas_parameter_group_id ... not found'. NOTE: unlike the id-bound c2 steps the bare path still maps to the catalog key statically (query params are stripped by _norm), which is fine — the key simply gains static union membership on top of its waiver."
         },
         {
           "name": "c2-show-request",
@@ -844,7 +844,7 @@
           ],
           "optional": true,
           "group": "c2-show-request",
-          "_note": "waiver 이행: 호출 증거(4xx). sqlservershowrequest is reachability-waived (request_id only comes from async writes, none possible without a license) — same 0000{unique} tokenized convention as searchengine/vertica read-coverage (2026-07-08 통일; 정적 자가검증용, runtime은 4xx 계약). LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 400 Dbaas.ResourceError.NotFound. The probe-reads step's request_id placeholder is conditional at runtime; this explicit step guarantees the call."
+          "_note": "negative-probe: 의도된 4xx — waiver 이행: 호출 증거(4xx). sqlservershowrequest is reachability-waived (request_id only comes from async writes, none possible without a license) — same 0000{unique} tokenized convention as searchengine/vertica read-coverage (2026-07-08 통일; 정적 자가검증용, runtime은 4xx 계약). LIVE-VERIFIED 2026-07-08 (literal-uuid probe): 400 Dbaas.ResourceError.NotFound. The probe-reads step's request_id placeholder is conditional at runtime; this explicit step guarantees the call."
         },
         {
           "name": "probe-reads",

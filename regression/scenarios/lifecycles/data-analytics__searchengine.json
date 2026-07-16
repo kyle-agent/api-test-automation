@@ -233,7 +233,7 @@
           "expect_status": [200, 400, 401, 403, 404, 500],
           "optional": true,
           "group": "se-c2-waiver",
-          "_note": "C2 waiver 이행: 호출 증거(4xx) (searchengineshowrequest, class=reachability — request_id는 async 쓰기 응답에서만 나와 read-only 런에서 수확 불가). 경로를 리터럴 0000-UUID에서 토큰화 uuid(0000{unique}, 8-hex 빌트인 → 유효 포맷·확실히 미존재)로 교체: 세그먼트에 {token}이 있어야 카탈로그 * 키로 매핑·기록됨(리터럴은 unmapped — 감사 한계 ②). live 캘리브레이션 2026-07-08: 400 Dbaas.ResourceError.NotFound(404 아님 — DBaaS request-not-found 특이 400)."
+          "_note": "negative-probe: 의도된 4xx — C2 waiver 이행: 호출 증거(4xx) (searchengineshowrequest, class=reachability — request_id는 async 쓰기 응답에서만 나와 read-only 런에서 수확 불가). 경로를 리터럴 0000-UUID에서 토큰화 uuid(0000{unique}, 8-hex 빌트인 → 유효 포맷·확실히 미존재)로 교체: 세그먼트에 {token}이 있어야 카탈로그 * 키로 매핑·기록됨(리터럴은 unmapped — 감사 한계 ②). live 캘리브레이션 2026-07-08: 400 Dbaas.ResourceError.NotFound(404 아님 — DBaaS request-not-found 특이 400)."
         },
         {
           "name": "create-cluster-waiver",
@@ -243,7 +243,7 @@
           "expect_status": [400, 401, 403, 404, 409, 422],
           "optional": true,
           "group": "se-c2-waiver",
-          "_note": "C2 waiver 이행: 호출 증거(4xx) (searchenginecreatecluster, class=reachability: license-gated). body는 name 등 다른 필수 필드가 전부 빠져 있어 400 Field-required 보장 — 실생성 절대 불가(라이선스 소비·과금 리스크 0). expect에 2xx 불포함: 만에 하나 2xx면 시끄럽게 실패해야 함. 2026-07-15 스펙 버전업(searchengineclustercreaterequestv1dot1): service_watch_log_collection(boolean, 신규 required)을 반영 — 400 detail이 이 필드를 더 이상 요구하지 않음을 waiver 호출 자체가 회귀-검증함."
+          "_note": "negative-probe: 의도된 4xx — C2 waiver 이행: 호출 증거(4xx) (searchenginecreatecluster, class=reachability: license-gated). body는 name 등 다른 필수 필드가 전부 빠져 있어 400 Field-required 보장 — 실생성 절대 불가(라이선스 소비·과금 리스크 0). expect에 2xx 불포함: 만에 하나 2xx면 시끄럽게 실패해야 함. 2026-07-15 스펙 버전업(searchengineclustercreaterequestv1dot1): service_watch_log_collection(boolean, 신규 required)을 반영 — 400 detail이 이 필드를 더 이상 요구하지 않음을 waiver 호출 자체가 회귀-검증함."
         },
         {
           "name": "delete-cluster-waiver",
@@ -253,7 +253,7 @@
           "optional": true,
           "destructive": true,
           "group": "se-c2-waiver",
-          "_note": "C2 waiver 이행: 호출 증거(4xx) (searchenginedeletecluster). 존재하지 않는 uuid(토큰화 세그먼트 → 카탈로그 * 매핑) → 404 기대: 같은 모양 GET(가짜 uuid backup-histories) live 404 ResourceNotFound 2026-07-08. destructive 게이트, 2xx 불포함."
+          "_note": "negative-probe: 의도된 4xx — C2 waiver 이행: 호출 증거(4xx) (searchenginedeletecluster). 존재하지 않는 uuid(토큰화 세그먼트 → 카탈로그 * 매핑) → 404 기대: 같은 모양 GET(가짜 uuid backup-histories) live 404 ResourceNotFound 2026-07-08. destructive 게이트, 2xx 불포함."
         },
         {
           "name": "list-backup-histories-waiver",
@@ -262,7 +262,7 @@
           "expect_status": [400, 401, 403, 404],
           "optional": true,
           "group": "se-c2-waiver",
-          "_note": "C2 waiver 이행: 호출 증거(4xx) (searchenginelistbackuphistories, class=reachability — 실 cluster_id 공급원 없음(계정 클러스터 0, license-gated)). 가짜 uuid → live 404 ResourceNotFound 2026-07-08."
+          "_note": "negative-probe: 의도된 4xx — C2 waiver 이행: 호출 증거(4xx) (searchenginelistbackuphistories, class=reachability — 실 cluster_id 공급원 없음(계정 클러스터 0, license-gated)). 가짜 uuid → live 404 ResourceNotFound 2026-07-08."
         },
         {
           "name": "probe-reads",

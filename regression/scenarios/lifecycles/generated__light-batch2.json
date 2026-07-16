@@ -653,6 +653,32 @@
           "optional": true
         },
         {
+          "name": "wait-private-nat-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/private-nats/{private_nat_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "private-nat-dx",
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              403
+            ]
+          },
+          "_note": "SETTLE 2026-07-16 (관용 4xx 원인규명 캠페인 C, run a690+e68b 실측): delete-private-nat 202(비동기) 직후 delete-direct-connect-for-pnat 가 400 scp-network.direct-connect.not-deletable-error — private-nat 이 DC 를 물고 드레인되는 동안 DC 는 삭제 불가라, 재시도 사다리(8×20s=160s)만으로는 부족해 e68b 에서도 DC 82a3621e 가 삭제 이벤트 없이 누수(res 이벤트 실측: created 00:17:26, deleted 없음). 이 누수 DC 가 VPC 의 DC 배타(1 VPC 1 DC)/캡을 물고 있어 같은 VPC 계열의 gen-direct-connect create 400 연쇄(하드 실패)의 유력 원인. 수리: private-nat 404 소멸 확인 후에만 DC delete 진입 (until 404, 600s). create-private-nat 400/캡처미스면 리터럴 토큰 GET 400/404 → give_up 즉시 통과(무해). group private-nat-dx 선두 배치로 DC delete 체인 전체를 게이트."
+        },
+        {
           "name": "delete-direct-connect-for-pnat",
           "method": "DELETE",
           "path": "/v1/direct-connects/{direct_connect_id}",

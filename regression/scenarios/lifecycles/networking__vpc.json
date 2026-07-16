@@ -193,7 +193,7 @@
           "json": {
             "name": "regrvpc{unique}",
             "description": "API regression PLS",
-            "cidr": "10.128.0.0/20",
+            "cidr": "10.124.0.0/20",
             "tags": []
           },
           "expect_status": [
@@ -236,7 +236,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression PLS",
-            "cidr": "10.128.7.0/24",
+            "cidr": "10.124.11.0/24",
             "type": "PUBLIC",
             "category": "PRIMARY",
             "vpc_id": "{vpc_id}",
@@ -255,7 +255,7 @@
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
           },
-          "adopt": "subnet"
+          "_note": "REPAIR 2026-07-16 (관용 4xx 원인규명 캠페인 C, run a690 실측): create-privatelink-service 400 scp-network.privatelink-service.ip-address-overlap — 'The requested PrivateLink Service IP Address(10.128.7.5) does not overlap with the requested subnet CIDR.' 원인 CONFIRMED(오답 아님, a690 step-end 원문): adopt:subnet 이 이 스텝을 스킵시키고 공유 GENERAL subnet(10.124.0.0/24)을 시딩했는데 PLS 바디의 고정 IP(10.128.7.5/.10)는 옛 자기-서브넷(10.128.7.0/24) 잔재라 CIDR 밖 → 구조적으로 매 런 400 (공유 subnet 이전 잔재). 수리: adopt:subnet 제거(자기 서브넷 복원 — vpc-endpoint 의 HB4 선례: IP-고정 lifecycle 은 자기 서브넷 필요) + cidr 를 adopt:vpc 로 시딩되는 공유 VPC CIDR(10.124.0.0/20, engine._SHARED_VPC_CIDR) 안의 빈 /24 인 10.124.11.0/24 로 이주 (.0 공유 / .7 DB / .8 vs-full / .9 vpc-endpoint / .10 gen-vpc-endpoint / .12 eventstreams 와 비충돌 — grep 확인). create-vpc 폴백 바디 cidr 도 10.128.0.0/20 → 10.124.0.0/20 정합 (비-xdist 자기생성 경로에서 subnet include-vp-cidr 400 방지, vpc-endpoint HB4c 잔여결함 클래스 선제 차단). UNVERIFIED LIVE — 다음 heavy 디스패치에서 PLS 2xx 확인 필요."
         },
         {
           "name": "wait-subnet",
@@ -281,16 +281,16 @@
           "path": "/v1/privatelink-services",
           "group": "pls",
           "optional": true,
-          "_note": "IP-type PLS: uses connected_resource_type=IP with two IPs from the subnet CIDR. No real load balancer required. CONFIRMED LIVE 2026-06-24: reaches ACTIVE in ~30s. connected_resource_ip_address REQUIRED when type=IP (same value as connected_resource_id). service_ip_address must also be provided.",
+          "_note": "IP-type PLS: uses connected_resource_type=IP with two IPs from the subnet CIDR. No real load balancer required. CONFIRMED LIVE 2026-06-24: reaches ACTIVE in ~30s. connected_resource_ip_address REQUIRED when type=IP (same value as connected_resource_id). service_ip_address must also be provided. REPAIR 2026-07-16 (run a690, 캠페인 C): 고정 IP 10.128.7.5/.10 → 10.124.11.5/.10 — create-subnet 이 자기 서브넷(10.124.11.0/24)을 복원하며 CIDR 정합 (상세는 create-subnet _note). ip-address-overlap 400 은 IP가 subnet CIDR 안에 있어야 한다는 뜻(에러 문구의 'does not overlap'은 '포함되지 않음' 의미) — 라이브 원문 근거.",
           "json": {
             "approval_type": "AUTO",
-            "connected_resource_id": "10.128.7.10",
-            "connected_resource_ip_address": "10.128.7.10",
+            "connected_resource_id": "10.124.11.10",
+            "connected_resource_ip_address": "10.124.11.10",
             "connected_resource_type": "IP",
             "description": "API regression privatelink service",
             "high_speed_transfer": false,
             "name": "regrpls{unique}",
-            "service_ip_address": "10.128.7.5",
+            "service_ip_address": "10.124.11.5",
             "subnet_id": "{subnet_id}",
             "tags": []
           },
@@ -439,7 +439,7 @@
           ],
           "retries": 4,
           "retry_interval": 15,
-          "adopt": "subnet"
+          "_note": "REPAIR 2026-07-16 (캠페인 C): adopt:subnet 마커 제거 — create-subnet 이 자기 서브넷 복원(adopt 제거)으로 되돌아가며 delete 쪽 마커가 남으면 create/delete 비대칭으로 자기 서브넷이 매 런 누수 (f4139a64 의 역방향 클래스). wait-subnet-gone 도 동일."
         },
         {
           "name": "wait-subnet-gone",
@@ -456,8 +456,7 @@
             ],
             "timeout": 600,
             "interval": 15
-          },
-          "adopt": "subnet"
+          }
         },
         {
           "name": "delete-vpc",
@@ -576,6 +575,28 @@
           }
         },
         {
+          "name": "list-vpc-endpoint-connectable-resources",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-endpoints/connectable-resources",
+          "group": "vpce",
+          "optional": true,
+          "params": {
+            "resource_type": "FS"
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "vpce_resource_key": "$.vpc_endpoint_connectable_resources[0].resource_key",
+            "vpce_resource_info": "$.vpc_endpoint_connectable_resources[0].resource_info"
+          },
+          "_note": "Closes listvpcendpointconnectableresources (GET /v1/vpc-endpoints/connectable-resources). Required query param: resource_type (FS|OBS|SCR|DNS). Proven 200 with resource_type=FS (all accounts). REPAIR 2026-07-16 (관용 4xx 원인규명 캠페인 C, run a690 실측): create 뒤에 있던 이 스텝을 create 앞으로 이동 + (resource_key, resource_info) [0] 쌍 capture_soft 추가 (envelope $.vpc_endpoint_connectable_resources[] — gen-vpc-endpoint 2026-07-09 라이브 실측 동일 경로) — create-vpc-endpoint 400 scp-network.vpc-endpoint.invalid-resource-key 'Resource Key is not valid : <unique>' 의 근본원인은 {unique} 합성 키. 같은 런 a690 에서 gen-vpc-endpoint(generated__light-batch2.json) 가 동일 GET 의 [0] 쌍(예: resource_key '198.19.64.85', resource_info '198.19.64.85(SSD)' — FS 의 키는 FS 서비스 endpoint IP, 볼륨 uuid 아님)을 배선해 create 202 → verify 200 → delete 202 → 404 까지 LIVE PROVEN. 스펙 대조: models['networking/vpc/vpcendpointcreaterequest'].resource_key 는 버전업 전후 동일(실키 요구) — 버전업 회귀 아님, 원래부터 무효 픽스처. 빈 목록이면 capture_soft 미스 → create 가 리터럴 토큰으로 400 soft (종전과 동일, non-red)."
+        },
+        {
           "name": "create-vpc-endpoint",
           "service": "vpc",
           "method": "POST",
@@ -586,8 +607,8 @@
             "description": "API regression vpc endpoint",
             "endpoint_ip_address": "10.124.9.20",
             "name": "regrvpce{unique}",
-            "resource_info": "x.samsungsdscloud.com(Registry)",
-            "resource_key": "{unique}",
+            "resource_info": "{vpce_resource_info}",
+            "resource_key": "{vpce_resource_key}",
             "resource_type": "FS",
             "subnet_id": "{subnet_id}",
             "vpc_id": "{vpc_id}",
@@ -611,7 +632,7 @@
             "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
             "service": "vpc"
           },
-          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 6): 400 `scp-network.vpc-endpoint.check-ip-address-overlap` (\"The requested IP Address (10.124.0.20) does not overlap with the requested subnet CIDR\") — CONFIRMED residual from the HB4c subnet-cidr fix just above (create-subnet's own note): that repair moved the dedicated subnet's cidr from `10.129.8.0/24` to `10.124.9.0/24` but never updated this step's `endpoint_ip_address`, which was still the OLD scheme's address (`10.124.0.20`, actually inside the session-shared GENERAL subnet's `10.124.0.0/24`, not this endpoint's own `10.124.9.0/24` subnet) — an obvious address/subnet mismatch, not a new backend quirk. Fix: `endpoint_ip_address` -> `10.124.9.20`, inside the dedicated `subnet_id`'s own `10.124.9.0/24` range. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx (or the next real 4xx, e.g. the still-open `resource_key` gap noted in create-subnet's own note)."
+          "_note": "REPAIR 2026-07-07 (HB4d, run 28835929967, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md §HB4d item 6): 400 `scp-network.vpc-endpoint.check-ip-address-overlap` (\"The requested IP Address (10.124.0.20) does not overlap with the requested subnet CIDR\") — CONFIRMED residual from the HB4c subnet-cidr fix just above (create-subnet's own note): that repair moved the dedicated subnet's cidr from `10.129.8.0/24` to `10.124.9.0/24` but never updated this step's `endpoint_ip_address`, which was still the OLD scheme's address (`10.124.0.20`, actually inside the session-shared GENERAL subnet's `10.124.0.0/24`, not this endpoint's own `10.124.9.0/24` subnet) — an obvious address/subnet mismatch, not a new backend quirk. Fix: `endpoint_ip_address` -> `10.124.9.20`, inside the dedicated `subnet_id`'s own `10.124.9.0/24` range. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm 2xx (or the next real 4xx, e.g. the still-open `resource_key` gap noted in create-subnet's own note). REPAIR 2026-07-16 (캠페인 C, run a690 실측): resource_key/resource_info 를 {unique}/합성 텍스트에서 직전 list-vpc-endpoint-connectable-resources [0] 캡처 쌍으로 재배선 — a690 에서 이 바디 클래스가 400 invalid-resource-key, 같은 런의 gen-vpc-endpoint 동일 배선은 202 LIVE PROVEN (상세는 그 list 스텝 _note)."
         },
         {
           "name": "list-vpc-endpoints",
@@ -623,24 +644,6 @@
           "expect_status": [
             200
           ]
-        },
-        {
-          "name": "list-vpc-endpoint-connectable-resources",
-          "service": "vpc",
-          "method": "GET",
-          "path": "/v1/vpc-endpoints/connectable-resources",
-          "group": "vpce",
-          "optional": true,
-          "params": {
-            "resource_type": "FS"
-          },
-          "expect_status": [
-            200,
-            400,
-            403,
-            404
-          ],
-          "_note": "Closes listvpcendpointconnectableresources (GET /v1/vpc-endpoints/connectable-resources). Required query param: resource_type (FS|OBS|SCR|DNS). Proven 200 with resource_type=FS (all accounts). Makes the endpoint reliably covered even when no vpc-endpoint exists. Optional so if the endpoint 400s for other reasons it still records."
         },
         {
           "name": "show-vpc-endpoint",
@@ -2447,6 +2450,35 @@
           "_note": "Response envelope is flat: {id, publicip_id, state} — capture path is $.id (not $.static_nat_ip.id). CONFIRMED 2026-06-23 via live test."
         },
         {
+          "name": "wait-vip-static-nat-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+          "group": "vip",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "poll": {
+            "field": "$.subnet_vip.static_nat.state",
+            "until": [
+              "ACTIVE",
+              "ERROR"
+            ],
+            "timeout": 180,
+            "interval": 10,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          },
+          "_note": "SETTLE 2026-07-16 (관용 4xx 원인규명 캠페인 C, run a690 실측): create-vip-static-nat-ip 202 직후 delete-vip-static-nat-ip 가 400 scp-network.static-nat.not-deletable-state-error 'Static Nat state is not deletable state(Active, Error) : CREATING' — 에러 원문이 삭제 가능 상태를 (Active, Error) 로 명시하므로 그 두 상태까지 settle-poll (wait-vpn-gateway-active HB4c 와 같은 async-create-not-settled 클래스). 필드 경로 $.subnet_vip.static_nat.state 는 refresh-vip-static-nat-id 가 라이브 확인한 show envelope($.subnet_vip.static_nat.id)의 형제 키. 이 settle 로 첫 delete 가 성공하면 후속 delete-vip 409 connected-ports-error(NAT 잔존 캐스케이드, a690 동일 런 실측)도 함께 사라진다. params 없음 = showsubnetvip 커버리지 이중기록 안 함 (show-subnet-vip 담당)."
+        },
+        {
           "name": "delete-vip-connected-port",
           "service": "vpc",
           "method": "DELETE",
@@ -2487,10 +2519,12 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 4,
-          "retry_interval": 15
+          "retry_interval": 15,
+          "_note": "RETRY 2026-07-16 (캠페인 C, run a690): 400 not-deletable-state-error(CREATING) 은 전이성 — 1차 방어는 바로 위 wait-vip-static-nat-active settle, 이 400 재시도는 2차 벨트 (settle 필드 경로가 빗나가 풀타임아웃으로 통과해도 여기서 흡수)."
         },
         {
           "name": "delete-vip",
