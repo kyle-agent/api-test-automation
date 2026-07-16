@@ -183,7 +183,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes privatelink-services: POST /v1/privatelink-services, GET list, GET show, GET connected-endpoints, PUT set, DELETE. CONFIRMED LIVE 2026-06-24: IP-type PLS (connected_resource_type=IP with two IPs in subnet CIDR) reaches ACTIVE in ~30s without a real load balancer. capture envelope $.privatelink_service.id CONFIRMED. PLS DELETE must wait until all PLEs are removed (409 exist-connected-endpoint otherwise). heavy:true (real VPC + subnet).",
+      "_note": "LANE MOVE 2026-07-16 (run 6ebd 실측: 공유 main VPC PRIMARY 캡(3) 경합으로 create-subnet exceed-max-count 환경 스킵 — 상주 shared+db subnet에 eventstreams 전용 subnet까지 겹치면 4번째가 됨): net-B 레인으로 이동 (B 상주 subnet 0, fw/DC 레인과 subnet 캡 무경합). CIDR 10.141.11.0/24 + service_ip 정합. || Closes privatelink-services: POST /v1/privatelink-services, GET list, GET show, GET connected-endpoints, PUT set, DELETE. CONFIRMED LIVE 2026-06-24: IP-type PLS (connected_resource_type=IP with two IPs in subnet CIDR) reaches ACTIVE in ~30s without a real load balancer. capture envelope $.privatelink_service.id CONFIRMED. PLS DELETE must wait until all PLEs are removed (409 exist-connected-endpoint otherwise). heavy:true (real VPC + subnet).",
       "steps": [
         {
           "name": "create-vpc",
@@ -193,7 +193,7 @@
           "json": {
             "name": "regrvpc{unique}",
             "description": "API regression PLS",
-            "cidr": "10.124.0.0/20",
+            "cidr": "10.141.0.0/20",
             "tags": []
           },
           "expect_status": [
@@ -209,7 +209,7 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc#b"
         },
         {
           "name": "wait-vpc",
@@ -236,7 +236,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression PLS",
-            "cidr": "10.124.11.0/24",
+            "cidr": "10.141.11.0/24",
             "type": "PUBLIC",
             "category": "PRIMARY",
             "vpc_id": "{vpc_id}",
@@ -284,13 +284,13 @@
           "_note": "IP-type PLS: uses connected_resource_type=IP with two IPs from the subnet CIDR. No real load balancer required. CONFIRMED LIVE 2026-06-24: reaches ACTIVE in ~30s. connected_resource_ip_address REQUIRED when type=IP (same value as connected_resource_id). service_ip_address must also be provided. REPAIR 2026-07-16 (run a690, 캠페인 C): 고정 IP 10.128.7.5/.10 → 10.124.11.5/.10 — create-subnet 이 자기 서브넷(10.124.11.0/24)을 복원하며 CIDR 정합 (상세는 create-subnet _note). ip-address-overlap 400 은 IP가 subnet CIDR 안에 있어야 한다는 뜻(에러 문구의 'does not overlap'은 '포함되지 않음' 의미) — 라이브 원문 근거.",
           "json": {
             "approval_type": "AUTO",
-            "connected_resource_id": "10.124.11.10",
-            "connected_resource_ip_address": "10.124.11.10",
+            "connected_resource_id": "10.141.11.10",
+            "connected_resource_ip_address": "10.141.11.10",
             "connected_resource_type": "IP",
             "description": "API regression privatelink service",
             "high_speed_transfer": false,
             "name": "regrpls{unique}",
-            "service_ip_address": "10.124.11.5",
+            "service_ip_address": "10.141.11.5",
             "subnet_id": "{subnet_id}",
             "tags": []
           },
@@ -474,7 +474,7 @@
           ],
           "retries": 8,
           "retry_interval": 20,
-          "adopt": "vpc"
+          "adopt": "vpc#b"
         }
       ]
     },
@@ -1015,7 +1015,11 @@
           "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
           "group": "peering",
           "optional": true,
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "capture_soft": {
             "routing_rule_id": "$.vpc_peering_rules[0].id"
           },
@@ -1115,10 +1119,16 @@
           "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
           "group": "peering",
           "optional": true,
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "poll": {
             "field": "$.count",
-            "until": [0],
+            "until": [
+              0
+            ],
             "timeout": 300,
             "interval": 10
           },
@@ -2848,7 +2858,10 @@
             409
           ],
           "destructive": true,
-          "retry_on_status": [400, 409],
+          "retry_on_status": [
+            400,
+            409
+          ],
           "retries": 4,
           "retry_interval": 15,
           "_note": "Closes deletepublicip (DELETE /v1/publicips/{publicip_id})."

@@ -3819,3 +3819,22 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - 판별법: 콘솔에서 백업 이력 삭제 시 본인인증 팝업 여부 — 뜨면 API 한계
   (waiver + conformance '인증 승격 절차 미문서'), 안 뜨면 백엔드 인증 연동
   결함(티켓). 오너 확인 대기.
+
+## run 6ebd 판정 — subnet 체인 CIDR·PLS 레인·500 3종 (2026-07-16)
+
+- **run 6ebd: 115 passed / 3 failed / 2 skipped** — 직전 런 실패였던 vpn·
+  gen-direct-connect **둘 다 통과** (EDITING settle·DC 레인/게이트 수리 적중).
+  SKE 2회 연속 풀체인 완주.
+- **SECONDARY subnet 커버리지 확보** (primary_subnet_id 연결 생성/삭제 실증).
+  PRIVATE/LOCAL은 CIDR 산수 실수(.16/.17은 net-A /20 대역 밖 — 400
+  include-vp-cidr)로 미도달 → .10/.11 교정.
+- **공유 main VPC의 PRIMARY subnet 캡(3) 예산**: 상주 shared(.0)+db(.7) +
+  eventstreams 전용(.12) = 런 중 3/3 — 여기에 subnet을 더 만드는 lifecycle은
+  구조적 스킵. PLS를 net-B 레인(10.141.11.0/24)으로 이동. **main VPC에 subnet
+  만드는 신규 lifecycle 금지** (B 또는 A 레인 사용).
+- **apigateway API 쿼터**: 동시 apigw lifecycle들이 쿼터를 나눠 씀 —
+  gen-wave5-apigw-policy 환경 스킵. 쿼터-인지 스케줄링(core.budgets 편입) 후보.
+- **500-on-client-state 클래스 3종 추가** (conformance): PLE approval(AUTO
+  승인 상태에 APPROVE), quick-query validate(인스턴스 부재), dbaas
+  log-export-configs(access_key 빈 문자열 — 400이어야 할 곳 전부 500).
+  lifecycle들은 관용 통과 중 — 백엔드 리포트 후보 목록에 편입.

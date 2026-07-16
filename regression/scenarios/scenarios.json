@@ -661,7 +661,7 @@
           "json": {
             "name": "regrsubpriv{unique}",
             "description": "API regression private subnet",
-            "cidr": "10.130.16.0/24",
+            "cidr": "10.130.10.0/24",
             "type": "PRIVATE",
             "category": "PRIMARY",
             "vpc_id": "{vpc_id}",
@@ -680,7 +680,7 @@
             "path": "/v1/subnets/{subnet_priv_id}",
             "service": "vpc"
           },
-          "_note": "type=PRIVATE 생성/삭제 커버 (오너 2026-07-16: 'public 생성했다 지우고 private 생성했다 지우고 이런것 포함'). 직전 subnet gone 후 생성이라 net-A PRIMARY 동시 점유 ≤2/3. 미검증 — 다음 런 판정."
+          "_note": "CIDR FIX 2026-07-16 (run 6ebd 실측 400 include-vp-cidr): net-A는 10.130.0.0/20(.0~.15)이라 .16/.17은 대역 밖이었음. .10으로 교정. SECONDARY까지는 같은 런에서 생성 성공 실증. || type=PRIVATE 생성/삭제 커버 (오너 2026-07-16: 'public 생성했다 지우고 private 생성했다 지우고 이런것 포함'). 직전 subnet gone 후 생성이라 net-A PRIMARY 동시 점유 ≤2/3. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-subnet-private",
@@ -738,7 +738,7 @@
           "json": {
             "name": "regrsubloca{unique}",
             "description": "API regression local subnet",
-            "cidr": "10.130.17.0/24",
+            "cidr": "10.130.11.0/24",
             "type": "LOCAL",
             "category": "PRIMARY",
             "vpc_id": "{vpc_id}",
@@ -757,7 +757,7 @@
             "path": "/v1/subnets/{subnet_local_id}",
             "service": "vpc"
           },
-          "_note": "type=LOCAL 생성/삭제 커버 (오너 2026-07-16: 'public 생성했다 지우고 private 생성했다 지우고 이런것 포함'). 직전 subnet gone 후 생성이라 net-A PRIMARY 동시 점유 ≤2/3. 미검증 — 다음 런 판정."
+          "_note": "CIDR FIX 2026-07-16: /20 대역 내 .11로 교정 (동일 건). || type=LOCAL 생성/삭제 커버 (오너 2026-07-16: 'public 생성했다 지우고 private 생성했다 지우고 이런것 포함'). 직전 subnet gone 후 생성이라 net-A PRIMARY 동시 점유 ≤2/3. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-subnet-local",
