@@ -3848,3 +3848,25 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   subops-full의 a/b 분할 (클러스터 2개 병렬, 임계경로 ~47분 → ~32분 예상,
   비용: ES 클러스터 1개 ~30분 추가 과금). 현 임계경로가 eventstreams이므로
   makespan을 더 줄이려면 이 카드가 첫 후보 — 재제안 금지, 오너가 꺼낼 때만.
+
+## run c72e 판정 — subnet 읽기플레인 enum 불일치(중대) + settle 3종 + 잔재 (2026-07-16)
+
+- **run c72e: 114 passed / 3 failed** (scr 쿼터레이스=기수리, PLS·nvs=아래 수리).
+- **[중대 conformance] subnet 읽기 플레인이 v1.2 enum**: PRIVATE subnet은
+  생성(v1.3: PUBLIC/PRIVATE/LOCAL/VPC_ENDPOINT) 202 성공하지만 show가 404
+  "Not found with ID **With Invalid Type**", list `?type=PRIVATE`는 400
+  "Input should be 'GENERAL', 'LOCAL' or 'VPC_ENDPOINT'" — **읽기가 구버전
+  enum이라 PRIVATE는 API로 읽을 수 없는 유령** (라이브 프로브 실증,
+  req-65a36c09…; 삭제는 202 정상). 시나리오는 show-poll 대신 30s 블라인드
+  settle로 우회.
+- **settle 클래스 확장 3종** (create 202 비동기 → CREATING 중 set/delete 400):
+  vpc-endpoint, privatelink-service (+6ebd의 vpn gateway/tunnel EDITING) —
+  네트워킹 create/set-PUT 뒤에는 무조건 ACTIVE settle을 둘 것.
+- **낡은 템플릿 잔재 2건**: nvs setsubnet dhcp 10.123.1.5(자체-VPC 시절),
+  PLS set-subnet dhcp "" — 레인 이동 시 body 내 IP류 전수 grep 필수.
+- **이미지 셸**: url 포함 create는 자동 업로드로 queued를 지나쳐 import가
+  영구 409 — url 없는 셸(queued) + import(url) 분리로 양쪽 커버.
+  sharing 이미지의 member status는 오너 플레인에서 갱신 불가(400
+  MemberCannotBeUpdatedToSharingImage) — 멤버 계정 플레인 소관 (미문서).
+- **conformance 소소 2종**: LB static-nats 빈 컬렉션 404(200 [] 아님) /
+  private-static-nat 검증 오류에 403(400 아님).

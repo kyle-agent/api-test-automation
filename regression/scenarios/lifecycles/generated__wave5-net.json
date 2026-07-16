@@ -1005,7 +1005,7 @@
           ],
           "optional": true,
           "group": "lb-nat-empty-reads",
-          "_note": "REPAIR 2026-07-08 (live run, 첫실측): 404 StaticNatNotFound — 이 시점엔 static NAT 을 아직 만들지 않았고(생성 스텝 create-lb-static-nat 는 igw/publicip 이후에 존재), 이 컬렉션 GET 은 빈 상태를 200+빈배열이 아니라 404 로 반환 (PF/conformance 후보: empty-collection 404). 라이브 재판별 시도 2026-07-08: 계정에 LB 가 0 개라 (GET /v1/loadbalancers → 200 count 0) 재현 GET 불가 — 이번 런 관측(LB ACTIVE + NAT 0 개 → 404)이 판별 근거. 404 관용 + optional + 자체 그룹 (실데이터 검증은 create-lb-static-nat 뒤 verify-lb-static-nat-read 가 strict 200 으로 계속 담당)."
+          "_note": "negative-probe: 의도된 4xx (c72e 404 StaticNatNotFoundLoadbalancerId — NAT 0건 컬렉션 조회에 200 [] 대신 404. conformance: 빈 컬렉션 404 클래스)."
         },
         {
           "name": "verify-load-balancer-read-private-static-nats",
@@ -1377,7 +1377,7 @@
         },
         {
           "name": "verify-lb-member-set",
-          "_note": "set은 실제 변경이어야 함(run-923a port 80→8080 수리와 동일 규칙) — run-892a: member_state ENABLE 그대로 보내 400 ExistRequestMemberState → DISABLE로 토글",
+          "_note": "2026-07-10 오너 실측(run 라이브): member 반영 중 서버그룹이 잠시 Not-Active → 후속 member op가 409 NotUpdatableState. settle 409 재시도 사다리(8x15s) — batch-2 'ExistInprogress pacing' 규약과 동형. 참고: 이 409의 존재 자체가 member create 성공 증거 (PF-35 해결: WEIGHTED_ROUND_ROBIN+weight 10). || run-923a: 같은 포트(80) 재설정 → 400 ExistRequestMemberPort — set은 실제 '변경'이어야 함, 8080으로.",
           "service": "loadbalancer",
           "method": "PUT",
           "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
@@ -1387,7 +1387,6 @@
               "member_state": "DISABLE"
             }
           },
-          "_note": "2026-07-11 run-892a: member_state=ENABLE 송신이 400 ExistRequestMemberState('이미 ENABLE') — set은 멱등 거부. 현재 상태(ENABLE)의 반대인 DISABLE로 전이시켜 2xx 유도 (멤버는 직후 teardown이라 트래픽 영향 없음).",
           "expect_status": [
             200,
             202
@@ -1397,8 +1396,7 @@
             409
           ],
           "retries": 8,
-          "retry_interval": 15,
-          "_note": "2026-07-10 오너 실측(run 라이브): member 반영 중 서버그룹이 잠시 Not-Active → 후속 member op가 409 NotUpdatableState. settle 409 재시도 사다리(8x15s) — batch-2 'ExistInprogress pacing' 규약과 동형. 참고: 이 409의 존재 자체가 member create 성공 증거 (PF-35 해결: WEIGHTED_ROUND_ROBIN+weight 10). || run-923a: 같은 포트(80) 재설정 → 400 ExistRequestMemberPort — set은 실제 '변경'이어야 함, 8080으로."
+          "retry_interval": 15
         },
         {
           "name": "create-lb-member-bulk",
@@ -1642,7 +1640,7 @@
             },
             "service": "loadbalancer"
           },
-          "_note": "DEDUP-AUDIT-2026-07-08 §C (owner GO): networking-loadbalancer-members-nat 은퇴로 흡수한 sole 3키 중 1 (createloadbalancerprivatenatip). body/캡처는 members-nat private-static-nat-create 에서 그대로 이식, {loadbalancer_id} 는 이 lifecycle 의 실 LB strict 캡처(create-load-balancer)에 배선 — LB ACTIVE(wait-load-balancer) + public static-nat 가족 뒤에 위치. HB4 (run 28738115294, 2026-07-05) live 403 scp-loadbalancer.loadbalancers.PrivateNatIpForbidden — WAIVER CANDIDATE (entitlement): 이 계정은 private-NAT-IP 자원 권한이 없어 body 내용과 무관하게 403 (private_nat_id/private_nat_ip_id 실값 확보 경로도 없음 — 빈 문자열 by design, members-nat 관례 승계). 403 이 expect_status 에 있어 reach-coverage 는 기록. 미검증(un-2xx'd) → optional + 자체 그룹(lb-private-static-nat)로 격리."
+          "_note": "negative-probe: 의도된 4xx (c72e 403 PrivateNatIpForbidden — private NAT 미보유 환경에서 빈 id 프로브; 검증 오류에 400 아닌 403 — conformance 후보)."
         },
         {
           "name": "verify-lb-private-static-nat-read",

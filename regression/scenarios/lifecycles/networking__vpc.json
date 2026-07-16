@@ -314,6 +314,24 @@
           }
         },
         {
+          "name": "wait-privatelink-service-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/privatelink-services/{privatelink_service_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.privatelink_service.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "_note": "SETTLE 신설 2026-07-16 (c72e: set 400 modify-restricted-state(CREATING), delete 400 invalid-deletable-state(CREATING), 그 여파로 subnet 409): create 202 비동기 → ACTIVE settle 후 set/delete. 필드 경로는 에러 문구 기반 추정 — 미검증, 다음 런 판정."
+        },
+        {
           "name": "list-privatelink-services",
           "service": "vpc",
           "method": "GET",

@@ -505,7 +505,7 @@
             400
           ],
           "group": "server",
-          "_note": "OWNER DECISION 2026-07-08: ubuntu 고정(create-image os_distro=ubuntu) + 실키 단발 전달 유지. ubuntu 게스트는 암호화 admin password 를 게시하지 않으므로(게시 흐름은 Windows/cloudbase-init 기전) 400 'Failed to decrypt' 가 예상 종착 상태 — 같은 날 넣었던 10분 until-200 poll(Windows 지연 가설, PF-17 정정 참고)은 ubuntu 에선 순수 낭비라 제거. waiver 여부는 owner 결정 대기."
+          "_note": "negative-probe: 의도된 4xx (c72e 재확인 400 InvalidPrivateKeyValue — ubuntu는 암호화 패스워드 미게시, Windows 전용 기전). Windows 이미지 커버리지는 별도 결정 사항."
         },
         {
           "name": "create-custom-image",
@@ -579,8 +579,7 @@
             "min_ram": 0,
             "name": "regrimgsh{ualpha}",
             "os_distro": "ubuntu",
-            "protected": false,
-            "url": "{env:SCP_QCOW2_ASSET_URL}"
+            "protected": false
           },
           "capture_soft": {
             "pending_image_id": "$.id"
@@ -598,7 +597,7 @@
             "path": "/v1/images/{pending_image_id}",
             "service": "virtualserver"
           },
-          "_note": "2026-07-08 25-편입(owner GO): createimage. 2026-07-11 run-923a 수리: url 필수 (400 'Field url is invalid … 255자 이하, .qcow2') — oplog 버킷 assets/regr-minimal.qcow2 (수제 qcow2 v3 262144B, public-read, anon GET 200 실측 2026-07-11)를 소스로 주입. RGW tenant path(<account>:<bucket>)는 ops.html DEFAULT_BASE와 동일 형식. 판정 2026-07-16 (soft-4xx 원인규명, run a690 400 Image.InvalidObjectStorageUrl): 원인은 URL '형식'이 아니라 '계정' — SCP_OPLOG_* 오버라이드(구계정 ec11538a…) 버킷 URL이라 거부됐다. 라이브 프로브 확정: 같은 콜론 tenant-path URL을 호출자 계정(81eccb26…) 버킷으로 바꾸면 createimage 200(queued)→DELETE 204 즉시 성공, 문서 예시의 슬래시 형식은 RGW·createimage 양쪽 400. core/oplog.py ensure_image_asset()을 keys='test'(항상 테스트 계정) 고정으로 수리 — 다음 런부터 이 스텝과 후속 image-shell 체인(visibility/members) 2xx 예상. 멤버/visibility ops는 볼륨 없는 이 셸에서만 가능(custom image는 Image.InvalidVolumeOnVisibilityUpdate/SharedVisibilityRequired로 categorical 거부 — run-923a 실측)이라 이 그룹으로 이전."
+          "_note": "QUEUED-SHELL 전환 2026-07-16 (c72e: import 409 'File can only be imported when Image status is queued' — url 포함 create는 자동 업로드로 queued를 지나쳐 import가 영구 409): url 없이 셸 생성(queued 유지) → import(url)가 업로드 담당. createimage/importimage 둘 다 정당 커버. 미검증 — 다음 런 판정."
         },
         {
           "name": "set-image-shell-visibility-shared",
@@ -688,7 +687,7 @@
             400,
             404
           ],
-          "_note": "2026-07-11 라이브 프로브 확정: status는 소문자(accepted/pending/rejected)만 유효 형식이나, 유효값 전부에 Image.MemberCannotBeUpdatedToSharingImage — shared 이미지의 member status는 owner 계정에서 변경 불가 (member 수신 계정 전용 op로 추정, 단일 계정 구조상 2xx 도달 불가) → reachability waiver 후보."
+          "_note": "negative-probe: 의도된 4xx 확정 2026-07-16 (c72e 400 Image.MemberCannotBeUpdatedToSharingImage): 공유(sharing) 이미지의 멤버 status는 소유 계정 경로로 갱신 불가 — 수락/거절은 멤버 계정 플레인 소관 (단일 계정 환경에선 구조적 미도달). conformance: 오너-플레인 갱신 불가가 미문서."
         },
         {
           "name": "delete-image-member",
