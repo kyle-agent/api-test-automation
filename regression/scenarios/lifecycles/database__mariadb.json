@@ -848,6 +848,433 @@
           }
         }
       ]
+    }    ,
+    {
+      "id": "mariadb-cluster-version-upgrade",
+      "service": "database/mariadb",
+      "enabled": true,
+      "heavy": true,
+      "_note": "HEAVY 2026-07-16 (svccov-mariadb session, owner-approved SCP_RUN_HEAVY): dedicated 1-cluster campaign for the version-axis + new-instance-ops gap keys that mariadb-cluster-subops-a/b (database__subops-full.json) can't reach on a single-major cluster: mariadbupgrademajorversion, mariadbpatchminorversion, mariadbshowinstance, mariadbmanualbackup, mariadbexportlog. Ported STRUCTURALLY from the live-proven mysql-cluster-version-upgrade (database__mysql.json, 2026-07-16 svccov-mysql session) with mariadb's OWN live-verified specifics. LIVE GET /v1/engine-versions 2026-07-16 (svccov-mariadb session): contents[0]=11.4.10 id fd5ca852145b498783de6dbd0762e146 (newest 11.4 minor), contents[1]=11.4.7 id 5828d309085e4094808614ce0694e8c6 (oldest 11.4 minor -- only 2 minors in the 11.4 major, unlike mysql's 3 in 8.4), contents[2]=10.11.15 id 1a83ff91141d419aafb26eae8986b2b9 (newest 10.11 minor), contents[3..5]=10.11.13/10.11.9/10.11.8 (older 10.11 minors) -- ASSUMES this descending-by-recency order holds; re-derive indices from a fresh GET if a run shows a capture mismatch. STRATEGY: create the cluster on the OLD MAJOR (10.11, via where_prefix match -> whichever 10.11 entry sorts first, here 10.11.15) -> mariadbupgrademajorversion jumps it to the OLDEST 11.4 minor (11.4.7, contents[1]) -> mariadbpatchminorversion then jumps 11.4.7 -> 11.4.10 (newest, contents[0]) on the SAME cluster, mirroring mysql's proven single-cluster version-axis chain. MinorPatchRequest body: {backup_before_upgrade: bool REQUIRED, software_version: string REQUIRED} per mysql precedent (data/api_docs.json model requires backup_before_upgrade even though some doc examples omit it) -- verify live on this run; if mariadb's model differs the actual response will show it. PatchRequest (major-version-upgrade) body: {dbaas_engine, software_version} -- dbaas_engine is captured LIVE from the cluster's own detail GET ($.dbaas_engine), never hardcoded (mysql's case-sensitivity quirk 'MySQL' vs 'mysql' means mariadb's own casing must be captured, not assumed). mariadbshowinstance needs path param instance_name (a NAME not an id) captured from $.instance_groups[0].instances[0].name. mariadbmanualbackup takes NO request body per the docs model (path cluster_id only), mirrors mysqlmanualbackup. mariadbexportlog log_type is a fixed enum (alert|audit|slow, data/api_docs.json database/mariadb/mariadbexportlog) -- tries all 3 values sequentially (own group each) since mysql only proved 'alert' works and the owner asked us to also try 'audit' for mariadb specifically; registration is PF-blocked per orchestrator brief (500 ContactAdminForAssistance class) so export is attempted WITHOUT a registered config, same as mysql. mariadbremovebackuphistories: body key IS ALREADY 'backup_history_number' (verified correct in this file's mariadb-cluster-subops-guarded AND database__subops-full.json's mariadb-cluster-subops-a -- no typo present, contrary to the orchestrator brief's assumption); its prior 401 Dbaas.Unauthorized.AuthNFailed (knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04) is a known backend auth quirk shared across mysql/mariadb/postgresql/epas/cachestore, NOT a body-shape bug -- reconfirmed once more here for the record, not re-litigated. C-group (mariadbcreaterestore, mariadbcreateotherregionreplica, mariadbswitchovercluster) deliberately EXCLUDED -- each needs its own extra billable cluster or ha_enabled=true, out of this session's single-cluster/time budget; left as a follow-up lever. Own dedicated VPC/subnet (10.144.0.0/20) so this lifecycle never contends with mariadb-cluster-subops-a/b's shared VPC ranges or the mysql-cluster-version-upgrade's 10.142.0.0/20.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression DBaaS version-upgrade mariadb",
+            "cidr": "10.144.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression DBaaS version-upgrade mariadb",
+            "cidr": "10.144.3.0/24",
+            "type": "PUBLIC",
+            "category": "PRIMARY",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {"subnet_id": "$.subnet.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"},
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.subnet.state", "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "find-engine-version",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [200],
+          "capture": {
+            "engine_version_old_id": {
+              "list": "$.contents",
+              "where_prefix": {"major_version": "10.11"},
+              "get": "id"
+            }
+          },
+          "capture_soft": {
+            "engine_version_top_software": "$.contents[0].software_version",
+            "engine_version_mid_software": "$.contents[1].software_version"
+          },
+          "_note": "engine_version_old_id = the OLD MAJOR (10.11.x) via semantic where_prefix (robust to catalog reordering). engine_version_top_software/mid_software use literal contents[] indices (live-verified 2026-07-16: [0]=newest 11.4 minor, [1]=oldest 11.4 minor -- mariadb's 11.4 major has only 2 minors, unlike mysql's 8.4 with 3) -- re-derive from a fresh GET if a future run's capture looks wrong."
+        },
+        {
+          "name": "find-server-type",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [200],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "where_prefix": {"purpose": "general", "type": "Standard-1"},
+              "min_by": ["cpu_core", "memory_gb"],
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-cluster",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrdbvu{ualpha}",
+            "instance_name_prefix": "regrdbvu",
+            "dbaas_engine_version_id": "{engine_version_old_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_character_set": "utf8",
+              "database_name": "regrdb",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss@2026",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {"role_type": "OS", "size_gb": 104, "volume_type": "SSD"}
+                ],
+                "instances": [
+                  {"role_type": "ACTIVE", "public_ip_id": ""}
+                ]
+              }
+            ]
+          },
+          "capture": {"cluster_id": "$.resource.id"},
+          "capture_soft": {"request_id": "$.request_id"},
+          "expect_status": [200, 201, 202],
+          "retry_on_status": [500, 503],
+          "retries": 2,
+          "retry_interval": 60,
+          "cleanup": {"method": "DELETE", "path": "/v1/clusters/{cluster_id}", "service": "mariadb"},
+          "_note": "dbaas_engine_version_id = engine_version_old_id (10.11.x, old MAJOR) -- deliberate, this is the version-upgrade campaign's starting point. Body shape mirrors the live-proven mariadb-cluster-subops-a maria-create (database__subops-full.json): audit_enabled bool (not string), database_character_set utf8 (not utf8mb4 like mysql), no database_case_sensitive field."
+        },
+        {
+          "name": "wait-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.service_state",
+            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
+            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "capture-cluster-detail",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200],
+          "capture_soft": {
+            "dbaas_engine": "$.dbaas_engine",
+            "instance_name": "$.instance_groups[0].instances[0].name"
+          },
+          "_note": "dbaas_engine feeds mariadbupgrademajorversion's PatchRequest.dbaas_engine (captured live, never hardcoded -- mysql's live value was the string 'MySQL', mariadb's own casing TBD from this run); instance_name (a NAME not an id) feeds mariadbshowinstance."
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"cluster_id": "{cluster_id}"}
+        },
+        {
+          "name": "major-version-upgrade",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/major-version-upgrade",
+          "json": {"dbaas_engine": "{dbaas_engine}", "software_version": "{engine_version_mid_software}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "major-upgrade",
+          "_note": "gap mariadbupgrademajorversion. Targets the OLDEST 11.4 minor (engine_version_mid_software) -- NOT the newest -- so patch-minor-version below still has a genuinely newer target on the SAME cluster."
+        },
+        {
+          "name": "wait-after-major-upgrade",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "major-upgrade",
+          "poll": {
+            "field": "$.service_state",
+            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
+            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "timeout": 3600,
+            "interval": 30,
+            "give_up_status": [400, 404]
+          },
+          "_note": "major-version-upgrade is documented as long-running -- generous 3600s settle timeout, mirrors the mysql precedent."
+        },
+        {
+          "name": "verify-after-major-upgrade",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "major-upgrade",
+          "capture_soft": {"software_version_after_major": "$.software_version"},
+          "_note": "logs the post-upgrade software_version for the observation trail; not otherwise consumed."
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {"backup_before_upgrade": false, "software_version": "{engine_version_top_software}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "minor-patch",
+          "_note": "gap mariadbpatchminorversion. Targets engine_version_top_software (newest 11.4 minor) -- genuinely newer than wherever major-version-upgrade landed the cluster, unlike the known-blocked pattern of resending the cluster's OWN current version (mysql precedent: 400 'Unpatchable version')."
+        },
+        {
+          "name": "wait-after-minor-patch",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "minor-patch",
+          "poll": {
+            "field": "$.service_state",
+            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
+            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "timeout": 1800,
+            "interval": 30,
+            "give_up_status": [400, 404]
+          }
+        },
+        {
+          "name": "show-instance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/instances/{instance_name}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "show-instance",
+          "_note": "gap mariadbshowinstance -- instance_name captured from the cluster detail's instance_groups[0].instances[0].name (a NAME, not an id)."
+        },
+        {
+          "name": "manual-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups/manual",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "manual-backup",
+          "retry_on_status": [409],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "gap mariadbmanualbackup -- no request body per docs model (path cluster_id only); 409 retry ladder for in-flight-op contention, mirrors mysqlmanualbackup."
+        },
+        {
+          "name": "wait-after-manual-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "manual-backup",
+          "poll": {
+            "field": "$.service_state",
+            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
+            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [400, 404]
+          }
+        },
+        {
+          "name": "list-backup-histories-after",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "manual-backup",
+          "capture_soft": {"backup_history_number": "$.contents[0].backup_history_number"},
+          "_note": "feeds cleanup-backup-histories's REQUIRED field."
+        },
+        {
+          "name": "cleanup-backup-histories",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "json": {"backup_history_number": ["{backup_history_number}"]},
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422],
+          "optional": true,
+          "group": "manual-backup",
+          "_note": "gap mariadbremovebackuphistories. Body key is 'backup_history_number' (array[string]) -- confirmed already correct here (no typo present in this repo's mariadb fragments). Prior 401 Dbaas.Unauthorized.AuthNFailed on this endpoint is a documented backend auth quirk (knowledge/validated-facts.md 2026-06-10, HB1 2026-07-04) shared with delete-backup and across mysql/mariadb/postgresql/epas/cachestore -- NOT a body-shape bug. Populated with the REAL backup_history_number captured right after manual-backup so this is a genuine cleanup attempt."
+        },
+        {
+          "name": "set-log-type-alert",
+          "action": "set_const",
+          "values": {"log_type": "alert"}
+        },
+        {
+          "name": "export-log-alert",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "export-log-alert",
+          "_note": "gap mariadbexportlog attempt 1/3 (log_type=alert, the value the mariadbregisterlogexportconfig doc's own request_example uses; also the value that worked live for mysqlexportlog on 2026-07-16). log_type is a fixed enum path token, NOT dependent on a registered log-export-config (registration is PF-blocked, 500 ContactAdminForAssistance class per orchestrator brief). No request body per docs model."
+        },
+        {
+          "name": "set-log-type-audit",
+          "action": "set_const",
+          "values": {"log_type": "audit"}
+        },
+        {
+          "name": "export-log-audit",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "export-log-audit",
+          "_note": "gap mariadbexportlog attempt 2/3 (log_type=audit) -- owner explicitly asked to try this value for mariadb since mysql only proved 'alert'."
+        },
+        {
+          "name": "set-log-type-slow",
+          "action": "set_const",
+          "values": {"log_type": "slow"}
+        },
+        {
+          "name": "export-log-slow",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "export-log-slow",
+          "_note": "gap mariadbexportlog attempt 3/3 (log_type=slow) -- mysql confirmed this 400s InvalidLogType on a real cluster despite the docs enum listing it; kept here for completeness/parity."
+        },
+        {
+          "name": "pre-delete-sync-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "retry_on_status": [400, 409],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "recovers a post-subop UNKNOWN service_state before delete so delete-cluster doesn't 400 InvalidState."
+        },
+        {
+          "name": "wait-pre-delete-settle",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
+            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [400, 404]
+          }
+        },
+        {
+          "name": "delete-cluster",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [400, 409, 500, 503],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "wait-cluster-gone",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 404],
+          "poll": {
+            "until_status": [404],
+            "timeout": 1800,
+            "interval": 30,
+            "refire": {"method": "DELETE", "path": "/v1/clusters/{cluster_id}", "field": "$.service_state", "when": ["DELETE_FAILED", "ERROR_DELETING", "FAILED", "ERROR"], "max": 3}
+          },
+          "_note": "negative-probe: until_status 404 is the success condition (resource gone)."
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 202, 204, 409],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 8,
+          "retry_interval": 30,
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 10},
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "adopt": "vpc"
+        }
+      ]
     }
+
   ]
 }

@@ -5,7 +5,7 @@
       "service": "database/postgresql",
       "enabled": true,
       "heavy": true,
-      "_note": "COVERAGE-ONLY guarded lifecycle for the postgresql DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXISTING cluster_id (+ instance_group_id / bsg_id / log_type) from read-only list/show calls; when none exists the {{cluster_id}} (and {{instance_group_id}}/{{bsg_id}}/{{log_type}}/{{origin_cluster_id}}/{{replica_cluster_id}}) tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 404/400/403/409/422 counts as covered per the engine). Every mutating step is optional+grouped+broad-expect_status so an isolated 4xx records coverage WITHOUT failing the run or chaining a real create->mutate->delete. heavy:true gates behind SCP_RUN_HEAVY; DELETEs are destructive:true. Bodies derive from the shared SCP DBaaS shape + per-endpoint api_docs request_example (data/api_bodies.json only has createcluster) and are UNPROVEN \u2014 promote to validated after a real 2xx. The relational engines (mysql/mariadb/epas/postgresql) share ONE body template; postgresql adds audit-log + DELETE /archive.",
+      "_note": "COVERAGE-ONLY guarded lifecycle for the postgresql DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXISTING cluster_id (+ instance_group_id / bsg_id / log_type) from read-only list/show calls; when none exists the {{cluster_id}} (and {{instance_group_id}}/{{bsg_id}}/{{log_type}}/{{origin_cluster_id}}/{{replica_cluster_id}}) tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 404/400/403/409/422 counts as covered per the engine). Every mutating step is optional+grouped+broad-expect_status so an isolated 4xx records coverage WITHOUT failing the run or chaining a real create->mutate->delete. heavy:true gates behind SCP_RUN_HEAVY; DELETEs are destructive:true. Bodies derive from the shared SCP DBaaS shape + per-endpoint api_docs request_example (data/api_bodies.json only has createcluster) and are UNPROVEN — promote to validated after a real 2xx. The relational engines (mysql/mariadb/epas/postgresql) share ONE body template; postgresql adds audit-log + DELETE /archive.",
       "steps": [
         {
           "name": "list-clusters",
@@ -834,6 +834,801 @@
             "dbaas_engine_version_id": "{dbaas_engine_version_id}",
             "request_id": "00000000-0000-0000-0000-000000000000"
           }
+        }
+      ]
+    },
+    {
+      "id": "postgresql-cluster-version-upgrade",
+      "service": "database/postgresql",
+      "enabled": true,
+      "heavy": true,
+      "_note": "HEAVY 2026-07-16 (svccov-pg session, owner-approved SCP_RUN_HEAVY): dedicated 1-cluster campaign for postgresql's residual gap keys that the main database-postgresql-cluster + postgresql-cluster-subops-a/b lifecycles (run earlier today, run 20260716-181204-4912, 37/49 keys 2xx) never reach: postgresqlpatchminorversion, postgresqlshowinstance, postgresqlmanualbackup, postgresqlremovebackuphistories (PF recheck), postgresqlunsetbackup (PF recheck), postgresqlregisterlogexportconfig/setlogexportconfig/unregisterlogexportconfig/exportlog (PF recheck chain). postgresql has NO major-version-upgrade endpoint (confirmed absent from the catalog, unlike mysql/mariadb) so this lifecycle only does the minor-patch axis. STRATEGY: live GET /v1/engine-versions 2026-07-16 shows TWO minors under the newest major (COMMUNITY 17: 17.7 newest, 17.6 next) -- this CONTRADICTS the a690 2026-07-16 note in knowledge/validated-facts.md claiming 'no second minor exists' (that finding was stale/mistaken, or based on always resending the cluster's OWN current version rather than checking the full engine-versions list). Create the cluster on the OLDER minor (COMMUNITY 17.6, via where_prefix major_version='COMMUNITY 17' nth=1) so postgresqlpatchminorversion has a genuinely NEWER same-major target (COMMUNITY 17.7, nth=0) to patch to -- avoids the known 'Unpatchable version' 400 that resending the current version produces. postgresqlshowinstance needs instance_name (a NAME not an id) captured from $.instance_groups[0].instances[0].name on the cluster detail. postgresqlmanualbackup takes no request body (path cluster_id only, per data/api_docs.json). postgresqlremovebackuphistories body is {backup_history_number: [string]} (confirmed correct key, NOT a typo -- data/api_docs.json backuphistorynumberrequest) populated with a REAL id captured from list-backup-histories after manual-backup; the mysql sibling proved this STILL 401s Dbaas.Unauthorized.AuthNFailed even with the correct key + a real id (run svccov-mysql today) -- same backup-family query-string HMAC signing PF as postgresqlunsetbackup (known_issues.json), so both are 1-shot PF rechecks here, not chased further. register-log-export-config is a confirmed-PF 500 ContactAdminForAssistance across ALL 5 DB engines including postgresql (knowledge/validated-facts.md 'DB register-log-export-config 500 = 백엔드 PF 확정', our input already eliminated as cause) -- set/export/unregister-log-export-config are structurally unreachable-2xx downstream of it (export additionally 400s Dbaas.InvalidLogType on an unregistered log_type even with a literal enum value, confirmed on the mysql sibling), so this lifecycle 1-shot rechecks the whole chain then treats it as blocked, not a body bug. C-group (postgresqlcreaterestore, postgresqlcreateotherregionreplica, postgresqlswitchovercluster) deliberately EXCLUDED: each needs its own extra billable cluster, a completed backup, or an ha_enabled=true cluster -- left as a follow-up lever, not attempted here to stay in the session's single-cluster/time budget. Own dedicated VPC/subnet (10.143.0.0/20) so this lifecycle never contends with the main database-postgresql-cluster (10.133), heavy-shared-dbaas/subops-a/b (10.134), mysql-cluster-version-upgrade (10.142), or mariadb-cluster-version-upgrade (10.144).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression PG version-upgrade",
+            "cidr": "10.143.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression PG version-upgrade",
+            "cidr": "10.143.3.0/24",
+            "type": "PUBLIC",
+            "category": "PRIMARY",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "find-engine-version",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "engine_version_old_id": {
+              "list": "$.contents",
+              "where_prefix": {
+                "major_version": "COMMUNITY 17"
+              },
+              "nth": 1,
+              "get": "id"
+            }
+          },
+          "capture_soft": {
+            "engine_version_target_software": {
+              "list": "$.contents",
+              "where_prefix": {
+                "major_version": "COMMUNITY 17"
+              },
+              "nth": 0,
+              "get": "software_version"
+            }
+          },
+          "_note": "engine_version_old_id = 2nd-newest minor under the newest major (nth=1, live-verified 2026-07-16: COMMUNITY 17.6); engine_version_target_software = the newest minor of that SAME major (nth=0: COMMUNITY 17.7) -- feeds patch-minor-version so the target is genuinely newer than create, unlike resending the cluster's own current version (known 'Unpatchable version' 400)."
+        },
+        {
+          "name": "find-server-type",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              }
+            }
+          }
+        },
+        {
+          "name": "create-cluster",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrpgvu{ualpha}",
+            "instance_name_prefix": "regrpgvu",
+            "dbaas_engine_version_id": "{engine_version_old_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C",
+              "database_name": "regrpgvu",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "postgresql"
+          },
+          "_note": "dbaas_engine_version_id = engine_version_old_id (COMMUNITY 17.6) -- deliberate, this is the version-upgrade campaign's starting point. Body otherwise copied VERBATIM from live-proven database-postgresql-cluster / postgresql-cluster-subops-full (verified 2xx in data/baselines/verified_endpoints.json)."
+        },
+        {
+          "name": "wait-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30,
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "capture-cluster-detail",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "instance_name": "$.instance_groups[0].instances[0].name"
+          },
+          "_note": "instance_name (a NAME not an id) feeds postgresqlshowinstance."
+        },
+        {
+          "name": "show-instance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/instances/{instance_name}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "show-instance",
+          "_note": "gap postgresqlshowinstance."
+        },
+        {
+          "name": "manual-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups/manual",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "gap postgresqlmanualbackup -- no request body per docs model (path cluster_id only); 409 retry ladder for in-flight-op contention."
+        },
+        {
+          "name": "wait-after-manual-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "list-backup-histories-after",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "capture_soft": {
+            "backup_history_number": "$.contents[0].backup_history_number"
+          }
+        },
+        {
+          "name": "remove-backup-histories",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "json": {
+            "backup_history_number": [
+              "{backup_history_number}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "_note": "gap postgresqlremovebackuphistories -- body key is 'backup_history_number' (array[string]), confirmed correct (not a typo) per data/api_docs.json backuphistorynumberrequest. PF-recheck 1-shot: the mysql sibling proved this STILL 401s Dbaas.Unauthorized.AuthNFailed even with the correct key + a real captured id -- backup-family query-string HMAC signing PF (known_issues.json), same class as unset-backup below."
+        },
+        {
+          "name": "unset-backup",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "unset-backup",
+          "_note": "gap postgresqlunsetbackup -- PF-recheck 1-shot (known_issues.json backup-family 401 AuthNFailed with valid HMAC)."
+        },
+        {
+          "name": "register-log-export-config",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "json": {
+            "access_key": "",
+            "bucket_name": "apitest-logsink",
+            "delete_on_export": true,
+            "log_type": "alert",
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
+            "schedule_hour": "12",
+            "secret_key": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
+          "optional": true,
+          "group": "log-export",
+          "_note": "gap postgresqlregisterlogexportconfig -- PF-recheck 1-shot (knowledge/validated-facts.md: confirmed backend 500 ContactAdminForAssistance across all 5 DB engines with this exact schedule shape + a real bucket, our input already eliminated as cause)."
+        },
+        {
+          "name": "wait-after-register-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "log-export",
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "set-log-type-fallback-const",
+          "action": "set_const",
+          "values": {
+            "log_type": "alert"
+          },
+          "_note": "seeds {log_type}='alert' as a fallback so the downstream set/export/unregister steps always have a resolved path token even if register-log-export-config 500'd and nothing was ever persisted; capture-log-type-after-register (next) overwrites with the REAL value if register actually succeeded."
+        },
+        {
+          "name": "capture-log-type-after-register",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "log-export",
+          "capture_soft": {
+            "log_type": "$.contents[0].log_type"
+          }
+        },
+        {
+          "name": "set-log-export-config",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+          "json": {
+            "access_key": "",
+            "delete_on_export": true,
+            "schedule_day_of_month": null,
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "WEEK",
+            "schedule_hour": "12",
+            "secret_key": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
+          "optional": true,
+          "group": "log-export",
+          "_note": "gap postgresqlsetlogexportconfig -- PF-recheck 1-shot, structurally downstream of register-log-export-config (see register step note)."
+        },
+        {
+          "name": "export-log",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
+          "optional": true,
+          "group": "log-export",
+          "_note": "gap postgresqlexportlog -- PF-recheck 1-shot. The mysql sibling confirmed export 400s Dbaas.InvalidLogType even with a valid enum literal when the log_type was never actually registered (register is PF-blocked), so this is structurally unreachable-2xx until register-log-export-config is fixed upstream."
+        },
+        {
+          "name": "unregister-log-export-config",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "log-export",
+          "_note": "gap postgresqlunregisterlogexportconfig -- PF-recheck 1-shot, same downstream-of-register class."
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {
+            "backup_before_upgrade": false,
+            "software_version": "{engine_version_target_software}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "minor-patch",
+          "_note": "gap postgresqlpatchminorversion -- targets engine_version_target_software (COMMUNITY 17.7, the newest minor of the SAME major the cluster was created on) -- genuinely newer than the cluster's own current version, unlike the known-blocked pattern of resending the cluster's OWN current version (400 'Unpatchable version')."
+        },
+        {
+          "name": "wait-after-minor-patch",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "minor-patch",
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "pre-delete-sync-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "recovers a post-subop UNKNOWN service_state before delete so delete-cluster doesn't 400 InvalidState (pg is the family known for set-parameters-class UNKNOWN excursions; harmless no-op here otherwise)."
+        },
+        {
+          "name": "wait-pre-delete-settle",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "delete-cluster",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "wait-cluster-gone",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30,
+            "refire": {
+              "method": "DELETE",
+              "path": "/v1/clusters/{cluster_id}",
+              "field": "$.service_state",
+              "when": [
+                "DELETE_FAILED",
+                "ERROR_DELETING",
+                "FAILED",
+                "ERROR"
+              ],
+              "max": 3
+            }
+          },
+          "_note": "negative-probe: until_status 404 is the success condition (resource gone)."
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "adopt": "vpc"
         }
       ]
     }
