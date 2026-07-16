@@ -649,6 +649,160 @@
           "_note": "2026-07-09 실측 수리: 서브넷 202 비동기 삭제가 180s보다 느려 이 폴이 200으로 pass-through → delete-vpc 409 related-resource (이번 런 잔존 VPC 2대의 뿌리). 600s로 상향; 진짜 stuck이면 아래 delete-vpc의 409 사다리 소진에서 크게 실패."
         },
         {
+          "name": "create-subnet-private",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsubpriv{unique}",
+            "description": "API regression private subnet",
+            "cidr": "10.130.16.0/24",
+            "type": "PRIVATE",
+            "category": "PRIMARY",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_priv_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_priv_id}",
+            "service": "vpc"
+          },
+          "_note": "type=PRIVATE 생성/삭제 커버 (오너 2026-07-16: 'public 생성했다 지우고 private 생성했다 지우고 이런것 포함'). 직전 subnet gone 후 생성이라 net-A PRIMARY 동시 점유 ≤2/3. 미검증 — 다음 런 판정."
+        },
+        {
+          "name": "wait-subnet-private",
+          "_note": "svc-opt 2026-07-11 실측: 자체생성 VPC의 서브넷은 ACTIVE까지 3분+ 걸릴 수 있음 (공유 VPC 서브넷은 수십초) — 180s 폴 소진 후 create-port가 not-active 400으로 환경스킵되던 것. timeout 상향.",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_priv_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 600,
+            "interval": 10
+          }
+        },
+        {
+          "name": "delete-subnet-private",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_priv_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ]
+        },
+        {
+          "name": "wait-subnet-private-gone",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_priv_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 15
+          },
+          "service": "vpc",
+          "_note": "2026-07-09 실측 수리: 서브넷 202 비동기 삭제가 180s보다 느려 이 폴이 200으로 pass-through → delete-vpc 409 related-resource (이번 런 잔존 VPC 2대의 뿌리). 600s로 상향; 진짜 stuck이면 아래 delete-vpc의 409 사다리 소진에서 크게 실패."
+        },
+        {
+          "name": "create-subnet-local",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsubloca{unique}",
+            "description": "API regression local subnet",
+            "cidr": "10.130.17.0/24",
+            "type": "LOCAL",
+            "category": "PRIMARY",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_local_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_local_id}",
+            "service": "vpc"
+          },
+          "_note": "type=LOCAL 생성/삭제 커버 (오너 2026-07-16: 'public 생성했다 지우고 private 생성했다 지우고 이런것 포함'). 직전 subnet gone 후 생성이라 net-A PRIMARY 동시 점유 ≤2/3. 미검증 — 다음 런 판정."
+        },
+        {
+          "name": "wait-subnet-local",
+          "_note": "svc-opt 2026-07-11 실측: 자체생성 VPC의 서브넷은 ACTIVE까지 3분+ 걸릴 수 있음 (공유 VPC 서브넷은 수십초) — 180s 폴 소진 후 create-port가 not-active 400으로 환경스킵되던 것. timeout 상향.",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_local_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 600,
+            "interval": 10
+          }
+        },
+        {
+          "name": "delete-subnet-local",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_local_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ]
+        },
+        {
+          "name": "wait-subnet-local-gone",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_local_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 15
+          },
+          "service": "vpc",
+          "_note": "2026-07-09 실측 수리: 서브넷 202 비동기 삭제가 180s보다 느려 이 폴이 200으로 pass-through → delete-vpc 409 related-resource (이번 런 잔존 VPC 2대의 뿌리). 600s로 상향; 진짜 stuck이면 아래 delete-vpc의 409 사다리 소진에서 크게 실패."
+        },
+        {
           "name": "delete-vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
