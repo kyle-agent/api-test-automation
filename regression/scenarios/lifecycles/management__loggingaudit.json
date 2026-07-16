@@ -36,7 +36,7 @@
             "trail_name": "regrtrail{unique}",
             "trail_description": "API regression coverage probe",
             "trail_save_type": "JSON",
-            "bucket_name": "do-not-delete-apitest",
+            "bucket_name": "apitest-logsink",
             "bucket_region": "{region}",
             "region_total_yn": "Y",
             "region_names": [],
@@ -46,7 +46,7 @@
             "target_resource_types": [],
             "user_total_yn": "Y",
             "target_users": [],
-            "service_watch_yn": "Y",
+            "service_watch_yn": "N",
             "organization_trail_yn": "N",
             "log_verification_yn": "N",
             "tag_create_requests": []
@@ -62,7 +62,7 @@
             "path": "/v1/trails/{trail_id}",
             "service": "loggingaudit"
           },
-          "_note": "Body fixed 2026-06-20: (1) added account_id (REQUIRED per TrailCreateRequestV1dot1 schema in api_docs.json — was causing 400 ValidationError 'Field required'); captured from iam capture-account-id pre-step. (2) changed log_type_total_yn N->Y for consistency (when N, target_log_types must be non-empty per API semantics; Y with empty array is safe). (3) replaced tags->tag_create_requests (correct field name per schema; 'tags' is not a valid TrailCreateRequest field). Source: data/api_docs.json key management/loggingaudit/trailcreaterequestv1dot1 (required fields: account_id, bucket_name, bucket_region, trail_name, trail_save_type). Response envelope $.trail.id confirmed by response_example. Shared test OBS bucket = do-not-delete-apitest (owner-provisioned, do NOT delete)."
+          "_note": "Body fixed 2026-06-20: (1) added account_id (REQUIRED per TrailCreateRequestV1dot1 schema in api_docs.json — was causing 400 ValidationError 'Field required'); captured from iam capture-account-id pre-step. (2) changed log_type_total_yn N->Y for consistency (when N, target_log_types must be non-empty per API semantics; Y with empty array is safe). (3) replaced tags->tag_create_requests (correct field name per schema; 'tags' is not a valid TrailCreateRequest field). Source: data/api_docs.json key management/loggingaudit/trailcreaterequestv1dot1 (required fields: account_id, bucket_name, bucket_region, trail_name, trail_save_type). Response envelope $.trail.id confirmed by response_example. bucket_name FIXED 2026-07-16 (new test account post 2026-07-15 cutover): do-not-delete-apitest no longer exists in this account (head_bucket 404, confirmed live). The pre-existing fixture bucket apitest-logsink (core.oplog.LOGSINK_BUCKET, plain private bucket in the CURRENT test account, confirmed live via list_buckets 2026-07-16) is the correct target — same bucket network-logging storages use. bucket_region={region} resolves to SCP_REGION (kr-west1), matching the bucket's actual object-store host region; doc's 'RegionOne' example is a generic placeholder, not a real enum. service_watch_yn FIXED 2026-07-16 Y->N: live 400 'invalid service watch values' when service_watch_yn=Y without iam_role_id+log_group_name (doc's own request_example sets both when service_watch_yn=Y — description says those two fields are 'Service Watch 트레일에만 해당' i.e. only meaningful/required together with it). N (plain trail, no Service Watch / CloudWatch-equivalent integration) needs neither and is the minimal-viable create."
         },
         {
           "name": "show-trail",
@@ -87,14 +87,14 @@
             "target_resource_types": [],
             "user_total_yn": "Y",
             "target_users": [],
-            "service_watch_yn": "Y",
+            "service_watch_yn": "N",
             "organization_trail_yn": "N",
             "log_verification_yn": "N"
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "la-trail",
-          "_note": "Body from api_docs.json settrail request_example (2026-06-20). No bucket_name/bucket_region on update (immutable). Fields match the PUT schema: trail_description, trail_save_type, and all yn-flag arrays. log_type_total_yn changed N->Y (consistent with createtrail fix: when N the API may require non-empty target_log_types)."
+          "_note": "Body from api_docs.json settrail request_example (2026-06-20). No bucket_name/bucket_region on update (immutable). Fields match the PUT schema: trail_description, trail_save_type, and all yn-flag arrays. log_type_total_yn changed N->Y (consistent with createtrail fix: when N the API may require non-empty target_log_types). service_watch_yn FIXED 2026-07-16 Y->N (same 'invalid service watch values' 400 as createtrail — Y requires iam_role_id+log_group_name, which this minimal update body doesn't set)."
         },
         {
           "name": "start-trail",

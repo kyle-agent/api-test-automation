@@ -174,6 +174,18 @@
           "poll": {"field": "$.private_dns.state", "until": ["ACTIVE"], "timeout": 3600, "interval": 30}
         },
         {
+          "name": "activate-private-dns",
+          "method": "POST",
+          "path": "/v1/private-dns/activate",
+          "group": "pdns",
+          "optional": true,
+          "json": {
+            "name": "regrpdns{ualpha}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409],
+          "_note": "COVERAGE-2026-07-16: activateprivatedns (dns gap key). Docs (data/api_docs.json PrivateDnsActivateRequest): body is just {name: 3-20 char pattern ^[a-zA-Z0-9-]*$}. Per knowledge/services.md, activate is documented for RE-USING an already-created account-global private-dns NAME in ANOTHER region; calling it on the SAME name in the SAME (creation) region right after create is untested live -- tolerant expect_status covers both an idempotent 2xx and a same-region/already-active 4xx. Uses the exact 'regrpdns{ualpha}' name create-private-dns used ({ualpha} is a single stable per-run token, so no separate capture needed). Placed after wait-private-dns-active (state ACTIVE) so the name is guaranteed to exist."
+        },
+        {
           "name": "connect-vpc-to-private-dns",
           "method": "PUT",
           "path": "/v1/private-dns/{private_dns_id}",
@@ -203,6 +215,18 @@
           "cleanup": {"method": "DELETE", "path": "/v1/hosted-zones/{hosted_zone_id}", "service": "dns"}
         },
         {
+          "name": "set-hosted-zone",
+          "method": "PUT",
+          "path": "/v1/hosted-zones/{hosted_zone_id}",
+          "group": "pdns",
+          "optional": true,
+          "json": {
+            "description": "API regression suite (updated)"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409],
+          "_note": "COVERAGE-2026-07-16: sethostedzone (dns gap key; run 4912 404'd because that separate heavy-shared-networking lifecycle's own private-dns/hosted-zone create had already failed on quota, leaving hosted_zone_id a dead placeholder). Body per docs (data/api_docs.json HostedZoneSetRequestV1Dot3): only optional 'description' field. Runs against THIS lifecycle's own freshly-created hosted_zone_id."
+        },
+        {
           "name": "create-a-record",
           "method": "POST",
           "path": "/v1/hosted-zones/{hosted_zone_id}/records",
@@ -218,6 +242,19 @@
           "capture": {"record_id": "$.id"},
           "expect_status": [200, 201, 202],
           "cleanup": {"method": "DELETE", "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}", "service": "dns"}
+        },
+        {
+          "name": "set-hosted-zone-record",
+          "method": "PUT",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+          "group": "pdns",
+          "optional": true,
+          "json": {
+            "records": ["192.0.2.20"],
+            "ttl": 3600
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409],
+          "_note": "COVERAGE-2026-07-16: sethostedzonerecord (dns gap key). Body per docs (data/api_docs.json RecordSetRequest): {records:[...], ttl}. Runs against THIS lifecycle's own real record_id (updates the A value 192.0.2.10 -> .20) instead of the synthetic-{unique}-id probe in the disabled-from-live networking-dns-public-domain lifecycle (avoids that lifecycle's real-paid-domain-registration create-public-domain step; see that lifecycle's _note + knowledge/services.md)."
         },
         {
           "name": "get-hosted-zone",
