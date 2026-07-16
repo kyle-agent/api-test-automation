@@ -102,7 +102,7 @@
             "path": "/v1/publicips/{publicip_id}",
             "service": "vpc"
           },
-          "_note": "ZONE REPAIR 2026-07-16 (run a690 실측: 400 ValidationError 'Field required' — PublicIpCreateRequestV1Dot3 zone 필수, 계정 단일 AZ {region}-b). "
+          "_note": "ZONE REPAIR 2026-07-16 (run a690 실측: 400 ValidationError 'Field required' — PublicIpCreateRequestV1Dot3 zone 필수, 계정 단일 AZ {region}-b). LIVE VERIFIED run e68b 2026-07-16: 201 (00:18:07Z)."
         },
         {
           "name": "list-igw-for-vpn",
@@ -465,6 +465,33 @@
           ]
         },
         {
+          "name": "wait-vpn-tunnel-settled-after-set",
+          "method": "GET",
+          "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+          "group": "vpn",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "poll": {
+            "field": "$.vpn_tunnel.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10,
+            "give_up_status": [
+              400,
+              403,
+              404
+            ]
+          },
+          "_note": "REPAIR 2026-07-16 (run e68b 실측, 관용 4xx 원인규명 캠페인 C — HB4c/HB4d 와 같은 async-not-settled 클래스의 UPDATE 경로 변종): set-vpn-tunnel 이 202 ASYNC 로 터널을 EDITING 으로 전이시키고(00:19:26), 2초 뒤 delete-vpn-tunnel 이 400 scp-network.vpn-tunnel.invalid-state 'Unable to modify or delete VPN Tunnel in EDITING state.' (00:19:29, req-b9b76231). 그 400 은 관용돼 터널이 잔존 → delete-vpn-gateway 409 has-related-resources 로 8×15s 소진(00:19:29→00:21:40) → delete-publicip 400 not-deletable-state(ATTACHED) 로 20×20s 소진(00:21:40→00:28:37) 후 expect 미포함 400 으로 lifecycle 하드 실패 — e68b 재실패의 전체 사인. 직전 수리들(publicip zone 201·gateway/tunnel settle-poll·set-vpn-tunnel 202)은 모두 이 런에서 LIVE VERIFIED. 수리: set 뒤 EDITING→ACTIVE settle-poll (HB4c 의 wait-vpn-gateway-active 패턴 미러). UNVERIFIED LIVE — 다음 heavy 디스패치에서 delete 체인 3단 (tunnel 2xx→gateway 2xx→publicip 2xx) 확인 필요."
+        },
+        {
           "name": "probe-vpn-reads",
           "probe_reads": {
             "vpn_gateway_id": "{vpn_gateway_id}",
@@ -488,10 +515,12 @@
             409
           ],
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 6,
-          "retry_interval": 15
+          "retry_interval": 15,
+          "_note": "RETRY 2026-07-16 (run e68b, 캠페인 C): 400 invalid-state(CREATING/EDITING) 는 전이성 — 1차 방어는 위 wait-vpn-tunnel-settled-after-set, 이 400 재시도는 2차 벨트."
         },
         {
           "name": "delete-vpn-gateway",
@@ -510,10 +539,12 @@
             409
           ],
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 8,
-          "retry_interval": 15
+          "retry_interval": 15,
+          "_note": "RETRY 2026-07-16 (run e68b, 캠페인 C): 409 has-related-resources 는 터널 삭제 수렴 대기용(기존), 400 invalid-state 도 전이성이라 사다리에 추가."
         },
         {
           "name": "delete-igw-for-vpn",

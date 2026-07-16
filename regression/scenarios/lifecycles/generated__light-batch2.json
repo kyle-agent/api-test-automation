@@ -979,7 +979,7 @@
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/accounts/products",
           "headers": {
-            "X-ResourceType": "INSTANCE"
+            "X-ResourceType": "VM"
           },
           "expect_status": [
             200,
@@ -989,15 +989,9 @@
           ],
           "optional": true,
           "group": "cm-event-policy",
-          "_note": "REPAIR 2026-07-08 (live run + 이 세션 read-only 라이브 재검증): 400 InvalidHeaderValue 의 원인은 문서에 없는 필수 헤더 X-ResourceType 누락 — 헤더 없이 GET → 400 InvalidHeaderValue (params 가 resourceType/X-ResourceType 지목, req-486525c2-9cbd-45dd-90d4-0828a6a4fd77), X-ResourceType:INSTANCE 부착 → 404 ResourceNotFound (모니터링 등록 자원 없음의 문서화된 fail-fast; params 힌트 productCategoryCode, req-eff179ea-ffb1-4e99-a86d-cdd1899900d8). waveA1 gen-cm-account-resource 의 LIVE-VERIFIED(2026-06-18) 사실과 일치 — 헤더 부착으로 정정하고 404 는 관용 (PF 후보: v2 헤더 거부 / PF-26 이중버전 경로 가족, cloudmonitoring 은 2026-09 단종 예정이라 깊은 투자 금지). 모니터링 등록 INSTANCE 가 없으면 capture 미스 → optional 그룹 skip 으로 event-policy 체인 전체가 non-red 격리; 등록 자원이 생기면 그대로 2xx 재개.",
+          "_note": "REPAIR 2026-07-08: 문서에 없는 필수 헤더 X-ResourceType 부착 (없으면 400 InvalidHeaderValue, req-486525c2). REPAIR 2026-07-16 (soft-4xx 원인규명, run a690): 'INSTANCE' 는 유효한 리소스타입 값이 아니어서 상시 404 ResourceNotFound(params 힌트 productCategoryCode)였다 — 같은 런 cloudmonitoring-readonly-shows 가 'VM' 으로 200 + Running VM(productResourceId=UUID) 을 실증. 'VM' 교체 + capture 를 $.contents[0].productResourceId 로 수리 (INSTANCE- 프리픽스는 실존한 적 없음) — VM 이 살아있는 전체 런에선 event-policy 체인(create→read→histories→notifications→delete) 2xx 재개 예상. VM 부재 런은 200 {totalCount:0} → capture 미스 → 그룹 skip 으로 종전과 동일하게 non-red 격리 (cloudmonitoring 은 2026-09 단종 예정이라 깊은 투자 금지).",
           "capture": {
-            "product_resource_id": {
-              "list": "$.contents",
-              "where_prefix": {
-                "productResourceId": "INSTANCE-"
-              },
-              "get": "productResourceId"
-            }
+            "product_resource_id": "$.contents[0].productResourceId"
           }
         },
         {

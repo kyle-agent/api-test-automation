@@ -329,7 +329,7 @@
       "id": "gen-cm-account-resource",
       "service": "management/cloudmonitoring",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: cm-account-resource. LIVE-VERIFIED (run 2026-06-18): getaccountproductlist REQUIRES the X-ResourceType header — without it the backend 400s 'InvalidHeaderValue' naming param resourceType / X-ResourceType. The header is undocumented (not in api_docs getaccountproductlist params) but mandatory — the earlier 'header was an invention, remove it' correction was a hypothesis the live call disproved. X-ResourceType:INSTANCE is accepted by the header validator (no more 400) but returns 404 ResourceNotFound on this account (error param hints the value should be a productCategoryCode and/or there is no INSTANCE-category monitored resource — the documented fail-fast when no Running VM is registered). 404 is therefore tolerated (records GET coverage) and capture is soft so the dependent read skips cleanly instead of false-failing.",
+      "_note": "composed by regression/scenarios/composer.py — targets: cm-account-resource. LIVE-VERIFIED (run 2026-06-18): getaccountproductlist REQUIRES the X-ResourceType header — without it the backend 400s 'InvalidHeaderValue' naming param resourceType / X-ResourceType. The header is undocumented (not in api_docs getaccountproductlist params) but mandatory. REPAIR 2026-07-16 (soft-4xx 원인규명, run a690): X-ResourceType:INSTANCE 은 헤더 검증만 통과하고 항상 404 ResourceNotFound(params 힌트 productCategoryCode = 유효 카테고리 아님)였다 — 같은 런의 cloudmonitoring-readonly-shows 가 X-ResourceType:'VM' 으로 200 + Running VM(productResourceId=UUID, productTypeCode=VM) 반환을 실증(18:10:36, totalCount:2). 'VM' 으로 교체하고 capture 도 실측 응답 형태($.contents[0].productResourceId, UUID — 'INSTANCE-' 프리픽스는 실존한 적 없음)로 수리. VM 이 없는 런에선 200 {totalCount:0} 이라 404 관용은 유지하되 사실상 200 예상.",
       "steps": [
         {
           "name": "create-cm-account-resource",
@@ -337,7 +337,7 @@
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/accounts/products",
           "headers": {
-            "X-ResourceType": "INSTANCE"
+            "X-ResourceType": "VM"
           },
           "expect_status": [
             200,
@@ -346,13 +346,7 @@
             404
           ],
           "capture_soft": {
-            "product_resource_id": {
-              "list": "$.contents",
-              "where_prefix": {
-                "productResourceId": "INSTANCE-"
-              },
-              "get": "productResourceId"
-            }
+            "product_resource_id": "$.contents[0].productResourceId"
           }
         },
         {
@@ -361,7 +355,7 @@
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/accounts/products",
           "headers": {
-            "X-ResourceType": "INSTANCE"
+            "X-ResourceType": "VM"
           },
           "expect_status": [
             200,

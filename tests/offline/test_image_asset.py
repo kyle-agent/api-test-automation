@@ -44,6 +44,9 @@ class _FakeS3:
         self.owner = owner
         self.puts = []
 
+    def head_bucket(self, Bucket):
+        return {}
+
     def head_object(self, Bucket, Key):
         if not self.have_object:
             raise RuntimeError("404")
@@ -67,13 +70,24 @@ def _reset_cache(monkeypatch):
 def _wire(monkeypatch, fake):
     cfg = {"bucket": "apitest-oplog-permanent",
            "endpoint": "https://object-store.kr-west1.e.samsungsdscloud.com"}
-    monkeypatch.setattr(oplog, "_client", lambda keys="oplog": (fake, cfg))
+    seen_keys = []
+
+    def _fake_client(keys="oplog"):
+        seen_keys.append(keys)
+        return fake, cfg
+
+    monkeypatch.setattr(oplog, "_client", _fake_client)
+    return seen_keys
 
 
 def test_ensure_image_asset_uploads_when_missing_and_builds_url(monkeypatch):
     fake = _FakeS3(have_object=False, owner="newacct$newacct")
-    _wire(monkeypatch, fake)
+    seen_keys = _wire(monkeypatch, fake)
     url = oplog.ensure_image_asset()
+    # 2026-07-16 라이브 확정: createimage는 호출자 자신의 계정 버킷 URL만
+    # 통과 — SCP_OPLOG_* 오버라이드(타 계정)를 절대 따라가지 않도록
+    # keys="test" 고정 (run a690 400 InvalidObjectStorageUrl의 근본 원인).
+    assert seen_keys == ["test"]
     assert fake.puts and fake.puts[0]["Key"] == oplog.IMAGE_ASSET_KEY
     assert fake.puts[0].get("ACL") == "public-read"
     assert url == ("https://object-store.kr-west1.e.samsungsdscloud.com/"

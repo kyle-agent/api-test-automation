@@ -7,14 +7,29 @@
       "_note": "Light, self-contained ROLE lifecycle covering 7 role write ops. A real role create->read->update->bindings->delete is attempted in group 'role-real'; every step is optional so an environmental 500/400/403 (the prior disabled iam-role saw POST /v1/roles -> 500 ContactAdminForAssistance) records coverage on the CALL and skips the rest of the group cleanly rather than failing the run. Bodies grounded on api_bodies.json (createrole/setrole/setroletrustpolicy/addrolepolicybindings). assume_role_policy_document uses an empty Resource and no real Principal (principals[] empty) to avoid referencing a non-existent user SRN. policy_ids sent empty on create; the binding steps then add/remove a placeholder policy id (synthetic -> expected 400/404). The standalone group 'role-bulk' exercises DELETE /v1/roles/bulk and the bindings DELETE endpoints against ids that need no real role (bulk delete of an empty/synthetic set), so those writes are CALLED even if role create 500s. RISK (from docs, not runtime-proven): create role may 500 on this account; bulk role delete body shape (role_ids) is from convention, not a confirmed example -> _note on that step. Create response envelope $.role.id confirmed from createrole 202 doc example.",
       "steps": [
         {
-          "name": "find-iam-user",
+          "name": "find-account-id",
           "method": "GET",
-          "path": "/v1/accounts/ec11538abf8f46d2953539521f745366/users",
+          "path": "/v1/access-keys",
           "expect_status": [
             200
           ],
-          "_note": "run-377e 실측: 이 계정의 GET /v1/accounts/{acct}/users = users:[] (count 0) — IAM 유저가 없어 user-SRN Principal 경로는 죽은 길 (iam-group-member류가 user_id로 blocked였던 기지 사실과 정합). 관측·커버리지용 optional 리드로 강등; 유저가 생기면 capture가 살아나 향후 user 경로 재고 가능.",
           "optional": true,
+          "group": "iam-user-observe",
+          "capture_soft": {
+            "account_id": "$.access_keys[0].account_id"
+          },
+          "_note": "REPAIR 2026-07-16 (soft-4xx 원인규명, run a690): 아래 find-iam-user가 구계정 id(ec11538a…)를 경로에 하드코딩하고 있었는데 2026-07-15 계정 교체(신계정 81eccb26…, access-key created_at 2026-07-15T11:34 실측)로 403 Forbidden('You do not have access permission')이 됐다 — ASG notification의 구계정 user 하드코딩과 동일 뿌리. iam-readonly-shows와 같은 패턴으로 호출자 자신의 account_id를 소프트 캡처해 주입 (같은 런에서 GET /v1/accounts/{account_id}/users 200 실증)."
+        },
+        {
+          "name": "find-iam-user",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}/users",
+          "expect_status": [
+            200
+          ],
+          "_note": "run-377e 실측: 이 계정의 GET /v1/accounts/{acct}/users = users:[] (count 0) — IAM 유저가 없어 user-SRN Principal 경로는 죽은 길 (iam-group-member류가 user_id로 blocked였던 기지 사실과 정합). 관측·커버리지용 optional 리드로 강등; 유저가 생기면 capture가 살아나 향후 user 경로 재고 가능. 2026-07-16: 하드코딩 계정 경로 → {account_id} 캡처 주입으로 수리 (find-account-id 참조).",
+          "optional": true,
+          "group": "iam-user-observe",
           "capture_soft": {
             "iam_user_id": "$.users[0].id"
           }
@@ -286,13 +301,14 @@
                 "name": [
                   "SCPServiceRole",
                   "AWSReserved",
-                  "AWS"
+                  "AWS",
+                  "regr"
                 ]
               },
               "get": "id"
             }
           },
-          "_note": "List roles and soft-capture the first non-SCP-service-linked role id (OrganizationAccountAccessRole on this account). Engine _capture filter: where_not_prefix excludes names starting with SCPServiceRole/AWS. If no USER_DEFINED role exists the capture is empty and the group steps all skip harmlessly. CONFIRMED 2026-06-24: captures OrganizationAccountAccessRole id."
+          "_note": "List roles and soft-capture the first non-SCP-service-linked role id (OrganizationAccountAccessRole on this account). Engine _capture filter: where_not_prefix excludes names starting with SCPServiceRole/AWS. If no USER_DEFINED role exists the capture is empty and the group steps all skip harmlessly. CONFIRMED 2026-06-24: captures OrganizationAccountAccessRole id. REPAIR 2026-07-16 (soft-4xx 원인규명, run a690): 'regr' 프리픽스 제외 추가 — 병렬 실행 중이던 iam-role-full의 임시 role(regrrole…, created_at 18:10:44 같은 런)을 캡처했다가 그 lifecycle이 role을 삭제하자 set-role-trust-policy/restore-role-description이 404 ContactAdminForAssistance 'No Role found with ID e4b9898f…'로 죽는 교차-lifecycle 레이스 실측. 다른 회귀 lifecycle의 단명 리소스는 절대 빌리지 않는다."
         },
         {
           "name": "create-temp-policy-for-role",

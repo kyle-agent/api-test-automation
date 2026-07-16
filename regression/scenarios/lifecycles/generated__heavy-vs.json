@@ -598,7 +598,7 @@
             "path": "/v1/images/{pending_image_id}",
             "service": "virtualserver"
           },
-          "_note": "2026-07-08 25-편입(owner GO): createimage. 2026-07-11 run-923a 수리: url 필수 (400 'Field url is invalid … 255자 이하, .qcow2') — oplog 버킷 assets/regr-minimal.qcow2 (수제 qcow2 v3 262144B, public-read, anon GET 200 실측 2026-07-11)를 소스로 주입. RGW tenant path(<account>:<bucket>)는 ops.html DEFAULT_BASE와 동일 형식. 멤버/visibility ops는 볼륨 없는 이 셸에서만 가능(custom image는 Image.InvalidVolumeOnVisibilityUpdate/SharedVisibilityRequired로 categorical 거부 — run-923a 실측)이라 이 그룹으로 이전."
+          "_note": "2026-07-08 25-편입(owner GO): createimage. 2026-07-11 run-923a 수리: url 필수 (400 'Field url is invalid … 255자 이하, .qcow2') — oplog 버킷 assets/regr-minimal.qcow2 (수제 qcow2 v3 262144B, public-read, anon GET 200 실측 2026-07-11)를 소스로 주입. RGW tenant path(<account>:<bucket>)는 ops.html DEFAULT_BASE와 동일 형식. 판정 2026-07-16 (soft-4xx 원인규명, run a690 400 Image.InvalidObjectStorageUrl): 원인은 URL '형식'이 아니라 '계정' — SCP_OPLOG_* 오버라이드(구계정 ec11538a…) 버킷 URL이라 거부됐다. 라이브 프로브 확정: 같은 콜론 tenant-path URL을 호출자 계정(81eccb26…) 버킷으로 바꾸면 createimage 200(queued)→DELETE 204 즉시 성공, 문서 예시의 슬래시 형식은 RGW·createimage 양쪽 400. core/oplog.py ensure_image_asset()을 keys='test'(항상 테스트 계정) 고정으로 수리 — 다음 런부터 이 스텝과 후속 image-shell 체인(visibility/members) 2xx 예상. 멤버/visibility ops는 볼륨 없는 이 셸에서만 가능(custom image는 Image.InvalidVolumeOnVisibilityUpdate/SharedVisibilityRequired로 categorical 거부 — run-923a 실측)이라 이 그룹으로 이전."
         },
         {
           "name": "set-image-shell-visibility-shared",

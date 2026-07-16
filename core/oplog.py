@@ -233,17 +233,35 @@ def ensure_image_asset() -> str | None:
     오너 2026-07-15: "테스트용 이미지는 git에 넣어두고, 이것도 최초 1회는
     obj(버킷) 만들고 넣는 걸로." 원본은 repo의 ``assets/regr-minimal.qcow2``
     (수제 qcow2 v3 헤더+refcount+L1, 262,144B — tests/offline이 구조 검증).
-    최초 1회: oplog 버킷 ensure(_ensure_oplog_once, _client 경유 자동) →
-    head_object → 없으면 git 원본을 public-read로 업로드(put_text와 같은 ACL
-    폴백). URL은 RGW tenant-path(``<account_id>:<bucket>``) — account_id는
-    SCP_ACCOUNT_ID env 우선, 없으면 get_bucket_acl Owner ID에서 유도(구 계정
-    id 하드코딩이 신규 계정에서 404 나던 문제의 근본 해소). 모든 실패는
-    None (best-effort — 해당 시나리오 스텝이 4xx로 표면화)."""
+    최초 1회: 버킷 ensure(아래 head/create) → head_object → 없으면 git
+    원본을 public-read로 업로드(put_text와 같은 ACL 폴백).
+
+    자격/URL 형식 (2026-07-16 라이브 확정, soft-4xx 원인규명 캠페인):
+    **항상 테스트 계정 키(keys="test")** — createimage는 URL의 계정이
+    **호출자 자신의 계정일 때만** 통과한다. run a690에서 SCP_OPLOG_* 오버라이드
+    (구 계정 ec11538a…)의 버킷 URL로 400 Image.InvalidObjectStorageUrl,
+    같은 객체를 신 계정(81eccb26…) 버킷에 두고 호출하면 200(queued, 즉시
+    DELETE 204)을 실측. URL 형식 자체는 RGW tenant-path
+    (``<account_id>:<bucket>``, 콜론)가 정답 — 문서 request_example의 슬래시
+    형식(``/<account>/<bucket>/…``)은 RGW anon GET 400 + createimage 400
+    둘 다 실측 (문서 예시가 이 환경과 불일치, conformance 후보). account_id는
+    SCP_ACCOUNT_ID env 우선, 없으면 get_bucket_acl Owner ID에서 유도.
+    모든 실패는 None (best-effort — 해당 시나리오 스텝이 4xx로 표면화)."""
     if _IMAGE_ASSET_URL[0]:
         return _IMAGE_ASSET_URL[0]
-    c, cfg = _client()
+    c, cfg = _client(keys="test")
     if not c:
         return None
+    try:
+        # keys="test"는 _ensure_oplog_once를 타지 않으므로 여기서 직접 ensure
+        # (신 계정 첫 사용 시 버킷 부재 — 이름은 계정 간 충돌하지 않는다).
+        c.head_bucket(Bucket=cfg["bucket"])
+    except Exception:
+        try:
+            c.create_bucket(Bucket=cfg["bucket"])
+        except Exception as exc:  # noqa: BLE001 — best-effort
+            print(f"[oplog] image asset bucket ensure failed ({exc})")
+            return None
     try:
         c.head_object(Bucket=cfg["bucket"], Key=IMAGE_ASSET_KEY)
     except Exception:

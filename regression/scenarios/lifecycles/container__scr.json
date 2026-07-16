@@ -255,6 +255,23 @@
           "_note": "updatepublicendpointenabled: enable public endpoint first so public-acl can be set (409 otherwise)"
         },
         {
+          "name": "wait-registry-public-endpoint",
+          "method": "GET",
+          "path": "/v1/container-registries/{registry_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "scr-registry-public-acl",
+          "poll": {
+            "field": "$.registry.public_endpoint_enabled",
+            "until": [true, "true", "True"],
+            "timeout": 420,
+            "interval": 15
+          },
+          "_note": "NEW 2026-07-16 (soft-4xx 원인규명, run a690): enable-public-endpoint 200(18:04:45) 후에도 public-acl PUT 이 409 put-conflict 'the registry does not use a public endpoint' 를 8x15s 재시도 내내(~18:07:05) 반환 — 200 응답이 곧 적용 완료가 아닌 비동기 프로비저닝임을 실측. 맹목 409 재시도(전 자동수리 R1-settle-409) 대신 show 응답의 public_endpoint_enabled($.registry.*, docs showregistry response_example 필드 확인) 가 true 로 뒤집힐 때까지 필드 폴로 settle. 타임아웃 시 이 그룹(public-acl)만 skip."
+        },
+        {
           "name": "registry-update-public-acl",
           "method": "PUT",
           "path": "/v1/container-registries/{registry_id}/public-acl",
@@ -338,6 +355,23 @@
           "retries": 6,
           "retry_interval": 15,
           "_note": "Deletes ONLY the self-created fallback registry ({created_registry_id} stays a literal placeholder in borrow mode -> harmless 4xx, borrowed/owner registry untouched). LIVE 2026-07-15: DELETE 202 -> GET 404 after ~110s. 409 retried while the repo delete settles."
+        },
+        {
+          "name": "wait-created-registry-gone",
+          "method": "GET",
+          "path": "/v1/container-registries/{created_registry_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "optional": true,
+          "group": "scr-registry-create",
+          "poll": {
+            "until_status": [404],
+            "timeout": 420,
+            "interval": 15
+          },
+          "_note": "NEW 2026-07-16 (soft-4xx 원인규명, run a690): 레지스트리 쿼터가 1EA(CONTAINER_REGISTRY.NON_VISIBILITY.MAX.COUNT) — 이 lifecycle 이 DELETE 202 만 확인하고 즉시 끝나면(18:07:44) 뒤이어 도는 container-scr-registry 의 create 가 403 scp-container-registry.quota.value.exceeded 로 죽는다(18:10:38 실측 — 202 후 ~3분이 지나도 쿼터 미반환). GET 404 까지 붙잡아 다음 lifecycle 의 쿼터 슬롯을 최대한 보장. 404 이후에도 쿼터 카운터 해제가 더 지연될 수 있음(a690 정황) — 재발 시 core.budgets 에 container-registry kind 편입이 다음 수단 (Hard Rule 6)."
         }
       ]
     },

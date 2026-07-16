@@ -88,7 +88,8 @@
             202
           ],
           "optional": true,
-          "group": "rg-tags"
+          "group": "rg-tags",
+          "_note": "판정 2026-07-16 (soft-4xx 원인규명, run a690): 403 Forbidden에 response.action_name=null·message 'Action definition …' (req-01601971) — updateresourcetags(PUT /v1/tags/{srn}/bulk)에 IAM action 정의가 없는 PF-15 클래스(미정의 IAM action 제품 결함; log-streams LIST·api-key GET·fs-snapshot GET·server static-nat GET과 동일) 5번째 사례. 같은 런에서 updatetags(PUT /v1/tags/bulk)는 200 — 바디/SRN 문제 아님. 403이 그룹을 끊어 list-rg-tags/del-rg-tag도 스킵됨 — 백엔드 action 정의 수리 전까지 재현 지속 예상."
         },
         {
           "name": "list-rg-tags",
@@ -2149,7 +2150,7 @@
             "service": "virtualserver"
           },
           "optional": true,
-          "_note": "PF-21 CONFIRMED product bug (500 InternalServerError, runs 27540589368/27583285457, req-bc27a3b6/req-78aec306) — baselined in known_issues.json (compute/virtualserver/createvolumetransfer); 500 tolerated so the chain survives, still records the 500 in observations. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume, body/캡처/expect verbatim)."
+          "_note": "PF-21 RESOLVED 판정 2026-07-16 (run a690): createvolumetransfer 202 + verify read 200 + list 200 + accept 202 라이브 실측 (id 67581451-1e7b, 18:08:30) — 버전업에서 제품버그 해소로 보임. 500 관용은 재발 감시용으로 한 런 더 유지(다음 전체 런에서 202 재확인 시 expect에서 500 제거 + known_issues.json 베이스라인 은퇴 권장). 원 기록: 500 InternalServerError runs 27540589368/27583285457, req-bc27a3b6/req-78aec306. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수."
         },
         {
           "name": "verify-volume-transfer-read",

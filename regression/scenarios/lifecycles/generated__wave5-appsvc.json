@@ -671,11 +671,11 @@
           "service": "apigateway",
           "method": "POST",
           "path": "/v1/apis",
-          "_note": "own api for the {api_id} the connection/approval DTOs require (PrivateLinkEndpointConnectionRequest/ApprovalRequest both carry api_id).",
+          "_note": "own api for the {api_id} the connection/approval DTOs require (PrivateLinkEndpointConnectionRequest/ApprovalRequest both carry api_id). REPAIR 2026-07-16 (soft-4xx 원인규명, run a690): approval/connection(DISCONNECT·RECONNECT) 프로브가 전부 400 scp-application-apigateway.api.cannot-use-region-api 'API endpoint of type REGION is not supported'(req-493c52e8 외) — privatelink 연결 대상 API 는 PRIVATE 타입이어야 한다는 명시적 에러 가이던스. endpoint_type REGION→PRIVATE 교체 (docs ApiCreateRequestV1Dot2 enum (REGION, PRIVATE) 확인). REGION 타입 createapi 커버리지는 같은 파일의 다른 두 lifecycle(create-api REGION)이 계속 담당.",
           "json": {
             "name": "regrw5ple{ualpha}",
             "description": "API regression wave5 privatelink",
-            "endpoint_type": "REGION",
+            "endpoint_type": "PRIVATE",
             "tags": []
           },
           "expect_status": [
