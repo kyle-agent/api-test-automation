@@ -117,10 +117,15 @@ def _run_with_mocked_engine(monkeypatch, lcs, *, workers, sleep=0.02,
     # 선택-게이트가 provision을 스킵해버리면 residents 시드를 관측할 수 없다
     # (게이트 자체는 test_shared_infra_needs.py가 검증).
     from regression.scenarios import shared_infra
+    # 병렬 프로비저닝(2026-07-16) 후 선시드는 needs 기반 '계획 상주 수'로
+    # 이뤄지므로, residents와 needs를 정합시킨다 (net truthy → 계획 3 = 실제 3;
+    # 아니면 t=0 창에서 self-create가 시드 전에 진입해 테스트 의도가 깨진다).
     monkeypatch.setattr(shared_infra, "shared_needs",
                         lambda only_ids=None: {"main": True, "db": False,
-                                               "net": (), "tgw": False,
+                                               "net": ("a", "b") if residents >= 3 else (),
+                                               "tgw": False,
                                                "igw": False, "any": True})
+    monkeypatch.setenv("SCP_WORKER_RAMP_S", "0")  # 램프는 오프라인 무대기
     _rkeys = ["shared_vpc_id", "shared_net_vpc_a_id", "shared_net_vpc_b_id"]
     _sctx = {k: f"r{i}" for i, k in enumerate(_rkeys[:residents])}
     monkeypatch.setattr(engine, "provision_shared_vpc",
