@@ -486,7 +486,11 @@
           "name": "list-clusters",
           "method": "GET",
           "path": "/v1/clusters",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "read-cov",
           "capture_soft": {
@@ -497,7 +501,11 @@
           "name": "list-engine-versions",
           "method": "GET",
           "path": "/v1/engine-versions",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "read-cov",
           "capture_soft": {
@@ -508,7 +516,11 @@
           "name": "get-cluster-commands",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/commands",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "read-cov",
           "_note": "환경/상태 관용 4xx (a690 원인규명 2026-07-16): commands read는 클러스터가 RUNNING일 때만 200 — read-coverage가 잡는 기존 클러스터가 생성/전이 중이면 400 Dbaas.ResourceStateError.InvalidState 'Resource State is not in RUNNING' (a690 LIVE). GET이 상태 이유로 400을 반환하는 것 자체는 conformance 후보로 보고됨. RUNNING 클러스터에서의 200 증거는 subops-a/-full의 capture-command-id 스텝이 담당."
@@ -517,7 +529,11 @@
           "name": "get-engine-version-properties",
           "method": "GET",
           "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "read-cov"
         },
@@ -525,7 +541,11 @@
           "name": "list-parameter-groups",
           "method": "GET",
           "path": "/v1/parameter-groups",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "read-cov",
           "capture_soft": {
@@ -539,7 +559,11 @@
           "params": {
             "dbaas_parameter_group_id": "{dbaas_parameter_group_id}"
           },
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "read-cov"
         },
@@ -551,6 +575,1076 @@
             "dbaas_parameter_group_id": "{dbaas_parameter_group_id}",
             "request_id": "00000000-0000-0000-0000-000000000000"
           }
+        }
+      ]
+    },
+    {
+      "id": "cachestore-cluster-version-upgrade",
+      "service": "database/cachestore",
+      "enabled": true,
+      "heavy": true,
+      "_note": "HEAVY 2026-07-16 (svccov-cache session, owner-approved SCP_RUN_HEAVY): dedicated 1-cluster campaign for the cachestore version-axis + remaining subop gap keys (cachestorepatchminorversion, cachestoreshowinstance, cachestoreremovebackuphistories, cachestoreunsetbackup) that neither cachestore-cluster-subops-guarded (soft-window, no create) nor cachestore-cluster-subops-a/b (database__subops-full.json, no patch/show-instance) reach with a real 2xx. STRATEGY (live GET /v1/engine-versions 2026-07-16: contents=[Valkey Sentinel 9.0.4 (maj 9) id fd55d33017b24a03a409f90617a2c316, Valkey Sentinel 8.1.8 (maj 8) id c1f958b5aea7493d82a9fd13bebb4340, Redis OSS Sentinel 7.2.14 (maj 7) id b8849e393072451c8ab5b35c4430624a] -- re-derive via where_prefix if a future run shows drift, catalog churns: the previously-hardcoded patch target 7.2.11 is GONE): create the cluster on Valkey Sentinel 8.1.8 -> patch-minor-version targets Valkey Sentinel 9.0.4 on the SAME cluster, since the catalog currently offers only ONE minor per major (no same-major old-vs-new minor pair exists, unlike mysql's 8.4.5/8.4.6/8.4.7) -- this necessarily tests whether cachestorepatchminorversion doubles as cachestore's cross-major upgrade path (cachestore, unlike mysql/mariadb, has no separate upgrademajorversion endpoint). MinorPatchDbEngineRequest body CONFIRMED via data/api_docs.json (database/cachestore/minorpatchdbenginerequest): {dbaas_engine string REQUIRED, software_version string REQUIRED} -- ONLY 2 fields, NO backup_before_upgrade (unlike mysql/mariadb's sibling MinorPatchRequest model, which DOES require it) -- do not port that field over by analogy. dbaas_engine is captured LIVE from the cluster's own detail GET ($.dbaas_engine) so it reflects whatever the backend actually reports (a690 2026-07-16 found this now reports 'Valkey Sentinel', not 'redis'/'Redis OSS Sentinel' -- the OLD hardcoded patch body in cachestore-cluster-subops-guarded is doubly stale: wrong engine name AND a software_version no longer in the catalog). cachestoreshowinstance needs instance_name (a NAME not an id) captured from $.instance_groups[0].instances[0].name on the cluster detail. cachestoreremovebackuphistories/cachestoreunsetbackup are RE-TESTED here for a fresh cachestore confirmation of the known cross-engine 401 Dbaas.Unauthorized.AuthNFailed-with-valid-HMAC PF quirk (mysql/mariadb/postgresql/epas/cachestore all show it on PUT .../backup-histories + DELETE .../backups per knowledge/validated-facts.md and cachestore-cluster-subops-a's 2026-07-04/2026-07-16 notes) -- widened expect_status tolerates it without cascading a group-skip. cachestorecreaterestore and cachestoreswitchovercluster are DELIBERATELY EXCLUDED (cost/design deferral, not attempted): create-restore provisions an ADDITIONAL untracked billable cluster with no capture/cleanup path in this lifecycle shape; switchover's RedisSwitchoverTargetRequest needs switch_host_name from a SECOND live host, which only exists on an ha_enabled=true cluster (this lifecycle is single-node, matching the existing subops-a/b non-HA design) -- both stay classified blockers/next_levers, not chased with a second billable cluster in this session. Own dedicated VPC/subnet (10.151.0.0/20) so this never contends with cachestore-cluster-subops-a/b's 10.134/10.136 ranges or other concurrent DBaaS agents' 10.13x/10.14x ranges.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression cachestore version-upgrade",
+            "cidr": "10.151.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression cachestore version-upgrade",
+            "cidr": "10.151.5.0/24",
+            "type": "PUBLIC",
+            "category": "PRIMARY",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 600,
+            "interval": 10
+          }
+        },
+        {
+          "name": "find-engine-version",
+          "service": "cachestore",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "cache_ver_old": {
+              "list": "$.contents",
+              "where_prefix": {
+                "product_image_type": "Valkey Sentinel",
+                "major_version": "8"
+              },
+              "get": "id"
+            }
+          },
+          "capture_soft": {
+            "cache_target_software": {
+              "list": "$.contents",
+              "where_prefix": {
+                "product_image_type": "Valkey Sentinel",
+                "major_version": "9"
+              },
+              "get": "software_version"
+            }
+          },
+          "_note": "cache_ver_old = Valkey Sentinel 8.1.8 (major_version '8', semantic where_prefix; live-verified 2026-07-16: contents=[Valkey Sentinel 9.0.4 (maj 9), Valkey Sentinel 8.1.8 (maj 8), Redis OSS Sentinel 7.2.14 (maj 7)] -- only ONE minor per major currently listed (the previously-hardcoded 7.2.11 target is GONE from the catalog, confirming versions churn and the old hardcoded patch body was stale). cache_target_software = Valkey Sentinel 9.0.4's software_version -- the only 'newer' version reachable is a MAJOR bump (8->9), so this lifecycle tests whether cachestorepatchminorversion's MinorPatchDbEngineRequest {dbaas_engine, software_version} (data/api_docs.json: NO backup_before_upgrade field, unlike mysql/mariadb's sibling model) permits a same-product-line major bump, not a same-major minor bump (none exists to target)."
+        },
+        {
+          "name": "find-server-type",
+          "service": "cachestore",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "cache_stype": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              }
+            },
+            "cache_stype2": {
+              "list": "$.contents",
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "nth": 1,
+              "get": "name",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1",
+                "name": "css"
+              }
+            }
+          }
+        },
+        {
+          "name": "create-cluster",
+          "service": "cachestore",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "replica_count": 0,
+            "init_config_option": {
+              "backup_option": {
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "database_port": 6378,
+              "database_user_password": "Regr1ss@2026",
+              "sentinel_port": 26378
+            },
+            "name": "regrcvu{ualpha}",
+            "instance_name_prefix": "regrcvu",
+            "dbaas_engine_version_id": "{cache_ver_old}",
+            "instance_groups": [
+              {
+                "role_type": "MASTER",
+                "server_type_name": "{cache_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "MASTER",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "cachestore"
+          },
+          "_note": "dbaas_engine_version_id = cache_ver_old (Valkey Sentinel 8.1.8) -- deliberate starting point for the patch-minor-version target test below."
+        },
+        {
+          "name": "wait-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30,
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "capture-cluster-detail",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "dbaas_engine": "$.dbaas_engine",
+            "instance_name": "$.instance_groups[0].instances[0].name",
+            "instance_group_id": "$.instance_groups[0].id",
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+          },
+          "_note": "dbaas_engine feeds cachestorepatchminorversion's MinorPatchDbEngineRequest.dbaas_engine (captured live, never hardcoded -- a690 2026-07-16 found this cluster's OWN dbaas_engine now reports 'Valkey Sentinel', not 'redis'/'Redis OSS Sentinel', confirming the old hardcoded {dbaas_engine:'redis', software_version:'7.2.11'} body was doubly stale). instance_name (a NAME not an id) feeds cachestoreshowinstance."
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}"
+          }
+        },
+        {
+          "name": "show-instance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/instances/{instance_name}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "show-instance",
+          "_note": "gap cachestoreshowinstance -- instance_name captured from cluster detail's instance_groups[0].instances[0].name."
+        },
+        {
+          "name": "set-maintenance",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "maint"
+        },
+        {
+          "name": "wait-after-set-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "maint"
+        },
+        {
+          "name": "unset-maintenance",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "maint"
+        },
+        {
+          "name": "wait-after-unset-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "maint"
+        },
+        {
+          "name": "set-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {
+            "retention_period_day": "8",
+            "starting_time_hour": "3"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "backup"
+        },
+        {
+          "name": "wait-after-set-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "backup"
+        },
+        {
+          "name": "list-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "backup-read",
+          "capture_soft": {
+            "backup_history_number": "$.contents[0].backup_history_number"
+          },
+          "_note": "gap cachestorelistbackuphistories re-confirm + feeds remove-backup-histories."
+        },
+        {
+          "name": "remove-backup-histories",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "json": {
+            "backup_history_number": [
+              "{backup_history_number}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
+          "optional": true,
+          "group": "backup",
+          "_note": "gap cachestoreremovebackuphistories. body field name confirmed backup_history_number (array[string], data/api_docs.json database/cachestore/backuphistorynumberrequest) -- no typo. If no real backup history exists yet (schedule config != immediate backup, cachestore has no manual-backup endpoint), the literal unresolved token still reaches the endpoint. expect_status widened to include 401(+500): known cross-engine backend quirk (mysql/mariadb/postgresql/epas/cachestore all show PUT .../backup-histories and DELETE .../backups 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while sibling subops on the same cluster/run succeed -- knowledge/validated-facts.md, reconfirmed HB1 2026-07-04 + a690 2026-07-16 cachestore-cluster-subops-a). Re-tested here for a fresh cachestore PF confirmation, not chased further if 401 recurs."
+        },
+        {
+          "name": "wait-after-remove-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "backup"
+        },
+        {
+          "name": "unset-backup",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "backup",
+          "_note": "gap cachestoreunsetbackup. Same known 401 Dbaas.Unauthorized.AuthNFailed PF quirk family as remove-backup-histories (see note there) -- re-tested for a fresh cachestore confirmation."
+        },
+        {
+          "name": "wait-after-unset-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "backup"
+        },
+        {
+          "name": "set-security-group-rules",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [
+              "10.124.0.10"
+            ],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "sg-rules"
+        },
+        {
+          "name": "wait-after-set-security-group-rules",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "sg-rules"
+        },
+        {
+          "name": "resize-instance-group",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/resize",
+          "json": {
+            "server_type_name": "{cache_stype2}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "resize"
+        },
+        {
+          "name": "wait-after-resize-instance-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "resize"
+        },
+        {
+          "name": "resize-block-storage",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "json": {
+            "size_gb": 112
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "resize"
+        },
+        {
+          "name": "wait-after-resize-block-storage",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "resize"
+        },
+        {
+          "name": "pre-patch-sync-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "recovers a post-resize UNKNOWN/in-progress service_state before patch (mirrors the mysql-cluster-version-upgrade/subops-a pre-delete-sync-state repair pattern)."
+        },
+        {
+          "name": "wait-pre-patch-settle",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {
+            "dbaas_engine": "{dbaas_engine}",
+            "software_version": "{cache_target_software}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "patch",
+          "_note": "gap cachestorepatchminorversion. MinorPatchDbEngineRequest body CONFIRMED via data/api_docs.json: {dbaas_engine string REQUIRED, software_version string REQUIRED} -- unlike mysql/mariadb's MinorPatchRequest sibling model, cachestore's has NO backup_before_upgrade field (checked live 2026-07-16, model has exactly 2 fields). dbaas_engine captured live from THIS cluster's own detail ($.dbaas_engine, e.g. 'Valkey Sentinel') -- never hardcoded. software_version targets cache_target_software (Valkey Sentinel 9.0.4) -- a MAJOR version bump, because the current engine-versions catalog (live 2026-07-16) lists only ONE minor per major (9.0.4/8.1.8/7.2.14), so no same-major newer minor exists to target; this tests whether the same generic 'patch' endpoint doubles as cachestore's major-upgrade path (cachestore has no separate upgrademajorversion endpoint, unlike mysql/mariadb)."
+        },
+        {
+          "name": "wait-after-patch",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "group": "patch"
+        },
+        {
+          "name": "verify-after-patch",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "patch",
+          "capture_soft": {
+            "software_version_after_patch": "$.software_version"
+          },
+          "_note": "logs the post-patch software_version for the observation trail."
+        },
+        {
+          "name": "pre-delete-sync-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "recovers a post-patch UNKNOWN/in-progress service_state before delete."
+        },
+        {
+          "name": "wait-pre-delete-settle",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "delete-cluster",
+          "service": "cachestore",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "wait-cluster-gone",
+          "service": "cachestore",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30,
+            "refire": {
+              "method": "DELETE",
+              "path": "/v1/clusters/{cluster_id}",
+              "field": "$.service_state",
+              "when": [
+                "DELETE_FAILED",
+                "ERROR_DELETING",
+                "FAILED",
+                "ERROR"
+              ],
+              "max": 3
+            }
+          },
+          "_note": "negative-probe: until_status 404 is the success condition (resource gone)."
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 900,
+            "interval": 15
+          },
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "adopt": "vpc"
         }
       ]
     }

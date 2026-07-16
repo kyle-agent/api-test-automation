@@ -897,6 +897,697 @@
           }
         }
       ]
+    },
+    {
+      "id": "epas-cluster-version-upgrade",
+      "service": "database/epas",
+      "enabled": true,
+      "heavy": true,
+      "_note": "HEAVY 2026-07-16 (svccov-epas session, owner-approved SCP_RUN_HEAVY): dedicated 1-cluster campaign for the version-axis + new-instance-ops gap keys that epas-cluster-subops-a/b (database__subops-full.json) can't reach on a single already-newest-version cluster: epaspatchminorversion, epasshowinstance, epasmanualbackup, epasexportlog, epasremovebackuphistories (PF recheck), epasunsetbackup (PF recheck). Ported STRUCTURALLY from the live-proven mysql-cluster-version-upgrade / mariadb-cluster-version-upgrade (database__mysql.json / database__mariadb.json, 2026-07-16 svccov sessions) with epas's OWN live-verified specifics. LIVE GET /v1/engine-versions 2026-07-16 (svccov-epas session): contents[0]=17.7 id d058dc79a86842f9b558933e9d285b9f (newest major 17 minor), contents[1]=17.6 id e9f7306c6734479b865d0dd8b9b8c6d5, contents[2]=16.11 id dd6967f9a5ef4fcb9cb0db7546be57ee (newest major 16 minor), contents[3]=16.10, contents[4]=16.9, contents[5]=16.8 id 821110c054044f0188b0811e53ef9ed6 (oldest major 16 minor), contents[6..9]=15.15/15.14/15.13/15.12 -- ASSUMES this descending-by-recency order holds; re-derive indices from a fresh GET if a run shows a capture mismatch. epas has NO major-version-upgrade endpoint (confirmed absent from the catalog -- unlike mysql/mariadb which have PUT .../major-version-upgrade) so this lifecycle only proves the minor-patch axis: create the cluster on the OLDEST minor of major 16 (16.8, contents[5]) -> epaspatchminorversion jumps it to the NEWEST minor of the SAME major (16.11, contents[2]) -- deliberately NOT major 17, since a patch across majors is untested/risky and the known-blocked pattern is resending the cluster's OWN current version (400 'Unpatchable version' per the mysql/mariadb precedent), not a same-major minor jump. MinorPatchRequest body: {backup_before_upgrade: bool REQUIRED, software_version: string REQUIRED} per mysql/mariadb precedent (data/api_docs.json epaspatchminorversion model list both fields; doc's own request_example shows both too). epasshowinstance needs path param instance_name (a NAME not an id) captured from $.instance_groups[0].instances[0].name on the cluster detail. epasmanualbackup takes NO request body per the docs model (path cluster_id only), mirrors mysql/mariadbmanualbackup. epasexportlog log_type is a fixed enum (alert|audit|slow, data/api_docs.json database/epas/epasexportlog) -- tries all 3 values sequentially (own group each) per the orchestrator brief; registration is PF-blocked (known_issues.json database/epas/epasregisterlogexportconfig, 500 ContactAdminForAssistance) so export is attempted WITHOUT a registered config, same as the mysql/mariadb siblings. epasremovebackuphistories: body key IS ALREADY 'backup_history_number' (verified correct against data/api_docs.json database/epas/epasremovebackuphistories -- no typo present in the existing epas-cluster-subops-a/guarded fragments, contrary to the orchestrator brief's caution); the mysql/postgresql siblings both reconfirmed TODAY that this endpoint (and its unsetbackup sibling) 401 Dbaas.Unauthorized.AuthNFailed even with a correct body + a REAL captured backup_history_number -- a known backend auth quirk (query-string HMAC signing on backup-family endpoints) shared across mysql/mariadb/postgresql/epas/cachestore, NOT a body-shape bug -- reconfirmed once more here for epas specifically (own known_issues.json entry to follow if reproduced). epasunsetbackup similarly 1-shot rechecked here (no known_issues.json entry existed yet for epas specifically before this run). C-group (epascreaterestore, epascreateotherregionreplica, epasswitchovercluster) deliberately EXCLUDED -- each needs its own extra billable cluster, a completed backup, or an ha_enabled=true/replica cluster (mysql precedent: switchover 404 'switchover-host.not-found' on a single-node cluster, structural) -- out of this session's single-cluster/time budget; left as a follow-up lever. register/set/unregister-log-export-config deliberately EXCLUDED from this lifecycle (same convention as the mysql/mariadb siblings) -- register is already a confirmed PF-500 across all 5 DB engines (knowledge/validated-facts.md), and set/unregister are structurally unreachable-2xx downstream of it. Own create-vpc(10.146.0.0/20)/create-subnet(10.146.3.0/24) + adopt:'vpc'/'subnet#db' markers mirroring the mysql/mariadb template -- per the mariadb sibling's LIVE-OBSERVED note, the session-scoped shared_infra fixture actually adopts/provisions a shared VPC and these steps get skipped at runtime; the CIDRs above are kept for schema-consistency with the other version-upgrade lifecycles, not because they're guaranteed to be used. OPERATIONAL LESSON (mariadb sibling, 2026-07-16): invoke via run_in_background:true -- a foreground shell call hitting the harness's own ~2min default timeout gets SIGKILLed WITHOUT running pytest's session teardown, orphaning the shared VPC+subnet. Budget the full session runway for one attempt (create ~2400s + minor-patch settle ~1800s + manual-backup settle ~600s + delete polling), do not split into a second short probe.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression DBaaS version-upgrade epas",
+            "cidr": "10.146.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression DBaaS version-upgrade epas",
+            "cidr": "10.146.3.0/24",
+            "type": "PUBLIC",
+            "category": "PRIMARY",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "find-engine-version",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "engine_version_old_id": "$.contents[5].id"
+          },
+          "capture_soft": {
+            "engine_version_new_software": "$.contents[2].software_version",
+            "engine_version_old_software": "$.contents[5].software_version"
+          },
+          "_note": "LIVE-VERIFIED 2026-07-16 (svccov-epas session): contents[2]=16.11 (newest minor of major 16), contents[5]=16.8 (oldest minor of major 16). epas has no major-version-upgrade endpoint so create+patch both stay within major 16. Re-derive indices from a fresh GET if a run shows mismatch."
+        },
+        {
+          "name": "find-server-type",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-cluster",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrepvu{ualpha}",
+            "instance_name_prefix": "regrepvu",
+            "dbaas_engine_version_id": "{engine_version_old_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "database_name": "regrepas",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss@2026",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C"
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "retry_on_status": [
+            500,
+            503
+          ],
+          "retries": 2,
+          "retry_interval": 60,
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "epas"
+          },
+          "_note": "dbaas_engine_version_id = engine_version_old_id (16.8, oldest minor of major 16) -- deliberate, this is the version-upgrade campaign's starting point. Body shape mirrors the live-proven epas-cluster-subops-a epas-create (database__subops-full.json)."
+        },
+        {
+          "name": "wait-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "capture-cluster-detail",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "instance_name": "$.instance_groups[0].instances[0].name"
+          },
+          "_note": "instance_name (a NAME not an id) feeds epasshowinstance."
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}"
+          }
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {
+            "backup_before_upgrade": false,
+            "software_version": "{engine_version_new_software}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "minor-patch",
+          "_note": "gap epaspatchminorversion. Targets engine_version_new_software (16.11, newest minor of major 16) -- genuinely newer than the cluster's own 16.8, unlike the known-blocked pattern of resending the cluster's OWN current version (mysql/mariadb precedent: 400 'Unpatchable version')."
+        },
+        {
+          "name": "wait-after-minor-patch",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "minor-patch",
+          "poll": {
+            "field": "$.service_state",
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30,
+            "give_up_status": [
+              400,
+              404
+            ]
+          }
+        },
+        {
+          "name": "show-instance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/instances/{instance_name}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "show-instance",
+          "_note": "gap epasshowinstance -- instance_name captured from the cluster detail's instance_groups[0].instances[0].name (a NAME, not an id)."
+        },
+        {
+          "name": "manual-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups/manual",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "gap epasmanualbackup -- no request body per docs model (path cluster_id only); 409 retry ladder for in-flight-op contention, mirrors mysql/mariadbmanualbackup."
+        },
+        {
+          "name": "wait-after-manual-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "poll": {
+            "field": "$.service_state",
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          }
+        },
+        {
+          "name": "list-backup-histories-after",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "capture_soft": {
+            "backup_history_number": "$.contents[0].backup_history_number"
+          },
+          "_note": "feeds cleanup-backup-histories's REQUIRED field."
+        },
+        {
+          "name": "cleanup-backup-histories",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "json": {
+            "backup_history_number": [
+              "{backup_history_number}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "_note": "gap epasremovebackuphistories. Body key is 'backup_history_number' (array[string]) -- confirmed correct against data/api_docs.json, no typo present. Populated with the REAL backup_history_number captured right after manual-backup. mysql/postgresql siblings both reconfirmed 2026-07-16 that this endpoint 401s Dbaas.Unauthorized.AuthNFailed even with a correct body + real id -- a backend auth quirk (query-string HMAC signing on backup-family endpoints), NOT a body-shape bug; expecting the same class here for epas."
+        },
+        {
+          "name": "unset-backup",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "unset-backup",
+          "_note": "gap/PF-recheck epasunsetbackup. mysql/postgresql siblings 401 Dbaas.Unauthorized.AuthNFailed on this endpoint (same backup-family HMAC quirk as removebackuphistories, known_issues.json mysql/postgresql entries) -- 1-shot recheck for epas specifically here."
+        },
+        {
+          "name": "set-log-type-alert",
+          "action": "set_const",
+          "values": {
+            "log_type": "alert"
+          }
+        },
+        {
+          "name": "export-log-alert",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "export-log-alert",
+          "_note": "gap epasexportlog attempt 1/3 (log_type=alert -- the value the epasregisterlogexportconfig doc's own request_example uses; also the value that worked live for mysqlexportlog 2026-07-16). log_type is a fixed enum path token, NOT dependent on a registered log-export-config (registration is PF-blocked, 500 ContactAdminForAssistance class). No request body per docs model."
+        },
+        {
+          "name": "set-log-type-audit",
+          "action": "set_const",
+          "values": {
+            "log_type": "audit"
+          }
+        },
+        {
+          "name": "export-log-audit",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "export-log-audit",
+          "_note": "gap epasexportlog attempt 2/3 (log_type=audit) -- owner asked to try all 3 enum values for epas."
+        },
+        {
+          "name": "set-log-type-slow",
+          "action": "set_const",
+          "values": {
+            "log_type": "slow"
+          }
+        },
+        {
+          "name": "export-log-slow",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "export-log-slow",
+          "_note": "gap epasexportlog attempt 3/3 (log_type=slow) -- mysql confirmed this 400s InvalidLogType on a real cluster despite the docs enum listing it; kept here for completeness/parity."
+        },
+        {
+          "name": "pre-delete-sync-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "recovers a post-subop UNKNOWN service_state before delete so delete-cluster doesn't 400 InvalidState."
+        },
+        {
+          "name": "wait-pre-delete-settle",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ]
+          }
+        },
+        {
+          "name": "delete-cluster",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "wait-cluster-gone",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30,
+            "refire": {
+              "method": "DELETE",
+              "path": "/v1/clusters/{cluster_id}",
+              "field": "$.service_state",
+              "when": [
+                "DELETE_FAILED",
+                "ERROR_DELETING",
+                "FAILED",
+                "ERROR"
+              ],
+              "max": 3
+            }
+          },
+          "_note": "negative-probe: until_status 404 is the success condition (resource gone)."
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "adopt": "subnet#db"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "adopt": "vpc"
+        }
+      ]
     }
   ]
 }
