@@ -30,7 +30,13 @@
             "method": "DELETE",
             "path": "/v1/apis/{api_id}",
             "service": "apigateway"
-          }
+          },
+          "retry_on_status": [
+            403
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "_note": "QUOTA-LADDER 2026-07-16 (run 4912/6ebd: CREATE_API_MAX_COUNT 3EA — 동시 apigw lifecycle 점유 창에서 환경 스킵): 30s×8 사다리로 쿼터 해제 대기 (apigw lifecycle들은 단주기라 수 분 내 반납). WAF 회피 간격 준수. || "
         },
         {
           "name": "find-root-resource",
@@ -1532,7 +1538,7 @@
           "service": "apigateway",
           "method": "POST",
           "path": "/v1/apis",
-          "_note": "cross-service prereq chain (apigw-api -> resource -> method -> deployment) so stage 'dev' exists for the trigger — all VALIDATED gen-wave-apigw bodies.",
+          "_note": "QUOTA-LADDER 2026-07-16 (run 4912/6ebd: CREATE_API_MAX_COUNT 3EA — 동시 apigw lifecycle 점유 창에서 환경 스킵): 30s×8 사다리로 쿼터 해제 대기 (apigw lifecycle들은 단주기라 수 분 내 반납). WAF 회피 간격 준수. || cross-service prereq chain (apigw-api -> resource -> method -> deployment) so stage 'dev' exists for the trigger — all VALIDATED gen-wave-apigw bodies.",
           "json": {
             "name": "regrw5trg{ualpha}",
             "description": "API regression wave5 scf trigger",
@@ -1551,7 +1557,12 @@
             "method": "DELETE",
             "path": "/v1/apis/{api_id}",
             "service": "apigateway"
-          }
+          },
+          "retry_on_status": [
+            403
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "find-root-resource",
