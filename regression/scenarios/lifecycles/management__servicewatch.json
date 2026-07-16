@@ -429,7 +429,7 @@
           "path": "/v1/metrics/custom/meta",
           "group": "custom-metric-meta",
           "optional": true,
-          "_note": "createcustommetricmetas FIX 2026-07-16 (svccov session, live-verified 200): dimension key changed 'image_id' -> 'resource_id'. Live 400 was {code: BadRequest, detail: 'resource_id is required dimension.'} — MetricMetaDto.dimensions must include the literal 'resource_id' dimension key (matches knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta node, which already had this right).",
+          "_note": "createcustommetricmetas FIX 2026-07-16 (svccov session, live-verified 200): dimension key changed 'image_id' -> 'resource_id'. Live 400 was {code: BadRequest, detail: 'resource_id is required dimension.'} — MetricMetaDto.dimensions must include the literal 'resource_id' dimension key (matches knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta node, which already had this right). FIX 2 (svccov session): metricName/namespace de-{unique}'d to FIXED values — there is NO delete API for custom metric metas (account-permanent, billed beyond the free-10/month per userguide), so the old '{unique}'-suffixed names meant every CI run minted a brand-new undeletable metric definition. Fixed names let repeated runs reuse the same one instead of accumulating quota.",
           "json": {
             "metricMetas": [
               {
@@ -438,12 +438,12 @@
                 "dimensions": [
                   ["resource_id"]
                 ],
-                "metricName": "Custom_regr_{unique}",
+                "metricName": "Custom_regr_probe_count",
                 "storageResolution": 60,
                 "unit": "Bytes"
               }
             ],
-            "namespace": "MyCustom/regr{unique}"
+            "namespace": "MyCustom/regr"
           },
           "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
         },
