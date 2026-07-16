@@ -3605,3 +3605,16 @@ DELETE 400 `Volume.VolumeForSharingImageDelete` ("try again later") — 참조�
   VM 체인). conformance 후보는 '취소 API 부재'에서 '**공유 취소 경로가
   문서화되지 않음** + 진행 중 원본 삭제 가드 부재 + 실패 시 고아 플래그'로
   조정.
+
+## Subnet PRIMARY/SECONDARY 규칙 + networking-vpc-subnet 확장 (2026-07-16, 오너+공식문서)
+
+- **PRIMARY: VPC당 ≤3** (기존 실측과 일치) / **SECONDARY: PRIMARY당 ≤10** —
+  별도 쿼터 (userguide/networking/vpc_enterprise/overview 실측). SECONDARY는
+  `primary_subnet_id` 필수로 PRIMARY에 종속 — PRIMARY 없이는 생성 불가
+  (오너 확인). 삭제 순서는 S → P.
+- networking-vpc-subnet 확장 (net-A 채택 위에서): P1 생성→port 커버→P1 삭제 →
+  **P2 생성 → SECONDARY 생성(primary_subnet_id=P2) → S 삭제 → P2 삭제**.
+  CIDR: P1 10.130.13.0/24, P2 .14.0/24, S .15.0/24 (net-A 10.130.0.0/20 대역,
+  vip-nat .9.0/24 비충돌). net-A PRIMARY 동시 점유 최대 2/3.
+- subnet type별 (문서): PUBLIC=IGW NAT+NATGW 인아웃 / PRIVATE=NATGW 아웃만 /
+  VPC_ENDPOINT=엔드포인트 전용 / LOCAL=서버간 전용(외부 불가, 기본 50개).
