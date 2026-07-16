@@ -2174,6 +2174,49 @@
           "_note": "2026-07-08 25-편입(owner GO): listvolumetransfer. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume; 무위험 리드 → strict 200)."
         },
         {
+          "name": "delete-volume-transfer-pre-accept",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/volume-transfer/{transfer_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "optional": true,
+          "group": "volume-transfer",
+          "destructive": true,
+          "_note": "NEW 2026-07-16 (soft-4xx 원인규명, run a690): PF-21이 버전업에서 해소되어 create가 이제 202(auth_key/id 정상 캡처, req 실측 18:08:30) — 그런데 accept 202가 transfer 레코드를 소비해 이후 DELETE는 구조적으로 404(Volume.TransferNotFound, 실측 18:11:02)였다. deletevolumetransfer의 진짜 2xx 커버리지는 accept 이전에만 가능하므로 여기서 삭제하고, 아래 recreate가 accept용 transfer를 다시 만든다."
+        },
+        {
+          "name": "recreate-volume-transfer",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/volume-transfer",
+          "json": {
+            "name": "regrvt2{unique}",
+            "volume_id": "{vol_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture_soft": {
+            "transfer_id": "$.id",
+            "transfer_auth_key": "$.auth_key"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volume-transfer/{transfer_id}",
+            "service": "virtualserver"
+          },
+          "optional": true,
+          "group": "volume-transfer",
+          "_note": "NEW 2026-07-16: pre-accept delete가 소비한 transfer를 재생성해 accept에 공급 (transfer create는 무과금 메타 리소스; accept가 소비하므로 잔재 없음, 실패 시 cleanup DELETE)."
+        },
+        {
           "name": "accept-volume-transfer",
           "service": "virtualserver",
           "optional": true,
@@ -2238,7 +2281,7 @@
           "optional": true,
           "group": "volume-transfer",
           "destructive": true,
-          "_note": "404 Volume.TransferNotFound: {transfer_id} stays literal when no transfer was created/soft-captured, so the delete hits a nonexistent id. Coverage-only (C2); deleting a never-created transfer -> 404 is expected. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수 (원: gen-wave2-volume; wave2 teardown 순서 유지 — snapshot→transfer→volume)."
+          "_note": "판정 갱신 2026-07-16 (run a690): PF-21(create 500)은 버전업에서 해소 — create 202 + accept 202 라이브 실측. accept가 transfer 레코드를 소비하므로 이 tail delete의 404 Volume.TransferNotFound는 accept 성공 시의 예상 종착 상태(벨트-앤-서스펜더 정리 스텝으로 유지). 진짜 DELETE 2xx 커버리지는 위 delete-volume-transfer-pre-accept가 담당. §C 통합 (owner 승인 2026-07-08) — gen-wave2-* 은퇴분 흡수."
         },
         {
           "name": "delete-volume",
@@ -2887,6 +2930,8 @@
           ],
           "optional": true,
           "group": "ske-cluster-swlog",
+          "wait": 20,
+          "_note": "REPAIR 2026-07-16 (soft-4xx 원인규명, run a690): 직전 set-cluster-logging 200 후 1~2초 내 이 폴이 돌면 status가 아직 RUNNING(전이 지연)이라 즉시 통과하고, 곧이어 set-cluster-service-watch-logging이 400 scp-kubernetes.cluster.status-invalid 'Cluster status (UPDATING) is not Running'(req-ff597137)을 맞는다 — wait:20으로 전이가 표면화된 뒤 RUNNING 폴을 태워 settle 레이스 제거.",
           "poll": {
             "field": "$.cluster.status",
             "until": [
@@ -2912,7 +2957,9 @@
           ],
           "optional": true,
           "group": "ske-cluster-swlog",
+          "_note": "2026-07-16: retry_on_status에 400 추가 — 400 scp-kubernetes.cluster.status-invalid(UPDATING)는 상태 레이스(409 의미)라 재시도로 흡수 (직전 wait 스텝의 wait:20과 이중 방어).",
           "retry_on_status": [
+            400,
             409
           ],
           "retries": 4,
@@ -9070,9 +9117,9 @@
           "retry_interval": 15,
           "json": {
             "cloud_function_id": "{cloud_function_id}",
-            "trigger_type": "cronjob"
+            "trigger_type": "cron"
           },
-          "_note": "body is a best-guess (doc exposes no params); 400 tolerated since the 12 GETs are captured by probe-reads before teardown and the leftover-sweep removes any orphaned trigger."
+          "_note": "REPAIR 2026-07-16 (soft-4xx 원인규명 캠페인, run a690): 종전 best-guess 바디 trigger_type:'cronjob'이 400 scp-cloud-function.invalid-request-error의 원인 — 라이브 에러 가이던스가 허용값을 명시(detail: \"Trigger type must be 'apigateway' or 'cron'.\", req-67d9ce9a). 'cron'으로 수리 (docs TriggerDeleteRequest 예시는 'apigateway'만 보여줌 — create 경로 세그먼트 'cronjob'과 delete 바디 enum 'cron'이 불일치하는 API 설계 결함, conformance 후보). 400 관용은 다음 전체 런에서 2xx 확인 전까지 유지."
         },
         {
           "name": "delete",
