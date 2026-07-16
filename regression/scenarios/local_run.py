@@ -491,8 +491,15 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
             prework = (75.0 + 240.0
                        + (60.0 if _needs["igw"] else 0.0)
                        + (120.0 if _needs["tgw"] else 0.0))
-    wfree = [prework] * n_w
-    vfree = [prework] * n_v
+    # 자체-VPC(adopt 마커 0) 시나리오는 공유 인프라가 필요 없으니 t=0에 즉시
+    # 출발 — adopter만 사전작업 종료를 기다린다 (오너 2026-07-16: "vpc 생성하는
+    # 시나리오들은 시작부터 만들어도 되는거 아닌가? ske 등"). SKE(임계경로)가
+    # 사전작업 ~4.3분을 겪지 않아 makespan이 그만큼 준다. 실행기(native_runner)
+    # 도 동일 게이트로 정렬.
+    wfree = [0.0] * n_w
+    vfree = [0.0] * n_v
+    def _adopts_shared(lc: dict) -> bool:
+        return any(s.get("adopt") for s in lc.get("steps", []))
     bars = []
     if prework > 0:
         bars.append({"id": "shared-infra", "w": 0, "s": 0.0,
@@ -500,8 +507,9 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
                      "prework": True})
     for lc in items:
         d = _dur(lc)
+        earliest = prework if _adopts_shared(lc) else 0.0
         wi = min(range(n_w), key=lambda i: wfree[i])
-        start = wfree[wi]
+        start = max(wfree[wi], earliest)
         v = _self_vpc(lc)
         if v:
             vi = min(range(n_v), key=lambda i: vfree[i])

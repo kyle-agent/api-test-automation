@@ -185,9 +185,29 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
            for lc in lcs for s in lc.get("steps", [])):
         _shared._ensure_image_asset_env()
     needs = _shared.shared_needs(only_ids=idset)
-    if not needs["any"]:
-        log("[native] 공유 인프라 스킵 — 선택에 adopt 시나리오 없음 (self-create 전용)")
-    else:
+    budget = _budgets.Budget()          # **공유** (스레드-안전) — 계정-전역 쿼터 조율
+
+    # 사전작업 병렬화 (오너 2026-07-16: "vpc 생성하는 시나리오들은 시작부터
+    # 만들어도 되는거 아닌가? ske 등"): 자체-VPC(adopt 마커 0) lifecycle은
+    # 공유 인프라가 필요 없으므로 t=0에 즉시 디스패치하고, 프로비저닝은 백그라운드
+    # 스레드로 돌린다. adopter는 provision_done 게이트에서 대기 — SKE(임계경로)가
+    # 사전작업 ~4분을 안 겪어 makespan이 직접 준다.
+    provision_done = threading.Event()
+    # t=0 세마포어 선시드: 프로비저닝이 만들 계획 상주 수만큼 미리 소비 처리
+    # — 안 하면 provision이 VPC 3개를 만드는 동안 self-create들이 (캡-0)까지
+    # 진입해 exceed-max-count가 난다. 완료 시 실제 상주 수로 재동기화.
+    _planned = (1 + (2 if needs["net"] else 0)) if needs["any"] else 0
+    if _planned:
+        budget.sync("vpc", _planned)
+        log(f"[native] VPC 세마포어 선시드(계획 상주 {_planned}) — 자체-VPC "
+            f"여유 {budget.available('vpc')}/{budget.limits.get('vpc')}")
+
+    def _provision():
+        nonlocal shared_ctx, shared_teardown
+        if not needs["any"]:
+            log("[native] 공유 인프라 스킵 — 선택에 adopt 시나리오 없음 (self-create 전용)")
+            provision_done.set()
+            return
         # 사전작업을 이벤트로 표면화 (오너 2026-07-15): '예측 vs 실제' 타임라인이
         # lifecycle-start/end 이벤트를 행으로 그리므로, 공유 인프라 프로비저닝도
         # lifecycle="shared-infra" 로 감싸면 schedule-sim의 동명 prework 고스트와
@@ -201,43 +221,39 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
                 need_net_vpcs=needs["net"], need_tgw=needs["tgw"],
                 need_igw=needs["igw"])
             if isinstance(res, tuple):
-                shared_ctx, shared_teardown = res
+                _ctx, _td = res
             else:
-                shared_ctx = res or {}
+                _ctx, _td = (res or {}), (lambda: None)
+            shared_ctx.update(_ctx)
+            shared_teardown = _td
         except Exception as e:  # noqa: BLE001
             log(f"[native] shared VPC provision 경고: {e}")
-
-    # 공유 서브넷 ACTIVE 게이트 — adopter를 준비된 인프라에만 디스패치 (라이브
-    # 검증: 이게 없으면 서브넷 CREATING 중 adopt → wait-subnet 타임아웃 → VM ERROR).
-    if shared_ctx:
-        _wait_shared_subnets_active(client, shared_ctx, log)
-    if needs["any"]:
-        from core import console_events as _cev
+        # 공유 서브넷 ACTIVE 게이트 — adopter를 준비된 인프라에만 디스패치 (라이브
+        # 검증: 이게 없으면 서브넷 CREATING 중 adopt → wait-subnet 타임아웃 → VM ERROR).
+        if shared_ctx:
+            _wait_shared_subnets_active(client, shared_ctx, log)
         _cev.emit("lifecycle-end", lifecycle="shared-infra", service="vpc",
                   status="passed" if shared_ctx else "skipped")
+        # 실제 상주 수로 재동기화 (계획과 다를 수 있음 — adopt/부분 실패)
+        _residents = sum(1 for k in ("shared_vpc_id", "shared_net_vpc_a_id",
+                                     "shared_net_vpc_b_id") if shared_ctx.get(k))
+        if _residents != _planned:
+            budget.sync("vpc", _residents)
+            log(f"[native] VPC 세마포어 재동기화: 상주 {_residents}개")
+        provision_done.set()
 
-    budget = _budgets.Budget()          # **공유** (스레드-안전) — 계정-전역 쿼터 조율
-    # VPC 세마포어 시드 (2026-07-13 오너 "세마포어로 b"; 2026-07-14 수정). 상주
-    # VPC(우리가 provision한 공유+net-A+net-B)는 Budget 밖에서 만들어져 세마포어가
-    # 모르므로, 이만큼을 소비로 시드해 self-create가 (캡 - 상주)만 쓰게 한다.
-    # **상주 개수(shared_ctx 결정론)** 를 쓴다 — 종전엔 raw live_count를 썼는데,
-    # 이전 런 잔재까지 시드하면 sync가 baseline을 통째로 세팅+절대 반납 안 해서
-    # 세마포어가 "여유 0"에 영구 고정 → self-create가 런 내내 막혔다(오너 2026-07-14
-    # 실측). 잔재는 시드로 흡수(=슬롯 영구 점유)할 게 아니라 pre-run 스윕 대상;
-    # 진짜 캡 초과는 create가 400 → engine의 skip-not-fail이 처리(종전 동작).
-    _residents = sum(1 for k in ("shared_vpc_id", "shared_net_vpc_a_id",
-                                 "shared_net_vpc_b_id") if shared_ctx.get(k))
-    if _residents:
-        budget.sync("vpc", _residents)
-        log(f"[native] VPC 세마포어 시드: 상주 {_residents}개/"
-            f"{budget.limits.get('vpc')} → self-create 여유 {budget.available('vpc')}")
+    _prov_thread = threading.Thread(target=_provision, daemon=True)
     reg = engine.ResourceRegistry()     # 공유 매니페스트
+
+    def _adopts_shared(lc: dict) -> bool:
+        return any(s.get("adopt") for s in lc.get("steps", []))
 
     lock = threading.Lock()
     queue = list(ordered)
     results: list[dict] = []
     started = 0
     t0 = time.time()
+    _prov_thread.start()
 
     def worker(wid: int):
         nonlocal started
@@ -245,9 +261,22 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
             with lock:
                 if not queue:
                     return                          # 큐 빔 → 그때만 워커 종료
-                lc = queue.pop(0)                    # 동적 LPT: 가장 긴 ready
-                started += 1
-                sidx = started
+                # adopter는 provision_done 전에는 건너뛰고 자체-VPC/무공유
+                # lifecycle부터 집는다 (t=0 즉시 출발 — 오너 2026-07-16).
+                lc = None
+                if provision_done.is_set():
+                    lc = queue.pop(0)                # 동적 LPT: 가장 긴 ready
+                else:
+                    for _i, _lc in enumerate(queue):
+                        if not _adopts_shared(_lc):
+                            lc = queue.pop(_i)
+                            break
+                if lc is not None:
+                    started += 1
+                    sidx = started
+            if lc is None:
+                provision_done.wait(timeout=10.0)    # adopter만 남음 — 게이트 대기
+                continue
             log(f"[native] w{wid} start [{sidx}/{len(ordered)}] {lc['id']}")
             # VPC-생성자가 슬롯 부족으로 예산-skip되면 skip이 아니라 **대기 후 재실행**
             # (오너 2026-07-13: "대기했다 실행"). 예산-skip은 create 이전에 나므로
@@ -284,6 +313,7 @@ def run(lifecycle_ids, *, workers: int | None = None, log=print) -> dict:
         t.start()
     for t in threads:
         t.join()
+    _prov_thread.join(timeout=60)   # 워커가 다 끝나면 프로비저닝도 끝났어야 정상
 
     try:
         shared_teardown()
