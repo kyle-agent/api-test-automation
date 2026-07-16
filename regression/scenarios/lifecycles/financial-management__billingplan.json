@@ -26,14 +26,14 @@
           "params": {
             "service_id": "VIRTUAL_SERVER",
             "os_type": "OPEN_SOURCE",
-            "server_type": "s1v1m2",
-            "start_date": "2026-01",
-            "end_date": "2026-06"
+            "server_type": "css1v1m2",
+            "start_date": "2026-07-13",
+            "end_date": "2026-07-14"
           },
           "expect_status": [200, 400, 403, 404, 500],
           "optional": true,
           "group": "pc-instances",
-          "_note": "GET /v1/planned-computes/instances (listplannedcomputeinstances). 5 required query params: service_id, os_type, server_type, start_date, end_date. os_type enum (per os-types endpoint): OPEN_SOURCE/RHEL/WINDOWS/SLES (uppercase token); lowercase 'opensource' rejected with 400 'Invalid os_type value'. server_type valid set comes from GET /v1/planned-computes/server-types which itself 500s (baselined Product Bug). PRODUCT BUG (2026-06-20): with os_type=OPEN_SOURCE (passes frontend validation) and any server_type value, the backend returns 500 ContactAdminForAssistance — same bug as listplannedcomputeservertypes. expect_status includes 500 so the optional step records as CALLED without failing the lifecycle. Until backend is fixed this endpoint cannot return 2xx. Live-probed 2026-06-20."
+          "_note": "GET /v1/planned-computes/instances (listplannedcomputeinstances). 5 required query params: service_id, os_type, server_type, start_date, end_date. os_type enum (per os-types endpoint): OPEN_SOURCE/RHEL/WINDOWS/SLES (uppercase token); lowercase 'opensource' rejected with 400 'Invalid os_type value'. date format MUST be yyyy-mm-dd (api_docs.json param description) — a prior 'YYYY-MM' value (e.g. '2026-01') 400s with a ValidationError note naming the exact malformed field, NOT the product-bug 500 (corrected here 2026-07-16; server_type also updated to the real spec id css1v1m2, confirmed live via GET server-types = 200, not the docs-example 's1v1m2'). A well-formed FUTURE date range instead 400s 'requested date range must be within the contracted date range' (account has 0 planned computes → no contract to bound it) — that is a needs-resource gap, not this bug. A well-formed RECENT/near-today date range (e.g. yesterday..today, used here) reproduces the PRODUCT BUG (2026-06-20, still live 2026-07-16 on a freshly-provisioned test account): backend returns 500 ContactAdminForAssistance — same bug family as listplannedcomputeservertypes used to have (that one is now FIXED — live-verified 200 parameterless 2026-06-29 and again 2026-07-16; data/baselines/known_issues.json still baselines it and should be dropped). expect_status includes 500 so the optional step records as CALLED without failing the lifecycle. Until backend is fixed this endpoint cannot return 2xx for any account without a real planned-compute contract in range."
         },
         {
           "name": "show-cancellation-fee",

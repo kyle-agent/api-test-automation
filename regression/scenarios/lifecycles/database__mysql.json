@@ -1126,9 +1126,17 @@
           "_note": "no-op clear after manual-backup so the run doesn't strand a billable backup history entry; mysqlremovebackuphistories is a known 401 Dbaas.Unauthorized.AuthNFailed PF class (reconfirmed 2026-07-16 run 4912) -- 401 tolerated here, not a fix attempt."
         },
         {
+          "name": "set-log-type-const",
+          "action": "set_const",
+          "values": {
+            "log_type": "slow"
+          },
+          "_note": "log_type is a fixed enum path token (alert|audit|slow, docs) with no live discovery endpoint -- set_const seeds ctx so {log_type} resolves to a real value on the wire while staying a template in 'path' (so _catalog_key_for still matches the mysqlexportlog catalog key for coverage recording)."
+        },
+        {
           "name": "export-log",
           "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/log-export-configs/slow/export",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
           "json": {},
           "expect_status": [
             200,

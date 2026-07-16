@@ -1234,8 +1234,26 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # "SRN decoding error" unless base64-encoded (knowledge/services.md).
             # The encoded value is published to ctx under step['output'] for
             # later {placeholder} substitution; the step issues no request.
+            # `set_const` (2026-07-16, mysql version-upgrade coverage session)
+            # seeds ctx with fixed literal values from `step['values']` — for a
+            # path token that is a documented FIXED ENUM (e.g. DBaaS
+            # {log_type}: alert|audit|slow) with no live discovery endpoint to
+            # capture it from. Writing the literal straight into the step's
+            # `path` (e.g. `.../log-export-configs/slow/export`) would ALSO
+            # work for the actual HTTP call, but `_catalog_key_for` (used both
+            # by the static validator and by the runtime write-coverage
+            # recorder) only recognizes a segment as a template placeholder
+            # when it still contains `{` — a bare literal segment silently
+            # stops the call from counting toward that endpoint's coverage.
+            # Keeping `{log_type}` in `path` (so it normalizes to the catalog
+            # key) and filling it from ctx via `set_const` gets both: correct
+            # coverage attribution AND the real enum value on the wire.
             _action = step.get("action")
             if _action:
+                if _action == "set_const":
+                    for _k, _v in (step.get("values") or {}).items():
+                        ctx[_k] = str(_v)
+                    continue
                 if _action != "b64_encode":
                     raise ValueError(
                         f"[{lifecycle['id']}] unknown step action '{_action}' "

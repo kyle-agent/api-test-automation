@@ -1918,6 +1918,153 @@
           "_note": "행복경로 즉시 삭제 — cleanup 등록과 이중 안전망."
         }
       ]
+    },
+    {
+      "id": "iam-access-key-full",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "coverage-agent iam 2026-07-16: access-key CRUD (accesskeycreate/set/delete/deletebulk, 4키) — 이전엔 iam-credentials-heavy(SAML/실유저와 묶여 SCP_RUN_HEAVY 필요)에서만 시도되던 항목을 가벼운 자체완결 lifecycle로 분리 (VM/DB급 과금 없음, 실행 즉시 삭제되는 단순 크리덴셜이라 heavy 게이팅 불필요하다고 판단). 라이브 실측 확정 사실: (1) accesskeycreate는 body에 account_id REQUIRED (문서+실측 일치; account_id 생략 시도는 과거 미검증) — self-discovery로 채움. (2) 응답 envelope은 전부 {\"access_key\": {...}} 로 래핑 ($.access_key.id, NOT flat $.id). (3) 계정 쿼터 IAM.USER.ACCESS_KEY.MAX.COUNT=2EA 확인 (3번째 키 생성 시도 -> 403 iam.quota.value.exceeded) — 이 lifecycle은 항상 그룹 순차 진행(ak1 전부 정리 후 ak2 시작)으로 동시 보유 키 수를 쿼터 이하로 유지한다. (4) accesskeydelete(단건)·accesskeydeletebulk 둘 다 키가 is_enabled:true인 상태로는 400 'Iam.AccessKeyEnabled'로 거부된다 (처음엔 단건 delete는 예외라고 오판했으나 재현 결과 둘 다 동일 요구사항으로 정정) — 반드시 accesskeyset으로 disable 후 delete. RISK: 각 create의 'cleanup' 백스톱은 disable 없이 바로 delete를 시도하므로, create~explicit-delete 사이에서 크래시하면 cleanup이 400으로 실패할 수 있다(좁은 창; 해피패스는 항상 명시적 disable→delete 순서를 탄다). secret_key/access_key 값은 절대 로그·노트에 남기지 않는다(비밀자료).",
+      "steps": [
+        {
+          "name": "seed-account-id",
+          "method": "GET",
+          "path": "/v1/access-keys",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "account_id": "$.access_keys[0].account_id"
+          },
+          "_note": "account_id 자가발견 (iam-user-full과 동일 패턴) — 리터럴 경로는 카탈로그 키 해석이 안 돼 커버리지 미집계 (validate WARN)."
+        },
+        {
+          "name": "create-access-key-1",
+          "method": "POST",
+          "path": "/v1/access-keys",
+          "group": "ak1",
+          "optional": true,
+          "json": {
+            "access_key_type": "PERMANENT",
+            "account_id": "{account_id}",
+            "description": "API regression suite (single-delete probe)"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "access_key_id_1": "$.access_key.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/access-keys/{access_key_id_1}",
+            "service": "iam"
+          },
+          "_note": "accesskeycreate: envelope $.access_key.id (NOT flat). account_id REQUIRED — self-discovered above. 라이브 2026-07-16 실측 201. PERMANENT, self-account. secret_key는 응답에 1회만 담김 — 기록 금지."
+        },
+        {
+          "name": "set-access-key-1",
+          "method": "PUT",
+          "path": "/v1/access-keys/{access_key_id_1}",
+          "group": "ak1",
+          "optional": true,
+          "json": {
+            "is_enabled": false
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "_note": "accesskeyset — is_enabled:false, delete 전제조건 (아래 참고)."
+        },
+        {
+          "name": "delete-access-key-1",
+          "method": "DELETE",
+          "path": "/v1/access-keys/{access_key_id_1}",
+          "group": "ak1",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "_note": "accesskeydelete(단건) — is_enabled:true 상태면 400 'Iam.AccessKeyEnabled'. 반드시 위 set-access-key-1(disable) 이후 호출."
+        },
+        {
+          "name": "create-access-key-2",
+          "method": "POST",
+          "path": "/v1/access-keys",
+          "group": "ak2",
+          "optional": true,
+          "json": {
+            "access_key_type": "PERMANENT",
+            "account_id": "{account_id}",
+            "description": "API regression suite (bulk-delete probe)"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            403
+          ],
+          "capture_soft": {
+            "access_key_id_2": "$.access_key.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/access-keys/bulk",
+            "json": {
+              "ids": [
+                "{access_key_id_2}"
+              ]
+            },
+            "service": "iam"
+          },
+          "_note": "ak1 그룹이 먼저 완전히 정리된 뒤 실행되므로 계정 쿼터(IAM.USER.ACCESS_KEY.MAX.COUNT=2EA) 이내. 403이 관측되면(다른 동시 실행/잔존 키) capture_soft가 비어 후속 스텝은 합성 id로 tolerant 4xx만 기록."
+        },
+        {
+          "name": "disable-access-key-2",
+          "method": "PUT",
+          "path": "/v1/access-keys/{access_key_id_2}",
+          "group": "ak2",
+          "optional": true,
+          "json": {
+            "is_enabled": false
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404
+          ],
+          "_note": "accesskeyset — bulk delete 전제조건(disable)."
+        },
+        {
+          "name": "delete-access-keys-bulk",
+          "method": "DELETE",
+          "path": "/v1/access-keys/bulk",
+          "group": "ak2",
+          "optional": true,
+          "destructive": true,
+          "json": {
+            "ids": [
+              "{access_key_id_2}"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404
+          ],
+          "_note": "accesskeydeletebulk: body key는 'ids' (ListAccessKeyRemoveRequest). ENABLED 키면 400 'Iam.AccessKeyEnabled' — 반드시 disable-access-key-2 이후. 성공 응답은 204가 아니라 200 + 삭제된 키 echo(ListAccessKeyResponse)."
+        }
+      ]
     }
   ]
 }

@@ -4,7 +4,7 @@
       "id": "servicewatch-alert",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "Observability alert lifecycle (C3 Tier-1 fix 2026-06-20): list-metric-catalog (POST /v1/metrics with {} body) -> soft-capture real sw_namespace_id + sw_metric_id -> create alert with those real ids -> read (showalert) -> PATCH full body / activated / description -> bulk-delete. FIX 1: metric_id/namespace_id now fed from soft-captured real catalog ids instead of fake doc-sample uuids (root cause of prior 400s). FIX 2: alert capture changed from $.alert.id to $.id (flat, per doc response_example 'id': '0ad6da92-...'). FIX 3: set-alert body also uses captured real ids. showalert (GET /v1/alerts/{id}) and setalert PATCH are the +2 target endpoints. list-metric-catalog is a POST-as-read query (no teardown, management/servicewatch constraint metric-posts-are-queries). All alert steps grouped so a single 4xx (e.g. metric catalog returns empty namespaces) isolates cleanly without failing the lifecycle.",
+      "_note": "Observability alert lifecycle (C3 Tier-1 fix 2026-06-20): list-metric-catalog (POST /v1/metrics with {} body) -> soft-capture real sw_namespace_id + sw_metric_id -> create alert with those real ids -> read (showalert) -> PATCH full body / activated / description -> bulk-delete. FIX 1: metric_id/namespace_id now fed from soft-captured real catalog ids instead of fake doc-sample uuids (root cause of prior 400s). FIX 2: alert capture changed from $.alert.id to $.id (flat, per doc response_example 'id': '0ad6da92-...'). FIX 3: set-alert body also uses captured real ids. showalert (GET /v1/alerts/{id}) and setalert PATCH are the +2 target endpoints. list-metric-catalog is a POST-as-read query (no teardown, management/servicewatch constraint metric-posts-are-queries). All alert steps grouped so a single 4xx (e.g. metric catalog returns empty namespaces) isolates cleanly without failing the lifecycle. FIX 2026-07-16 (svccov session, live-verified): createalert now REJECTS a body without a dimension (400 ValidationError 'At least one dimension must be set.' even though AlertCreateRequest marks dimension optional in the docs — runtime/docs mismatch, same as gen-newapi-servicewatch-alerts). Wired sw_dim_key/sw_dim_value from the metric catalog's real dimension pair (matches the ALREADY-validated fix in generated__newapi-servicewatch.json). create-alert capture changed hard->soft so a future 4xx isolates instead of aborting the whole 'alert' group (which was silently skipping get-alert/set-alert*/delete-alert, leaving showalert/setalert/setalertactivated/setalertdescription permanently uncovered). Added a probe_reads step (group 'alert', mapping id={alert_id}) so showalert also lands under its CANONICAL catalog key (a bare GET step's dual-write is otherwise scenario-key-only, per engine.py's GET-without-params exclusion — coverage_headroom.py doesn't count scenario keys).",
       "steps": [
         {
           "name": "list-metric-catalog",
@@ -12,12 +12,14 @@
           "path": "/v1/metrics",
           "group": "alert",
           "optional": true,
-          "_note": "listmetricinfos: POST-as-read query (no teardown needed, constraint metric-posts-are-queries). Empty body {} returns full metric catalog. Soft-captures first available namespace_id and metric_id to feed create-alert. If account has no metric-emitting resources, namespaces[] is empty and captures are unresolved -> alert create fires with unresolved placeholders -> 4xx (but still records POST /v1/alerts endpoint).",
+          "_note": "listmetricinfos: POST-as-read query (no teardown needed, constraint metric-posts-are-queries). Empty body {} returns full metric catalog. Soft-captures first available namespace_id/metric_id AND the metric's real dimension {key,value} pair (metrics[].dimensions[0]) — createalert 1.4 requires >=1 dimension at runtime (FIX 2026-07-16). If account has no metric-emitting resources, namespaces[] is empty and captures are unresolved -> alert create fires with unresolved placeholders -> 4xx (but still records POST /v1/alerts endpoint).",
           "json": {},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture_soft": {
             "sw_namespace_id": "$.namespaces[0].id",
-            "sw_metric_id": "$.namespaces[0].dimensions[0].metrics[0].id"
+            "sw_metric_id": "$.namespaces[0].dimensions[0].metrics[0].id",
+            "sw_dim_key": "$.namespaces[0].dimensions[0].metrics[0].dimensions[0].key",
+            "sw_dim_value": "$.namespaces[0].dimensions[0].metrics[0].dimensions[0].value"
           }
         },
         {
@@ -26,9 +28,10 @@
           "path": "/v1/alerts",
           "group": "alert",
           "optional": true,
-          "_note": "createalert: metric_id/namespace_id from soft-captured catalog ids (sw_metric_id/sw_namespace_id). threshold removed (live 400 when operator=RANGE). dimension/individual_items dropped (account-specific resource uuids). recipient_ids=[]. Capture is flat $.id per doc response_example.",
+          "_note": "createalert: metric_id/namespace_id from soft-captured catalog ids (sw_metric_id/sw_namespace_id). threshold removed (live 400 when operator=RANGE). dimension WIRED (FIX 2026-07-16, live-verified 201): real {key,value} from the metric catalog — a body without dimension 400s 'At least one dimension must be set.' regardless of the docs marking it optional. individual_items dropped (account-specific resource uuids). recipient_ids=[]. Capture is flat $.id per doc response_example, now soft so a 4xx isolates instead of skipping the whole group's downstream reads/writes.",
           "json": {
             "description": "regr alert {unique}",
+            "dimension": {"key": "{sw_dim_key}", "value": "{sw_dim_value}"},
             "evaluation_count": 3,
             "level": "HIGH",
             "lower_bound": 80.0,
@@ -45,7 +48,7 @@
             "violation_count": 2
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {
+          "capture_soft": {
             "alert_id": "$.id"
           },
           "cleanup": {
@@ -67,13 +70,21 @@
           "expect_status": [200, 403, 404]
         },
         {
+          "name": "probe-reads",
+          "group": "alert",
+          "optional": true,
+          "probe_reads": {"id": "{alert_id}"},
+          "_note": "FIX 2026-07-16: explicit id={alert_id} mapping so the engine's generic probe_reads walker (catalog GET /v1/alerts/{id} = showalert) records under the CANONICAL endpoint key, not just 'servicewatch-alert:get-alert'. No-op if alert_id unresolved (create-alert 4xx)."
+        },
+        {
           "name": "set-alert",
           "method": "PATCH",
           "path": "/v1/alerts/{alert_id}",
           "group": "alert",
           "optional": true,
-          "_note": "setalert: uses same sw_metric_id/sw_namespace_id from catalog. AlertSetRequest required: level, metric_id, namespace_id, operator, period, statistic (no name/recipient_ids/tags vs create). threshold removed.",
+          "_note": "setalert: uses same sw_metric_id/sw_namespace_id from catalog. AlertSetRequest required: level, metric_id, namespace_id, operator, period, statistic (no name/recipient_ids/tags vs create). threshold removed. FIX 2026-07-16 (svccov session, live-verified): same runtime dimension requirement as createalert — PATCH without dimension 400s 'At least one dimension must be set.' (docs mark it optional; runtime disagrees). Wired sw_dim_key/sw_dim_value like create-alert.",
           "json": {
+            "dimension": {"key": "{sw_dim_key}", "value": "{sw_dim_value}"},
             "evaluation_count": 3,
             "level": "HIGH",
             "lower_bound": 80.0,
@@ -309,6 +320,13 @@
           "expect_status": [200, 403, 404]
         },
         {
+          "name": "probe-reads",
+          "group": "event-rule-read",
+          "optional": true,
+          "probe_reads": {"event_rule_id": "{event_rule_id}"},
+          "_note": "FIX 2026-07-16: explicit event_rule_id mapping so the engine's probe_reads walker (catalog GET /v1/event-rules/{event_rule_id} = showeventrule) records under the CANONICAL endpoint key — the explicit get-event-rule step above only wrote the scenario-key form ('servicewatch-event-rule:get-event-rule'), which coverage_headroom.py does not count."
+        },
+        {
           "name": "set-event-rule",
           "method": "PATCH",
           "path": "/v1/event-rules/{event_rule_id}",
@@ -355,7 +373,7 @@
           "path": "/v1/metrics/custom",
           "group": "custom-metrics",
           "optional": true,
-          "_note": "createcustommetrics: OTLP body. FIX (2026-06-20): time_unix_nano changed from stale 2025-07-30 epoch to 1780272000000000000 (2026-06-01 UTC, matches resource model; ~15mo retention per userguide). as_double changed to as_int (docs: 'metric type can only be gauge or sum, exactly one value' -> integer preferred). resource.attributes key 'namespace' is a routing hypothesis (resource model note: 'namespace 라우팅 키가 미상'). Broad expect_status tolerates 400 if routing is wrong. See resource model knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta notes.",
+          "_note": "createcustommetrics: OTLP body. FIX (2026-06-20): time_unix_nano changed from stale 2025-07-30 epoch to 1780272000000000000 (2026-06-01 UTC, matches resource model; ~15mo retention per userguide). as_double changed to as_int (docs: 'metric type can only be gauge or sum, exactly one value' -> integer preferred). resource.attributes key 'namespace' is a routing hypothesis (resource model note: 'namespace 라우팅 키가 미상'). Broad expect_status tolerates 400 if routing is wrong. See resource model knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta notes. INVESTIGATED 2026-07-16 (svccov session, still BLOCKED): tested the hypothesis that the ingest namespace must exactly match a namespace already registered via createcustommetricmetas (this lifecycle's create-custom-metric-meta uses 'MyCustom/regr{unique}' but this step hardcodes 'MyCustom/regr' with no suffix — a plausible mismatch). Live probe: registered meta with namespace='MyCustom/probefix' (200 OK, confirms the separate 'resource_id is required dimension' fix), then immediately POSTed /v1/metrics/custom with resource.attributes namespace='MyCustom/probefix' (exact match) -> STILL 400 {message: SWT_CUSTOM_NAMESPACE}. Rules out the naming-mismatch theory; the OTLP resource.attributes routing key/shape genuinely differs from 'namespace'+string_value (doc's own request_example shows an EMPTY placeholder key, confirming SCP has not published the real key). Classify as blocked/needs-owner-knowledge (ServiceWatch Agent config schema, not discoverable via API docs) — do not keep re-guessing without a hint from support/console.",
           "json": {
             "resource_metrics": [
               {
@@ -411,13 +429,14 @@
           "path": "/v1/metrics/custom/meta",
           "group": "custom-metric-meta",
           "optional": true,
+          "_note": "createcustommetricmetas FIX 2026-07-16 (svccov session, live-verified 200): dimension key changed 'image_id' -> 'resource_id'. Live 400 was {code: BadRequest, detail: 'resource_id is required dimension.'} — MetricMetaDto.dimensions must include the literal 'resource_id' dimension key (matches knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta node, which already had this right).",
           "json": {
             "metricMetas": [
               {
                 "descriptionEn": "regression custom metric meta",
                 "descriptionKo": "regression custom metric meta",
                 "dimensions": [
-                  ["image_id"]
+                  ["resource_id"]
                 ],
                 "metricName": "Custom_regr_{unique}",
                 "storageResolution": 60,

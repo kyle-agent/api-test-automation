@@ -50,7 +50,7 @@ STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
              "expect_status", "capture", "capture_soft", "cleanup", "poll",
              "wait", "retries", "retry_interval", "retry_on_status",
              "group", "optional", "destructive", "adopt", "probe_reads",
-             "action", "input", "output", "json_b64_fields", "skip",
+             "action", "input", "output", "values", "json_b64_fields", "skip",
              "_note", "_comment"}
 METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 BUILTINS = {"unique", "ualpha", "region", "today", "today_plus_5y",
@@ -158,6 +158,13 @@ def validate(service_filter=None):
                 # publishes its 'output' as a placeholder for later steps. No HTTP,
                 # so it's checked here (input capture-before-use) and skipped from
                 # the path/method checks below.
+                # `set_const` (2026-07-16) has no {input} — it seeds ctx directly
+                # from its literal 'values' dict (fixed enum path tokens with no
+                # live discovery source), so each key becomes available right away.
+                if step["action"] == "set_const":
+                    for _k in (step.get("values") or {}):
+                        available.add(_k)
+                    continue
                 used = _placeholders_in(step.get("input"))
                 missing = used - available
                 if missing:
