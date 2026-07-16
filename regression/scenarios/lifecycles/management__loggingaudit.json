@@ -73,6 +73,11 @@
           "group": "la-trail"
         },
         {
+          "name": "probe-reads",
+          "probe_reads": {"trail_id": "{trail_id}"},
+          "_note": "ADDED 2026-07-16: the plain show-trail step above is a bare GET step (no explicit query `params`), so per engine.py's dual-write rule it is recorded ONLY under the lifecycle-scoped key (loggingaudit-trail:show-trail), never under the catalog key management/loggingaudit/showtrail (that only happens for non-GET steps or GET steps carrying explicit params). listtrails is normally empty (0 persistent trails) so the smoke suite's list->show read-chain (tests/smoke/test_read_chains.py) never gets a real id either. This explicit probe_reads step (same idiom as security__kms.json) calls every loggingaudit catalog GET whose path params resolve from the live trail_id — i.e. showtrail — WHILE the trail still exists (before delete-trail), recording it under its real catalog key. Confirmed live 2026-07-16: 200."
+        },
+        {
           "name": "set-trail",
           "method": "PUT",
           "path": "/v1/trails/{trail_id}",
