@@ -99,7 +99,11 @@
             200
           ],
           "optional": true,
-          "group": "rg-tags"
+          "group": "rg-tags",
+          "capture_soft": {
+            "rg_tag_key": "$.content.tags[0].key"
+          },
+          "_note": "2026-07-16: rg_tag_key 소프트 캡처 추가 (listresourcetags 응답 $.content.tags[].key, docs response_example) — del-rg-tag가 리터럴 'regr' 세그먼트 대신 플레이스홀더로 catalog key(DELETE /v1/tags/{srn}/{key})에 매칭되도록 (validate WARN 'does not resolve to a catalog endpoint' 해소)."
         },
         {
           "name": "updatetags",
@@ -127,7 +131,7 @@
         {
           "name": "del-rg-tag",
           "method": "DELETE",
-          "path": "/v1/tags/{rg_srn}/regr",
+          "path": "/v1/tags/{rg_srn}/{rg_tag_key}",
           "expect_status": [
             200,
             202,

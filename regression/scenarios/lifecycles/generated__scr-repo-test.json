@@ -4,8 +4,9 @@
     {
       "id": "gen-scr-repo-test",
       "service": "container/scr",
-      "enabled": true,
-      "_note": "isolation probe — light, no VPC. list-registries first so the artifact shows every visible registry + its real id (safety net if 'nayvugfp' is wrong). Then create repo 'test' on registry_id=nayvugfp. 201/202 => repo-create works with access/secret (owner hypothesis confirmed: the earlier 403 was NOT a repo/registry permission). 403 => permission boundary on repo-create. 404/400 => registry_id wrong (use the id from list-registries).",
+      "enabled": false,
+      "_status": "stale",
+      "_note": "RETIRED 2026-07-16 (soft-4xx 원인규명 캠페인, scr 담당): 하드코딩 registry_id 'nayvugfp'는 2026-07-15 계정 교체로 소멸 (run a690 GET /v1/container-registries 200 {count:0}) — 목적이었던 isolation 가설(403이 repo 권한이 아님)은 이미 확인 완료, repo CRUD는 scr-repo-borrow-coverage(borrow-or-create)가 전부 커버. validate WARN(create-test-repo leak)도 함께 해소. || 원 note: isolation probe — light, no VPC. list-registries first so the artifact shows every visible registry + its real id (safety net if 'nayvugfp' is wrong). Then create repo 'test' on registry_id=nayvugfp. 201/202 => repo-create works with access/secret (owner hypothesis confirmed: the earlier 403 was NOT a repo/registry permission). 403 => permission boundary on repo-create. 404/400 => registry_id wrong (use the id from list-registries).",
       "steps": [
         {
           "name": "list-registries",

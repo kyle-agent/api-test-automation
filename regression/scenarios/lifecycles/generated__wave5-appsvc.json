@@ -671,11 +671,11 @@
           "service": "apigateway",
           "method": "POST",
           "path": "/v1/apis",
-          "_note": "own api for the {api_id} the connection/approval DTOs require (PrivateLinkEndpointConnectionRequest/ApprovalRequest both carry api_id). REPAIR 2026-07-16 (soft-4xx 원인규명, run a690): approval/connection(DISCONNECT·RECONNECT) 프로브가 전부 400 scp-application-apigateway.api.cannot-use-region-api 'API endpoint of type REGION is not supported'(req-493c52e8 외) — privatelink 연결 대상 API 는 PRIVATE 타입이어야 한다는 명시적 에러 가이던스. endpoint_type REGION→PRIVATE 교체 (docs ApiCreateRequestV1Dot2 enum (REGION, PRIVATE) 확인). REGION 타입 createapi 커버리지는 같은 파일의 다른 두 lifecycle(create-api REGION)이 계속 담당.",
+          "_note": "own REGION api (v1.2 기본값 커버리지 유지 — REGION = no prereq). PLE approval/connection용 api_id로는 더 이상 쓰지 않는다: 담당 C/D 합동 판정 2026-07-16 (run a690 + e68b 재현) — REGION api_id로 approval/connection PUT은 400 scp-application-apigateway.api.cannot-use-region-api('API endpoint of type REGION is not supported', req-493c52e8 외) 확정이라 아래 create-private-api의 {private_api_id}로 재배선.",
           "json": {
             "name": "regrw5ple{ualpha}",
             "description": "API regression wave5 privatelink",
-            "endpoint_type": "PRIVATE",
+            "endpoint_type": "REGION",
             "tags": []
           },
           "expect_status": [
@@ -689,6 +689,34 @@
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/apis/{api_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "create-private-api",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis",
+          "optional": true,
+          "group": "apigw-ple-actions",
+          "_note": "NEW 2026-07-16 (담당 C 인계 + soft-4xx 원인규명, run a690): PLE 연계 전용 PRIVATE 타입 API — privatelink approval/connection은 PRIVATE 타입 API만 지원(REGION은 400 cannot-use-region-api). PRIVATE는 JWT auth가 강제되지만(knowledge/services.md:1583) 여기선 메서드 호출 없이 PLE DTO의 api_id 참조용으로만 사용. 기존 REGION create-api 커버리지는 그대로 유지. docs ApiCreateRequestV1Dot2 enum (REGION, PRIVATE).",
+          "json": {
+            "name": "regrw5plp{ualpha}",
+            "description": "API regression wave5 privatelink PRIVATE api",
+            "endpoint_type": "PRIVATE",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture_soft": {
+            "private_api_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{private_api_id}",
             "service": "apigateway"
           }
         },
@@ -773,9 +801,9 @@
           "service": "apigateway",
           "method": "PUT",
           "path": "/v1/privatelink-endpoints/{ple_id}/approval",
-          "_note": "GATED PROBE — PrivateLinkEndpointApprovalRequest {api_id, type APPROVE|REJECT}. With approval_type AUTO the endpoint may already be approved -> 4xx tolerated; the op still records. If live shows MANUAL flow is needed, flip the privatelink-service to MANUAL and approve here.",
+          "_note": "GATED PROBE — PrivateLinkEndpointApprovalRequest {api_id, type APPROVE|REJECT}. With approval_type AUTO the endpoint may already be approved -> 4xx tolerated; the op still records. If live shows MANUAL flow is needed, flip the privatelink-service to MANUAL and approve here. REWIRE 2026-07-16 (C/D 합동, run a690+e68b): api_id를 REGION api에서 {private_api_id}(create-private-api)로 교체 — REGION api_id는 400 cannot-use-region-api 확정.",
           "json": {
-            "api_id": "{api_id}",
+            "api_id": "{private_api_id}",
             "type": "APPROVE"
           },
           "expect_status": [
@@ -795,9 +823,9 @@
           "service": "apigateway",
           "method": "PUT",
           "path": "/v1/privatelink-endpoints/{ple_id}/connection",
-          "_note": "GATED PROBE — PrivateLinkEndpointConnectionRequest {api_id, type DISCONNECT|RECONNECT}. DISCONNECT first (2xx if the AUTO flow auto-connected), RECONNECT next — paired probes so one of the two lands 2xx whichever state the endpoint is in.",
+          "_note": "GATED PROBE — PrivateLinkEndpointConnectionRequest {api_id, type DISCONNECT|RECONNECT}. DISCONNECT first (2xx if the AUTO flow auto-connected), RECONNECT next — paired probes so one of the two lands 2xx whichever state the endpoint is in. REWIRE 2026-07-16 (C/D 합동, run a690+e68b): api_id → {private_api_id} — REGION api_id는 400 cannot-use-region-api 확정.",
           "json": {
-            "api_id": "{api_id}",
+            "api_id": "{private_api_id}",
             "type": "DISCONNECT"
           },
           "expect_status": [
@@ -818,7 +846,7 @@
           "method": "PUT",
           "path": "/v1/privatelink-endpoints/{ple_id}/connection",
           "json": {
-            "api_id": "{api_id}",
+            "api_id": "{private_api_id}",
             "type": "RECONNECT"
           },
           "expect_status": [
@@ -838,7 +866,7 @@
           "service": "apigateway",
           "method": "PUT",
           "path": "/v1/privatelink-endpoints/{ple_id}/request",
-          "_note": "GATED PROBE — PrivateLinkEndpointRequestRequest {type CANCEL|RE_REQUEST}. RE_REQUEST here; CANCEL deliberately last (below) right before delete so a successful cancel can't poison the earlier action probes.",
+          "_note": "GATED PROBE — PrivateLinkEndpointRequestRequest {type CANCEL|RE_REQUEST}. RE_REQUEST here; CANCEL deliberately last (below) right before delete so a successful cancel can't poison the earlier action probes. INTENDED-NEGATIVE 판정 2026-07-16 (run a690): approval_type AUTO라 endpoint가 REQUESTED/REJECTED 상태에 도달하지 않음 — RE_REQUEST는 400 invalid-requestable-state, CANCEL은 400 invalid-cancelable-state가 예상 종착(상태머신상 정상 네거티브, 도달 기록용 유지).",
           "json": {
             "type": "RE_REQUEST"
           },
@@ -1275,6 +1303,29 @@
             "timeout": 300,
             "interval": 15
           }
+        },
+        {
+          "name": "delete-private-api",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{private_api_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409
+          ],
+          "optional": true,
+          "group": "apigw-ple-actions",
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 15,
+          "_note": "NEW 2026-07-16: PLE 연계 전용 PRIVATE api 명시적 teardown (create-private-api 실패 시 그룹 스킵, cleanup 블록이 2차 방어)."
         },
         {
           "name": "delete-api",
