@@ -640,7 +640,17 @@ def _vpc_semaphore_cfg():
         return None
     cap = _budgets.Budget().limits.get("vpc", 5)
     _res = os.environ.get("SCP_VPC_SHARED_RESERVED", "").strip()
-    reserved = int(_res) if _res else (1 if os.environ.get(_ENV_SHARED_VPC, "").strip() else 0)
+    if _res:
+        reserved = int(_res)
+    else:
+        # 상주 공유 VPC 수만큼 예약 (2026-07-16 실측 수리: net A/B 도입 후
+        # 상주 공유 VPC가 main+A+B=3인데 기본 예약이 1이라, 세마포어가 동시
+        # self-create 4개를 승인해 실제 여유 2를 초과 → createvpc 400
+        # exceed-max-count. SKE의 self-create 전환으로 표면화 — 세마포어
+        # 한도는 '캡 − 실제 상주 공유 VPC 수'여야 한다).
+        reserved = sum(1 for k in (_ENV_SHARED_VPC, _ENV_SHARED_NET_VPC_A,
+                                   _ENV_SHARED_NET_VPC_B)
+                       if os.environ.get(k, "").strip())
     limit = max(1, cap - reserved)
     timeout = float(os.environ.get("SCP_VPC_SEMAPHORE_TIMEOUT", "1800"))
     poll = float(os.environ.get("SCP_VPC_SEMAPHORE_POLL", "1.0"))
