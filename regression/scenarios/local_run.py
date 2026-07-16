@@ -481,6 +481,13 @@ def simulate_schedule(lifecycle_ids: Sequence[str] | None = None,
         except ValueError:
             prework = 0.0
         if prework <= 0:
+            # 실측 우선 (오너 2026-07-16 "예측시간 현실화"): native_runner가
+            # 쏘는 shared-infra lifecycle 스팬 실측(durations.json)이 있으면
+            # 그걸 쓴다 — 정적 모델(75+240+igw60+tgw120=495s)은 IGW/TGW
+            # 프로비전이 실제로는 subnet 대기와 겹쳐 돌아 이중계산이었다
+            # (a690=260s, e68b=262.5s 실측).
+            prework = float(dur.get("shared-infra", 0.0))
+        if prework <= 0:
             prework = (75.0 + 240.0
                        + (60.0 if _needs["igw"] else 0.0)
                        + (120.0 if _needs["tgw"] else 0.0))
