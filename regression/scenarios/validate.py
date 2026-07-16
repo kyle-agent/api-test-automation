@@ -138,6 +138,13 @@ def validate(service_filter=None):
                     warnings.append(f"{sw}: unknown step key '{k}'")
             if "name" not in step:
                 errors.append(f"{sw}: missing 'name'")
+            # HTTP 스텝인데 method/path가 없으면 엔진이 step['path'] KeyError로
+            # 크래시한다 (2026-07-16 run 7a26 실측 — method 없는 단독 wait 스텝).
+            # 특수 스텝(probe_reads/action)만 예외.
+            if ("probe_reads" not in step and "action" not in step
+                    and (not step.get("method") or not step.get("path"))):
+                errors.append(f"{sw}: HTTP step needs method+path (엔진 크래시 클래스"
+                              " — wait만 필요하면 다음 HTTP 스텝에 wait를 접을 것)")
             if step.get("probe_reads"):
                 # probe_reads is a read-only map of {key: templated_path}; no method
                 used = _placeholders_in(step["probe_reads"])

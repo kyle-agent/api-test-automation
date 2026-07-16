@@ -684,11 +684,6 @@
           "_note": "CIDR FIX 2026-07-16 (run 6ebd 실측 400 include-vp-cidr): net-A는 10.130.0.0/20(.0~.15)이라 .16/.17은 대역 밖이었음. .10으로 교정. SECONDARY까지는 같은 런에서 생성 성공 실증. || type=PRIVATE 생성/삭제 커버 (오너 2026-07-16: 'public 생성했다 지우고 private 생성했다 지우고 이런것 포함'). 직전 subnet gone 후 생성이라 net-A PRIMARY 동시 점유 ≤2/3. 미검증 — 다음 런 판정."
         },
         {
-          "name": "wait-subnet-private",
-          "_note": "READ-PLANE BUG 우회 2026-07-16 (라이브 프로브 실증): PRIVATE subnet은 생성(v1.3 enum) 202 성공하지만 show/list가 v1.2 enum(GENERAL/LOCAL/VPC_ENDPOINT)이라 404 'Not found with ID With Invalid Type' — API로 읽을 수 없는 유령 (conformance 중대 결함, req-65a36c09…). show-poll 대신 30s 블라인드 settle; 삭제는 정상(202 실증).",
-          "wait": 30
-        },
-        {
           "name": "delete-subnet-private",
           "service": "vpc",
           "method": "DELETE",
@@ -699,7 +694,9 @@
             204,
             409,
             404
-          ]
+          ],
+          "wait": 30,
+          "_note": "BLIND-SETTLE 접합 2026-07-16 (run 7a26: method/path 없는 단독 wait 스텝은 엔진이 step['path'] KeyError로 크래시 — 22호출 fail 0인데 lifecycle failed의 원인): delete 스텝 선행 wait:30으로 접음. || READ-PLANE BUG 우회 2026-07-16 (라이브 프로브 실증): PRIVATE subnet은 생성(v1.3 enum) 202 성공하지만 show/list가 v1.2 enum(GENERAL/LOCAL/VPC_ENDPOINT)이라 404 'Not found with ID With Invalid Type' — API로 읽을 수 없는 유령 (conformance 중대 결함, req-65a36c09…). show-poll 대신 30s 블라인드 settle; 삭제는 정상(202 실증)."
         },
         {
           "name": "wait-subnet-private-gone",
