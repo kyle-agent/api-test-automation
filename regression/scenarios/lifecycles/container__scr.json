@@ -52,7 +52,12 @@
             "path": "/v1/container-registries/{created_registry_id}",
             "service": "scr"
           },
-          "_note": "Fires only usefully when borrow missed (registry quota=1: with a registry present this 4xxes on quota/duplication, capture_soft misses, borrowed registry_id survives). Body per container/scr/containerregistrycreaterequest (name/private_acl_enabled/private_acl_resources/public_acl_resources/public_visible_enabled required; name pattern ^[a-z][a-z0-9]*$ — regr{unique} fits, {unique} is 8 lowercase hex). LIVE 201 2026-07-15 ({id, message, state:Creating}). created_registry_id marks OUR registry so teardown never touches a borrowed one."
+          "_note": "QUOTA-RACE 수리 2026-07-16 (run c72e 실측 403 CONTAINER_REGISTRY.NON_VISIBILITY.MAX_COUNT 1EA, req-9423b4ce…): container-scr-registry가 쿼터 1개를 점유한 창에서 borrow가 돌면 빌릴 것도 없고 fallback create도 403 → 20s×12 사다리로 상대 lifecycle 종료+쿼터 해제 지연(D 실측 ~3분)을 흡수. dependencies.json의 직렬화 에지와 2중 방어. || Fires only usefully when borrow missed (registry quota=1: with a registry present this 4xxes on quota/duplication, capture_soft misses, borrowed registry_id survives). Body per container/scr/containerregistrycreaterequest (name/private_acl_enabled/private_acl_resources/public_acl_resources/public_visible_enabled required; name pattern ^[a-z][a-z0-9]*$ — regr{unique} fits, {unique} is 8 lowercase hex). LIVE 201 2026-07-15 ({id, message, state:Creating}). created_registry_id marks OUR registry so teardown never touches a borrowed one.",
+          "retry_on_status": [
+            403
+          ],
+          "retries": 30,
+          "retry_interval": 20
         },
         {
           "name": "wait-registry-running",
