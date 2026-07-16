@@ -3668,3 +3668,28 @@ DELETE 400 `Volume.VolumeForSharingImageDelete` ("try again later") — 참조�
 `SCP_IDC_INSTANCE_ID`/`SCP_IDC_TARGET_ACCOUNT_ID`(실 IDC 인스턴스/대상 계정),
 `SCP_ARCHIVESTORAGE_ENABLED`(온보딩 완료 플래그) — 미설정이 기본이며 해당
 lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다.
+
+## 관용 4xx 캠페인 A(dbaas) 핵심 판정 (2026-07-16, run a690 전수 + 라이브)
+
+- **cachestore 엔진 교체: Redis → Valkey Sentinel 9.0.4/8.1.8** (2026-07 버전업)
+  — redis 명령/버전 하드코딩 전부 stale (patch 400 InvalidParameter,
+  maxmemory-policy not-modifiable의 원인). eventstreams detail의
+  dbaas_engine 값은 "Kafka". 엔진/버전은 detail·engine-versions에서 capture.
+- **ParametersRequest 모델: {name,value} → {id,new_value,old_value}** —
+  list-parameter-values에서 id/applied_value capture 후 no-op echo가 안전
+  패턴 (동일 런 mysql-subops-a 202 실증).
+- **patch-minor-version 400 "Unpatchable version" = 환경 제약 확정** — 카탈로그에
+  동일 major의 두 번째 minor가 없어 패치 타깃이 구조적으로 부재 + 패치 가능
+  버전 discovery API 없음 (AI-usability 결함 후보).
+- **[백엔드 결함/신규] postgresql PUT parameters**: applied_value가 템플릿
+  문자열({1/8 of server total memory})인 파라미터를 no-op echo하면 **500
+  ContactAdminForAssistance** (req-ef12a36a…) — 400이어야 할 곳의 500.
+  시나리오는 where_prefix=max_connections로 회피.
+- **[conformance] DBaaS not-found=400 공통** (requests/{id}, parameters?group_id
+  — 4개 서비스 재확인) / **eventstreams security-group-rules: 문서 요청 예제
+  (빈 배열)가 실서버 400** — 문서-구현 불일치.
+- eventstreams: block-storage resize는 **DATA 그룹([1])만 허용** (OS-role 거부
+  클래스 재확인), add-instances IP는 전용 subnet(10.124.12.0/24) 대역과 정렬
+  필수. sync-state ExistInprogress류는 30s×8 재시도 사다리로 흡수.
+- backup-histories PUT / backups DELETE의 **401 AuthNFailed(유효 HMAC)**
+  패밀리는 a690에서도 전 엔진 재현 — 기존 기록 유지.
