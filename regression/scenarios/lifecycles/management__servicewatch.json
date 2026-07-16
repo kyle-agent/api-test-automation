@@ -448,6 +448,7 @@
           "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
         },
         {
+          "_note": "downloadmetricdataimage FIX 2026-07-16 (svccov session): live 400 was a schema ValidationError, NOT the metric-routing error — 'Input should be >= 1000'(width)/'>= 500'(height); height 400->500, width 600->1400 (matches knowledge/formal/resources/management__servicewatch.yaml sw-metric-catalog verify.image, live-validated run 27583285457).",
           "name": "download-metric-data-image",
           "method": "POST",
           "path": "/v1/metrics/data/download/image",
@@ -455,7 +456,7 @@
           "optional": true,
           "json": {
             "end": 1640995440,
-            "height": 400,
+            "height": 500,
             "metrics": [
               {
                 "color": "#0000ff",
@@ -477,7 +478,7 @@
             "statistic_type": "AVG",
             "timezone": "UTC",
             "title": "regr{unique} chart",
-            "width": 600
+            "width": 1400
           },
           "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
         },
