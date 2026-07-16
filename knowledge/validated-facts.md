@@ -3838,3 +3838,13 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   승인 상태에 APPROVE), quick-query validate(인스턴스 부재), dbaas
   log-export-configs(access_key 빈 문자열 — 400이어야 할 곳 전부 500).
   lifecycle들은 관용 통과 중 — 백엔드 리포트 후보 목록에 편입.
+
+## 스케줄 최적화 결정 기록 (2026-07-16 오너)
+
+- **적용**: 자체-VPC(adopt 마커 0) lifecycle은 t=0 즉시 디스패치, 프로비저닝
+  백그라운드 병렬화 (runner+sim 동일 모델, dcada553). 세마포어는 계획 상주
+  수 선시드 → 실측 재동기화.
+- **보류 (오너: "eventstream 분할은 아직 하지 말고")**: eventstreams
+  subops-full의 a/b 분할 (클러스터 2개 병렬, 임계경로 ~47분 → ~32분 예상,
+  비용: ES 클러스터 1개 ~30분 추가 과금). 현 임계경로가 eventstreams이므로
+  makespan을 더 줄이려면 이 카드가 첫 후보 — 재제안 금지, 오너가 꺼낼 때만.
