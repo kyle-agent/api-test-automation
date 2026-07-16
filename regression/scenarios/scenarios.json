@@ -267,7 +267,8 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          }
+          },
+          "adopt": "vpc#a"
         },
         {
           "name": "get-vpc-active",
@@ -313,7 +314,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression suite",
-            "cidr": "10.123.1.0/24",
+            "cidr": "10.130.13.0/24",
             "type": "PUBLIC",
             "category": "PRIMARY",
             "vpc_id": "{vpc_id}",
@@ -497,9 +498,11 @@
           ],
           "retries": 8,
           "retry_interval": 20,
-          "_note": "409 사다리(8×20s) — wait-subnet-gone 상향과 벨트로, 총 ~13분 내 수렴 못 하면 명시적 실패(신호 보존)."
+          "_note": "409 사다리(8×20s) — wait-subnet-gone 상향과 벨트로, 총 ~13분 내 수렴 못 하면 명시적 실패(신호 보존).",
+          "adopt": "vpc#a"
         }
-      ]
+      ],
+      "_note": "NET-A ADOPT 2026-07-16 (오너: 'networking vpc subnet도 net공유A에 넣는건' + 'igw를 따로 만들어야 하면 안되고'): VPC self-create를 net-VPC A 채택으로 전환 — 세마포어 슬롯 압박 완화(run e68b exceed-max-count 스킵의 재발 방지) + VPC 생성/삭제 대기 제거. 이 시나리오는 IGW를 만들지 않아 A의 IGW(vip-nat 소유)와 무충돌. subnet은 자기 것 실생성/실삭제(adopt 마커는 vpc 스텝에만 — 비대칭 클래스 주의), cidr는 A 대역 10.130.13.0/24 (vip-nat 10.130.9.0/24 비충돌, A PRIMARY 캡 2/3). set-vpc는 description-only PUT이라 공유 A에 무해 — setvpc 커버리지 유지. createvpc/deletevpc 커버리지는 SKE/heavy-shared 등 self-creator가 매 런 실호출로 유지. || "
     },
     {
       "id": "container-scr-registry",
