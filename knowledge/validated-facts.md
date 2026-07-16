@@ -3589,3 +3589,19 @@ DELETE 400 `Volume.VolumeForSharingImageDelete` ("try again later") — 참조�
   (종전 10.124.13.0/24는 공유 VPC 대역이라 자체 VPC에선 무효 — subnet은 VPC
   cidr 안이어야 함). VPC 슬롯은 엔진 budget 예약.
 - eventstreams는 delete/wait-gone에 adopt=subnet#db 마커 부여로 retain-skip.
+
+## 정정: 이미지 공유 수락/거절 API는 존재한다 — updateimagemember status enum (2026-07-16)
+
+- 앞선 "pending 공유 수락/거절/취소 API 부재" 기록을 **정정**: `PUT
+  /v1/images/{image_id}/members/{member_id}` (updateimagemember)의 바디가
+  `{"status": pending|accepted|rejected}` — Glance 스타일 멤버 status 변경이
+  수락/거절이다. 멤버 추가/삭제(POST/DELETE members)로 대상자 변경도 가능.
+- 단, 전부 image_id/member_id가 필요 — 웨지 볼륨 건은 공유 레코드가 등재 전에
+  소멸해 양 계정 어디에도 대상이 없으므로 여전히 적용 불가 (백엔드 플래그
+  문제라는 결론 불변).
+- **createsharingimage 재활성화 설계(backlog)**: self-share → pending-images
+  캡처 → member status=rejected → 임시 볼륨 해제 확인 → skip 해제. reject가
+  임시 볼륨을 실제 해제하는지 1회 라이브 검증 필요 (커스텀 이미지 필요 =
+  VM 체인). conformance 후보는 '취소 API 부재'에서 '**공유 취소 경로가
+  문서화되지 않음** + 진행 중 원본 삭제 가드 부재 + 실패 시 고아 플래그'로
+  조정.
