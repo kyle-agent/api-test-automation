@@ -2236,7 +2236,7 @@
       "id": "container-ske-cluster-nodepool",
       "service": "container/ske",
       "enabled": true,
-      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed. | EXPANDED (best-guess, validate via heavy dispatch): nodepool scale up/down + label set/clear. COVERAGE EXPANSION (not yet dispatch-validated): cluster setters (logging/service-watch-logging/public- & private-access-control/security-groups — re-assert safe/no-op values), nodepool taints set+clear, best-effort linked-resources, and the two no-param list GETs (clusters/images). Each setter optional+grouped with 409-retry for async reconcile contention. setclusterupgrade/setnodepoolupgrade deliberately omitted (irreversible / node-roll risk on a billable cluster).",
+      "_note": "ISOLATION 2026-07-16 (오너: 'ske는 아예 vpc 생성하고 하는 걸로') — SKE는 클러스터가 subnet을 30분+ 점유하는 최장 시나리오라 공유 subnet과 상성이 최악이고, adopt 생성/삭제 비대칭 버그(delete-subnet에 adopt 마커 누락 → 공유 subnet 삭제, 오너 실측)로 사고 위험까지 있어 자체 VPC+subnet 생성/삭제로 전환. VPC 슬롯은 엔진 budget이 예약. || VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed. | EXPANDED (best-guess, validate via heavy dispatch): nodepool scale up/down + label set/clear. COVERAGE EXPANSION (not yet dispatch-validated): cluster setters (logging/service-watch-logging/public- & private-access-control/security-groups — re-assert safe/no-op values), nodepool taints set+clear, best-effort linked-resources, and the two no-param list GETs (clusters/images). Each setter optional+grouped with 409-retry for async reconcile contention. setclusterupgrade/setnodepoolupgrade deliberately omitted (irreversible / node-roll risk on a billable cluster).",
       "steps": [
         {
           "name": "create-vpc",
@@ -2261,8 +2261,7 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          },
-          "adopt": "vpc"
+          }
         },
         {
           "name": "wait-vpc",
@@ -2285,12 +2284,11 @@
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
-          "adopt": "subnet",
           "path": "/v1/subnets",
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression SKE",
-            "cidr": "10.124.13.0/24",
+            "cidr": "10.125.0.0/24",
             "type": "PUBLIC",
             "category": "PRIMARY",
             "vpc_id": "{vpc_id}",
@@ -3252,8 +3250,7 @@
             202,
             204
           ],
-          "destructive": true,
-          "adopt": "vpc"
+          "destructive": true
         }
       ],
       "heavy": true

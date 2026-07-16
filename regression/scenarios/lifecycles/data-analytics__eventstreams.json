@@ -1381,7 +1381,9 @@
             409
           ],
           "retries": 8,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "adopt": "subnet#db",
+          "_note": "ADOPT-ASYMMETRY FIX 2026-07-16: create-subnet은 adopt=subnet#db인데 delete/wait-gone에 마커가 없어 공유 DB subnet을 실삭제하던 버그 (SKE 동일 클래스 — 오너 실측 '공유 subnet인데 본인이 삭제를 하고 있네'). adopt 마커로 retain-skip."
         },
         {
           "name": "wait-subnet-gone",
@@ -1398,7 +1400,9 @@
             ],
             "timeout": 900,
             "interval": 15
-          }
+          },
+          "adopt": "subnet#db",
+          "_note": "ADOPT-ASYMMETRY FIX 2026-07-16: create-subnet은 adopt=subnet#db인데 delete/wait-gone에 마커가 없어 공유 DB subnet을 실삭제하던 버그 (SKE 동일 클래스 — 오너 실측 '공유 subnet인데 본인이 삭제를 하고 있네'). adopt 마커로 retain-skip."
         },
         {
           "name": "delete-vpc",

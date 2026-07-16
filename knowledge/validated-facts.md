@@ -3573,3 +3573,19 @@ DELETE 400 `Volume.VolumeForSharingImageDelete` ("try again later") — 참조�
   삭제 허용 / 고아 플래그 정리 경로 부재.
 - **artifact/events.jsonl** (a690부터 생김)에 스텝 단위 req_body/resp_snippet가
   실린다 — 실패 원인 분석은 res 이벤트보다 이걸 먼저 볼 것.
+
+## adopt 생성/삭제 비대칭 버그 + SKE 자체-VPC 전환 (2026-07-16, 오너 실측)
+
+- **버그 클래스**: create 스텝에만 `adopt` 마커가 있고 짝인 delete/wait-gone에
+  없으면, 엔진이 캡처 변수에 공유 자원 id를 시딩한 뒤 **delete가 공유 자원을
+  실삭제**한다 (오너 실측: SKE 단독 런이 공유 subnet DELETE 202 후 gone-wait).
+  전수 스캔 결과 실버그 2건: container-ske-cluster-nodepool(delete-subnet),
+  eventstreams-cluster-subops-full(delete-subnet, subnet#db). gen-private-nat의
+  tgw 케이스는 자식(vpc-connection) 삭제라 정상 (경로에 부모 id가 보여도
+  삭제 대상이 자식이면 비대칭 아님 — 스캐너 오탐 주의).
+- **SKE는 자체 VPC+subnet으로 전환** (오너: "아예 vpc 생성하고 하는 걸로"):
+  클러스터가 subnet을 30분+ 점유하는 최장 시나리오라 공유 subnet과 상성이
+  최악. adopt 전부 제거, VPC cidr 10.125.0.0/20 + subnet 10.125.0.0/24
+  (종전 10.124.13.0/24는 공유 VPC 대역이라 자체 VPC에선 무효 — subnet은 VPC
+  cidr 안이어야 함). VPC 슬롯은 엔진 budget 예약.
+- eventstreams는 delete/wait-gone에 adopt=subnet#db 마커 부여로 retain-skip.
