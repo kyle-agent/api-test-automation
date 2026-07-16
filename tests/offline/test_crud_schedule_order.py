@@ -253,10 +253,12 @@ def test_simulate_schedule_pins_priority_first_at_t0():
     # 사전작업(shared-infra prework) 도입(2026-07-15) 후 첫 웨이브 = prework
     # 종료 시각 — 핀 규칙은 '첫 웨이브 선두'라는 상대 순서다.
     t0 = byid["shared-infra"]["e"] if "shared-infra" in byid else 0.0
-    assert byid["vpc-subnet-vip-nat"]["s"] == t0           # 핀 (슬롯 0)
-    assert byid["networking-vpc-subnet"]["s"] == t0        # 핀 (슬롯 1 선점)
+    assert byid["vpc-subnet-vip-nat"]["s"] == t0           # 핀 — vpc#a adopt, 슬롯 0
+    assert byid["networking-vpc-subnet"]["s"] == t0        # 핀 — 2026-07-16부터 vpc#a adopt, 슬롯 0
     assert byid["vpc-peering"]["s"] == t0                   # vpc#a/b adopt — 슬롯 0
-    assert byid["heavy-shared-networking"]["s"] >= byid["networking-vpc-subnet"]["e"]
+    # 2026-07-16 net-A 채택 이후 이 선택의 슬롯 소비자는 heavy-shared-networking
+    # 하나뿐 — 슬롯 경합이 사라져 hsn도 첫 웨이브에 든다.
+    assert byid["heavy-shared-networking"]["s"] == t0
 
 
 def test_class_default_replaces_zero_for_unmeasured():
@@ -362,8 +364,11 @@ def test_simulate_schedule_prepends_shared_infra_prework(monkeypatch):
         "시나리오 예측은 사전작업 종료 이후에 시작해야"
     assert sim["makespan_s"] >= pre["e"]
 
-    # adopter 없는 선택 — networking-vpc-subnet은 adopt 마커 0 (self-create)
-    sim2 = simulate_schedule(["networking-vpc-subnet"], workers=2, vpc_slots=2)
+    # adopter 없는 선택 — container-ske-cluster-nodepool은 adopt 마커 0
+    # (2026-07-16 자체 VPC 전환; 종전 표본 networking-vpc-subnet은 같은 날
+    # vpc#a adopt로 바뀌어 표본 교체)
+    sim2 = simulate_schedule(["container-ske-cluster-nodepool"],
+                             workers=2, vpc_slots=2)
     ids2 = {b["id"] for b in sim2["bars"]}
     assert "shared-infra" not in ids2
     assert min(b["s"] for b in sim2["bars"]) == 0.0
