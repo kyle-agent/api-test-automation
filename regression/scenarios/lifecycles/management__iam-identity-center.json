@@ -818,7 +818,7 @@
    "service": "management/iam-identity-center",
    "enabled": true,
    "heavy": false,
-   "_note": "READ-ONLY (non-heavy) coverage probe for the 5 direct-GET IdC endpoints, +1 (2026-07-08): show-group fulfills the showgroup reachability-waiver call contract (COMPLETENESS-AUDIT-2026-07-08 C2 debt — waived keys must still be CALLED; 4xx is the evidence). listinstances needs no params and returns 200 (empty list when no SSO instance is provisioned — this is the correct API response, not an error). The other 4 list endpoints each require instance_id as a required query param (proven 2026-06-20: bare call returns 400 ValidationError; with instance_id=ssoins-12345 returns 404 ResourceNotFound — the service IS reached). listaccountassignments additionally requires target_account_id (proven 2026-06-20: instance_id alone -> 400; both synthetic ids -> 404). All steps are optional and tolerant so this lifecycle is always green regardless of account state. No mutations, no destructive operations; the single path param (show-group) is a deliberately non-existent literal.",
+   "_note": "READ-ONLY (non-heavy) coverage probe — 2026-07-16 분할(soft-4xx 원인규명 캠페인 B, run 20260716-025427-a690): 종전 6스텝 중 instance_id 필요 5개(list-groups/show-group/list-permission-sets/list-users/list-account-assignments)는 synthetic ssoins-12345로 호출되어 404 ResourceNotFound('Not found with ID ssoins-12345')/identity-center.InstanceNotFound가 관용 soft로 통과됐다. 라이브 재확인 2026-07-16: GET /v1/instances → 200 count:0 (계정에 IDC 인스턴스 미프로비전) = 환경 부재 클래스. 해당 5개는 env-gated lifecycle 'idc-read-coverage-instance'로 이동 — 이 lifecycle에는 파라미터 불필요·실 200이 증명된 listinstances만 남긴다 (proven 200 2026-06-20, 빈 리스트는 정상 응답). 주의: showgroup의 reachability-waiver 호출 계약(C2, COMPLETENESS-AUDIT-2026-07-08)도 게이트 아래로 이동함 — 게이트 미해제 동안 showgroup 호출 증거는 발생하지 않는다(오너 트레이드오프 확인 대상).",
    "steps": [
     {
      "name": "list-instances",
@@ -832,7 +832,20 @@
       404
      ],
      "_note": "No required query params. Returns 200 with empty list when no SSO instance exists. Proven 200 2026-06-20."
-    },
+    }
+   ]
+  },
+  {
+   "id": "idc-read-coverage-instance",
+   "service": "management/iam-identity-center",
+   "enabled": true,
+   "heavy": false,
+   "requires_env": [
+    "SCP_IDC_INSTANCE_ID",
+    "SCP_IDC_TARGET_ACCOUNT_ID"
+   ],
+   "_note": "ENV-GATED 2026-07-16 (soft-4xx 원인규명 캠페인 B): IDC의 instance_id 필수 read 5종. 계정에 IDC 인스턴스가 없어 (라이브 2026-07-16: GET /v1/instances → 200 count:0) synthetic ssoins-12345 호출이 전부 404로 관용 통과되던 것을, requires_env 게이트로 전환 — SCP_IDC_INSTANCE_ID(실 인스턴스 id)·SCP_IDC_TARGET_ACCOUNT_ID(account-assignments 필수 쿼리) 미설정 시 lifecycle 환경적 스킵(대시보드에 'requires env not set' 명시). IDC 인스턴스 프로비전 후 두 env 설정 시 실 인스턴스 대상 200 검증으로 승급 가능(현재 expect는 미검증이라 관용 유지 — 첫 실 런에서 strict [200] 승급 검토). show-group은 list-groups capture_soft(group_id)를 사용: 그룹 0개면 리터럴 토큰 404(실 인스턴스 하에서는 nonexistent-id negative 케이스로 의미 유지).",
+   "steps": [
     {
      "name": "list-groups",
      "method": "GET",
@@ -840,23 +853,26 @@
      "service": "iam-identity-center",
      "optional": true,
      "params": {
-      "instance_id": "ssoins-12345"
+      "instance_id": "{env:SCP_IDC_INSTANCE_ID}"
      },
      "expect_status": [
       200,
       403,
       404
      ],
-     "_note": "instance_id required query param. Synthetic id -> 404 ResourceNotFound (service reached). 404 accepted as soft hit."
+     "_note": "instance_id={env:SCP_IDC_INSTANCE_ID} (게이트 하 실 인스턴스). group_id capture_soft ($.groups[0].id — 응답 키 UNPROVEN, 첫 실 런에서 확인) → show-group에 공급.",
+     "capture_soft": {
+      "group_id": "$.groups[0].id"
+     }
     },
     {
      "name": "show-group",
      "method": "GET",
-     "path": "/v1/groups/{ualpha}",
+     "path": "/v1/groups/{group_id}",
      "service": "iam-identity-center",
      "optional": true,
      "params": {
-      "instance_id": "ssoins-12345"
+      "instance_id": "{env:SCP_IDC_INSTANCE_ID}"
      },
      "expect_status": [
       200,
@@ -864,7 +880,7 @@
       403,
       404
      ],
-     "_note": "waiver 이행: showgroup (GET /v1/groups/{group_id}) is reachability-waived but the waiver contract requires the endpoint to be CALLED — 호출 증거(4xx). {ualpha} resolves to a random NON-EXISTENT literal id at runtime (same idiom as idc-delete-policies-probe) so _norm_path -> v1/groups/* -> catalog key management/iam-identity-center/showgroup records, while nothing real is ever read. Both docs-required params sent: instance_id (synthetic ssoins-12345 query) + group_id (nonexistent literal path). LIVE-PROBED 2026-07-08: 404 identity-center.InstanceNotFound — endpoint reached, 4xx evidence. Tolerant [200,400,403,404]. C2 debt of COMPLETENESS-AUDIT-2026-07-08."
+     "_note": "2026-07-16: 종전 {ualpha}(비실재 리터럴, waiver 호출 계약 C2) → 게이트 하에서는 list-groups가 capture_soft한 실 group_id 사용(그룹 0개면 리터럴 토큰 → 404 = nonexistent-id negative). waiver 계약의 '호출 증거'는 이제 게이트 해제 시에만 발생."
     },
     {
      "name": "list-permission-sets",
@@ -873,7 +889,7 @@
      "service": "iam-identity-center",
      "optional": true,
      "params": {
-      "instance_id": "ssoins-12345"
+      "instance_id": "{env:SCP_IDC_INSTANCE_ID}"
      },
      "expect_status": [
       200,
@@ -889,7 +905,7 @@
      "service": "iam-identity-center",
      "optional": true,
      "params": {
-      "instance_id": "ssoins-12345"
+      "instance_id": "{env:SCP_IDC_INSTANCE_ID}"
      },
      "expect_status": [
       200,
@@ -905,15 +921,15 @@
      "service": "iam-identity-center",
      "optional": true,
      "params": {
-      "instance_id": "ssoins-12345",
-      "target_account_id": "00000000000000000000000000000000"
+      "instance_id": "{env:SCP_IDC_INSTANCE_ID}",
+      "target_account_id": "{env:SCP_IDC_TARGET_ACCOUNT_ID}"
      },
      "expect_status": [
       200,
       403,
       404
      ],
-     "_note": "BOTH instance_id AND target_account_id required (proven 2026-06-20). Synthetic ids -> 404 (service reached)."
+     "_note": "BOTH instance_id AND target_account_id required (proven 2026-06-20). 2026-07-16: 둘 다 env 주입(게이트 requires_env와 짝)."
     }
    ]
   }

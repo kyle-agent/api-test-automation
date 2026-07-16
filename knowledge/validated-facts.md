@@ -3618,3 +3618,53 @@ DELETE 400 `Volume.VolumeForSharingImageDelete` ("try again later") — 참조�
   vip-nat .9.0/24 비충돌). net-A PRIMARY 동시 점유 최대 2/3.
 - subnet type별 (문서): PUBLIC=IGW NAT+NATGW 인아웃 / PRIVATE=NATGW 아웃만 /
   VPC_ENDPOINT=엔드포인트 전용 / LOCAL=서버간 전용(외부 불가, 기본 50개).
+
+## 관용 4xx 원인규명 캠페인 B — 환경 부재 연쇄 클래스 (run 20260716-025427-a690, 2026-07-16)
+
+오너 지시(soft 과거기록 관용 4xx 전부 원인규명)의 B 그룹 8개 서비스 판정.
+공통 패턴: **루트 환경 부재 → 자식 스텝 관용 4xx 연쇄**가 soft로 통과되어
+대시보드에서 원인이 가려짐 → lifecycle 차원 `requires_env` 게이트(엔진 기존
+관례, engine.py run_lifecycle의 env-skip)로 전환해 '환경 부재로 스킵'을 명시.
+
+- **baremetal-blockstorage (37건)**: 루트 POST /v1/volumes 400
+  `BaremetalBlockStorage.NoServersRequest`(계정 BM 서버 0대; attachments 1..8
+  BM REQUIRED) → {volume_id}/{volume_group_id} 리터럴 → 자식 404
+  VolumeNotFound/VolumeGroupNotFound ~35건 연쇄. blockstorage-volume /
+  blockstorage-volume-group에 `requires_env: [SCP_BM_SERVER_ID]` + attachments
+  가 `{env:SCP_BM_SERVER_ID}` 주입(설정 시 실 attach 검증 가능).
+  blockstorage-list-reads(200 실증)는 비게이트 유지.
+- **iam-identity-center (5건)**: 404 `ResourceNotFound: Not found with ID
+  ssoins-12345` / `identity-center.InstanceNotFound` — 라이브 재확인: GET
+  /v1/instances → 200 count:0 (IDC 인스턴스 미프로비전 계정). idc-read-coverage
+  를 분할: listinstances(실 200)만 잔류, instance_id 필요 read 5종은 신설
+  `idc-read-coverage-instance`로 이동 + `requires_env: [SCP_IDC_INSTANCE_ID,
+  SCP_IDC_TARGET_ACCOUNT_ID]`. **트레이드오프**: showgroup의 reachability-waiver
+  호출 계약(C2)이 게이트 아래로 들어가 게이트 미해제 동안 호출 증거 미발생 —
+  오너 확인 필요. heavy REACHABILITY-ONLY 4종(ssoins-12345 고의 4xx 설계)은
+  blast-radius 안전 설계라 비변경.
+- **archivestorage (15건, 전부 401)**: 인증 체계 조사 결론 — **별도 서명
+  알고리즘 아님**. 게이트웨이 응답 `Service Account catalog has not target's
+  endpoint. target : scp-archivestorage_hmac` = 서비스 어카운트 카탈로그에
+  archivestorage의 HMAC 타깃 미등록(계정 미온보딩/이용신청 필요). 타깃명
+  *_hmac이므로 표준 SCP HMAC 축 동일(SCR 401과 같은 클래스, 기존 기록 합치).
+  온보딩 전에는 요청이 백엔드 미도달 → 두 lifecycle에 `requires_env:
+  [SCP_ARCHIVESTORAGE_ENABLED]` (콘솔 온보딩 후 true로 해제).
+- **cloud-ml (2건)**: GET /v1/cloud-ml/images 404가 스펙 경로 오류인지 판별 —
+  **아님**. 카탈로그(cloudmlimages) 경로 일치 + documented check-duplication·
+  베이스 /v1/cloud-ml까지 전부 동일한 익명 Spring 404(에러코드 없음) = 계정에
+  cloud-ml 라우트 자체 미프로비전(2026-07-08 SCR 판정 합치). gen-cloudml-image
+  에 `requires_env: [SCP_CLOUDML_PRODUCT_GROUP_ID]` + 2026-07-08 계획대로
+  strict [200]·hard capture 승급(게이트 하에서만 실행).
+- **data-ops/data-flow (각 4건)**: `PRODUCT-AI-ANALYTICS-USER-0001: Input id
+  must start with DOPS-/DFLOW-…` + `ValidationError: Cluster ID should be
+  32-letter UUID` — 스펙 경로 오류 아님, **인스턴스 부재 클래스**(라이브: list
+  200 empty). 리터럴 토큰이 id-형식 검사에 걸리는 **의도된 called-only 설계**
+  → 게이트 대신 주석 고정 (2xx에는 실 과금 클러스터 필요, 오너 결정 대기).
+- **quick-query (1건)**: 404 `PRODUCT-AI-ANALYTICS-USER-0002: Quick Query Not
+  Found` — 서비스 도달 정상(image-versions 200 라이브), 인스턴스 0개의 정상
+  존재-검사 404 (data-ops/flow의 형식 400과 달리 존재 검사까지 도달). 주석 고정.
+
+신설 env 계약: `SCP_BM_SERVER_ID`(실 BM 서버 object_id),
+`SCP_IDC_INSTANCE_ID`/`SCP_IDC_TARGET_ACCOUNT_ID`(실 IDC 인스턴스/대상 계정),
+`SCP_ARCHIVESTORAGE_ENABLED`(온보딩 완료 플래그) — 미설정이 기본이며 해당
+lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다.
