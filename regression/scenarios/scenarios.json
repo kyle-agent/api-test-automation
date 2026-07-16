@@ -9019,6 +9019,7 @@
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/codes/file",
           "group": "xcov-setcloudfunctioncodefile",
+          "_note": "판정 2026-07-16 (soft-4xx 원인규명, run a690): 400 scp-cloud-function.bad-request — CodeFile 바디는 Java 전용(jar/class/method)인데 GET /v1/cloud-functions/sample-codes 실측상 이 환경 런타임은 Go/Node.js/PHP/Python 14종뿐, Java 부재 → 2xx 도달 불가(blocked-environment). 문서 예시 obs_url(obs.kr-east1.scp-in.com:8443)도 내부 호스트. 관용 도달 기록용으로 유지.",
           "optional": true,
           "json": {
             "class_name": "regr{unique}",

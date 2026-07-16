@@ -5,7 +5,7 @@
       "id": "gen-wave3-support",
       "service": "management/support",
       "enabled": true,
-      "_note": "recomposed 2026-06-13 — owner-provided known ids (inquiry sr-260613-00001-nuri-scp, SR SR0003870935) make the id-bound GETs deterministic; empty-list soft captures kept",
+      "_note": "recomposed 2026-06-13 — owner-provided known ids (inquiry sr-260613-00001-nuri-scp, SR SR0003870935) make the id-bound GETs deterministic; empty-list soft captures kept. 판정 2026-07-16 (soft-4xx 원인규명, run a690): 두 known-id GET 모두 404 ResourceNotFound(req-af176d97/req-4ad192f2) — 2026-07-15 계정 교체(구 ec11538a…→신 81eccb26…, IAM find-iam-user 403·ASG notification user 무효화와 동일 뿌리)로 구계정 소속 SR/inquiry 픽스처가 신계정에서 조회 불가. 바디/경로 회귀 아님 — OWNER ACTION: 신계정의 known inquiry/SR id 재공급 필요(재공급 전까지 optional 스텝이라 soft 404로만 기록됨).",
       "steps": [
         {
           "name": "create-support-inquiry",

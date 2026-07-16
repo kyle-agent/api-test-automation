@@ -1053,7 +1053,7 @@
           "service": "scf",
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/request",
-          "_note": "GATED PROBES — scf PrivateLinkEndpoint{Request,Approval,Connection} are single-field {type} enums mirroring the apigw family (no api_id). Same ordering rationale: RE_REQUEST / APPROVE / DISCONNECT->RECONNECT, CANCEL last. || run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리.",
+          "_note": "GATED PROBES — scf PrivateLinkEndpoint{Request,Approval,Connection} are single-field {type} enums mirroring the apigw family (no api_id). Same ordering rationale: RE_REQUEST / APPROVE / DISCONNECT->RECONNECT, CANCEL last. || run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리. || 판정 2026-07-16 (run a690): 동일 endpoint_id(e1e71cfd…)에 request류 PUT은 400 invalid-state(ACTIVE — AUTO 승인으로 이미 활성이라 RE_REQUEST/CANCEL 불가 = 상태머신상 예상 네거티브)인데 approval/connection PUT은 404 privatelink-endpoint-not-found — 같은 리소스가 op에 따라 404/invalid-state로 갈리는 백엔드 조회 스코프 불일치(approval 레코드는 REQUESTED 상태에서만 존재?) — conformance/backend 결함 후보로 기록, 바디 수리 대상 아님.",
           "json": {
             "type": "RE_REQUEST"
           },
@@ -1438,7 +1438,7 @@
           "service": "scf",
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/codes/file",
-          "_note": "setcloudfunctioncodefile — CodeFile {class_name, method_name, obs_url?} is Java-runtime-shaped (docs examples: com.example.Handler/handleRequest/jar in OBS); against our Node.js:20 function a 4xx is the expected outcome, but the op records. Proving 2xx needs a Java function + a real jar in Object Storage (owner question). On a (improbable) 202 the next poll re-syncs READY.",
+          "_note": "setcloudfunctioncodefile — CodeFile {class_name, method_name, obs_url?} is Java-runtime-shaped (docs examples: com.example.Handler/handleRequest/jar in OBS); against our Node.js:20 function a 4xx is the expected outcome, but the op records. Proving 2xx needs a Java function + a real jar in Object Storage (owner question). On a (improbable) 202 the next poll re-syncs READY. 판정 확정 2026-07-16 (soft-4xx 원인규명, run a690 + read-only 프로브): GET /v1/cloud-functions/sample-codes 200 실측 — 이 환경의 런타임은 Go/Node.js/PHP/Python 14종뿐, Java 부재. 즉 codes/file은 이 환경에서 2xx 도달 불가(blocked-environment; 문서 예시 obs_url도 내부호스트 obs.kr-east1.scp-in.com:8443). 400 scp-cloud-function.bad-request 관용 유지가 정답.",
           "json": {
             "class_name": "com.example.Handler",
             "method_name": "handleRequest"

@@ -3693,3 +3693,29 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   필수. sync-state ExistInprogress류는 30s×8 재시도 사다리로 흡수.
 - backup-histories PUT / backups DELETE의 **401 AuthNFailed(유효 HMAC)**
   패밀리는 a690에서도 전 엔진 재현 — 기존 기록 유지.
+
+## 관용 4xx 캠페인 C(네트워킹) 핵심 판정 (2026-07-16, run a690+e68b 교차검증)
+
+- **VPN 상태머신**: gateway/tunnel의 PUT(set)도 **202 비동기 → EDITING 전이** —
+  EDITING 중 modify/delete는 400 invalid-state (CREATING뿐 아니라 EDITING도
+  settle 대상). e68b vpn 재실패(680s)의 사인: set-tunnel 202 → 2초 뒤 delete
+  400 → gateway 409 has-related → publicip 400 ATTACHED 연쇄. 수리: set 후
+  ACTIVE settle 폴 + delete 재시도 벨트에 400 추가. zone 수리는 LIVE VERIFIED
+  (201) 승격.
+- **DC 배타/누수**: vpc-already-connected 에러 바디가 점유 VPC id를 명시.
+  DC delete는 드레인 중 400 not-deletable이 수 분 지속 — 부모(private-nat)
+  **소멸(404) 게이트 없이 DC를 지우면 누수**한다 (e68b: DC 82a3621e 누수 →
+  gen-direct-connect 사다리 10×30s 전량 소진 하드실패). 수리:
+  wait-private-nat-gone 게이트 + 레인 분리(vpc#a) 이중 방어.
+- **vpc-endpoint resource_key 정본**: formal yaml의 {filestorage volume_id}
+  모델은 **반증** — 정답은 `GET /v1/vpc-endpoints/connectable-resources?
+  resource_type=FS`의 (key,info) 쌍 (FS 키 = FS 서비스 endpoint IP).
+- **lb-health-check**: 대상 subnet에 **LB 선존 필수** — light 미러의 2xx는
+  heavy LB 생존 타이밍 레이스 (a690 400 ↔ e68b 201 실증). heavy-shared는
+  health-check가 lb-create보다 앞이던 자충수 재배열.
+- **PLS service_ip_address**: ip-address-overlap의 "does not overlap"은
+  "subnet CIDR에 포함 안 됨"(포함 필수)의 뜻 — 문구 오해 유발 (conformance).
+  adopt 이전 잔재 고정 IP가 구조적 매런 400이던 것 자기-subnet 복원으로 수리.
+- **apigw privatelink**: REGION 타입 API는 PLE 연계 불가(400 cannot-use-region-api)
+  — PLE는 PRIVATE 타입(JWT 강제) 필요. request/cancel은 AUTO 승인이라
+  REQUESTED/REJECTED 미도달(의도된 네거티브).

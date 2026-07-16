@@ -524,7 +524,7 @@
             202,
             400
           ],
-          "_note": "live 400 {message: SWT_CUSTOM_NAMESPACE} (run 27452095757) — OTLP resource.attributes의 namespace 라우팅 키가 미상(콘솔 agent 설정 지식 필요, owner 질문). meta 생성은 2xx — ingest 라우팅 확정 전까지 [202,400] 관용"
+          "_note": "live 400 {message: SWT_CUSTOM_NAMESPACE} (run 27452095757, run a690 재현). 판정 2026-07-16 (soft-4xx 원인규명, 라이브 프로브 9종 소진): attribute key(namespace/service.namespace/scp.namespace/Namespace), value(MyCustom/regr·regr·MyCustom/filestorage), datapoint-level namespace, 빈 attributes, camelCase 전신, 현재 timestamp — 전부 동일 400 SWT_CUSTOM_NAMESPACE. 바디 형태 무관 + 같은 네임스페이스의 meta 생성 200·data readback 200(status Completed) 실측 → 메타 플레인엔 네임스페이스가 실존하나 ingest 플레인이 계정/에이전트 등록 수준에서 거부하는 것으로 판정 (콘솔 ServiceWatch agent 프로비저닝 전제 유력 — owner 확인 필요, 바디 수리로는 해소 불가). [202,400] 관용 유지"
         },
         {
           "name": "verify-sw-custom-metric-meta-data-readback",
