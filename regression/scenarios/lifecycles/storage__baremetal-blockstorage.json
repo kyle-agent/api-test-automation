@@ -3,10 +3,12 @@
     {
       "id": "blockstorage-volume",
       "service": "storage/baremetal-blockstorage",
-      "enabled": true,
+      "enabled": false,
       "heavy": true,
-      "requires_env": ["SCP_BM_SERVER_ID"],
-      "_note": "ENV-GATED 2026-07-16 (soft-4xx 원인규명 캠페인 B, run 20260716-025427-a690): 루트 create-volume이 400 BaremetalBlockStorage.NoServersRequest('No servers have been requested' — 계정에 BM 서버 0대, attachments 1..8 BM REQUIRED)로 실패하면 {volume_id}가 리터럴로 남아 자식 스텝 ~18건이 전부 404 VolumeNotFound 연쇄 → 관용 soft로 통과되어 원인이 가려졌다. requires_env 게이트로 전환: SCP_BM_SERVER_ID(실 BM 서버 object_id) 미설정 시 엔진이 lifecycle 전체를 'requires env/secret(s) not set' 사유로 환경적 스킵(대시보드에 명시) — 관용 404 연쇄를 더 이상 기록하지 않는다. BM 서버 확보 후 SCP_BM_SERVER_ID 설정 시 attachments가 {env:SCP_BM_SERVER_ID}로 실 서버에 연결되어 체인이 2xx 검증 가능. | (기존) Baremetal block storage VOLUME lifecycle (billable -> heavy, gated by SCP_RUN_HEAVY). Create a block volume (disk_type SSD, size_gb 10) -> poll $.result.state to AVAILABLE -> exercise snapshots, snapshot-rates, snapshot-schedules, replications, attachments, recoveries, restore -> tear down. ALL bodies from data/api_bodies.json (storage/baremetal-blockstorage/*) and data/api_docs.json model schemas; provenance docs-only (no live 2xx yet). Capture ids: volume create returns $.result.id (VolumeModelV1Dot2.id); snapshot create returns flat $.snapshot_id (VolumeSnapshotResponse). Volume create requires an 'attachments' array of {object_id,object_type:BM} -> we send [] because this account has no baremetal server to attach; if the API rejects an empty attachments list the optional create simply 4xx's (still recorded as covered) and the dependent families run with the unfilled {volume_id} placeholder (each call still records coverage for its endpoint). Replication targets a remote region (region kr-west1 from docs example) -> may 4xx if DR/region unavailable; optional+grouped. Attachments POST/DELETE need a real BM object_id (placeholder from docs) -> optional+grouped. snapshot_id for restore/delete is captured from the create-snapshot response. Teardown: snapshot-schedules/rates/replications/attachments are deleted as cleanup before the volume DELETE; volume DELETE is destructive with 409/500 retry, then poll to 404. KNOWN-BLOCKED (userguide, fetched 2026-06-10): \uc5f0\uacb0 \uc11c\ubc84 (attachments, 1..8 Bare Metal Servers) is a REQUIRED create field \u2014 attachments:[] is why create 400s (run 27258520218); the chain stays called-only until a real BM server id is available to attach (knowledge/formal/services/storage__baremetal-blockstorage.yaml).",
+      "requires_env": [
+        "SCP_BM_SERVER_ID"
+      ],
+      "_note": "EXCLUDED 2026-07-16 (오너: 'BM블록스토리지는 테스트 제외대상인데?'): BM 블록스토리지는 테스트 범위에서 제외 — 계정에 BM 서버가 없고 확보 계획도 범위 밖. 캠페인 B의 requires_env 게이트(SCP_BM_SERVER_ID) 위에 비활성을 얹음(게이트 배선은 보존 — 범위 편입 시 env 설정+enabled:true로 즉시 복귀). || ENV-GATED 2026-07-16 (soft-4xx 원인규명 캠페인 B, run 20260716-025427-a690): 루트 create-volume이 400 BaremetalBlockStorage.NoServersRequest('No servers have been requested' — 계정에 BM 서버 0대, attachments 1..8 BM REQUIRED)로 실패하면 {volume_id}가 리터럴로 남아 자식 스텝 ~18건이 전부 404 VolumeNotFound 연쇄 → 관용 soft로 통과되어 원인이 가려졌다. requires_env 게이트로 전환: SCP_BM_SERVER_ID(실 BM 서버 object_id) 미설정 시 엔진이 lifecycle 전체를 'requires env/secret(s) not set' 사유로 환경적 스킵(대시보드에 명시) — 관용 404 연쇄를 더 이상 기록하지 않는다. BM 서버 확보 후 SCP_BM_SERVER_ID 설정 시 attachments가 {env:SCP_BM_SERVER_ID}로 실 서버에 연결되어 체인이 2xx 검증 가능. | (기존) Baremetal block storage VOLUME lifecycle (billable -> heavy, gated by SCP_RUN_HEAVY). Create a block volume (disk_type SSD, size_gb 10) -> poll $.result.state to AVAILABLE -> exercise snapshots, snapshot-rates, snapshot-schedules, replications, attachments, recoveries, restore -> tear down. ALL bodies from data/api_bodies.json (storage/baremetal-blockstorage/*) and data/api_docs.json model schemas; provenance docs-only (no live 2xx yet). Capture ids: volume create returns $.result.id (VolumeModelV1Dot2.id); snapshot create returns flat $.snapshot_id (VolumeSnapshotResponse). Volume create requires an 'attachments' array of {object_id,object_type:BM} -> we send [] because this account has no baremetal server to attach; if the API rejects an empty attachments list the optional create simply 4xx's (still recorded as covered) and the dependent families run with the unfilled {volume_id} placeholder (each call still records coverage for its endpoint). Replication targets a remote region (region kr-west1 from docs example) -> may 4xx if DR/region unavailable; optional+grouped. Attachments POST/DELETE need a real BM object_id (placeholder from docs) -> optional+grouped. snapshot_id for restore/delete is captured from the create-snapshot response. Teardown: snapshot-schedules/rates/replications/attachments are deleted as cleanup before the volume DELETE; volume DELETE is destructive with 409/500 retry, then poll to 404. KNOWN-BLOCKED (userguide, fetched 2026-06-10): 연결 서버 (attachments, 1..8 Bare Metal Servers) is a REQUIRED create field — attachments:[] is why create 400s (run 27258520218); the chain stays called-only until a real BM server id is available to attach (knowledge/formal/services/storage__baremetal-blockstorage.yaml).",
       "steps": [
         {
           "name": "create-volume",
@@ -16,15 +18,29 @@
             "name": "regrbsvol{unique}",
             "disk_type": "SSD",
             "size_gb": 10,
-            "qos": {"iops": 5000, "throughput": 250},
-            "attachments": [{"object_id": "{env:SCP_BM_SERVER_ID}", "object_type": "BM"}],
+            "qos": {
+              "iops": 5000,
+              "throughput": 250
+            },
+            "attachments": [
+              {
+                "object_id": "{env:SCP_BM_SERVER_ID}",
+                "object_type": "BM"
+              }
+            ],
             "zone": "kr-west1-b",
             "tags": []
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot4): zone 신규 REQUIRED. 라이브 실측 2026-07-15 (생성 금지 — BM 종속이라 400 detail로 판정): zone 누락 → 400 'Zone input is required.'; zone=kr-west1-a 포함 → 400이 BaremetalBlockStorage.NoServersRequest('No servers have been requested.')로 진행 = zone이 스키마 단계를 통과하고 기존 KNOWN-BLOCKED(attachments 1..8 BM 필수) 단계로 넘어감. zone 값 자체의 최종 유효성은 BM 서버 확보 후 2xx로만 증명 가능. | 2026-07-16: attachments []→[{env:SCP_BM_SERVER_ID}] — lifecycle이 requires_env로 게이트되므로 이 스텝이 실행될 때는 항상 실 BM 서버 id가 주입된다 (빈 attachments의 NoServersRequest 400은 게이트로 대체).",
           "optional": true,
-          "expect_status": [200, 201, 202],
-          "capture": {"volume_id": "$.result.id"},
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "volume_id": "$.result.id"
+          },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/volumes/{volume_id}",
@@ -36,10 +52,18 @@
           "method": "GET",
           "path": "/v1/volumes/{volume_id}",
           "optional": true,
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
             "field": "$.result.state",
-            "until": ["AVAILABLE", "available", "IN_USE", "ACTIVE"],
+            "until": [
+              "AVAILABLE",
+              "available",
+              "IN_USE",
+              "ACTIVE"
+            ],
             "timeout": 300,
             "interval": 15
           }
@@ -49,7 +73,9 @@
           "method": "GET",
           "path": "/v1/volumes",
           "optional": true,
-          "expect_status": [200]
+          "expect_status": [
+            200
+          ]
         },
         {
           "name": "set-snapshot-rate",
@@ -57,8 +83,19 @@
           "path": "/v1/volumes/{volume_id}/snapshot-rates",
           "group": "vol-snapshot-rate",
           "optional": true,
-          "json": {"snapshot_rate": 100},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "snapshot_rate": 100
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-snapshot-rate",
@@ -66,8 +103,19 @@
           "path": "/v1/volumes/{volume_id}/snapshot-rates",
           "group": "vol-snapshot-rate",
           "optional": true,
-          "json": {"snapshot_rate": 100},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "snapshot_rate": 100
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-snapshot-rate",
@@ -76,7 +124,16 @@
           "group": "vol-snapshot-rate",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-snapshot-schedule",
@@ -84,8 +141,20 @@
           "path": "/v1/volumes/{volume_id}/snapshot-schedules",
           "group": "vol-snapshot-schedule",
           "optional": true,
-          "json": {"day_of_week": "SUN", "hour": 18},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "day_of_week": "SUN",
+            "hour": 18
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-snapshot-schedule",
@@ -93,8 +162,20 @@
           "path": "/v1/volumes/{volume_id}/snapshot-schedules",
           "group": "vol-snapshot-schedule",
           "optional": true,
-          "json": {"day_of_week": "SUN", "hour": 18},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "day_of_week": "SUN",
+            "hour": 18
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-snapshot-schedule",
@@ -103,7 +184,16 @@
           "group": "vol-snapshot-schedule",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-snapshot",
@@ -112,8 +202,19 @@
           "group": "vol-snapshot",
           "optional": true,
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {"snapshot_id": "$.snapshot_id"}
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture": {
+            "snapshot_id": "$.snapshot_id"
+          }
         },
         {
           "name": "list-snapshots",
@@ -121,7 +222,10 @@
           "path": "/v1/volumes/{volume_id}/snapshots",
           "group": "vol-snapshot",
           "optional": true,
-          "expect_status": [200, 404]
+          "expect_status": [
+            200,
+            404
+          ]
         },
         {
           "name": "restore-snapshot",
@@ -130,7 +234,16 @@
           "group": "vol-snapshot",
           "optional": true,
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-snapshot",
@@ -139,8 +252,20 @@
           "group": "vol-snapshot",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "retry_on_status": [409, 500],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 4,
           "retry_interval": 15
         },
@@ -150,9 +275,23 @@
           "path": "/v1/volumes/{volume_id}/replications",
           "group": "vol-replication",
           "optional": true,
-          "json": {"cycle": "5MIN", "name": "regrbsrepl{unique}", "region": "kr-west1", "zone": "kr-west1-b"},
+          "json": {
+            "cycle": "5MIN",
+            "name": "regrbsrepl{unique}",
+            "region": "kr-west1",
+            "zone": "kr-west1-b"
+          },
           "_note": "SPEC BUMP 2026-07-15 (VolumeReplicationCreateRequestV1Dot4): zone 신규 REQUIRED (region은 유지 — filestorage와 달리 제거 안 됨). 값은 docs Example(kr-west1/kr-west1-a); 체인이 KNOWN-BLOCKED라 called-only.",
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "list-volume-replications",
@@ -160,7 +299,12 @@
           "path": "/v1/volumes/{volume_id}/replications",
           "group": "vol-replication",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "_note": "id-bound read (list a volume's replications). Closes the volume_id getid GET /v1/volumes/{volume_id}/replications. Keys off the create-volume-captured volume_id; tolerant [200,400,403,404] because in a LIGHT run the volume create 4xx's (REQUIRED attachments to a Bare Metal Server, none on this account) leaving volume_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
         },
         {
@@ -169,8 +313,19 @@
           "path": "/v1/volumes/{volume_id}/replications/cycle",
           "group": "vol-replication",
           "optional": true,
-          "json": {"cycle": "5MIN"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "cycle": "5MIN"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-replication-policy",
@@ -178,8 +333,19 @@
           "path": "/v1/volumes/{volume_id}/replications/policy",
           "group": "vol-replication",
           "optional": true,
-          "json": {"policy": "RESYNC"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "policy": "RESYNC"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-replication",
@@ -188,7 +354,16 @@
           "group": "vol-replication",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-recovery",
@@ -196,8 +371,20 @@
           "path": "/v1/volumes/{volume_id}/recoveries",
           "group": "vol-recovery",
           "optional": true,
-          "json": {"name": "regrbsrecov{unique}", "snapshot_id": "{snapshot_id}"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "name": "regrbsrecov{unique}",
+            "snapshot_id": "{snapshot_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-attachment",
@@ -205,14 +392,34 @@
           "path": "/v1/volumes/{volume_id}/attachments",
           "group": "vol-attachment",
           "optional": true,
-          "json": {"attachments": [{"object_id": "{env:SCP_BM_SERVER_ID}", "object_type": "BM"}]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "attachments": [
+              {
+                "object_id": "{env:SCP_BM_SERVER_ID}",
+                "object_type": "BM"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "_note": "2026-07-16: object_id 더미(32-zero)→{env:SCP_BM_SERVER_ID} — requires_env 게이트 하에서만 실행되므로 실 BM 서버로 attach를 실제 검증.",
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/volumes/{volume_id}/attachments",
             "service": "baremetal-blockstorage",
-            "json": {"attachments": ["{env:SCP_BM_SERVER_ID}"]}
+            "json": {
+              "attachments": [
+                "{env:SCP_BM_SERVER_ID}"
+              ]
+            }
           }
         },
         {
@@ -222,12 +429,27 @@
           "group": "vol-attachment",
           "optional": true,
           "destructive": true,
-          "json": {"attachments": ["{env:SCP_BM_SERVER_ID}"]},
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "json": {
+            "attachments": [
+              "{env:SCP_BM_SERVER_ID}"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "probe-reads",
-          "probe_reads": {"volume_id": "{volume_id}"}
+          "probe_reads": {
+            "volume_id": "{volume_id}"
+          }
         },
         {
           "name": "delete-volume",
@@ -235,8 +457,16 @@
           "path": "/v1/volumes/{volume_id}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 404],
-          "retry_on_status": [409, 500],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 6,
           "retry_interval": 20
         },
@@ -245,18 +475,30 @@
           "method": "GET",
           "path": "/v1/volumes/{volume_id}",
           "optional": true,
-          "expect_status": [200, 404],
-          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
         }
-      ]
+      ],
+      "_status": "blocked-owner"
     },
     {
       "id": "blockstorage-volume-group",
       "service": "storage/baremetal-blockstorage",
-      "enabled": true,
+      "enabled": false,
       "heavy": true,
-      "requires_env": ["SCP_BM_SERVER_ID"],
-      "_note": "ENV-GATED 2026-07-16 (soft-4xx 원인규명 캠페인 B, run 20260716-025427-a690): 루트 create-member-volume이 400 NoServersRequest(계정 BM 서버 0대)로 실패 → {member_volume_id}/{volume_group_id} 리터럴 → 자식 스텝 ~17건 404 VolumeNotFound/VolumeGroupNotFound 연쇄가 관용 soft로 통과되어 원인이 가려졌다. requires_env SCP_BM_SERVER_ID 게이트로 전환 — 미설정 시 lifecycle 전체 환경적 스킵(대시보드 명시), 설정 시 멤버 볼륨 create가 실 BM 서버에 attach되어 체인 검증 가능. | (기존) Baremetal block storage VOLUME-GROUP lifecycle (billable -> heavy). Create a member volume -> create a volume-group containing it -> exercise members add/remove, group snapshots + snapshot-schedules, group replications (+cycle/policy), group recoveries, group snapshot restore -> tear down (group then member volume). Bodies from data/api_bodies.json + api_docs model schemas (docs-only provenance). Captures: volume create $.result.id; volume-group create $.result.id (VolumeGroupModel.id); group snapshot create flat $.snapshot_id (VolumeGroupSnapshotResponse). members/add + members/remove take {volume_ids:[...]}; we add then remove the created member volume. Group replication targets remote region kr-west1 (docs example) -> may 4xx; optional+grouped. Group DELETE endpoint is not in this service's catalog (no DELETE /v1/volume-groups/{id}) so the group is removed implicitly by deleting its members + best-effort; member volume is the registered cleanup. snapshot-schedules/replications are deleted as cleanup before teardown. KNOWN-BLOCKED (userguide, fetched 2026-06-10): the member-volume create has the same REQUIRED attachments (1..8 BM servers) gap as blockstorage-volume, and volume-group targets must additionally have snapshot capacity SET + schedule/replication UNUSED before grouping (knowledge/formal/services/storage__baremetal-blockstorage.yaml).",
+      "requires_env": [
+        "SCP_BM_SERVER_ID"
+      ],
+      "_note": "EXCLUDED 2026-07-16 (오너: 'BM블록스토리지는 테스트 제외대상인데?'): BM 블록스토리지는 테스트 범위에서 제외 — 계정에 BM 서버가 없고 확보 계획도 범위 밖. 캠페인 B의 requires_env 게이트(SCP_BM_SERVER_ID) 위에 비활성을 얹음(게이트 배선은 보존 — 범위 편입 시 env 설정+enabled:true로 즉시 복귀). || ENV-GATED 2026-07-16 (soft-4xx 원인규명 캠페인 B, run 20260716-025427-a690): 루트 create-member-volume이 400 NoServersRequest(계정 BM 서버 0대)로 실패 → {member_volume_id}/{volume_group_id} 리터럴 → 자식 스텝 ~17건 404 VolumeNotFound/VolumeGroupNotFound 연쇄가 관용 soft로 통과되어 원인이 가려졌다. requires_env SCP_BM_SERVER_ID 게이트로 전환 — 미설정 시 lifecycle 전체 환경적 스킵(대시보드 명시), 설정 시 멤버 볼륨 create가 실 BM 서버에 attach되어 체인 검증 가능. | (기존) Baremetal block storage VOLUME-GROUP lifecycle (billable -> heavy). Create a member volume -> create a volume-group containing it -> exercise members add/remove, group snapshots + snapshot-schedules, group replications (+cycle/policy), group recoveries, group snapshot restore -> tear down (group then member volume). Bodies from data/api_bodies.json + api_docs model schemas (docs-only provenance). Captures: volume create $.result.id; volume-group create $.result.id (VolumeGroupModel.id); group snapshot create flat $.snapshot_id (VolumeGroupSnapshotResponse). members/add + members/remove take {volume_ids:[...]}; we add then remove the created member volume. Group replication targets remote region kr-west1 (docs example) -> may 4xx; optional+grouped. Group DELETE endpoint is not in this service's catalog (no DELETE /v1/volume-groups/{id}) so the group is removed implicitly by deleting its members + best-effort; member volume is the registered cleanup. snapshot-schedules/replications are deleted as cleanup before teardown. KNOWN-BLOCKED (userguide, fetched 2026-06-10): the member-volume create has the same REQUIRED attachments (1..8 BM servers) gap as blockstorage-volume, and volume-group targets must additionally have snapshot capacity SET + schedule/replication UNUSED before grouping (knowledge/formal/services/storage__baremetal-blockstorage.yaml).",
       "steps": [
         {
           "name": "create-member-volume",
@@ -267,14 +509,28 @@
             "name": "regrbsgvol{unique}",
             "disk_type": "SSD",
             "size_gb": 10,
-            "qos": {"iops": 5000, "throughput": 250},
-            "attachments": [{"object_id": "{env:SCP_BM_SERVER_ID}", "object_type": "BM"}],
+            "qos": {
+              "iops": 5000,
+              "throughput": 250
+            },
+            "attachments": [
+              {
+                "object_id": "{env:SCP_BM_SERVER_ID}",
+                "object_type": "BM"
+              }
+            ],
             "zone": "kr-west1-b",
             "tags": []
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot4): zone 신규 REQUIRED — create-volume(blockstorage-volume) _note의 400-detail 판정 참조 (zone 누락 400 'Zone input is required.' / 포함 시 NoServersRequest 단계로 진행, 라이브 실측).",
-          "expect_status": [200, 201, 202],
-          "capture": {"member_volume_id": "$.result.id"},
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "member_volume_id": "$.result.id"
+          },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/volumes/{member_volume_id}",
@@ -286,10 +542,18 @@
           "method": "GET",
           "path": "/v1/volumes/{member_volume_id}",
           "optional": true,
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
             "field": "$.result.state",
-            "until": ["AVAILABLE", "available", "IN_USE", "ACTIVE"],
+            "until": [
+              "AVAILABLE",
+              "available",
+              "IN_USE",
+              "ACTIVE"
+            ],
             "timeout": 300,
             "interval": 15
           }
@@ -301,23 +565,43 @@
           "optional": true,
           "json": {
             "name": "regrbsvg{unique}",
-            "volume_ids": ["{member_volume_id}"],
+            "volume_ids": [
+              "{member_volume_id}"
+            ],
             "zone": "kr-west1-b",
             "tags": []
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeGroupCreationRequestV1Dot4): zone 신규 REQUIRED (docs 정본; Example kr-west1-a). 멤버 볼륨 create가 KNOWN-BLOCKED(BM attachments)라 이 스텝은 여전히 called-only — zone 값의 라이브 검증은 멤버 볼륨 2xx 이후 과제.",
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {"volume_group_id": "$.result.id"}
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture": {
+            "volume_group_id": "$.result.id"
+          }
         },
         {
           "name": "wait-group-available",
           "method": "GET",
           "path": "/v1/volume-groups/{volume_group_id}",
           "optional": true,
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
             "field": "$.result.state",
-            "until": ["AVAILABLE", "available", "ACTIVE"],
+            "until": [
+              "AVAILABLE",
+              "available",
+              "ACTIVE"
+            ],
             "timeout": 300,
             "interval": 15
           }
@@ -327,7 +611,9 @@
           "method": "GET",
           "path": "/v1/volume-groups",
           "optional": true,
-          "expect_status": [200]
+          "expect_status": [
+            200
+          ]
         },
         {
           "name": "remove-group-member",
@@ -335,8 +621,21 @@
           "path": "/v1/volume-groups/{volume_group_id}/members/remove",
           "group": "vg-members",
           "optional": true,
-          "json": {"volume_ids": ["{member_volume_id}"]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "volume_ids": [
+              "{member_volume_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "add-group-member",
@@ -344,8 +643,21 @@
           "path": "/v1/volume-groups/{volume_group_id}/members/add",
           "group": "vg-members",
           "optional": true,
-          "json": {"volume_ids": ["{member_volume_id}"]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "volume_ids": [
+              "{member_volume_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-group-snapshot-schedule",
@@ -353,8 +665,20 @@
           "path": "/v1/volume-groups/{volume_group_id}/snapshot-schedules",
           "group": "vg-snapshot-schedule",
           "optional": true,
-          "json": {"day_of_week": "SUN", "hour": 18},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "day_of_week": "SUN",
+            "hour": 18
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-group-snapshot-schedule",
@@ -362,8 +686,20 @@
           "path": "/v1/volume-groups/{volume_group_id}/snapshot-schedules",
           "group": "vg-snapshot-schedule",
           "optional": true,
-          "json": {"day_of_week": "SUN", "hour": 18},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "day_of_week": "SUN",
+            "hour": 18
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-group-snapshot-schedule",
@@ -372,7 +708,16 @@
           "group": "vg-snapshot-schedule",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-group-snapshot",
@@ -381,8 +726,19 @@
           "group": "vg-snapshot",
           "optional": true,
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {"group_snapshot_id": "$.snapshot_id"}
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture": {
+            "group_snapshot_id": "$.snapshot_id"
+          }
         },
         {
           "name": "list-group-snapshots",
@@ -390,7 +746,10 @@
           "path": "/v1/volume-groups/{volume_group_id}/snapshots",
           "group": "vg-snapshot",
           "optional": true,
-          "expect_status": [200, 404]
+          "expect_status": [
+            200,
+            404
+          ]
         },
         {
           "name": "restore-group-snapshot",
@@ -399,7 +758,16 @@
           "group": "vg-snapshot",
           "optional": true,
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-group-snapshot",
@@ -408,8 +776,20 @@
           "group": "vg-snapshot",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "retry_on_status": [409, 500],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 4,
           "retry_interval": 15
         },
@@ -427,7 +807,16 @@
             "zone": "kr-west1-b"
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeGroupReplicationCreateRequestV1Dot4): zone 신규 REQUIRED (region 유지). 값은 docs Example; 체인이 KNOWN-BLOCKED라 called-only.",
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "list-group-replications",
@@ -435,7 +824,12 @@
           "path": "/v1/volume-groups/{volume_group_id}/replications",
           "group": "vg-replication",
           "optional": true,
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "_note": "id-bound read (list a volume-group's replications). Closes the volume_group_id getid GET /v1/volume-groups/{volume_group_id}/replications. Keys off the create-volume-group-captured volume_group_id; tolerant [200,400,403,404] because in a LIGHT run the member-volume/group create 4xx's (same REQUIRED-attachments gap) leaving volume_group_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
         },
         {
@@ -444,8 +838,19 @@
           "path": "/v1/volume-groups/{volume_group_id}/replications/cycle",
           "group": "vg-replication",
           "optional": true,
-          "json": {"cycle": "5MIN"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "cycle": "5MIN"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "set-group-replication-policy",
@@ -453,8 +858,19 @@
           "path": "/v1/volume-groups/{volume_group_id}/replications/policy",
           "group": "vg-replication",
           "optional": true,
-          "json": {"policy": "RESYNC"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "policy": "RESYNC"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "delete-group-replication",
@@ -463,7 +879,16 @@
           "group": "vg-replication",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-group-recovery",
@@ -471,12 +896,27 @@
           "path": "/v1/volume-groups/{volume_group_id}/recoveries",
           "group": "vg-recovery",
           "optional": true,
-          "json": {"block_storage_name_prefix": "regrrec", "snapshot_id": "{group_snapshot_id}"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "block_storage_name_prefix": "regrrec",
+            "snapshot_id": "{group_snapshot_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "probe-reads",
-          "probe_reads": {"volume_group_id": "{volume_group_id}", "volume_id": "{member_volume_id}"}
+          "probe_reads": {
+            "volume_group_id": "{volume_group_id}",
+            "volume_id": "{member_volume_id}"
+          }
         },
         {
           "name": "delete-member-volume",
@@ -484,8 +924,17 @@
           "path": "/v1/volumes/{member_volume_id}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 404, 409],
-          "retry_on_status": [409, 500],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 6,
           "retry_interval": 20
         },
@@ -494,33 +943,48 @@
           "method": "GET",
           "path": "/v1/volumes/{member_volume_id}",
           "optional": true,
-          "expect_status": [200, 404],
-          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
         }
-      ]
+      ],
+      "_status": "blocked-owner"
     },
     {
       "id": "blockstorage-list-reads",
       "service": "storage/baremetal-blockstorage",
-      "enabled": true,
+      "enabled": false,
       "heavy": false,
-      "_note": "LIGHT read-only lifecycle: GET /v1/volumes and GET /v1/volume-groups both return 200 (empty list) with no resources and no path params. Confirmed live 2026-06-29: both return 200 {total_count:0,...}. No VPC/BM server needed. Covers listvolumes + listvolumegroups without SCP_RUN_HEAVY.",
+      "_note": "EXCLUDED 2026-07-16 (오너: 'BM블록스토리지는 테스트 제외대상인데?'): BM 블록스토리지는 테스트 범위에서 제외 — 계정에 BM 서버가 없고 확보 계획도 범위 밖. 캠페인 B의 requires_env 게이트(SCP_BM_SERVER_ID) 위에 비활성을 얹음(게이트 배선은 보존 — 범위 편입 시 env 설정+enabled:true로 즉시 복귀). || LIGHT read-only lifecycle: GET /v1/volumes and GET /v1/volume-groups both return 200 (empty list) with no resources and no path params. Confirmed live 2026-06-29: both return 200 {total_count:0,...}. No VPC/BM server needed. Covers listvolumes + listvolumegroups without SCP_RUN_HEAVY.",
       "steps": [
         {
           "name": "list-volumes",
           "method": "GET",
           "path": "/v1/volumes",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "params": {}
         },
         {
           "name": "list-volume-groups",
           "method": "GET",
           "path": "/v1/volume-groups",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "params": {}
         }
-      ]
+      ],
+      "_status": "blocked-owner"
     }
   ]
 }

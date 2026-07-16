@@ -3,10 +3,12 @@
     {
       "id": "archivestorage-bucket",
       "service": "storage/archivestorage",
-      "enabled": true,
+      "enabled": false,
       "heavy": true,
-      "requires_env": ["SCP_ARCHIVESTORAGE_ENABLED"],
-      "_note": "ENV-GATED 2026-07-16 (soft-4xx 원인규명 캠페인 B, run 20260716-025427-a690 + 라이브 재검증 2026-07-16): 전 스텝(15건)이 401 '{status:UNAUTHORIZED, name:Request was rejected by gateway, message:Service Account catalog has not target's endpoint. target : scp-archivestorage_hmac}' — 인증 체계 조사 결과 별도 서명 알고리즘이 아니라, 게이트웨이의 서비스 어카운트 카탈로그에 archivestorage의 HMAC 타깃(scp-archivestorage_hmac)이 미등록(계정 미온보딩/미신청) 상태. 타깃명 자체가 *_hmac이므로 서명 방식은 표준 SCP HMAC 동일 — SCR 401('Service Account catalog…' 동일 축, validated-facts)과 같은 클래스. 온보딩 전에는 요청이 백엔드에 도달조차 못 하므로 reachability 401 관용 기록도 무의미 → requires_env SCP_ARCHIVESTORAGE_ENABLED 게이트로 전환: 미설정 시 lifecycle 환경적 스킵(대시보드 명시), 콘솔에서 Archive Storage 이용 신청/서비스어카운트 타깃 등록 후 SCP_ARCHIVESTORAGE_ENABLED=true로 해제. | (기존) reachability-only (owner override 2026-06-16): archivestorage endpoints access-tested, 4xx tolerated, no real creation expected (no archivestorage key); heavy.",
+      "requires_env": [
+        "SCP_ARCHIVESTORAGE_ENABLED"
+      ],
+      "_note": "EXCLUDED 2026-07-16 (오너: 'BM블록스토리지/archive storage는 테스트 제외대상' — data/baselines/untestable_services.json에 이미 '전용 콘솔 인증키 미발급'로 등재, 대시보드 waiver 표시와 정합): lifecycle enabled가 waiver 레지스트리와 모순이라 비활성. 캠페인 B의 requires_env 배선은 보존 — 범위 편입 시 env+enabled로 즉시 복귀. || ENV-GATED 2026-07-16 (soft-4xx 원인규명 캠페인 B, run 20260716-025427-a690 + 라이브 재검증 2026-07-16): 전 스텝(15건)이 401 '{status:UNAUTHORIZED, name:Request was rejected by gateway, message:Service Account catalog has not target's endpoint. target : scp-archivestorage_hmac}' — 인증 체계 조사 결과 별도 서명 알고리즘이 아니라, 게이트웨이의 서비스 어카운트 카탈로그에 archivestorage의 HMAC 타깃(scp-archivestorage_hmac)이 미등록(계정 미온보딩/미신청) 상태. 타깃명 자체가 *_hmac이므로 서명 방식은 표준 SCP HMAC 동일 — SCR 401('Service Account catalog…' 동일 축, validated-facts)과 같은 클래스. 온보딩 전에는 요청이 백엔드에 도달조차 못 하므로 reachability 401 관용 기록도 무의미 → requires_env SCP_ARCHIVESTORAGE_ENABLED 게이트로 전환: 미설정 시 lifecycle 환경적 스킵(대시보드 명시), 콘솔에서 Archive Storage 이용 신청/서비스어카운트 타깃 등록 후 SCP_ARCHIVESTORAGE_ENABLED=true로 해제. | (기존) reachability-only (owner override 2026-06-16): archivestorage endpoints access-tested, 4xx tolerated, no real creation expected (no archivestorage key); heavy.",
       "steps": [
         {
           "name": "create-bucket",
@@ -282,15 +284,18 @@
             "interval": 15
           }
         }
-      ]
+      ],
+      "_status": "blocked-owner"
     },
     {
       "id": "archivestorage-archiving-policy",
       "service": "storage/archivestorage",
-      "enabled": true,
+      "enabled": false,
       "heavy": true,
-      "requires_env": ["SCP_ARCHIVESTORAGE_ENABLED"],
-      "_note": "ENV-GATED 2026-07-16: archivestorage-bucket과 동일 근거 — 게이트웨이 401 'Service Account catalog has not target's endpoint. target : scp-archivestorage_hmac'(계정 미온보딩, 서명 방식은 표준 HMAC 동일). SCP_ARCHIVESTORAGE_ENABLED 미설정 시 환경적 스킵. | (기존) reachability-only (owner override 2026-06-16): archivestorage endpoints access-tested, 4xx tolerated, no real creation expected (no archivestorage key); heavy.",
+      "requires_env": [
+        "SCP_ARCHIVESTORAGE_ENABLED"
+      ],
+      "_note": "EXCLUDED 2026-07-16 (오너: 'BM블록스토리지/archive storage는 테스트 제외대상' — data/baselines/untestable_services.json에 이미 '전용 콘솔 인증키 미발급'로 등재, 대시보드 waiver 표시와 정합): lifecycle enabled가 waiver 레지스트리와 모순이라 비활성. 캠페인 B의 requires_env 배선은 보존 — 범위 편입 시 env+enabled로 즉시 복귀. || ENV-GATED 2026-07-16: archivestorage-bucket과 동일 근거 — 게이트웨이 401 'Service Account catalog has not target's endpoint. target : scp-archivestorage_hmac'(계정 미온보딩, 서명 방식은 표준 HMAC 동일). SCP_ARCHIVESTORAGE_ENABLED 미설정 시 환경적 스킵. | (기존) reachability-only (owner override 2026-06-16): archivestorage endpoints access-tested, 4xx tolerated, no real creation expected (no archivestorage key); heavy.",
       "steps": [
         {
           "name": "create-archiving-policy",
@@ -474,7 +479,8 @@
             422
           ]
         }
-      ]
+      ],
+      "_status": "blocked-owner"
     }
   ]
 }

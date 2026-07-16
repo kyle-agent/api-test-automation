@@ -403,7 +403,11 @@
               "list": "$.contents",
               "get": "id"
             }
-          }
+          },
+          "capture_soft": {
+            "es_target_version": "$.contents[0].software_version"
+          },
+          "_note": "a690(2026-07-16) 원인규명: es_target_version capture_soft 추가 — patch-minor-version 바디의 software_version 공급용 (a690 LIVE: contents[0].software_version='3.9.2')."
         },
         {
           "name": "es-prefer-older-version",
@@ -600,8 +604,11 @@
           "optional": true,
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
-            "block_storage_group_id": "$.instance_groups[0].block_storage_groups[0].id"
-          }
+            "block_storage_group_id": "$.instance_groups[0].block_storage_groups[0].id",
+            "block_storage_group_data_id": "$.instance_groups[0].block_storage_groups[1].id",
+            "es_engine_name": "$.dbaas_engine"
+          },
+          "_note": "a690(2026-07-16) 원인규명: (1) block_storage_group_data_id — es-create가 OS(104GB)+DATA(16GB) 두 그룹을 만들고 [0]=OS는 resize가 400 InvalidBlockStorageRoleType로 거부(a690 LIVE) → [1]=DATA를 set-block-storage-size에 공급 (mysql/pg 2026-07-13 동일-클래스 수리와 정합). (2) es_engine_name — cluster detail dbaas_engine='Kafka' (a690 LIVE), patch-minor-version 바디에 공급."
         },
         {
           "name": "list-parameter-values",
@@ -627,7 +634,7 @@
           "json": {
             "instance_count": 1,
             "service_ip_addresses": [
-              "10.124.0.30"
+              "10.124.12.30"
             ]
           },
           "expect_status": [
@@ -642,7 +649,7 @@
           ],
           "optional": true,
           "group": "es-instances",
-          "_note": "verbatim from eventstreams-cluster-subops-guarded (EventStreamsClusterAddInstancesRequest, docs-derived)."
+          "_note": "EventStreamsClusterAddInstancesRequest {instance_count, service_ip_addresses(required)}, docs-derived. | a690(2026-07-16) 원인규명 수리: 10.124.0.30은 공유 db-subnet(10.124.0.0/24) 주소인데 (a) a690에서 400 'is not available' (LIVE — 공유 subnet 내 동시 점유/충돌), (b) 이 lifecycle은 2026-07-15부터 전용 subnet 10.124.12.0/24(create-subnet cidr)에 클러스터를 만들므로 subnet 밖 IP가 됨(잠재 정합성 버그). service IP는 클러스터 subnet 내여야 하므로 10.124.12.30으로 정렬 — 전용 /24라 브로커 3대 외 점유자가 없어 충돌 확률 제거. 미검증 — 다음 런 판정."
         },
         {
           "name": "wait-after-add-instances",
@@ -800,7 +807,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.124.12.10"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
@@ -814,7 +823,8 @@
             422
           ],
           "optional": true,
-          "group": "es-sg-rules"
+          "group": "es-sg-rules",
+          "_note": "a690(2026-07-16) 원인규명 수리: 양쪽 빈 배열(문서 예제 그대로)은 400 ValidationError 'invalid security-group-rules' (a690 LIVE) — 문서 예제가 실서버에서 거부되는 케이스(conformance 후보). 같은 런에서 cachestore set-security-group-rules가 {add_ip_addresses:['10.124.0.10'], del_ip_addresses:[]}로 202 LIVE-VERIFIED (detail의 allowable_ip_addresses에 '10.124.0.10/32'로 반영 확인) — 동일 모양으로 전용 subnet 내 IP 1개 추가. allowlist 추가는 가역·무해. 미검증(ES) — 다음 런 판정."
         },
         {
           "name": "wait-after-set-security-group-rules",
@@ -1076,7 +1086,10 @@
           "name": "patch-minor-version",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/patch",
-          "json": {},
+          "json": {
+            "dbaas_engine": "{es_engine_name}",
+            "software_version": "{es_target_version}"
+          },
           "expect_status": [
             200,
             201,
@@ -1089,7 +1102,7 @@
           ],
           "optional": true,
           "group": "es-patch",
-          "_note": "Body kept DELIBERATELY empty, verbatim from eventstreams-cluster-subops-guarded: MinorPatchDbEngineRequest {dbaas_engine, software_version} — dbaas_engine's valid string for this engine (\"kafka\"?) is UNDOCUMENTED (no enum/example in api_docs, same blind spot as cachestore's identical model, which this campaign's mariadb/mysql/epas/postgresql software_version fix deliberately left untouched too). The guaranteed 4xx still records C2."
+          "_note": "a690(2026-07-16) 원인규명 수리: 빈 바디 {} → 400 ValidationError ['value_error','value_error'] (a690 LIVE — MinorPatchDbEngineRequest의 required 2필드 dbaas_engine/software_version 누락과 정확히 일치). 종전 노트의 'dbaas_engine 유효 문자열 UNDOCUMENTED' 공백을 라이브로 해소: cluster detail dbaas_engine='Kafka' (a690 LIVE, capture-subop-ids es_engine_name) + engine-versions contents[0].software_version='3.9.2' (a690 LIVE, es-find-version es_target_version). es-prefer-older-version이 구버전으로 생성한 경우 [0]=최신이 실제 패치 타깃이 되고, 이미 최신이면 mysql/mariadb/epas/pg와 동일한 400 'Unpatchable version' 예상(a690 LIVE 검증된 패밀리 semantics) — 관용 유지. detail 노출값이 요청 enum과 다를 가능성 있음(미검증 — 다음 런 판정)."
         },
         {
           "name": "wait-after-patch-minor-version",
@@ -1187,9 +1200,9 @@
         {
           "name": "set-block-storage-size",
           "method": "POST",
-          "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+          "path": "/v1/block-storage-groups/{block_storage_group_data_id}/resize",
           "json": {
-            "size_gb": 112
+            "size_gb": 32
           },
           "expect_status": [
             200,
@@ -1203,7 +1216,7 @@
           ],
           "optional": true,
           "group": "es-resize",
-          "_note": "size_gb raised from the guarded variant's 20 to 112 (> the 104GB OS volume this lifecycle's own es-create just provisioned) — resize-UP is the documented direction for block storage groups across every other DBaaS engine in this repo (mariadb/mysql/epas/postgresql/cachestore resize-block-storage all use size_gb:112 against a 104 create). 20 would be a shrink, which is never a supported operation for any engine seen so far."
+          "_note": "a690(2026-07-16) 원인규명 수리: 종전엔 {block_storage_group_id}=[0]=OS(104GB) 그룹을 112GB로 resize → 400 Dbaas.ValidationError.InvalidBlockStorageRoleType (a690 LIVE) — OS-role 그룹은 resize 불가(mysql/pg 2026-07-13 batch ① 수리에서 이미 확립된 클래스). es-create가 DATA(16GB) 그룹을 함께 만들므로 [1]=DATA({block_storage_group_data_id}, capture-subop-ids)를 16→32GB(2x create size, mysql/pg 208=2x104 관례)로 resize. [1]=DATA 순서 가정은 create 바디 순서(OS,DATA) 기반 — 미검증, 다음 런 판정."
         },
         {
           "name": "stop-cluster",
@@ -1363,7 +1376,8 @@
               ],
               "max": 3
             }
-          }
+          },
+          "_note": "negative-probe: 의도된 4xx — delete-confirm poll: until_status 404가 성공 조건(자원 소멸 확인), soft-4xx 집계에 잡히지만 정상 (a690 원인규명 태깅 2026-07-16)."
         },
         {
           "name": "delete-subnet",
@@ -1503,7 +1517,8 @@
             404
           ],
           "optional": true,
-          "group": "es-read"
+          "group": "es-read",
+          "_note": "negative-probe: 의도된 4xx — read-only 런에서 request_id는 수확 불가(async 쓰기 응답에서만 나옴)라 {request_id}가 리터럴 토큰으로 나가 400 Dbaas.ResourceError.NotFound (a690 LIVE). DBaaS 공통 특이점: request-not-found가 404가 아니라 400 (vertica/searchengine/sqlserver read-coverage와 동일 — conformance 후보로 보고됨). a690 원인규명 태깅 2026-07-16."
         },
         {
           "name": "probe-reads",
