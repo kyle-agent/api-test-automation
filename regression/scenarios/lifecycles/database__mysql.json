@@ -450,7 +450,7 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
           "json": {
-            "backup_history_ids": []
+            "backup_history_number": []
           },
           "expect_status": [
             200,
@@ -463,7 +463,8 @@
             422
           ],
           "optional": true,
-          "group": "backup-hist"
+          "group": "backup-hist",
+          "_note": "FIELD-NAME FIX 2026-07-16 (svccov-mysql session): body key was 'backup_history_ids' -- the documented request model is BackupHistoryNumberRequest {backup_history_number: array[string]} (data/api_docs.json database/mysql/backuphistorynumberrequest); the wrong key produced a 400 ValidationError ['value_error'] that looked like the unrelated unsetbackup/backup-family 401 PF class but was actually just a body-shape bug. Live-confirmed same fix on mysql-cluster-version-upgrade (this file) run svccov-mysql-1784211350."
         },
         {
           "name": "patch-minor-version",
@@ -1104,11 +1105,29 @@
           }
         },
         {
+          "name": "list-backup-histories-after",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "manual-backup",
+          "capture_soft": {
+            "backup_history_number": "$.contents[0].backup_history_number"
+          },
+          "_note": "feeds cleanup-backup-histories's REQUIRED field (see next step's note)."
+        },
+        {
           "name": "cleanup-backup-histories",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
           "json": {
-            "backup_history_ids": []
+            "backup_history_number": [
+              "{backup_history_number}"
+            ]
           },
           "expect_status": [
             200,
@@ -1123,15 +1142,15 @@
           ],
           "optional": true,
           "group": "manual-backup",
-          "_note": "no-op clear after manual-backup so the run doesn't strand a billable backup history entry; mysqlremovebackuphistories is a known 401 Dbaas.Unauthorized.AuthNFailed PF class (reconfirmed 2026-07-16 run 4912) -- 401 tolerated here, not a fix attempt."
+          "_note": "FIELD-NAME FIX 2026-07-16 (svccov-mysql session, live-confirmed run svccov-mysql-1784211350): body key is 'backup_history_number' (array[string]) per data/api_docs.json database/mysql/backuphistorynumberrequest -- NOT 'backup_history_ids'. The wrong key 400'd ValidationError ['value_error'], which on a first read looked like the unrelated mysqlunsetbackup 401 Dbaas.Unauthorized.AuthNFailed PF class but was actually just a body-shape bug -- do not conflate the two. Populated with the REAL backup_history_number captured from list-backup-histories-after (right after manual-backup) so this is a genuine cleanup, not a no-op clear-all; if the list capture misses (manual-backup itself failed/skipped), the unresolved '{backup_history_number}' literal still reaches the endpoint (tolerated 400/404)."
         },
         {
           "name": "set-log-type-const",
           "action": "set_const",
           "values": {
-            "log_type": "slow"
+            "log_type": "alert"
           },
-          "_note": "log_type is a fixed enum path token (alert|audit|slow, docs) with no live discovery endpoint -- set_const seeds ctx so {log_type} resolves to a real value on the wire while staying a template in 'path' (so _catalog_key_for still matches the mysqlexportlog catalog key for coverage recording)."
+          "_note": "log_type is a fixed enum path token with no live discovery endpoint. LIVE-CONFIRMED 2026-07-16 (run svccov-mysql-1784211350): 'slow' 400s Dbaas.InvalidLogType 'Log type is invalid' on a real mysql cluster despite the generic docs enum listing (alert, audit, slow) for the {log_type} path param -- 'alert' is the value shown in the mysqlregisterlogexportconfig doc's own request_example and is what's used here. set_const seeds ctx so {log_type} resolves to a real value on the wire while staying a template in 'path' (so _catalog_key_for still matches the mysqlexportlog catalog key for coverage recording)."
         },
         {
           "name": "export-log",
