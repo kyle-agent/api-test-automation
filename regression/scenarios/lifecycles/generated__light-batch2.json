@@ -665,8 +665,15 @@
           ],
           "optional": true,
           "group": "private-nat-dx",
-          "_note": "DX 정리 — private-nat 삭제 후. cleanup 등록과 이중이지만 행복경로에서 즉시 삭제.",
-          "service": "direct-connect"
+          "_note": "DELETE-HARDEN 2026-07-16: DC delete가 상태 의존 403/400을 주고(고아 regrdcpncboaidon 실측 — 관용 expect가 403을 삼켜 DC가 새고 VPC 삭제 후 고아 ACTIVE DC로 잔존; 같은 DC를 나중에 지우면 202 정상) 재시도 사다리로 누수 차단. 20s×8.",
+          "service": "direct-connect",
+          "retry_on_status": [
+            400,
+            403,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20
         },
         {
           "name": "wait-direct-connect-gone",
@@ -778,7 +785,7 @@
       "id": "gen-direct-connect",
       "service": "networking/direct-connect",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: direct-connect",
+      "_note": "DC-LANE 2026-07-16 (run e68b 실측 400 vpc-already-connected): DC는 VPC당 1개 배타인데 gen-private-nat도 공유 main VPC에 자기 DC(regrdcpn*)를 만들어 동시 실행 시 무조건 충돌 (a690 4s 실패의 진짜 원인 — 종전 '드레인' 추정 정정). 07-13 레인 설계에 맞춰 이 lifecycle은 net-VPC A로 이동 (A=vip-nat IGW 레인, DC 없음; B=routing DC 레인; main=private-nat DC). || composed by regression/scenarios/composer.py — targets: direct-connect",
       "steps": [
         {
           "name": "create-vpc",
@@ -804,7 +811,7 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc#a"
         },
         {
           "name": "wait-vpc",
@@ -930,7 +937,7 @@
           ],
           "retries": 40,
           "retry_interval": 30,
-          "adopt": "vpc"
+          "adopt": "vpc#a"
         }
       ]
     },
