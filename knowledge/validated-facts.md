@@ -3719,3 +3719,79 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - **apigw privatelink**: REGION 타입 API는 PLE 연계 불가(400 cannot-use-region-api)
   — PLE는 PRIVATE 타입(JWT 강제) 필요. request/cancel은 AUTO 승인이라
   REQUESTED/REJECTED 미도달(의도된 네거티브).
+
+## 관용 4xx 캠페인 D(compute/plat) 핵심 판정 (2026-07-16, run a690 전수 + 라이브 프로브)
+
+- **createimage URL 계약 확정 (라이브 프로브)**: `POST /v1/images`의 `url`은
+  **호출자 자신의 계정** Object Storage여야 하고 형식은 **RGW tenant-path
+  (콜론) `https://object-store.{region}.{env}.samsungsdscloud.com/<account>:<bucket>/<key>`**.
+  실측: 신계정(81eccb26…) 버킷 콜론 URL → **200 (queued)**, 같은 객체의 슬래시
+  형식(`/<account>/<bucket>/…`, 문서 request_example 형식) → 400
+  InvalidObjectStorageUrl **그리고 RGW anon GET도 400** (문서 예시가 이 환경과
+  불일치 — conformance 후보). 타 계정(구 ec11538a…) 버킷은 콜론 형식이어도 400.
+  **queued 이미지는 즉시 DELETE 204** (repair-log의 leak 우려 해소).
+  `core/oplog.py ensure_image_asset()`을 keys="test"(항상 테스트 계정) 고정으로
+  수리 — SCP_OPLOG_* 오버라이드가 구계정을 가리켜도 이미지 자산은 신계정에 ensure.
+- **PF-21(createvolumetransfer 500) 버전업에서 해소**: create 202 + read 200 +
+  list 200 + **accept 202** 전부 실측(run a690). accept가 transfer 레코드를
+  소비하므로 **accept 후 DELETE는 구조적 404** — DELETE 2xx 커버리지는 accept
+  이전에만 가능 (compute-virtualserver-volume-snapshot에 pre-accept delete +
+  재생성 스텝 신설). known_issues의 PF-21 베이스라인은 다음 런 재확인 후 은퇴 권장.
+- **scf deletetrigger `trigger_type` enum = `'apigateway' | 'cron'`** (라이브
+  에러 가이던스 명시, req-67d9ce9a). create 경로 세그먼트는 `/v1/triggers/cronjob`
+  인데 delete 바디 enum은 `cron` — 명명 불일치 (conformance 후보). 'cronjob'
+  전송이 400 invalid-request-error의 원인이었음 (수리 완료).
+- **scf codes/file(setcloudfunctioncodefile)은 이 환경에서 2xx 도달 불가**:
+  CodeFile 바디는 Java 전용(jar/class/method)인데 `GET /v1/cloud-functions/sample-codes`
+  실측상 제공 런타임은 Go/Node.js/PHP/Python 14종뿐(Java 부재). 문서 예시
+  obs_url도 내부 호스트(obs.kr-east1.scp-in.com:8443). blocked-environment.
+- **scf privatelink-endpoint 백엔드 조회 스코프 불일치**: 동일 endpoint_id에
+  request류 PUT은 400 invalid-state(ACTIVE)로 리소스를 찾는데 approval/connection
+  PUT은 404 privatelink-endpoint-not-found (run a690, e1e71cfd…) — op에 따라
+  404/invalid-state가 갈리는 백엔드 결함 후보.
+- **apigw privatelink 계열은 PRIVATE 타입 API 필수**: REGION 타입 api_id로
+  approval/connection PUT → 400 `scp-application-apigateway.api.cannot-use-region-api`
+  ("API endpoint of type REGION is not supported"). createapi enum (REGION, PRIVATE)
+  — gen-wave5-apigw-privatelink의 create-api를 PRIVATE로 수리.
+- **servicewatch POST /v1/metrics/custom 400 `SWT_CUSTOM_NAMESPACE`는 바디 무관**:
+  attribute key 4종(namespace/service.namespace/scp.namespace/Namespace), value
+  3종, datapoint-level namespace, 빈 attributes, camelCase 전신, 현재 timestamp
+  9개 변형 전부 동일 400 (라이브 프로브 2026-07-16). 같은 네임스페이스의 meta
+  생성 200·data readback 200(status Completed) — 메타 플레인엔 실존하나 ingest
+  플레인이 계정/에이전트 등록 수준에서 거부. 콘솔 ServiceWatch agent 프로비저닝
+  전제 유력 (owner 확인 필요).
+- **servicewatch POST /v1/metrics/data 400 "Invalid metrics requests"는 환경적**:
+  (namespace,metric) 쌍이 계정 메트릭 카탈로그(listmetricinfos)에 등록돼 있어야
+  하는데 run a690 시점 count:0 (Running VM 등록 전) — 기존 판정 유지.
+- **cloudmonitoring getaccountproductlist `X-ResourceType` 유효값은 'VM'/'Object
+  Storage'** (동일 런 200 실측, VM은 productResourceId=UUID) — 'INSTANCE'는 헤더
+  검증만 통과하고 **항상 404** (params 힌트 productCategoryCode = 유효 카테고리
+  아님). waveA1/light-batch2의 INSTANCE·'INSTANCE-' prefix capture는 실존한 적
+  없는 형식이었음 (수리 완료 — VM 헤더 + $.contents[0].productResourceId).
+- **2026-07-15 계정 교체(구 ec11538a… → 신 81eccb26…) 파급 목록**: ① iam
+  find-iam-user 하드코딩 경로 403 (수리: /v1/access-keys에서 account_id 캡처 주입),
+  ② support known inquiry/SR id 404 (owner 재공급 필요), ③ ASG notification
+  구계정 user 무효 (agent-B가 $.created_by 캡처로 기수리), ④ oplog 버킷
+  owner=구계정 → createimage 400 (ensure_image_asset keys='test'로 수리).
+- **iam 교차-lifecycle 리소스 차용 레이스**: iam-role-existing의 where_not_prefix
+  캡처가 병렬 iam-role-full의 임시 regrrole…을 잡았다가 삭제 후 404
+  ContactAdminForAssistance ×2 (run a690) — 'regr' 프리픽스 제외 추가로 수리.
+  교훈: **list→capture 차용 필터는 항상 자기 팀의 'regr' 단명 리소스를 제외할 것**.
+- **scr enable-public-endpoint 200은 비동기**: 200 후 ~2분 넘게 public-acl PUT이
+  409 put-conflict("does not use a public endpoint") — show의
+  `$.registry.public_endpoint_enabled` 필드 폴로 settle (수리 완료). 레지스트리
+  **쿼터(NON_VISIBILITY 1EA)는 DELETE 202→GET 404 후에도 해제 지연** 정황
+  (run a690: 202 후 ~3분에도 quota.value.exceeded) — wait-gone 폴 신설, 재발 시
+  core.budgets에 container-registry kind 편입 권장.
+- **PF-15(미정의 IAM action 403) 5번째 사례**: resourcemanager
+  updateresourcetags(PUT /v1/tags/{srn}/bulk) — 같은 런에서 updatetags(PUT
+  /v1/tags/bulk)는 200이므로 바디/SRN 문제 아님 (req-01601971).
+- **ske service-watch-logging 400 status-invalid는 settle 레이스**: 직전
+  set-cluster-logging 200 후 1~2초 내 RUNNING 폴이 전이 전에 통과 → PUT 시점엔
+  UPDATING. wait:20 선지연 + 400 재시도 사다리로 수리.
+- **filestorage replication은 생성 중 show가 통째로 400**
+  (`filestorage.BadRequest.replication.creating` — 200+상태필드가 아니라 400,
+  conformance 후보)이라 필드 폴 불가 — until_status:[200] 폴로 settle (수리 완료).
+- **secretsmanager createsecretsmanagerkmskey(POST /v1/secrets/kms-key) 스텝 제거**:
+  2026-07 버전업에서 엔드포인트가 카탈로그/문서에서 공식 삭제 (SPEC-DIFF §2⑩,
+  종전에도 미라우팅 404) — validate WARN 해소, kms 연결은 setkmsid가 커버.
