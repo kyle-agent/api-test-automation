@@ -3795,3 +3795,14 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - **secretsmanager createsecretsmanagerkmskey(POST /v1/secrets/kms-key) 스텝 제거**:
   2026-07 버전업에서 엔드포인트가 카탈로그/문서에서 공식 삭제 (SPEC-DIFF §2⑩,
   종전에도 미라우팅 404) — validate WARN 해소, kms 연결은 setkmsid가 커버.
+
+## scr borrow 레이스: CREATING 레지스트리 show = 500 (2026-07-16 런 실측)
+
+- scr-repo-borrow-coverage가 동시 실행 중인 container-scr-registry의 **CREATING
+  전이 중 레지스트리**를 list[0]으로 차용 → `GET /v1/container-registries/{id}`가
+  **500 ContactAdminForAssistance** (req-90138294…). 전이 상태 show에 4xx가
+  아닌 500 — conformance 후보 (SKE nodepool·pg parameters와 같은
+  500-on-client-state 클래스). 수리: wait-registry-running에 500 재시도
+  15s×10 (ACTIVE 도달까지 흡수).
+- 런 전체 fail 탭의 backup-histories PUT / backups DELETE **401 AuthNFailed
+  패밀리는 기지 백엔드 결함** (유효 HMAC, 전 엔진) — 신규 아님.

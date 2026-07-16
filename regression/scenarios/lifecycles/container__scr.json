@@ -71,7 +71,12 @@
             "timeout": 420,
             "interval": 15
           },
-          "_note": "Freshly created registry stays Creating ~160s (LIVE 2026-07-15) — repo create before Running would 4xx. Borrowed registry is already Running (immediate pass). If registry_id is still unresolved (no registry, create failed) the engine skips the poll and create-repo fails hard, which is correct."
+          "_note": "BORROW-RACE 수리 2026-07-16: 동시 실행 container-scr-registry가 만들던 CREATING 레지스트리를 [0]으로 빌리면 show가 500 ContactAdminForAssistance (req-90138294… — 전이 중 show 500은 백엔드 결함, conformance 후보). 500 재시도 15s×10으로 ACTIVE 도달까지 흡수. || Freshly created registry stays Creating ~160s (LIVE 2026-07-15) — repo create before Running would 4xx. Borrowed registry is already Running (immediate pass). If registry_id is still unresolved (no registry, create failed) the engine skips the poll and create-repo fails hard, which is correct.",
+          "retry_on_status": [
+            500
+          ],
+          "retries": 10,
+          "retry_interval": 15
         },
         {
           "name": "create-repo",
@@ -265,7 +270,11 @@
           "group": "scr-registry-public-acl",
           "poll": {
             "field": "$.registry.public_endpoint_enabled",
-            "until": [true, "true", "True"],
+            "until": [
+              true,
+              "true",
+              "True"
+            ],
             "timeout": 420,
             "interval": 15
           },
@@ -367,7 +376,9 @@
           "optional": true,
           "group": "scr-registry-create",
           "poll": {
-            "until_status": [404],
+            "until_status": [
+              404
+            ],
             "timeout": 420,
             "interval": 15
           },
