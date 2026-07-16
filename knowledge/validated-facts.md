@@ -3870,3 +3870,13 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   MemberCannotBeUpdatedToSharingImage) — 멤버 계정 플레인 소관 (미문서).
 - **conformance 소소 2종**: LB static-nats 빈 컬렉션 404(200 [] 아님) /
   private-static-nat 검증 오류에 403(400 아님).
+
+## SCR 레지스트리 쿼터의 정체 = 가시성 유형별 1개 (2026-07-16, 오너 제공 공식 문서)
+
+- "Container Registry는 Account별 최대 2개 — **가시성 유형별 1개**"
+  (NON_VISIBILITY 1 + PUBLIC_VISIBILITY 1). 쿼터 증설 대상이 아니라 제품
+  하드 리밋. 두 SCR lifecycle이 모두 public_visible_enabled=false로 같은
+  NON_VISIBILITY 슬롯을 다투던 것이 borrow-coverage 4패의 구조 원인.
+- 수리: borrow 폴백 create를 PUBLIC_VISIBILITY로 — 유형 레인 분리로 레이스
+  원천 소멸 + public 변형 커버리지 덤. (public 레지스트리 하위 repo 동작
+  미검증 — 다음 런 판정.)
