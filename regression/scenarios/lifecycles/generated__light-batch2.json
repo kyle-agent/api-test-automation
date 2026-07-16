@@ -970,8 +970,8 @@
     {
       "id": "gen-cm-event-policy",
       "service": "management/cloudmonitoring",
-      "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: cm-event-policy",
+      "enabled": false,
+      "_note": "EXCLUDED 2026-07-16 (오너: 'cloud monitoring도 waiver로 빼자 — 곧 deprecate 예정'): 서비스 단종 예정이라 테스트 범위 제외. || composed by regression/scenarios/composer.py — targets: cm-event-policy",
       "steps": [
         {
           "name": "create-cm-account-resource",
@@ -1080,7 +1080,8 @@
           "destructive": true,
           "group": "cm-event-policy"
         }
-      ]
+      ],
+      "_status": "blocked-owner"
     },
     {
       "id": "gen-lb-members-light",
