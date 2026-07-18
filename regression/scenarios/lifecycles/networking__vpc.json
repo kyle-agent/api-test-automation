@@ -1395,7 +1395,12 @@
           "capture_soft": {
             "vpc_connection_id": "$.transit_gateway_vpc_connection.id"
           },
-          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): capture path was `$.vpc_connection.id`, which never matches — `data/api_docs.json` endpoints['networking/vpc/createtransitgatewayvpcconnection'].response_example wraps the object as `transit_gateway_vpc_connection` (id/state/vpc_id/transit_gateway_id fields), not `vpc_connection`. CONFIRMED as the direct cause of the downstream delete-tgw-vpc-connection 400 `not-in-vpc-connection` whose error body showed the LITERAL unresolved placeholder `{vpc_connection_id}` (proof the soft-capture found nothing, not a TGW-state issue as first hypothesized) — see that step's own _note."
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): capture path was `$.vpc_connection.id`, which never matches — `data/api_docs.json` endpoints['networking/vpc/createtransitgatewayvpcconnection'].response_example wraps the object as `transit_gateway_vpc_connection` (id/state/vpc_id/transit_gateway_id fields), not `vpc_connection`. CONFIRMED as the direct cause of the downstream delete-tgw-vpc-connection 400 `not-in-vpc-connection` whose error body showed the LITERAL unresolved placeholder `{vpc_connection_id}` (proof the soft-capture found nothing, not a TGW-state issue as first hypothesized) — see that step's own _note. || REPAIR 2026-07-18: cleanup added (mirrors gen-private-nat) — run 6954 (2026-07-18, ALL-GREEN run's silent leak): wait-tgw-active-after-connection polled 420s, TGW stayed EDITING the whole time -> group skip -> only cleanup was the TGW DELETE -> 400 (vpc-connection still attached) -> TGW+connection leaked to the sweep every time this settle overruns.",
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+            "service": "vpc"
+          }
         },
         {
           "name": "wait-tgw-active-after-connection",
@@ -1415,7 +1420,7 @@
             "until": [
               "ACTIVE"
             ],
-            "timeout": 420,
+            "timeout": 900,
             "interval": 15,
             "give_up_status": [
               400,
@@ -1423,7 +1428,7 @@
               404
             ]
           },
-          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): observation timestamps CONFIRM create-tgw-vpc-connection (202 at wait-tgw-active+~3s, itself already past a successful wait-tgw-active 200) is immediately followed (~7s later, after only 3 read-only GETs) by create-tgw-firewall 400 `transit-gateway.not-active-state:(EDITING)` — i.e. the vpc-connection create ASYNC-transitions the TGW from ACTIVE back to EDITING, exactly like create-transit-gateway itself does (same wait-tgw-active precedent), and every child write issued in that window 400s. Fix: re-settle to ACTIVE right after create-tgw-vpc-connection (same field/until/give_up_status as wait-tgw-active) before any subsequent child create touches the TGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm the firewall/routing-rule/uplink-routing-rule cascade clears. || auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 300s의 97%를 소진 (until 미충족) — 경계 플레이키 위험"
+          "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): observation timestamps CONFIRM create-tgw-vpc-connection (202 at wait-tgw-active+~3s, itself already past a successful wait-tgw-active 200) is immediately followed (~7s later, after only 3 read-only GETs) by create-tgw-firewall 400 `transit-gateway.not-active-state:(EDITING)` — i.e. the vpc-connection create ASYNC-transitions the TGW from ACTIVE back to EDITING, exactly like create-transit-gateway itself does (same wait-tgw-active precedent), and every child write issued in that window 400s. Fix: re-settle to ACTIVE right after create-tgw-vpc-connection (same field/until/give_up_status as wait-tgw-active) before any subsequent child create touches the TGW. UNVERIFIED LIVE (offline repair) — next heavy dispatch must confirm the firewall/routing-rule/uplink-routing-rule cascade clears. || auto-repair R3-timeout-경계 (run-end 자동수리): 폴이 timeout 300s의 97%를 소진 (until 미충족) — 경계 플레이키 위험 || REPAIR 2026-07-18: timeout 420->900s — run 6954 (2026-07-18, ALL-GREEN run's silent leak): wait-tgw-active-after-connection polled 420s, TGW stayed EDITING the whole time -> group skip -> only cleanup was the TGW DELETE -> 400 (vpc-connection still attached) -> TGW+connection leaked to the sweep every time this settle overruns. (auto-repair had already flagged the 300s-era poll as boundary-flaky; 420s was still short under full-run load)"
         },
         {
           "name": "get-tgw-routing-rules",
@@ -1981,6 +1986,28 @@
           "_note": "REPAIR 2026-07-07 (HB4b-2, run 28827996068, OFFLINE repair — see CAMPAIGN-C3-100-repair-log.md #HB4b-2 item 2): task hypothesis was that the 400 `not-in-vpc-connection` here was the SAME TGW-not-active-state class as the child creates. Observation evidence DISPROVES that: the error body's literal, unresolved `{vpc_connection_id}` placeholder text (not a real id) proves capture_soft never resolved a value — i.e. this was the create-tgw-vpc-connection capture-KEY bug (`$.vpc_connection.id` vs the doc-confirmed `$.transit_gateway_vpc_connection.id`, fixed on that step above), not a state/timing issue. With the capture fixed, a real `{vpc_connection_id}` should resolve here; the wait-tgw-active-after-connection settle-poll (added above) additionally covers the case where the TGW itself is still EDITING when this DELETE fires."
         },
         {
+          "name": "wait-tgw-vpc-connection-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [
+            200,
+            403,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              403,
+              404
+            ],
+            "timeout": 600,
+            "interval": 15
+          },
+          "_note": "mirror of gen-private-nat wait-tgw-vpc-connection-gone (run-0099: TGW delete 400 'not deletable state' while detach drains async; run-85e8: deleted connection detail GET returns 403 not 404). Added 2026-07-18."
+        },
+        {
           "name": "wait-tgw-active-before-set",
           "service": "vpc",
           "method": "GET",
@@ -2079,8 +2106,8 @@
             400,
             409
           ],
-          "retries": 4,
-          "retry_interval": 15
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "delete-vpc",

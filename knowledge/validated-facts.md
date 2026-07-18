@@ -3982,3 +3982,23 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   같은 호스트가 분 단위로 성공↔실패 왕복) — SCP 장애가 아니라 프록시
   upstream 문제. 로컬 라이브 프로브/스모크만 영향; 콘솔2 런과 oplog(S3)는
   무관. 재시도 사다리로 부분 통과 가능하나 관측 오염 위험 시 대기가 맞다.
+
+## TGW vpc-connection 침묵 누수 (그린런 6954에서도 매번) — 3중 belt (2026-07-18)
+
+- **실측 체인**: create-tgw-vpc-connection 202 → TGW가 ACTIVE→EDITING 재전환
+  → wait-tgw-active-after-connection 이 420s 내내 EDITING(미도달 타임아웃)
+  → group "tgw" 스킵(모든 delete 스텝 포함) → 유일 cleanup(TGW DELETE) 400
+  (connection 잔존) → **TGW+connection이 스윕으로 넘어가는 구조적 누수**.
+  lifecycle 자체는 optional 그룹이라 passed — 그린런에서도 침묵.
+- **수리**(networking__vpc.json, gen-private-nat 검증 패턴 미러):
+  ① create-tgw-vpc-connection에 cleanup 등록 — teardown 역순이라 connection
+  → TGW 순서 보장 (엔진 _run_cleanup의 상태-사유 400/409 사다리 3×20s 활용),
+  ② settle 폴 420→900s (풀런 부하에서 EDITING 405s+ 실측),
+  ③ 해피패스에 wait-tgw-vpc-connection-gone 삽입 (삭제된 connection GET은
+  404가 아니라 **403** — run-85e8), ④ TGW delete 사다리 8×30s.
+- **스케줄 시사점**: optimizer 분석상 6954는 구조적 하한(공유 subnet ACTIVE
+  게이트 276s + eventstreams 4909s)에 이미 도달 — 남은 레버는 parked
+  eventstreams 분할과 게이트 축소뿐인데, 게이트의 ~250s는 subnet ACTIVE
+  백엔드 지연 자체라 (VM-ERROR 2026-07-13 재발 방지 게이트 유지 필수)
+  안전히 줄일 여지가 사실상 없다. nvs 내부 직렬성은 same-VPC subnet 전환
+  직렬화(백엔드) 때문이라 오버랩 불가 — 병렬화 제안 기각.
