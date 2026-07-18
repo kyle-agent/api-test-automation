@@ -3898,3 +3898,13 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - 수리: native_runner 워커 램프 — 워커별 0.75s 계단 기동(30워커 ≈ 22s,
   makespan 무시 수준), SCP_WORKER_RAMP_S 조정/0=끔. 사다리 축소(45s×6)는
   유지 (동일-바디 반복 회피 규칙도 유효).
+
+## dbaas 삭제-웨지 refire 불발 원인 = 엔벨로프 경로 (2026-07-18, run 5c89 실측)
+
+- pg 클러스터 DELETE 202 수락 후 **service_state=FAILED로 웨지** — gone-wait가
+  200만 25분 폴링. refire는 배선돼 있었으나 field가 `$.service_state`(플랫)
+  인데 실제 show 응답은 `$.cluster.service_state`(엔벨로프)라 FAILED를 평생
+  못 봄 → 재발사 불발. 전 dbaas gone-wait refire field 일괄 교정.
+- 수동 재-DELETE는 202 즉시 수락 (FAILED 상태 재삭제 즉효라는 기지 사실 재확인).
+- nvs PRIVATE: 30s 블라인드로는 ACTIVE 직렬화(4~5분)를 못 기다림 + 읽기 불가
+  → delete를 400/409 사다리(30s×20)로 '삭제 가능해질 때까지' 대기로 전환.
