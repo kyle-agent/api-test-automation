@@ -138,7 +138,8 @@
             422
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "delete-backup",
@@ -156,7 +157,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "set-parameters",
@@ -1220,7 +1222,7 @@
           ],
           "optional": true,
           "group": "manual-backup",
-          "_note": "gap postgresqlremovebackuphistories -- body key is 'backup_history_number' (array[string]), confirmed correct (not a typo) per data/api_docs.json backuphistorynumberrequest. PF-recheck 1-shot: the mysql sibling proved this STILL 401s Dbaas.Unauthorized.AuthNFailed even with the correct key + a real captured id -- backup-family query-string HMAC signing PF (known_issues.json), same class as unset-backup below."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || gap postgresqlremovebackuphistories -- body key is 'backup_history_number' (array[string]), confirmed correct (not a typo) per data/api_docs.json backuphistorynumberrequest. PF-recheck 1-shot: the mysql sibling proved this STILL 401s Dbaas.Unauthorized.AuthNFailed even with the correct key + a real captured id -- backup-family query-string HMAC signing PF (known_issues.json), same class as unset-backup below."
         },
         {
           "name": "unset-backup",
@@ -1240,7 +1242,7 @@
           "optional": true,
           "destructive": true,
           "group": "unset-backup",
-          "_note": "gap postgresqlunsetbackup -- PF-recheck 1-shot (known_issues.json backup-family 401 AuthNFailed with valid HMAC)."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || gap postgresqlunsetbackup -- PF-recheck 1-shot (known_issues.json backup-family 401 AuthNFailed with valid HMAC)."
         },
         {
           "name": "register-log-export-config",

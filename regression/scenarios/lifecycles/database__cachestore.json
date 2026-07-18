@@ -120,7 +120,8 @@
             422
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "delete-backup",
@@ -138,7 +139,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "set-parameters",
@@ -1090,7 +1092,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "gap cachestoreremovebackuphistories. body field name confirmed backup_history_number (array[string], data/api_docs.json database/cachestore/backuphistorynumberrequest) -- no typo. If no real backup history exists yet (schedule config != immediate backup, cachestore has no manual-backup endpoint), the literal unresolved token still reaches the endpoint. expect_status widened to include 401(+500): known cross-engine backend quirk (mysql/mariadb/postgresql/epas/cachestore all show PUT .../backup-histories and DELETE .../backups 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while sibling subops on the same cluster/run succeed -- knowledge/validated-facts.md, reconfirmed HB1 2026-07-04 + a690 2026-07-16 cachestore-cluster-subops-a). Re-tested here for a fresh cachestore PF confirmation, not chased further if 401 recurs."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || gap cachestoreremovebackuphistories. body field name confirmed backup_history_number (array[string], data/api_docs.json database/cachestore/backuphistorynumberrequest) -- no typo. If no real backup history exists yet (schedule config != immediate backup, cachestore has no manual-backup endpoint), the literal unresolved token still reaches the endpoint. expect_status widened to include 401(+500): known cross-engine backend quirk (mysql/mariadb/postgresql/epas/cachestore all show PUT .../backup-histories and DELETE .../backups 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while sibling subops on the same cluster/run succeed -- knowledge/validated-facts.md, reconfirmed HB1 2026-07-04 + a690 2026-07-16 cachestore-cluster-subops-a). Re-tested here for a fresh cachestore PF confirmation, not chased further if 401 recurs."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -1146,7 +1148,7 @@
           "optional": true,
           "destructive": true,
           "group": "backup",
-          "_note": "gap cachestoreunsetbackup. Same known 401 Dbaas.Unauthorized.AuthNFailed PF quirk family as remove-backup-histories (see note there) -- re-tested for a fresh cachestore confirmation."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || gap cachestoreunsetbackup. Same known 401 Dbaas.Unauthorized.AuthNFailed PF quirk family as remove-backup-histories (see note there) -- re-tested for a fresh cachestore confirmation."
         },
         {
           "name": "wait-after-unset-backup",

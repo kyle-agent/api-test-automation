@@ -219,7 +219,8 @@
             500
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "delete-backup",
@@ -239,7 +240,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "set-parameters",
@@ -701,7 +703,7 @@
           "name": "delete-cluster-guarded",
           "method": "DELETE",
           "path": "/v1/clusters/regrnonexistent{unique}",
-          "_note": "Targets a SYNTHETIC non-existent cluster id (never the soft-captured {cluster_id}) so this can only 404 and NEVER deletes a real adopted sqlserver cluster \u2014 it exists solely to CALL+record the DELETE /v1/clusters/{cluster_id} endpoint under the sqlserver host.",
+          "_note": "Targets a SYNTHETIC non-existent cluster id (never the soft-captured {cluster_id}) so this can only 404 and NEVER deletes a real adopted sqlserver cluster — it exists solely to CALL+record the DELETE /v1/clusters/{cluster_id} endpoint under the sqlserver host.",
           "expect_status": [
             200,
             202,

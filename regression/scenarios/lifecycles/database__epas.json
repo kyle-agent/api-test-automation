@@ -5,7 +5,7 @@
       "service": "database/epas",
       "enabled": true,
       "heavy": true,
-      "_note": "COVERAGE-ONLY guarded lifecycle for the epas DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXISTING cluster_id (+ instance_group_id / bsg_id / log_type) from read-only list/show calls; when none exists the {{cluster_id}} (and {{instance_group_id}}/{{bsg_id}}/{{log_type}}/{{origin_cluster_id}}/{{replica_cluster_id}}) tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 404/400/403/409/422 counts as covered per the engine). Every mutating step is optional+grouped+broad-expect_status so an isolated 4xx records coverage WITHOUT failing the run or chaining a real create->mutate->delete. heavy:true gates behind SCP_RUN_HEAVY; DELETEs are destructive:true. Bodies derive from the shared SCP DBaaS shape + per-endpoint api_docs request_example (data/api_bodies.json only has createcluster) and are UNPROVEN \u2014 promote to validated after a real 2xx. The relational engines (mysql/mariadb/epas/postgresql) share ONE body template; epas adds audit-log + DELETE /archive.",
+      "_note": "COVERAGE-ONLY guarded lifecycle for the epas DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXISTING cluster_id (+ instance_group_id / bsg_id / log_type) from read-only list/show calls; when none exists the {{cluster_id}} (and {{instance_group_id}}/{{bsg_id}}/{{log_type}}/{{origin_cluster_id}}/{{replica_cluster_id}}) tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 404/400/403/409/422 counts as covered per the engine). Every mutating step is optional+grouped+broad-expect_status so an isolated 4xx records coverage WITHOUT failing the run or chaining a real create->mutate->delete. heavy:true gates behind SCP_RUN_HEAVY; DELETEs are destructive:true. Bodies derive from the shared SCP DBaaS shape + per-endpoint api_docs request_example (data/api_bodies.json only has createcluster) and are UNPROVEN — promote to validated after a real 2xx. The relational engines (mysql/mariadb/epas/postgresql) share ONE body template; epas adds audit-log + DELETE /archive.",
       "steps": [
         {
           "name": "list-clusters",
@@ -169,7 +169,8 @@
             422
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "delete-backup",
@@ -187,7 +188,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "set-parameters",
@@ -1331,7 +1333,7 @@
           ],
           "optional": true,
           "group": "manual-backup",
-          "_note": "gap epasremovebackuphistories. Body key is 'backup_history_number' (array[string]) -- confirmed correct against data/api_docs.json, no typo present. Populated with the REAL backup_history_number captured right after manual-backup. mysql/postgresql siblings both reconfirmed 2026-07-16 that this endpoint 401s Dbaas.Unauthorized.AuthNFailed even with a correct body + real id -- a backend auth quirk (query-string HMAC signing on backup-family endpoints), NOT a body-shape bug; expecting the same class here for epas."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || gap epasremovebackuphistories. Body key is 'backup_history_number' (array[string]) -- confirmed correct against data/api_docs.json, no typo present. Populated with the REAL backup_history_number captured right after manual-backup. mysql/postgresql siblings both reconfirmed 2026-07-16 that this endpoint 401s Dbaas.Unauthorized.AuthNFailed even with a correct body + real id -- a backend auth quirk (query-string HMAC signing on backup-family endpoints), NOT a body-shape bug; expecting the same class here for epas."
         },
         {
           "name": "unset-backup",
@@ -1351,7 +1353,7 @@
           "optional": true,
           "destructive": true,
           "group": "unset-backup",
-          "_note": "gap/PF-recheck epasunsetbackup. mysql/postgresql siblings 401 Dbaas.Unauthorized.AuthNFailed on this endpoint (same backup-family HMAC quirk as removebackuphistories, known_issues.json mysql/postgresql entries) -- 1-shot recheck for epas specifically here."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || gap/PF-recheck epasunsetbackup. mysql/postgresql siblings 401 Dbaas.Unauthorized.AuthNFailed on this endpoint (same backup-family HMAC quirk as removebackuphistories, known_issues.json mysql/postgresql entries) -- 1-shot recheck for epas specifically here."
         },
         {
           "name": "set-log-type-alert",

@@ -465,7 +465,7 @@
           ],
           "optional": true,
           "group": "backup-hist",
-          "_note": "FIELD-NAME FIX 2026-07-16 (svccov-mysql session): body key was 'backup_history_ids' -- the documented request model is BackupHistoryNumberRequest {backup_history_number: array[string]} (data/api_docs.json database/mysql/backuphistorynumberrequest); the wrong key produced a 400 ValidationError ['value_error'] that looked like the unrelated unsetbackup/backup-family 401 PF class but was actually just a body-shape bug. Live-confirmed same fix on mysql-cluster-version-upgrade (this file) run svccov-mysql-1784211350."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || FIELD-NAME FIX 2026-07-16 (svccov-mysql session): body key was 'backup_history_ids' -- the documented request model is BackupHistoryNumberRequest {backup_history_number: array[string]} (data/api_docs.json database/mysql/backuphistorynumberrequest); the wrong key produced a 400 ValidationError ['value_error'] that looked like the unrelated unsetbackup/backup-family 401 PF class but was actually just a body-shape bug. Live-confirmed same fix on mysql-cluster-version-upgrade (this file) run svccov-mysql-1784211350."
         },
         {
           "name": "patch-minor-version",
@@ -1143,7 +1143,7 @@
           ],
           "optional": true,
           "group": "manual-backup",
-          "_note": "FIELD-NAME FIX 2026-07-16 (svccov-mysql session, live-confirmed run svccov-mysql-1784211350): body key is 'backup_history_number' (array[string]) per data/api_docs.json database/mysql/backuphistorynumberrequest -- NOT 'backup_history_ids'. The wrong key 400'd ValidationError ['value_error'], which on a first read looked like the unrelated mysqlunsetbackup 401 Dbaas.Unauthorized.AuthNFailed PF class but was actually just a body-shape bug -- do not conflate the two. Populated with the REAL backup_history_number captured from list-backup-histories-after (right after manual-backup) so this is a genuine cleanup, not a no-op clear-all; if the list capture misses (manual-backup itself failed/skipped), the unresolved '{backup_history_number}' literal still reaches the endpoint (tolerated 400/404)."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || FIELD-NAME FIX 2026-07-16 (svccov-mysql session, live-confirmed run svccov-mysql-1784211350): body key is 'backup_history_number' (array[string]) per data/api_docs.json database/mysql/backuphistorynumberrequest -- NOT 'backup_history_ids'. The wrong key 400'd ValidationError ['value_error'], which on a first read looked like the unrelated mysqlunsetbackup 401 Dbaas.Unauthorized.AuthNFailed PF class but was actually just a body-shape bug -- do not conflate the two. Populated with the REAL backup_history_number captured from list-backup-histories-after (right after manual-backup) so this is a genuine cleanup, not a no-op clear-all; if the list capture misses (manual-backup itself failed/skipped), the unresolved '{backup_history_number}' literal still reaches the endpoint (tolerated 400/404)."
         },
         {
           "name": "set-log-type-const",

@@ -11,15 +11,23 @@
           "name": "list-clusters",
           "method": "GET",
           "path": "/v1/clusters",
-          "expect_status": [200],
-          "capture_soft": {"cluster_id": "$.contents[0].id"}
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "cluster_id": "$.contents[0].id"
+          }
         },
         {
           "name": "list-engine-versions",
           "method": "GET",
           "path": "/v1/engine-versions",
-          "expect_status": [200],
-          "capture_soft": {"dbaas_engine_version_id": "$.contents[0].id"}
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "dbaas_engine_version_id": "$.contents[0].id"
+          }
         },
         {
           "name": "probe-reads",
@@ -32,7 +40,14 @@
           "name": "capture-subop-ids",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 400, 401, 403, 404, 500],
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
           "optional": true,
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
@@ -43,8 +58,30 @@
           "name": "set-security-group-rules",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
-          "json": {"security_group_rules": [{"direction": "INBOUND", "protocol": "TCP", "port_min": 5433, "port_max": 5433, "remote_ip_prefix": "10.0.0.0/8", "description": "regr coverage probe"}]},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "json": {
+            "security_group_rules": [
+              {
+                "direction": "INBOUND",
+                "protocol": "TCP",
+                "port_min": 5433,
+                "port_max": 5433,
+                "remote_ip_prefix": "10.0.0.0/8",
+                "description": "regr coverage probe"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-sg-rules"
         },
@@ -52,8 +89,23 @@
           "name": "set-maintenance",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
-          "json": {"period_hour": "5", "starting_day_of_week": "MON", "starting_time": "0000"},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "json": {
+            "period_hour": "5",
+            "starting_day_of_week": "MON",
+            "starting_time": "0000"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-maintenance"
         },
@@ -61,7 +113,18 @@
           "name": "unset-maintenance",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/maintenance",
-          "expect_status": [200, 202, 204, 400, 401, 403, 404, 409, 422, 500],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "destructive": true,
           "group": "vt-maintenance"
@@ -70,8 +133,22 @@
           "name": "set-backup",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/backups",
-          "json": {"retention_period_day": "7", "starting_time_hour": "2"},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "json": {
+            "retention_period_day": "7",
+            "starting_time_hour": "2"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-backup"
         },
@@ -79,26 +156,72 @@
           "name": "unset-backup",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/backups",
-          "expect_status": [200, 202, 204, 400, 401, 403, 404, 409, 422, 500],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "destructive": true,
-          "group": "vt-backup"
+          "group": "vt-backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "remove-backup-histories",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
-          "json": {"backup_history_ids": []},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "json": {
+            "backup_history_ids": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
-          "group": "vt-backup-hist"
+          "group": "vt-backup-hist",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "create-restore",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/restore",
-          "json": {"name": "regrrst{ualpha}", "instance_name_prefix": "regrrst", "subnet_id": "", "restore_option": {"restore_type": "DATETIME", "restore_dt": "{today}"}, "tags": []},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "json": {
+            "name": "regrrst{ualpha}",
+            "instance_name_prefix": "regrrst",
+            "subnet_id": "",
+            "restore_option": {
+              "restore_type": "DATETIME",
+              "restore_dt": "{today}"
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-restore"
         },
@@ -107,7 +230,18 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/restart",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-power"
         },
@@ -116,7 +250,18 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/stop",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-power"
         },
@@ -125,7 +270,18 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/start",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-power"
         },
@@ -134,7 +290,18 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-power"
         },
@@ -142,8 +309,21 @@
           "name": "set-server-type",
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/resize",
-          "json": {"server_type_name": ""},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "json": {
+            "server_type_name": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-resize"
         },
@@ -151,8 +331,27 @@
           "name": "add-block-storages",
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
-          "json": {"block_storage_groups": [{"role_type": "DATA", "size_gb": 10, "volume_type": "SSD"}]},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "json": {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 10,
+                "volume_type": "SSD"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-resize"
         },
@@ -160,8 +359,21 @@
           "name": "set-block-storage-size",
           "method": "POST",
           "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
-          "json": {"size_gb": 20},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
+          "json": {
+            "size_gb": 20
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422,
+            500
+          ],
           "optional": true,
           "group": "vt-resize"
         }
@@ -178,7 +390,9 @@
           "name": "list-server-types",
           "method": "GET",
           "path": "/v1/server-types",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "vt-read",
           "_note": "GAP 편입 2026-07-08 (verticalistservertypes, 감사 'Gap = 1' 대상 키). 쿼리 전부 optional(name/product_image_type). live 200 2026-07-08 ({contents:[{name:db1v10m120, product_image_type:'Vertica Enterprise',...}]}) — 라이선스 무관 전역 read라 strict."
         },
@@ -186,7 +400,9 @@
           "name": "list-clusters",
           "method": "GET",
           "path": "/v1/clusters",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "vt-read",
           "_note": "전역 read (verticalistclusters) — 기존엔 heavy guarded probe lifecycle에만 있어 verify 합집합에서 빠져 있던 키. strict [200], live 200 2026-07-08 ({contents:[], count:0} — 빈 목록 200으로 충분)."
         },
@@ -194,17 +410,23 @@
           "name": "list-engine-versions",
           "method": "GET",
           "path": "/v1/engine-versions",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "optional": true,
           "group": "vt-read",
-          "capture_soft": {"dbaas_engine_version_id": "$.contents[0].id"},
+          "capture_soft": {
+            "dbaas_engine_version_id": "$.contents[0].id"
+          },
           "_note": "strict 승급 2026-07-08: live 200 ({contents:[{id:09c2fe88..., name:'Vertica ENTERPRISE 24.2.0-2',...}]}) — 플랫폼 메타데이터라 라이선스 무관. 관용으로 되돌리면 role 파생이 probe로 뒤집힘(ROLE GUARD 참조)."
         },
         {
           "name": "get-engine-version-properties",
           "method": "GET",
           "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "optional": true,
           "group": "vt-read",
           "_note": "strict 승급 2026-07-08: 위 list의 실 capture id로 live 200 ({contents:[{name:db.locale, value:ko_KR.utf8,en_US.utf8}]}). id 원천이 항상 채워지는 플랫폼 메타데이터 리스트이므로 placeholder-read 아님. list가 비면 미해석 토큰 → 404지만 optional이라 런은 안 깨짐."
@@ -213,7 +435,14 @@
           "name": "get-request",
           "method": "GET",
           "path": "/v1/requests/00000000-0000-0000-0000-0000{unique}",
-          "expect_status": [200, 400, 401, 403, 404, 500],
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404,
+            500
+          ],
           "optional": true,
           "group": "vt-c2-waiver",
           "_note": "negative-probe: 의도된 4xx — C2 waiver 이행: 호출 증거(4xx) (verticashowrequest, class=reachability — request_id는 async 쓰기 응답에서만 나와 read-only 런에서 수확 불가). 경로를 리터럴 0000-UUID에서 토큰화 uuid(0000{unique}, 8-hex 빌트인 → 유효 포맷·확실히 미존재)로 교체: 세그먼트에 {token}이 있어야 카탈로그 * 키로 매핑·기록됨(리터럴은 unmapped — 감사 한계 ②). live 캘리브레이션 2026-07-08: 400 Dbaas.ResourceError.NotFound(404 아님 — DBaaS request-not-found 특이 400)."
@@ -222,8 +451,17 @@
           "name": "create-cluster-waiver",
           "method": "POST",
           "path": "/v1/clusters",
-          "json": {"service_watch_log_collection": true},
-          "expect_status": [400, 401, 403, 404, 409, 422],
+          "json": {
+            "service_watch_log_collection": true
+          },
+          "expect_status": [
+            400,
+            401,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "vt-c2-waiver",
           "_note": "negative-probe: 의도된 4xx — C2 waiver 이행: 호출 증거(4xx) (verticacreatecluster, class=reachability: license-gated — create가 license 필드를 요구). body는 name/license 등 다른 필수 필드가 전부 빠져 있어 400 Field-required 보장 — 실생성 절대 불가(라이선스 소비·과금 리스크 0). expect에 2xx 불포함: 만에 하나 2xx면 시끄럽게 실패해야 함. 2026-07-15 스펙 버전업(verticaclustercreaterequestv1dot1): service_watch_log_collection(boolean, 신규 required)을 반영 — 400 detail이 이 필드를 더 이상 요구하지 않음을 waiver 호출 자체가 회귀-검증함."
@@ -232,7 +470,14 @@
           "name": "delete-cluster-waiver",
           "method": "DELETE",
           "path": "/v1/clusters/00000000-0000-0000-0000-0000{unique}",
-          "expect_status": [400, 401, 403, 404, 409, 422],
+          "expect_status": [
+            400,
+            401,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "destructive": true,
           "group": "vt-c2-waiver",
@@ -242,14 +487,21 @@
           "name": "list-backup-histories-waiver",
           "method": "GET",
           "path": "/v1/clusters/00000000-0000-0000-0000-0000{unique}/backup-histories",
-          "expect_status": [400, 401, 403, 404],
+          "expect_status": [
+            400,
+            401,
+            403,
+            404
+          ],
           "optional": true,
           "group": "vt-c2-waiver",
           "_note": "negative-probe: 의도된 4xx — C2 waiver 이행: 호출 증거(4xx) (verticalistbackuphistories, class=reachability — 실 cluster_id 공급원 없음(계정 클러스터 0, license-gated)). 가짜 uuid → live 404 ResourceNotFound 2026-07-08."
         },
         {
           "name": "probe-reads",
-          "probe_reads": {"dbaas_engine_version_id": "{dbaas_engine_version_id}"}
+          "probe_reads": {
+            "dbaas_engine_version_id": "{dbaas_engine_version_id}"
+          }
         }
       ]
     }

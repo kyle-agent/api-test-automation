@@ -911,7 +911,7 @@
           ],
           "optional": true,
           "group": "backup-hist",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md. ALSO fixed field-name bug 2026-07-04: body key was 'backup_history_ids' (wrong) — data/api_docs.json models['database/mysql/backuphistorynumberrequest'] verbatim field is 'backup_history_number' (identical DTO name to mariadb/postgresql/epas/cachestore). UNVERIFIED LIVE (mysql-cluster-subops-full never reaches this step while create-cluster PFs 500 ContactAdminForAssistance) — fixed for readiness once that PF clears."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md. ALSO fixed field-name bug 2026-07-04: body key was 'backup_history_ids' (wrong) — data/api_docs.json models['database/mysql/backuphistorynumberrequest'] verbatim field is 'backup_history_number' (identical DTO name to mariadb/postgresql/epas/cachestore). UNVERIFIED LIVE (mysql-cluster-subops-full never reaches this step while create-cluster PFs 500 ContactAdminForAssistance) — fixed for readiness once that PF clears."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -2138,7 +2138,7 @@
           ],
           "optional": true,
           "group": "backup-hist",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md. ALSO fixed field-name bug 2026-07-04: body key was 'backup_history_ids' (wrong) — data/api_docs.json models['database/mysql/backuphistorynumberrequest'] verbatim field is 'backup_history_number' (identical DTO name to mariadb/postgresql/epas/cachestore). UNVERIFIED LIVE (mysql-cluster-subops-full never reaches this step while create-cluster PFs 500 ContactAdminForAssistance) — fixed for readiness once that PF clears."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md. ALSO fixed field-name bug 2026-07-04: body key was 'backup_history_ids' (wrong) — data/api_docs.json models['database/mysql/backuphistorynumberrequest'] verbatim field is 'backup_history_number' (identical DTO name to mariadb/postgresql/epas/cachestore). UNVERIFIED LIVE (mysql-cluster-subops-full never reaches this step while create-cluster PFs 500 ContactAdminForAssistance) — fixed for readiness once that PF clears."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -3688,7 +3688,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -3743,7 +3743,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-delete-backup",
@@ -5652,7 +5653,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -5707,7 +5708,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-delete-backup",
@@ -8134,7 +8136,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -8189,7 +8191,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-delete-backup",
@@ -10056,7 +10059,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -10111,7 +10114,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-delete-backup",
@@ -12456,7 +12460,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -12511,7 +12515,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-delete-backup",
@@ -14024,7 +14029,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -14079,7 +14084,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-delete-backup",
@@ -16057,7 +16063,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -16112,7 +16118,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-delete-backup",
@@ -18041,7 +18048,7 @@
           ],
           "optional": true,
           "group": "backup",
-          "_note": "expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || expect_status widened to include 401(+500) 2026-07-04 (HB1 repair): PUT .../backup-histories (and DELETE .../backups) return 401 Dbaas.Unauthorized.AuthNFailed with a VALID HMAC while every sibling subop on the same cluster/run succeeds — a known backend auth quirk family already documented for mysql/mariadb/postgresql/epas/cachestore (knowledge/formal/services/database__*.yaml, knowledge/validated-facts.md 2026-06-10, reconfirmed HB1 2026-07-04: mariadb-cluster-subops-full:remove-backup-histories 401 Dbaas.Unauthorized.AuthNFailed). Root cause NOT on our side (no doc/header/version difference found for this endpoint vs. its siblings, which all pass with the same signed request) — not fixable by body/param changes, so NOT attempting one; this just stops the known 401 from cascading a group-skip that would also swallow the sibling delete-backup step. sqlserver's subops file already carries this exact tolerance (database__sqlserver.json remove-backup-histories/delete-backup expect_status includes 401+500) — this aligns the -full variants with that precedent. PF/waiver candidate, see CAMPAIGN-C3-100-repair-log.md."
         },
         {
           "name": "wait-after-remove-backup-histories",
@@ -18096,7 +18103,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-delete-backup",

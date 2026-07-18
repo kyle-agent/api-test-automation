@@ -5,7 +5,7 @@
       "service": "database/mariadb",
       "enabled": true,
       "heavy": true,
-      "_note": "COVERAGE-ONLY guarded lifecycle for the mariadb DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXISTING cluster_id (+ instance_group_id / bsg_id / log_type) from read-only list/show calls; when none exists the {{cluster_id}} (and {{instance_group_id}}/{{bsg_id}}/{{log_type}}/{{origin_cluster_id}}/{{replica_cluster_id}}) tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 404/400/403/409/422 counts as covered per the engine). Every mutating step is optional+grouped+broad-expect_status so an isolated 4xx records coverage WITHOUT failing the run or chaining a real create->mutate->delete. heavy:true gates behind SCP_RUN_HEAVY; DELETEs are destructive:true. Bodies derive from the shared SCP DBaaS shape + per-endpoint api_docs request_example (data/api_bodies.json only has createcluster) and are UNPROVEN \u2014 promote to validated after a real 2xx. The relational engines (mysql/mariadb/epas/postgresql) share ONE body template; mariadb adds audit-log (PUT /audit-log).",
+      "_note": "COVERAGE-ONLY guarded lifecycle for the mariadb DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXISTING cluster_id (+ instance_group_id / bsg_id / log_type) from read-only list/show calls; when none exists the {{cluster_id}} (and {{instance_group_id}}/{{bsg_id}}/{{log_type}}/{{origin_cluster_id}}/{{replica_cluster_id}}) tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 404/400/403/409/422 counts as covered per the engine). Every mutating step is optional+grouped+broad-expect_status so an isolated 4xx records coverage WITHOUT failing the run or chaining a real create->mutate->delete. heavy:true gates behind SCP_RUN_HEAVY; DELETEs are destructive:true. Bodies derive from the shared SCP DBaaS shape + per-endpoint api_docs request_example (data/api_bodies.json only has createcluster) and are UNPROVEN — promote to validated after a real 2xx. The relational engines (mysql/mariadb/epas/postgresql) share ONE body template; mariadb adds audit-log (PUT /audit-log).",
       "steps": [
         {
           "name": "list-clusters",
@@ -138,7 +138,8 @@
             422
           ],
           "optional": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "delete-backup",
@@ -156,7 +157,8 @@
           ],
           "optional": true,
           "destructive": true,
-          "group": "backup"
+          "group": "backup",
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "set-parameters",
@@ -848,7 +850,7 @@
           }
         }
       ]
-    }    ,
+    },
     {
       "id": "mariadb-cluster-version-upgrade",
       "service": "database/mariadb",
@@ -870,8 +872,16 @@
           "capture": {
             "vpc_id": "$.vpc.id"
           },
-          "expect_status": [200, 201, 202],
-          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
           "adopt": "vpc"
         },
         {
@@ -879,8 +889,20 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/vpcs/{vpc_id}",
-          "expect_status": [200],
-          "poll": {"field": "$.vpc.state", "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"], "timeout": 180, "interval": 10}
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
         },
         {
           "name": "create-subnet",
@@ -896,9 +918,19 @@
             "vpc_id": "{vpc_id}",
             "tags": []
           },
-          "capture": {"subnet_id": "$.subnet.id"},
-          "expect_status": [200, 201, 202],
-          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"},
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
           "adopt": "subnet#db"
         },
         {
@@ -906,18 +938,34 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
-          "expect_status": [200],
-          "poll": {"field": "$.subnet.state", "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"], "timeout": 180, "interval": 10}
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
         },
         {
           "name": "find-engine-version",
           "method": "GET",
           "path": "/v1/engine-versions",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture": {
             "engine_version_old_id": {
               "list": "$.contents",
-              "where_prefix": {"major_version": "10.11"},
+              "where_prefix": {
+                "major_version": "10.11"
+              },
               "get": "id"
             }
           },
@@ -931,12 +979,20 @@
           "name": "find-server-type",
           "method": "GET",
           "path": "/v1/server-types",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture": {
             "db_server_type": {
               "list": "$.contents",
-              "where_prefix": {"purpose": "general", "type": "Standard-1"},
-              "min_by": ["cpu_core", "memory_gb"],
+              "where_prefix": {
+                "purpose": "general",
+                "type": "Standard-1"
+              },
+              "min_by": [
+                "cpu_core",
+                "memory_gb"
+              ],
               "get": "name"
             }
           }
@@ -982,32 +1038,68 @@
                 "role_type": "ACTIVE",
                 "server_type_name": "{db_server_type}",
                 "block_storage_groups": [
-                  {"role_type": "OS", "size_gb": 104, "volume_type": "SSD"}
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
                 ],
                 "instances": [
-                  {"role_type": "ACTIVE", "public_ip_id": ""}
+                  {
+                    "role_type": "ACTIVE",
+                    "public_ip_id": ""
+                  }
                 ]
               }
             ]
           },
-          "capture": {"cluster_id": "$.resource.id"},
-          "capture_soft": {"request_id": "$.request_id"},
-          "expect_status": [200, 201, 202],
-          "retry_on_status": [500, 503],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "retry_on_status": [
+            500,
+            503
+          ],
           "retries": 2,
           "retry_interval": 60,
-          "cleanup": {"method": "DELETE", "path": "/v1/clusters/{cluster_id}", "service": "mariadb"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "mariadb"
+          },
           "_note": "dbaas_engine_version_id = engine_version_old_id (10.11.x, old MAJOR) -- deliberate, this is the version-upgrade campaign's starting point. Body shape mirrors the live-proven mariadb-cluster-subops-a maria-create (database__subops-full.json): audit_enabled bool (not string), database_character_set utf8 (not utf8mb4 like mysql), no database_case_sensitive field."
         },
         {
           "name": "wait-cluster",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.service_state",
-            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
-            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
             "timeout": 2400,
             "interval": 30
           }
@@ -1016,7 +1108,9 @@
           "name": "capture-cluster-detail",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture_soft": {
             "dbaas_engine": "$.dbaas_engine",
             "instance_name": "$.instance_groups[0].instances[0].name"
@@ -1025,14 +1119,28 @@
         },
         {
           "name": "probe-reads",
-          "probe_reads": {"cluster_id": "{cluster_id}"}
+          "probe_reads": {
+            "cluster_id": "{cluster_id}"
+          }
         },
         {
           "name": "major-version-upgrade",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/major-version-upgrade",
-          "json": {"dbaas_engine": "{dbaas_engine}", "software_version": "{engine_version_mid_software}"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "dbaas_engine": "{dbaas_engine}",
+            "software_version": "{engine_version_mid_software}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "major-upgrade",
           "_note": "gap mariadbupgrademajorversion. Targets the OLDEST 11.4 minor (engine_version_mid_software) -- NOT the newest -- so patch-minor-version below still has a genuinely newer target on the SAME cluster."
@@ -1041,16 +1149,35 @@
           "name": "wait-after-major-upgrade",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "major-upgrade",
           "poll": {
             "field": "$.service_state",
-            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
-            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
             "timeout": 3600,
             "interval": 30,
-            "give_up_status": [400, 404]
+            "give_up_status": [
+              400,
+              404
+            ]
           },
           "_note": "major-version-upgrade is documented as long-running -- generous 3600s settle timeout, mirrors the mysql precedent."
         },
@@ -1058,18 +1185,36 @@
           "name": "verify-after-major-upgrade",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "major-upgrade",
-          "capture_soft": {"software_version_after_major": "$.software_version"},
+          "capture_soft": {
+            "software_version_after_major": "$.software_version"
+          },
           "_note": "logs the post-upgrade software_version for the observation trail; not otherwise consumed."
         },
         {
           "name": "patch-minor-version",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/patch",
-          "json": {"backup_before_upgrade": false, "software_version": "{engine_version_top_software}"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "json": {
+            "backup_before_upgrade": false,
+            "software_version": "{engine_version_top_software}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "minor-patch",
           "_note": "gap mariadbpatchminorversion. Targets engine_version_top_software (newest 11.4 minor) -- genuinely newer than wherever major-version-upgrade landed the cluster, unlike the known-blocked pattern of resending the cluster's OWN current version (mysql precedent: 400 'Unpatchable version')."
@@ -1078,23 +1223,46 @@
           "name": "wait-after-minor-patch",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "minor-patch",
           "poll": {
             "field": "$.service_state",
-            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
-            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
             "timeout": 1800,
             "interval": 30,
-            "give_up_status": [400, 404]
+            "give_up_status": [
+              400,
+              404
+            ]
           }
         },
         {
           "name": "show-instance",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/instances/{instance_name}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "show-instance",
           "_note": "gap mariadbshowinstance -- instance_name captured from the cluster detail's instance_groups[0].instances[0].name (a NAME, not an id)."
@@ -1104,10 +1272,21 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/backups/manual",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "manual-backup",
-          "retry_on_status": [409],
+          "retry_on_status": [
+            409
+          ],
           "retries": 8,
           "retry_interval": 30,
           "_note": "gap mariadbmanualbackup -- no request body per docs model (path cluster_id only); 409 retry ladder for in-flight-op contention, mirrors mysqlmanualbackup."
@@ -1116,49 +1295,99 @@
           "name": "wait-after-manual-backup",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "manual-backup",
           "poll": {
             "field": "$.service_state",
-            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
-            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
             "timeout": 600,
             "interval": 20,
-            "give_up_status": [400, 404]
+            "give_up_status": [
+              400,
+              404
+            ]
           }
         },
         {
           "name": "list-backup-histories-after",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "manual-backup",
-          "capture_soft": {"backup_history_number": "$.contents[0].backup_history_number"},
+          "capture_soft": {
+            "backup_history_number": "$.contents[0].backup_history_number"
+          },
           "_note": "feeds cleanup-backup-histories's REQUIRED field."
         },
         {
           "name": "cleanup-backup-histories",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
-          "json": {"backup_history_number": ["{backup_history_number}"]},
-          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422],
+          "json": {
+            "backup_history_number": [
+              "{backup_history_number}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            401,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "manual-backup",
-          "_note": "gap mariadbremovebackuphistories. Body key is 'backup_history_number' (array[string]) -- confirmed already correct here (no typo present in this repo's mariadb fragments). Prior 401 Dbaas.Unauthorized.AuthNFailed on this endpoint is a documented backend auth quirk (knowledge/validated-facts.md 2026-06-10, HB1 2026-07-04) shared with delete-backup and across mysql/mariadb/postgresql/epas/cachestore -- NOT a body-shape bug. Populated with the REAL backup_history_number captured right after manual-backup so this is a genuine cleanup attempt."
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || gap mariadbremovebackuphistories. Body key is 'backup_history_number' (array[string]) -- confirmed already correct here (no typo present in this repo's mariadb fragments). Prior 401 Dbaas.Unauthorized.AuthNFailed on this endpoint is a documented backend auth quirk (knowledge/validated-facts.md 2026-06-10, HB1 2026-07-04) shared with delete-backup and across mysql/mariadb/postgresql/epas/cachestore -- NOT a body-shape bug. Populated with the REAL backup_history_number captured right after manual-backup so this is a genuine cleanup attempt."
         },
         {
           "name": "set-log-type-alert",
           "action": "set_const",
-          "values": {"log_type": "alert"}
+          "values": {
+            "log_type": "alert"
+          }
         },
         {
           "name": "export-log-alert",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "export-log-alert",
           "_note": "gap mariadbexportlog attempt 1/3 (log_type=alert, the value the mariadbregisterlogexportconfig doc's own request_example uses; also the value that worked live for mysqlexportlog on 2026-07-16). log_type is a fixed enum path token, NOT dependent on a registered log-export-config (registration is PF-blocked, 500 ContactAdminForAssistance class per orchestrator brief). No request body per docs model."
@@ -1166,14 +1395,25 @@
         {
           "name": "set-log-type-audit",
           "action": "set_const",
-          "values": {"log_type": "audit"}
+          "values": {
+            "log_type": "audit"
+          }
         },
         {
           "name": "export-log-audit",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "export-log-audit",
           "_note": "gap mariadbexportlog attempt 2/3 (log_type=audit) -- owner explicitly asked to try this value for mariadb since mysql only proved 'alert'."
@@ -1181,14 +1421,25 @@
         {
           "name": "set-log-type-slow",
           "action": "set_const",
-          "values": {"log_type": "slow"}
+          "values": {
+            "log_type": "slow"
+          }
         },
         {
           "name": "export-log-slow",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "export-log-slow",
           "_note": "gap mariadbexportlog attempt 3/3 (log_type=slow) -- mysql confirmed this 400s InvalidLogType on a real cluster despite the docs enum listing it; kept here for completeness/parity."
@@ -1198,9 +1449,21 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
-          "retry_on_status": [400, 409],
+          "retry_on_status": [
+            400,
+            409
+          ],
           "retries": 8,
           "retry_interval": 30,
           "_note": "recovers a post-subop UNKNOWN service_state before delete so delete-cluster doesn't 400 InvalidState."
@@ -1209,24 +1472,52 @@
           "name": "wait-pre-delete-settle",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "poll": {
             "field": "$.service_state",
-            "refire": {"field": "$.service_state", "when": ["UNKNOWN"], "method": "POST", "path": "/v1/clusters/{cluster_id}/sync-state", "max": 2},
-            "until": ["RUNNING", "ACTIVE", "AVAILABLE"],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            },
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
             "timeout": 600,
             "interval": 20,
-            "give_up_status": [400, 404]
+            "give_up_status": [
+              400,
+              404
+            ]
           }
         },
         {
           "name": "delete-cluster",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
-          "retry_on_status": [400, 409, 500, 503],
+          "retry_on_status": [
+            400,
+            409,
+            500,
+            503
+          ],
           "retries": 20,
           "retry_interval": 60
         },
@@ -1234,12 +1525,28 @@
           "name": "wait-cluster-gone",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
-            "until_status": [404],
+            "until_status": [
+              404
+            ],
             "timeout": 1800,
             "interval": 30,
-            "refire": {"method": "DELETE", "path": "/v1/clusters/{cluster_id}", "field": "$.service_state", "when": ["DELETE_FAILED", "ERROR_DELETING", "FAILED", "ERROR"], "max": 3}
+            "refire": {
+              "method": "DELETE",
+              "path": "/v1/clusters/{cluster_id}",
+              "field": "$.service_state",
+              "when": [
+                "DELETE_FAILED",
+                "ERROR_DELETING",
+                "FAILED",
+                "ERROR"
+              ],
+              "max": 3
+            }
           },
           "_note": "negative-probe: until_status 404 is the success condition (resource gone)."
         },
@@ -1248,9 +1555,16 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/subnets/{subnet_id}",
-          "expect_status": [200, 202, 204, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
           "destructive": true,
-          "retry_on_status": [409],
+          "retry_on_status": [
+            409
+          ],
           "retries": 8,
           "retry_interval": 30,
           "adopt": "subnet#db"
@@ -1260,8 +1574,17 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
-          "expect_status": [200, 404],
-          "poll": {"until_status": [404], "timeout": 300, "interval": 10},
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
           "adopt": "subnet#db"
         },
         {
@@ -1269,12 +1592,15 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
           "adopt": "vpc"
         }
       ]
     }
-
   ]
 }

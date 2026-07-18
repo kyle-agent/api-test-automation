@@ -3946,3 +3946,11 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   service_state=UNKNOWN → `POST /v1/clusters/{id}/sync-state` 202 → 수십 초
   내 RUNNING 복귀. UNKNOWN을 보면 sync-state가 정답 (엔진 refire when에
   UNKNOWN+sync-state 배선된 폴은 자동, 아니면 수동).
+
+## backup 401 패밀리 — 최종 판정: AUTH-GATED, 포기 (2026-07-18 오너 결정)
+
+- removebackuphistories/unsetbackup 401(유효 HMAC)은 파괴적 백업 작업의
+  **사용자 본인인증(SMS/콘솔) 승격 요구**로 판정 — 오너: "sms 넣어서 진행은
+  안됨, 포기". API 플레인 2xx 구조적 불가 → coverage_waivers reachability
+  등재(형제 세션 기등재 확인) + 시나리오 43스텝 AUTH-GATED 태깅 → soft
+  '정책' 분류. 콘솔 판별 실험 불필요 — 종결.

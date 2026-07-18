@@ -5428,7 +5428,8 @@
           "retries": 20,
           "retry_interval": 60,
           "group": "mysql-backup",
-          "optional": true
+          "optional": true,
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "wait-after-unset-backup",
@@ -6583,7 +6584,8 @@
           ],
           "retries": 20,
           "retry_interval": 60,
-          "destructive": true
+          "destructive": true,
+          "_note": "AUTH-GATED waiver 2026-07-18 (오너 포기 결정): 파괴적 백업 작업은 사용자 본인인증 요구로 API 401 구조적 — coverage_waivers reachability 등재, soft '정책' 분류. || "
         },
         {
           "name": "set-archive",
