@@ -2135,6 +2135,76 @@
       "reason": "AI-Analytics data-flow/data-ops product is not entitled on this test account (runtime: PRODUCT-AI-ANALYTICS-USER-0001 on every reachable read; writes provision a billable AI-analytics cluster). Cannot 2xx by design — C2-only. Owner decision 2026-07-14.",
       "provenance": "runtime",
       "added": "2026-07-14"
+    },
+    {
+      "key": "database/mysql/mysqlunsetbackup",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/mysql/mysqlremovebackuphistories",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/mariadb/mariadbunsetbackup",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/mariadb/mariadbremovebackuphistories",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/postgresql/postgresqlunsetbackup",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/postgresql/postgresqlremovebackuphistories",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/epas/epasunsetbackup",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/epas/epasremovebackuphistories",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/cachestore/cachestoreunsetbackup",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
+    },
+    {
+      "key": "database/cachestore/cachestoreremovebackuphistories",
+      "class": "unsatisfiable-flow",
+      "reason": "PF-48: 백업 파일 삭제/해제는 콘솔에서 SMS 본인인증 필수인 인증 승격 작업 — Open API에 해당 인증 컨텍스트 전달 수단 없음(2026-07-18 오너 콘솔 실측 확정). setbackup POST 동일 경로 2xx로 클라이언트 소거 완전. 오너 승인 2026-07-18 (waiver 승인 선택).",
+      "provenance": "VALIDATED",
+      "added": "2026-07-18"
     }
   ]
 }
