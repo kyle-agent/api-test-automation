@@ -1,8 +1,8 @@
 {
   "summary": {
-    "operations_with_undiscoverable_required_fields": 282,
-    "total_undiscoverable_required_fields": 641,
-    "create_operations_affected": 142
+    "operations_with_undiscoverable_required_fields": 291,
+    "total_undiscoverable_required_fields": 666,
+    "create_operations_affected": 145
   },
   "operations": [
     {
@@ -149,6 +149,60 @@
       ]
     },
     {
+      "endpoint": "security/configinspection/creatediagnosisobject",
+      "method": "POST",
+      "path": "/v1/configinspection/diagnosis/save",
+      "model": "diagnosisobjectrequestv1dot3",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/security/configinspection/apis/creatediagnosisobject/1.3/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "account_id",
+          "schema": "string",
+          "description": "진단 계정"
+        },
+        {
+          "field": "check_list_version_id",
+          "schema": "string",
+          "description": "체크리스트 ID ( 상품 신청 API의 request parameter check_list_version_id에 사용하세요.)"
+        },
+        {
+          "field": "csp_type",
+          "schema": "string",
+          "description": "클라우드 서비스 제공자의 유형"
+        },
+        {
+          "field": "diagnosis_account_id",
+          "schema": "string",
+          "description": "진단 ID"
+        },
+        {
+          "field": "diagnosis_check_type",
+          "schema": "string",
+          "description": "진단 체크리스트"
+        },
+        {
+          "field": "diagnosis_id",
+          "schema": "string",
+          "description": "진단 ID"
+        },
+        {
+          "field": "diagnosis_name",
+          "schema": "string",
+          "description": "진단명"
+        },
+        {
+          "field": "diagnosis_type",
+          "schema": "string",
+          "description": "진단 유형"
+        },
+        {
+          "field": "plan_type",
+          "schema": "string",
+          "description": "요금제"
+        }
+      ]
+    },
+    {
       "endpoint": "ai-ml/cloud-ml/createcloudml",
       "method": "POST",
       "path": "/v1/cloud-ml",
@@ -201,8 +255,8 @@
       "endpoint": "container/ske/createnodepool",
       "method": "POST",
       "path": "/v1/nodepools",
-      "model": "nodepoolcreaterequestv1dot4",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/container/ske/apis/createnodepool/1.4/",
+      "model": "nodepoolcreaterequestv1dot5",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/container/ske/apis/createnodepool/1.5/",
       "undiscoverable_required_fields": [
         {
           "field": "cluster_id",
@@ -243,55 +297,6 @@
           "field": "volume_type_name",
           "schema": "string",
           "description": "볼륨 타입 이름"
-        }
-      ]
-    },
-    {
-      "endpoint": "security/configinspection/creatediagnosisobject",
-      "method": "POST",
-      "path": "/v1/configinspection/diagnosis/save",
-      "model": "diagnosisobjectrequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/security/configinspection/apis/creatediagnosisobject/1.2/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "account_id",
-          "schema": "string",
-          "description": "진단 계정"
-        },
-        {
-          "field": "csp_type",
-          "schema": "string",
-          "description": "클라우드 서비스 제공자의 유형"
-        },
-        {
-          "field": "diagnosis_account_id",
-          "schema": "string",
-          "description": "진단 ID"
-        },
-        {
-          "field": "diagnosis_check_type",
-          "schema": "string",
-          "description": "진단 체크리스트"
-        },
-        {
-          "field": "diagnosis_id",
-          "schema": "string",
-          "description": "진단 ID"
-        },
-        {
-          "field": "diagnosis_name",
-          "schema": "string",
-          "description": "진단명"
-        },
-        {
-          "field": "diagnosis_type",
-          "schema": "string",
-          "description": "진단 유형"
-        },
-        {
-          "field": "plan_type",
-          "schema": "string",
-          "description": "요금제"
         }
       ]
     },
@@ -519,9 +524,14 @@
       "endpoint": "compute/baremetal/createbaremetals",
       "method": "POST",
       "path": "/v1/baremetals",
-      "model": "baremetalcreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/baremetal/apis/createbaremetals/1.1/",
+      "model": "baremetalcreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/baremetal/apis/createbaremetals/1.2/",
       "undiscoverable_required_fields": [
+        {
+          "field": "region_id",
+          "schema": "string",
+          "description": "리전 ID"
+        },
         {
           "field": "image_id",
           "schema": "string",
@@ -538,19 +548,14 @@
           "description": "OS 유저 패스워드"
         },
         {
-          "field": "region_id",
+          "field": "vpc_id",
           "schema": "string",
-          "description": "리전 ID"
+          "description": "VPC ID"
         },
         {
           "field": "subnet_id",
           "schema": "string",
           "description": "Subnet ID"
-        },
-        {
-          "field": "vpc_id",
-          "schema": "string",
-          "description": "VPC ID"
         }
       ]
     },
@@ -558,9 +563,14 @@
       "endpoint": "compute/multinodegpucluster/creategpunodes",
       "method": "POST",
       "path": "/v1/gpu-nodes",
-      "model": "gpunodecreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/multinodegpucluster/apis/creategpunodes/1.2/",
+      "model": "gpunodecreaterequestv1dot3",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/multinodegpucluster/apis/creategpunodes/1.3/",
       "undiscoverable_required_fields": [
+        {
+          "field": "region_id",
+          "schema": "string",
+          "description": "리전 ID"
+        },
         {
           "field": "image_id",
           "schema": "string",
@@ -577,19 +587,14 @@
           "description": "OS 사용자 패스워드"
         },
         {
-          "field": "region_id",
+          "field": "vpc_id",
           "schema": "string",
-          "description": "리전 ID"
+          "description": "VPC ID"
         },
         {
           "field": "subnet_id",
           "schema": "string",
           "description": "Subnet ID"
-        },
-        {
-          "field": "vpc_id",
-          "schema": "string",
-          "description": "VPC ID"
         }
       ]
     },
@@ -629,84 +634,6 @@
           "field": "scale_type",
           "schema": "string",
           "description": "스케일 유형"
-        }
-      ]
-    },
-    {
-      "endpoint": "data-analytics/data-flow/createdataflow",
-      "method": "POST",
-      "path": "/v1/data-flows",
-      "model": "dataflowbodycreate",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-flow/apis/createdataflow/1.1/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "cluster_id",
-          "schema": "string",
-          "description": "cluster_id"
-        },
-        {
-          "field": "data_flow_name",
-          "schema": "string",
-          "description": "data_flow_name"
-        },
-        {
-          "field": "domain",
-          "schema": "string",
-          "description": "domain"
-        },
-        {
-          "field": "image_id",
-          "schema": "string",
-          "description": "image_id"
-        },
-        {
-          "field": "ingress_controller_name",
-          "schema": "string",
-          "description": "ingress_controller_name"
-        },
-        {
-          "field": "storage_class_name",
-          "schema": "string",
-          "description": "storage_class_name"
-        }
-      ]
-    },
-    {
-      "endpoint": "data-analytics/data-ops/createdataops",
-      "method": "POST",
-      "path": "/v1/data-ops",
-      "model": "dataopscreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-ops/apis/createdataops/1.1/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "cluster_id",
-          "schema": "string",
-          "description": "cluster_id"
-        },
-        {
-          "field": "data_ops_name",
-          "schema": "string",
-          "description": "data_ops_name"
-        },
-        {
-          "field": "domain",
-          "schema": "string",
-          "description": "domain"
-        },
-        {
-          "field": "image_id",
-          "schema": "string",
-          "description": "image_id"
-        },
-        {
-          "field": "ingress_controller_name",
-          "schema": "string",
-          "description": "ingress_controller_name"
-        },
-        {
-          "field": "storage_class_name",
-          "schema": "string",
-          "description": "storage_class_name"
         }
       ]
     },
@@ -867,11 +794,84 @@
       ]
     },
     {
+      "endpoint": "database/sqlserver/sqlserveradddrsecondary",
+      "method": "POST",
+      "path": "/v1/clusters/{cluster_id}/dr-secondaries",
+      "model": "sqlserverdrsecondarycreaterequest",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/sqlserver/apis/sqlserveradddrsecondary/1.1/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "ad_user_id",
+          "schema": "string",
+          "description": "AD User ID"
+        },
+        {
+          "field": "ad_user_password",
+          "schema": "string",
+          "description": "AD User Password"
+        },
+        {
+          "field": "license",
+          "schema": "string",
+          "description": "license"
+        },
+        {
+          "field": "name",
+          "schema": "string",
+          "description": "Secondary Name"
+        },
+        {
+          "field": "region",
+          "schema": "string",
+          "description": "Region"
+        },
+        {
+          "field": "subnet_id",
+          "schema": "string",
+          "description": "Subnet ID. The ID can be obtained via the GET /vpc/v1/subnets endpoint."
+        }
+      ]
+    },
+    {
+      "endpoint": "compute/virtualserver/createvirtualserver",
+      "method": "POST",
+      "path": "/v1/servers",
+      "model": "servercreaterequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/createvirtualserver/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "image_id",
+          "schema": "string",
+          "description": "이미지 ID"
+        },
+        {
+          "field": "keypair_name",
+          "schema": "string",
+          "description": "키페어 이름"
+        },
+        {
+          "field": "name",
+          "schema": "string",
+          "description": "서버 이름"
+        },
+        {
+          "field": "server_type_id",
+          "schema": "string",
+          "description": "서버 타입 ID"
+        },
+        {
+          "field": "zone",
+          "schema": "string",
+          "description": "Availability Zone"
+        }
+      ]
+    },
+    {
       "endpoint": "container/ske/createcluster",
       "method": "POST",
       "path": "/v1/clusters",
-      "model": "clustercreaterequestv1dot1",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/container/ske/apis/createcluster/1.4/",
+      "model": "clustercreaterequestv1dot5",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/container/ske/apis/createcluster/1.5/",
       "undiscoverable_required_fields": [
         {
           "field": "kubernetes_version",
@@ -901,11 +901,79 @@
       ]
     },
     {
+      "endpoint": "data-analytics/data-flow/createdataflow",
+      "method": "POST",
+      "path": "/v1/data-flows",
+      "model": "dataflowbodycreatev1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-flow/apis/createdataflow/1.2/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "cluster_id",
+          "schema": "string",
+          "description": "cluster_id"
+        },
+        {
+          "field": "data_flow_name",
+          "schema": "string",
+          "description": "data_flow_name"
+        },
+        {
+          "field": "domain",
+          "schema": "string",
+          "description": "domain"
+        },
+        {
+          "field": "image_id",
+          "schema": "string",
+          "description": "image_id"
+        },
+        {
+          "field": "storage_class_name",
+          "schema": "string",
+          "description": "storage_class_name"
+        }
+      ]
+    },
+    {
+      "endpoint": "data-analytics/data-ops/createdataops",
+      "method": "POST",
+      "path": "/v1/data-ops",
+      "model": "dataopscreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-ops/apis/createdataops/1.2/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "cluster_id",
+          "schema": "string",
+          "description": "cluster_id"
+        },
+        {
+          "field": "data_ops_name",
+          "schema": "string",
+          "description": "data_ops_name"
+        },
+        {
+          "field": "domain",
+          "schema": "string",
+          "description": "domain"
+        },
+        {
+          "field": "image_id",
+          "schema": "string",
+          "description": "image_id"
+        },
+        {
+          "field": "storage_class_name",
+          "schema": "string",
+          "description": "storage_class_name"
+        }
+      ]
+    },
+    {
       "endpoint": "data-analytics/data-ops/createdataopsservice",
       "method": "POST",
       "path": "/v1/data-ops-services",
-      "model": "dataopsservicecreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-ops/apis/createdataopsservice/1.1/",
+      "model": "dataopsservicecreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-ops/apis/createdataopsservice/1.2/",
       "undiscoverable_required_fields": [
         {
           "field": "data_ops_id",
@@ -972,13 +1040,13 @@
       "endpoint": "data-analytics/searchengine/searchenginecreatecluster",
       "method": "POST",
       "path": "/v1/clusters",
-      "model": "searchengineclustercreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/searchengine/apis/searchenginecreatecluster/1.0/",
+      "model": "searchengineclustercreaterequestv1dot1",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/searchengine/apis/searchenginecreatecluster/1.1/",
       "undiscoverable_required_fields": [
         {
           "field": "dbaas_engine_version_id",
           "schema": "string",
-          "description": "DBaaS engine version ID"
+          "description": "DBaaS engine version ID. The ID can be obtained via the “GET /v1/engine-versions” endpoint."
         },
         {
           "field": "instance_name_prefix",
@@ -993,12 +1061,12 @@
         {
           "field": "subnet_id",
           "schema": "string",
-          "description": "Subnet ID"
+          "description": "Subnet ID. The ID can be obtained via the GET /vpc/v1/subnets endpoint."
         },
         {
           "field": "timezone",
           "schema": "string",
-          "description": "Timezone"
+          "description": "Timezone. The timezone can be obtained via the “GET /support/v1/timezones” endpoint."
         }
       ]
     },
@@ -1006,13 +1074,13 @@
       "endpoint": "data-analytics/vertica/verticacreatecluster",
       "method": "POST",
       "path": "/v1/clusters",
-      "model": "verticaclustercreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/vertica/apis/verticacreatecluster/1.0/",
+      "model": "verticaclustercreaterequestv1dot1",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/vertica/apis/verticacreatecluster/1.1/",
       "undiscoverable_required_fields": [
         {
           "field": "dbaas_engine_version_id",
           "schema": "string",
-          "description": "DBaaS engine version ID"
+          "description": "DBaaS engine version ID. The ID can be obtained via the “GET /v1/engine-versions” endpoint."
         },
         {
           "field": "instance_name_prefix",
@@ -1027,12 +1095,12 @@
         {
           "field": "subnet_id",
           "schema": "string",
-          "description": "Subnet ID"
+          "description": "Subnet ID. The ID can be obtained via the GET /vpc/v1/subnets endpoint."
         },
         {
           "field": "timezone",
           "schema": "string",
-          "description": "Timezone"
+          "description": "Timezone. The timezone can be obtained via the “GET /support/v1/timezones” endpoint."
         }
       ]
     },
@@ -1040,13 +1108,13 @@
       "endpoint": "database/cachestore/cachestorecreatecluster",
       "method": "POST",
       "path": "/v1/clusters",
-      "model": "redisclustercreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/cachestore/apis/cachestorecreatecluster/1.0/",
+      "model": "redisclustercreaterequestv1dot1",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/cachestore/apis/cachestorecreatecluster/1.1/",
       "undiscoverable_required_fields": [
         {
           "field": "dbaas_engine_version_id",
           "schema": "string",
-          "description": "DBaaS engine version ID"
+          "description": "DBaaS engine version ID. The ID can be obtained via the “GET /v1/engine-versions” endpoint."
         },
         {
           "field": "instance_name_prefix",
@@ -1061,12 +1129,12 @@
         {
           "field": "subnet_id",
           "schema": "string",
-          "description": "Subnet ID"
+          "description": "Subnet ID. The ID can be obtained via the GET /vpc/v1/subnets endpoint."
         },
         {
           "field": "timezone",
           "schema": "string",
-          "description": "Timezone"
+          "description": "Timezone. The timezone can be obtained via the “GET /support/v1/timezones” endpoint."
         }
       ]
     },
@@ -1074,13 +1142,13 @@
       "endpoint": "database/epas/epascreatecluster",
       "method": "POST",
       "path": "/v1/clusters",
-      "model": "epasclustercreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/epas/apis/epascreatecluster/1.1/",
+      "model": "epasclustercreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/epas/apis/epascreatecluster/1.2/",
       "undiscoverable_required_fields": [
         {
           "field": "dbaas_engine_version_id",
           "schema": "string",
-          "description": "DBaaS engine version ID"
+          "description": "DBaaS engine version ID. The ID can be obtained via the “GET /v1/engine-versions” endpoint."
         },
         {
           "field": "instance_name_prefix",
@@ -1095,12 +1163,12 @@
         {
           "field": "subnet_id",
           "schema": "string",
-          "description": "Subnet ID"
+          "description": "Subnet ID. The ID can be obtained via the GET /vpc/v1/subnets endpoint."
         },
         {
           "field": "timezone",
           "schema": "string",
-          "description": "Timezone"
+          "description": "Timezone. The timezone can be obtained via the “GET /support/v1/timezones” endpoint."
         }
       ]
     },
@@ -1278,13 +1346,13 @@
       "endpoint": "database/postgresql/postgresqlcreatecluster",
       "method": "POST",
       "path": "/v1/clusters",
-      "model": "postgresqlclustercreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/postgresql/apis/postgresqlcreatecluster/1.1/",
+      "model": "postgresqlclustercreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/postgresql/apis/postgresqlcreatecluster/1.2/",
       "undiscoverable_required_fields": [
         {
           "field": "dbaas_engine_version_id",
           "schema": "string",
-          "description": "DBaaS engine version ID"
+          "description": "DBaaS engine version ID. The ID can be obtained via the “GET /v1/engine-versions” endpoint."
         },
         {
           "field": "instance_name_prefix",
@@ -1299,12 +1367,12 @@
         {
           "field": "subnet_id",
           "schema": "string",
-          "description": "Subnet ID"
+          "description": "Subnet ID. The ID can be obtained via the GET /vpc/v1/subnets endpoint."
         },
         {
           "field": "timezone",
           "schema": "string",
-          "description": "Timezone"
+          "description": "Timezone. The timezone can be obtained via the “GET /support/v1/timezones” endpoint."
         }
       ]
     },
@@ -1346,13 +1414,13 @@
       "endpoint": "database/sqlserver/sqlservercreatecluster",
       "method": "POST",
       "path": "/v1/clusters",
-      "model": "sqlserverclustercreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/sqlserver/apis/sqlservercreatecluster/1.0/",
+      "model": "sqlserverclustercreaterequestv1dot1",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/sqlserver/apis/sqlservercreatecluster/1.1/",
       "undiscoverable_required_fields": [
         {
           "field": "dbaas_engine_version_id",
           "schema": "string",
-          "description": "DBaaS engine version ID"
+          "description": "DBaaS engine version ID. The ID can be obtained via the “GET /v1/engine-versions” endpoint."
         },
         {
           "field": "instance_name_prefix",
@@ -1367,12 +1435,12 @@
         {
           "field": "subnet_id",
           "schema": "string",
-          "description": "Subnet ID"
+          "description": "Subnet ID. The ID can be obtained via the GET /vpc/v1/subnets endpoint."
         },
         {
           "field": "timezone",
           "schema": "string",
-          "description": "Timezone"
+          "description": "Timezone. The timezone can be obtained via the “GET /support/v1/timezones” endpoint."
         }
       ]
     },
@@ -1479,45 +1547,11 @@
       ]
     },
     {
-      "endpoint": "security/configinspection/diagnosisrequest",
-      "method": "POST",
-      "path": "/v1/configinspection/diagnosis/request",
-      "model": "diagnosisrequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/security/configinspection/apis/diagnosisrequest/1.2/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "access_key",
-          "schema": "string",
-          "description": "Access Key"
-        },
-        {
-          "field": "diagnosis_check_type",
-          "schema": "string",
-          "description": "진단 체크리스트"
-        },
-        {
-          "field": "diagnosis_id",
-          "schema": "string",
-          "description": "진단 ID"
-        },
-        {
-          "field": "secret_key",
-          "schema": "string",
-          "description": "Secret Key"
-        },
-        {
-          "field": "tenant_id",
-          "schema": "string",
-          "description": "Tenant ID"
-        }
-      ]
-    },
-    {
       "endpoint": "storage/filestorage/createvolumereplication",
       "method": "POST",
       "path": "/v1/replications",
-      "model": "replicationcreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/filestorage/apis/createvolumereplication/1.1/",
+      "model": "replicationcreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/filestorage/apis/createvolumereplication/1.2/",
       "undiscoverable_required_fields": [
         {
           "field": "name",
@@ -1530,9 +1564,9 @@
           "description": "복제 주기"
         },
         {
-          "field": "region",
+          "field": "zone",
           "schema": "string",
-          "description": "복제본 리전"
+          "description": "존"
         },
         {
           "field": "volume_id",
@@ -1543,6 +1577,35 @@
           "field": "replication_type",
           "schema": "string",
           "description": "복제 유형"
+        }
+      ]
+    },
+    {
+      "endpoint": "compute/virtualserver/createautoscalinggroup",
+      "method": "POST",
+      "path": "/v1/auto-scaling-groups",
+      "model": "autoscalinggroupcreaterequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/createautoscalinggroup/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "launch_configuration_id",
+          "schema": "string",
+          "description": "Launch Configuration ID"
+        },
+        {
+          "field": "name",
+          "schema": "string",
+          "description": "Auto-Scaling Group 이름"
+        },
+        {
+          "field": "placement_strategy",
+          "schema": "string",
+          "description": "Availability Zone 배포 방식"
+        },
+        {
+          "field": "server_name_prefix",
+          "schema": "string",
+          "description": "서버 이름 접두사"
         }
       ]
     },
@@ -1576,40 +1639,11 @@
       ]
     },
     {
-      "endpoint": "compute/virtualserver/createvirtualserver",
-      "method": "POST",
-      "path": "/v1/servers",
-      "model": "servercreaterequestv1dot2",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/createvirtualserver/1.3/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "image_id",
-          "schema": "string",
-          "description": "이미지 ID"
-        },
-        {
-          "field": "keypair_name",
-          "schema": "string",
-          "description": "키페어 이름"
-        },
-        {
-          "field": "name",
-          "schema": "string",
-          "description": "서버 이름"
-        },
-        {
-          "field": "server_type_id",
-          "schema": "string",
-          "description": "서버 타입 ID"
-        }
-      ]
-    },
-    {
       "endpoint": "data-analytics/data-flow/createdataflowserviceconsole",
       "method": "POST",
       "path": "/v1/data-flow-services",
-      "model": "dataflowservicecreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-flow/apis/createdataflowserviceconsole/1.1/",
+      "model": "dataflowservicecreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-flow/apis/createdataflowserviceconsole/1.2/",
       "undiscoverable_required_fields": [
         {
           "field": "data_flow_id",
@@ -1779,11 +1813,40 @@
       ]
     },
     {
+      "endpoint": "security/configinspection/diagnosisrequest",
+      "method": "POST",
+      "path": "/v1/configinspection/diagnosis/request",
+      "model": "diagnosisrequestv1dot3",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/security/configinspection/apis/diagnosisrequest/1.3/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "access_key",
+          "schema": "string",
+          "description": "Access Key"
+        },
+        {
+          "field": "diagnosis_id",
+          "schema": "string",
+          "description": "진단 ID"
+        },
+        {
+          "field": "secret_key",
+          "schema": "string",
+          "description": "Secret Key"
+        },
+        {
+          "field": "tenant_id",
+          "schema": "string",
+          "description": "Tenant ID"
+        }
+      ]
+    },
+    {
       "endpoint": "security/kms/createkey",
       "method": "POST",
       "path": "/v1/kms/transit",
-      "model": "keycreatemasterkeyrequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/security/kms/apis/createkey/1.3/",
+      "model": "keycreatemasterkeyrequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/security/kms/apis/createkey/1.4/",
       "undiscoverable_required_fields": [
         {
           "field": "auto_rotate",
@@ -1804,6 +1867,93 @@
           "field": "purpose",
           "schema": "string",
           "description": "키 용도"
+        }
+      ]
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/createvolumegroupreplication",
+      "method": "POST",
+      "path": "/v1/volume-groups/{volume_group_id}/replications",
+      "model": "volumegroupreplicationcreaterequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/baremetal-blockstorage/apis/createvolumegroupreplication/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "name",
+          "schema": "string",
+          "description": "복제본 볼륨 그룹명"
+        },
+        {
+          "field": "region",
+          "schema": "string",
+          "description": "리전"
+        },
+        {
+          "field": "replication_volume_name_prefix",
+          "schema": "string",
+          "description": "복제본 볼륨명 접두사"
+        },
+        {
+          "field": "zone",
+          "schema": "string",
+          "description": "Availability zone"
+        }
+      ]
+    },
+    {
+      "endpoint": "storage/filestorage/createvolume",
+      "method": "POST",
+      "path": "/v1/volumes",
+      "model": "volumecreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/filestorage/apis/createvolume/1.2/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "name",
+          "schema": "string",
+          "description": "볼륨 이름"
+        },
+        {
+          "field": "protocol",
+          "schema": "string",
+          "description": "프로토콜"
+        },
+        {
+          "field": "type_name",
+          "schema": "string",
+          "description": "볼륨 유형 이름"
+        },
+        {
+          "field": "zone",
+          "schema": "string",
+          "description": "존"
+        }
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/createloggroupexporttask",
+      "method": "POST",
+      "path": "/v1/log-groups/export-tasks",
+      "model": "loggroupexporttaskcreaterequest",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/management/servicewatch/apis/createloggroupexporttask/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "bucket_name",
+          "schema": "string",
+          "description": "Log group export task bucket name"
+        },
+        {
+          "field": "end_at",
+          "schema": "any of [string (date-time), null]",
+          "description": "End datetime"
+        },
+        {
+          "field": "log_group_id",
+          "schema": "string",
+          "description": "Log group ID"
+        },
+        {
+          "field": "start_at",
+          "schema": "any of [string (date-time), null]",
+          "description": "Start datetime"
         }
       ]
     },
@@ -1900,30 +2050,6 @@
           "field": "timezone",
           "schema": "string",
           "description": "타임존"
-        }
-      ]
-    },
-    {
-      "endpoint": "compute/virtualserver/createautoscalinggroup",
-      "method": "POST",
-      "path": "/v1/auto-scaling-groups",
-      "model": "autoscalinggroupcreaterequestv1dot2",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/createautoscalinggroup/1.3/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "launch_configuration_id",
-          "schema": "string",
-          "description": "Launch Configuration ID"
-        },
-        {
-          "field": "name",
-          "schema": "string",
-          "description": "Auto-Scaling Group 이름"
-        },
-        {
-          "field": "server_name_prefix",
-          "schema": "string",
-          "description": "서버 이름 접두사"
         }
       ]
     },
@@ -2387,8 +2513,8 @@
       "endpoint": "networking/vpc/createsubnet",
       "method": "POST",
       "path": "/v1/subnets",
-      "model": "subnetcreaterequestv1dot2",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/vpc/apis/createsubnet/1.2/",
+      "model": "subnetcreaterequestv1dot3",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/vpc/apis/createsubnet/1.3/",
       "undiscoverable_required_fields": [
         {
           "field": "cidr",
@@ -2528,16 +2654,16 @@
       ]
     },
     {
-      "endpoint": "storage/baremetal-blockstorage/createvolumegroupreplication",
+      "endpoint": "storage/baremetal-blockstorage/createvolumereplication",
       "method": "POST",
-      "path": "/v1/volume-groups/{volume_group_id}/replications",
-      "model": "volumegroupreplicationcreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/baremetal-blockstorage/apis/createvolumegroupreplication/1.3/",
+      "path": "/v1/volumes/{volume_id}/replications",
+      "model": "volumereplicationcreaterequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/baremetal-blockstorage/apis/createvolumereplication/1.4/",
       "undiscoverable_required_fields": [
         {
           "field": "name",
           "schema": "string",
-          "description": "복제본 볼륨 그룹명"
+          "description": "복제본 볼륨 목록"
         },
         {
           "field": "region",
@@ -2545,33 +2671,9 @@
           "description": "리전"
         },
         {
-          "field": "replication_volume_name_prefix",
+          "field": "zone",
           "schema": "string",
-          "description": "복제본 볼륨명 접두사"
-        }
-      ]
-    },
-    {
-      "endpoint": "storage/filestorage/createvolume",
-      "method": "POST",
-      "path": "/v1/volumes",
-      "model": "volumecreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/filestorage/apis/createvolume/1.1/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "name",
-          "schema": "string",
-          "description": "볼륨 이름"
-        },
-        {
-          "field": "protocol",
-          "schema": "string",
-          "description": "프로토콜"
-        },
-        {
-          "field": "type_name",
-          "schema": "string",
-          "description": "볼륨 유형 이름"
+          "description": "Availability zone"
         }
       ]
     },
@@ -2786,6 +2888,25 @@
           "field": "volume_id",
           "schema": "string",
           "description": "볼륨 ID"
+        }
+      ]
+    },
+    {
+      "endpoint": "compute/virtualserver/createvolume",
+      "method": "POST",
+      "path": "/v1/volumes",
+      "model": "volumecreaterequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/createvolume/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "name",
+          "schema": "string",
+          "description": "볼륨명"
+        },
+        {
+          "field": "zone",
+          "schema": "string",
+          "description": "Availability Zone"
         }
       ]
     },
@@ -3534,8 +3655,8 @@
       "endpoint": "networking/direct-connect/createdirectconnect",
       "method": "POST",
       "path": "/v1/direct-connects",
-      "model": "directconnectcreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/direct-connect/apis/createdirectconnect/1.1/",
+      "model": "directconnectcreaterequestv1dot2",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/direct-connect/apis/createdirectconnect/1.2/",
       "undiscoverable_required_fields": [
         {
           "field": "name",
@@ -3572,8 +3693,8 @@
       "endpoint": "networking/security-group/createsecuritygrouprule",
       "method": "POST",
       "path": "/v1/security-group-rules",
-      "model": "securitygrouprulecreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/security-group/apis/createsecuritygrouprule/1.0/",
+      "model": "securitygrouprulecreaterequestv1dot1",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/security-group/apis/createsecuritygrouprule/1.1/",
       "undiscoverable_required_fields": [
         {
           "field": "direction",
@@ -3584,25 +3705,6 @@
           "field": "security_group_id",
           "schema": "string",
           "description": "Security Group ID"
-        }
-      ]
-    },
-    {
-      "endpoint": "networking/vpc/createnatgateway",
-      "method": "POST",
-      "path": "/v1/nat-gateways",
-      "model": "natgatewaycreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/vpc/apis/createnatgateway/1.2/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "publicip_id",
-          "schema": "string",
-          "description": "PublicIP ID"
-        },
-        {
-          "field": "subnet_id",
-          "schema": "string",
-          "description": "Subnet CIDR"
         }
       ]
     },
@@ -3816,6 +3918,44 @@
       ]
     },
     {
+      "endpoint": "storage/baremetal-blockstorage/createvolume",
+      "method": "POST",
+      "path": "/v1/volumes",
+      "model": "volumecreaterequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/baremetal-blockstorage/apis/createvolume/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "name",
+          "schema": "string",
+          "description": "볼륨명"
+        },
+        {
+          "field": "zone",
+          "schema": "string",
+          "description": "Availability zone"
+        }
+      ]
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/createvolumegroup",
+      "method": "POST",
+      "path": "/v1/volume-groups",
+      "model": "volumegroupcreationrequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/baremetal-blockstorage/apis/createvolumegroup/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "name",
+          "schema": "string",
+          "description": "볼륨 그룹명"
+        },
+        {
+          "field": "zone",
+          "schema": "string",
+          "description": "Availability zone"
+        }
+      ]
+    },
+    {
       "endpoint": "storage/baremetal-blockstorage/createvolumegrouprecovery",
       "method": "POST",
       "path": "/v1/volume-groups/{volume_group_id}/recoveries",
@@ -3854,21 +3994,59 @@
       ]
     },
     {
-      "endpoint": "storage/baremetal-blockstorage/createvolumereplication",
+      "endpoint": "storage/parallel-filestorage/createvolume",
       "method": "POST",
-      "path": "/v1/volumes/{volume_id}/replications",
-      "model": "volumereplicationcreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/baremetal-blockstorage/apis/createvolumereplication/1.3/",
+      "path": "/v1/volumes",
+      "model": "volumecreaterequestv1dot1",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/parallel-filestorage/apis/createvolume/1.1/",
       "undiscoverable_required_fields": [
         {
           "field": "name",
           "schema": "string",
-          "description": "복제본 볼륨 목록"
+          "description": "볼륨 이름"
         },
         {
-          "field": "region",
+          "field": "zone",
           "schema": "string",
-          "description": "리전"
+          "description": "존"
+        }
+      ]
+    },
+    {
+      "endpoint": "database/mariadb/mariadbupgrademajorversion",
+      "method": "PUT",
+      "path": "/v1/clusters/{cluster_id}/major-version-upgrade",
+      "model": "patchrequest",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/mariadb/apis/mariadbupgrademajorversion/1.2/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "dbaas_engine",
+          "schema": "string",
+          "description": "dbaas_engine"
+        },
+        {
+          "field": "software_version",
+          "schema": "string",
+          "description": "software_version"
+        }
+      ]
+    },
+    {
+      "endpoint": "database/mysql/mysqlupgrademajorversion",
+      "method": "PUT",
+      "path": "/v1/clusters/{cluster_id}/major-version-upgrade",
+      "model": "patchrequest",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/database/mysql/apis/mysqlupgrademajorversion/1.2/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "dbaas_engine",
+          "schema": "string",
+          "description": "dbaas_engine"
+        },
+        {
+          "field": "software_version",
+          "schema": "string",
+          "description": "software_version"
         }
       ]
     },
@@ -4223,20 +4401,6 @@
       ]
     },
     {
-      "endpoint": "compute/virtualserver/createvolume",
-      "method": "POST",
-      "path": "/v1/volumes",
-      "model": "volumecreaterequestv1dot2",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/createvolume/1.3/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "name",
-          "schema": "string",
-          "description": "볼륨명"
-        }
-      ]
-    },
-    {
       "endpoint": "compute/virtualserver/createvolumetransfer",
       "method": "POST",
       "path": "/v1/volume-transfer",
@@ -4275,6 +4439,20 @@
           "field": "server_type",
           "schema": "string",
           "description": "서버 타입"
+        }
+      ]
+    },
+    {
+      "endpoint": "compute/virtualserver/updateserverinterface",
+      "method": "PUT",
+      "path": "/v1/servers/{server_id}/interfaces/{port_id}",
+      "model": "serverinterfaceupdaterequestv1dot4",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/updateserverinterface/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "fixed_ip_address",
+          "schema": "string",
+          "description": "IP 주소"
         }
       ]
     },
@@ -4758,8 +4936,8 @@
       "endpoint": "management/iam-identity-center/createinstance",
       "method": "POST",
       "path": "/v1/instances",
-      "model": "instancecreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/management/iam-identity-center/apis/createinstance/1.4/",
+      "model": "instancecreaterequestv1dot5",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/management/iam-identity-center/apis/createinstance/1.5/",
       "undiscoverable_required_fields": [
         {
           "field": "name",
@@ -5287,6 +5465,20 @@
       ]
     },
     {
+      "endpoint": "networking/vpc/createnatgateway",
+      "method": "POST",
+      "path": "/v1/nat-gateways",
+      "model": "natgatewaycreaterequestv1dot3",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/vpc/apis/createnatgateway/1.3/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "subnet_id",
+          "schema": "string",
+          "description": "Subnet CIDR"
+        }
+      ]
+    },
+    {
       "endpoint": "networking/vpc/createprivatenatip",
       "method": "POST",
       "path": "/v1/private-nats/{private_nat_id}/private-nat-ips",
@@ -5297,6 +5489,20 @@
           "field": "ip_address",
           "schema": "string",
           "description": "Private NAT IP 주소"
+        }
+      ]
+    },
+    {
+      "endpoint": "networking/vpc/createpublicip",
+      "method": "POST",
+      "path": "/v1/publicips",
+      "model": "publicipcreaterequestv1dot3",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/vpc/apis/createpublicip/1.3/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "zone",
+          "schema": "string",
+          "description": "Zone"
         }
       ]
     },
@@ -5651,34 +5857,6 @@
       ]
     },
     {
-      "endpoint": "storage/baremetal-blockstorage/createvolume",
-      "method": "POST",
-      "path": "/v1/volumes",
-      "model": "volumecreaterequestv1dot2",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/baremetal-blockstorage/apis/createvolume/1.3/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "name",
-          "schema": "string",
-          "description": "볼륨명"
-        }
-      ]
-    },
-    {
-      "endpoint": "storage/baremetal-blockstorage/createvolumegroup",
-      "method": "POST",
-      "path": "/v1/volume-groups",
-      "model": "volumegroupcreationrequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/baremetal-blockstorage/apis/createvolumegroup/1.3/",
-      "undiscoverable_required_fields": [
-        {
-          "field": "name",
-          "schema": "string",
-          "description": "볼륨 그룹명"
-        }
-      ]
-    },
-    {
       "endpoint": "storage/filestorage/createsnapshot",
       "method": "POST",
       "path": "/v1/snapshots",
@@ -5735,16 +5913,44 @@
       ]
     },
     {
-      "endpoint": "storage/parallel-filestorage/createvolume",
+      "endpoint": "container/ske/setnodepoolpreferredips",
+      "method": "PUT",
+      "path": "/v1/nodepools/{nodepool_id}/preferred-ips",
+      "model": "nodepoolpreferredipssetrequest",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/container/ske/apis/setnodepoolpreferredips/1.5/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "preferred_ips",
+          "schema": "string",
+          "description": "우선 지정 IP 대역"
+        }
+      ]
+    },
+    {
+      "endpoint": "networking/security-group/createaddressgroup",
       "method": "POST",
-      "path": "/v1/volumes",
-      "model": "volumecreaterequest",
-      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/storage/parallel-filestorage/apis/createvolume/1.0/",
+      "path": "/v1/address-groups",
+      "model": "addressgroupcreaterequest",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/networking/security-group/apis/createaddressgroup/1.1/",
       "undiscoverable_required_fields": [
         {
           "field": "name",
           "schema": "string",
-          "description": "볼륨 이름"
+          "description": "Address Group 이름"
+        }
+      ]
+    },
+    {
+      "endpoint": "security/kms/kmssetaclcidr",
+      "method": "PUT",
+      "path": "/v1/kms/transit/{key_id}/acl-cidr",
+      "model": "keysetaclcidrrequest",
+      "doc_url": "https://docs.e.samsungsdscloud.com/apireference/security/kms/apis/kmssetaclcidr/1.4/",
+      "undiscoverable_required_fields": [
+        {
+          "field": "acl_cidr",
+          "schema": "string",
+          "description": "Public ACL CIDR List"
         }
       ]
     }
