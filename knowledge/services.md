@@ -1075,6 +1075,10 @@ lifecycle `heavy-asg-full-coverage` in
   16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind
   the heavy private-dns create. Account left clean (no resources created).
 
+
+**2026-07-18 — DB log-export register 500의 유력 뿌리 = 빈 인증키 (전 엔진):**
+콘솔 등록 폼 실측(마리아DB 스크린샷): 로그 유형·버킷 외에 **인증키 Access/Secret Key 쌍이 필수 입력**이며 "본인 계정 키가 아니어도 됨, 만료 주의" 안내. 우리 API 바디는 시크릿 금지 규칙 탓에 `access_key:"", secret_key:""`를 보내고 있었고 백엔드는 이를 400 대신 500 ContactAdmin으로 처리(빈/불량 입력→500 클래스, SCR 비hex id와 동일). 수리: 엔진 런타임 토큰 `{scp_access_key}/{scp_secret_key}`(env 주입, git 무유출) + step-end req_body 마스킹(`_redact_body`). register 2xx가 나오면 set/unregister/exportlog 하류도 열림 — **다음 heavy 런이 판정. 판정 전까지 known_issues의 register-500 PF 기준선은 유지하되 재분류 후보로 취급.**
+
 ## data-analytics / quick-query
 
 - **Host:** regional (`quick-query.<region>.<env>...`). 12 endpoints.

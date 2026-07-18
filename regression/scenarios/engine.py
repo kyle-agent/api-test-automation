@@ -129,6 +129,23 @@ def _canon_service(service: str | None) -> str:
     return svc[:-3] if svc.endswith("-dr") else svc
 
 
+# step-end 이벤트의 req_body는 oplog 버킷으로 영구 미러된다 — 자격/비밀 필드는
+# 절대 원문 유출 금지 (Hard Rule 2). {scp_access_key}/{scp_secret_key} 런타임
+# 주입 토큰과 한 쌍으로 도입 (2026-07-18).
+_REDACT_KEYS = {"access_key", "secret_key", "password", "secret", "auth_key",
+                "private_key", "client_secret"}
+
+
+def _redact_body(obj):
+    """Deep-copy ``obj`` with any sensitive-named field masked for logging."""
+    if isinstance(obj, dict):
+        return {k: ("***" if str(k).lower() in _REDACT_KEYS and v else _redact_body(v))
+                for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_redact_body(x) for x in obj]
+    return obj
+
+
 def _catalog_key_for(method: str, templated_path: str, service: str | None):
     """Resolve a step's (method, templated path, service) to a catalog key, or None."""
     m, p = (method or "").upper(), _norm_path(templated_path)
@@ -1059,6 +1076,15 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                                         time.gmtime(time.time() - 29 * 86400)),
         "iso_dt_1h_ago": time.strftime("%Y-%m-%dT%H:00:00.000Z",
                                        time.gmtime(time.time() - 3600)),
+        # 런타임 자격 토큰 (2026-07-18, DB log-export 콘솔 폼 실측): 일부 API는
+        # 바디에 Object-Storage 접근용 Access/Secret Key 쌍을 REQUIRED로 받는다
+        # (콘솔 등록 폼의 인증키 필수 입력과 동일 계약). 시크릿은 git에 못 넣으므로
+        # 시나리오 JSON에는 이 플레이스홀더만 두고 값은 실행 시 env에서 주입한다.
+        # step-end 이벤트의 req_body는 _redact_body가 마스킹하므로 oplog 미러로
+        # 새지 않는다.
+        # getattr: 오프라인 테스트의 SimpleNamespace cfg 스텁엔 자격 속성이 없다.
+        "scp_access_key": getattr(cfg, "access_key", "") or "",
+        "scp_secret_key": getattr(cfg, "secret_key", "") or "",
     }
     # Seed shared resources (e.g. a session-shared VPC) so {"adopt": ...} steps
     # reuse them instead of creating their own.
@@ -1495,7 +1521,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 _cev_req = None
                 if body is not None:
                     try:
-                        _cev_req = json.dumps(body, ensure_ascii=False, default=str)[:400]
+                        _cev_req = json.dumps(_redact_body(body), ensure_ascii=False,
+                                              default=str)[:400]
                     except Exception:  # noqa: BLE001 — never let detail break a run
                         _cev_req = str(body)[:400]
                 _cev_resp = (resp.raw_text or "")[:400] or None

@@ -54,6 +54,7 @@ STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
              "_note", "_comment"}
 METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 BUILTINS = {"unique", "ualpha", "region", "today", "today_plus_5y",
+            "scp_access_key", "scp_secret_key",
             "iso_today", "iso_29d_ago", "epoch_now", "epoch_1h_ago",
             "iso_dt_29d_ago", "iso_dt_1h_ago",
             "shared_vpc_id", "shared_subnet_id",

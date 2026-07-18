@@ -120,7 +120,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs",
           "json": {
-            "access_key": "",
+            "access_key": "{scp_access_key}",
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "general",
@@ -128,7 +128,7 @@
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
-            "secret_key": ""
+            "secret_key": "{scp_secret_key}"
           },
           "expect_status": [
             200,
@@ -141,7 +141,8 @@
             422
           ],
           "optional": true,
-          "group": "log-export"
+          "group": "log-export",
+          "_note": "2026-07-18: 콘솔 등록 폼 실측 — 인증키(Access/Secret) 쌍이 REQUIRED. 기존 빈 문자열(\"\")이 500 ContactAdmin의 유력 원인(빈 입력→500 클래스). 런타임 env 주입 토큰으로 교체; 이벤트 req_body는 엔진이 마스킹. 다음 heavy 런이 판정."
         },
         {
           "name": "set-log-export-config",
