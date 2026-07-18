@@ -23,6 +23,7 @@ from pathlib import Path
 from core.results import Finding, record_finding
 from conformance import rules as rules_mod
 from conformance.rules import validation as validation_rules
+from conformance.rules import live_confirmed as live_confirmed_rules
 
 ROOT = Path(__file__).resolve().parent.parent
 F = ROOT / "data"
@@ -403,6 +404,15 @@ def build(*, emit_findings: bool = True) -> dict:
             add(r["endpoint"], "red", "opaque-validation", "runtime",
                 "400 names neither field nor rule", 5)
 
+    # ---- LIVE-CONFIRMED (2026-07-15..18 ad-hoc runtime probing sweep; ported
+    # from knowledge/validated-facts.md — defect classes neither static
+    # analysis nor the standard `conformance.runtime --probe all` sweep can see
+    # on their own; see conformance/rules/live_confirmed.py for full evidence
+    # per entry, owner task "오너 승인 작업 ②") -----------------------------
+    for rec in live_confirmed_rules.entries():
+        add(rec["endpoint_key"], rec["severity"], rec["rule_id"], "runtime",
+            rec["detail"], rec.get("issue", ""))
+
     # ---- assemble -------------------------------------------------------
     by_endpoint = {}
     for k in keys:
@@ -458,6 +468,9 @@ def main() -> None:
     total = counts["total"]
     print(f"conformance: green={counts['green']} yellow={counts['yellow']} "
           f"red={counts['red']} / {total} -> {OUT}")
+    print(f"live-confirmed (2026-07-15..18 sweep): "
+          f"{len(live_confirmed_rules.ALL)} entries folded in "
+          f"(see conformance/rules/live_confirmed.py)")
     reds = [k for k, v in by_endpoint.items() if v["status"] == "red"]
     print("red endpoints:", len(reds))
     for k in reds[:20]:
