@@ -96,7 +96,9 @@ def test_real_run_has_sane_documented_distribution():
     self-param totals (960 produced / 19 waivers / 0 null) must hold."""
     rows_by_service, _skipped = rr.analyze()
     rows = [r for rows in rows_by_service.values() for r in rows]
-    assert len(rows) == 302, "id-bound GET universe changed unexpectedly"
+    # 315 since the 2026-07-18 45-endpoint catalog scrape (e8fe8b3d) grew the
+    # id-bound GET universe by 13; was 302. Re-pin deliberately on spec bumps.
+    assert len(rows) == 315, "id-bound GET universe changed unexpectedly"
     totals = {v: sum(1 for r in rows if r["verdict"] == v) for v in rr._VERDICTS}
     assert sum(totals.values()) == len(rows)
     # every verdict is a recognised bucket

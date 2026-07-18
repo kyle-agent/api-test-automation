@@ -891,3 +891,50 @@ def test_vpc_409_igw_holder_reaps_fw_rules_before_igw_delete():
     assert rule_i >= 0 and igw_i >= 0 and rule_i < igw_i, \
         f"홀더 IGW도 rule 선삭제 후 삭제: {seq}"
     assert "/v1/vpcs/vpc-igw" in seq, "VPC 재시도까지 도달"
+
+
+# --------------------------------------------------------------------------- #
+# Second-chance stuck retry (field 2026-07-18: IGW_regrvpcsh6a5af376 was marked
+# stuck mid-sweep — its FW-rule dependency drained in a LATER pass — and a
+# manual DELETE right after the sweep succeeded instantly. The sweep now fires
+# exactly one more DELETE per stuck item at campaign end.)
+# --------------------------------------------------------------------------- #
+def test_second_chance_reclaims_stuck_item_when_dependency_drained():
+    it = _owned("regrigw-late", id="igw-late")
+    client = FakeClient(lists={"/v1/internet-gateways": [it]})
+    recon._note_progress(400, it)                       # round 1: hard fail
+    recon._select(client, "vpc", "/v1/internet-gateways",
+                  name_prefixes=("regrigw",))           # round 2 -> stuck
+    assert "igw-late" in recon._STUCK
+    assert recon._STUCK_LOC["igw-late"][:2] == ("vpc", "/v1/internet-gateways")
+    # dependency has drained by sweep end — the retry DELETE now succeeds (204)
+    reclaimed = recon._second_chance_stuck(client)
+    assert reclaimed == 1
+    assert "igw-late" not in recon._STUCK, \
+        "a reclaimed item must leave the final stuck report"
+    assert "igw-late" not in recon._STUCK_LOC
+    assert any(p == "/v1/internet-gateways/igw-late"
+               for p in _delete_paths(client))
+
+
+def test_second_chance_keeps_genuinely_stuck_item():
+    it = _owned("regrfs-hard", id="vol-hard")
+    client = FakeClient(lists={"/v1/volumes": [it]},
+                        delete_status={"/v1/volumes": 400})
+    recon._note_progress(400, it)
+    recon._select(client, "filestorage", "/v1/volumes",
+                  name_prefixes=("regrfs",))
+    assert "vol-hard" in recon._STUCK
+    reclaimed = recon._second_chance_stuck(client)
+    assert reclaimed == 0
+    assert "vol-hard" in recon._STUCK, \
+        "a still-400 item stays in the stuck report (reported, not forced)"
+
+
+def test_second_chance_skips_bespoke_collections_without_location():
+    """Stuck ids with no _STUCK_LOC entry (log-group bulk pass etc.) are not
+    retried — the generic {path}/{id} DELETE shape would be wrong for them."""
+    recon._STUCK["lg-1"] = "log-group persists after delete"
+    client = FakeClient()
+    assert recon._second_chance_stuck(client) == 0
+    assert _delete_paths(client) == []

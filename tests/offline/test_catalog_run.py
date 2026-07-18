@@ -77,9 +77,14 @@ def test_plan_for_ske_cluster_real_catalog():
     placed = {lid for w in plan.waves for lid in w.lifecycles}
     # every runnable leaf lands in some wave (roots aside)
     assert set(leaf) <= placed
-    # ske's lifecycle adopts the shared VPC -> lands in the adopt wave
+    # ske self-creates its own VPC since the 2026-07-17 conversion (owner:
+    # "아예 vpc 생성하고 하는 걸로" — shared-subnet adoption kept deleting the
+    # shared subnet) -> lands in the self-create wave, NOT adopt.
+    selfc = [lid for w in plan.waves if w.kind == "self-create"
+             for lid in w.lifecycles]
+    assert "container-ske-cluster-nodepool" in selfc
     adopt = [lid for w in plan.waves if w.kind == "adopt" for lid in w.lifecycles]
-    assert "container-ske-cluster-nodepool" in adopt
+    assert "container-ske-cluster-nodepool" not in adopt
 
 
 def test_leaf_set_for_no_deps_is_subset():

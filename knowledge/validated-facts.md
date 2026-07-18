@@ -3954,3 +3954,31 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   안됨, 포기". API 플레인 2xx 구조적 불가 → coverage_waivers reachability
   등재(형제 세션 기등재 확인) + 시나리오 43스텝 AUTH-GATED 태깅 → soft
   '정책' 분류. 콘솔 판별 실험 불필요 — 종결.
+
+## 스윕 관측 공백 + stuck 조기 마킹 (2026-07-18 런 6954 스윕 사후분석)
+
+- **스윕 단계는 oplog에 아무 이벤트도 안 남겼다**: 런 이벤트는 마지막
+  lifecycle-end(04:57)에서 끝나고, 이후 ~20분의 스윕은 원격에서 완전한
+  블랙박스 (오너 "왜 자원정리를 이리 오래하고 있는건가?"에 근거 있는 답을
+  못 함). → reconciler가 `sweep`(start/end) / `sweep-round`(라운드 wall·
+  listing 비용·genuine/inprog/verdict) / `sweep-second-chance` 마일스톤을
+  oplog로 발신하도록 계측 (best-effort, 스윕 실패 원인 금지).
+- **stuck 마킹이 이르면 회수 기회를 놓친다**: IGW_regrvpcsh6a5af376 가
+  "delete 발사됐는데 여전히 목록에 남음"으로 stuck 마킹 → 캠페인 내 재시도
+  금지 → 스윕 종료 후 수동 DELETE는 즉시 202→404. 잔존 원인(FW rule 등
+  의존)이 이후 패스/라운드에서 비워지는 경우가 실재한다. → 스윕 말미
+  `_second_chance_stuck`: stuck 아이템당 정확히 1회 DELETE 재발사(재나열·
+  대기 없음), 2xx/404면 최종 리포트에서 제거. _select 경유(위치 기록 있는)
+  stuck만 대상 — log-groups 등 bespoke 삭제는 제외.
+
+## 공식 CI 런 불가 + 원격 egress 프록시 간헐 502 (2026-07-18)
+
+- **api-test.yml workflow_dispatch는 GitHub App 권한 부족으로 403**
+  ("Resource not accessible by integration") — MCP 통합에 actions:write가
+  없다. run-request 파일 트리거도 오너 결정(06-18)으로 비활성. 공식 런은
+  오너 doctrine대로 **원격(콘솔2/세션) 실행이 유일 경로**.
+- **세션 egress 프록시가 SCP 호스트 CONNECT를 간헐 502로 거부** (05:14~,
+  networking/management/container/database 502·virtualserver 200 혼재,
+  같은 호스트가 분 단위로 성공↔실패 왕복) — SCP 장애가 아니라 프록시
+  upstream 문제. 로컬 라이브 프로브/스모크만 영향; 콘솔2 런과 oplog(S3)는
+  무관. 재시도 사다리로 부분 통과 가능하나 관측 오염 위험 시 대기가 맞다.

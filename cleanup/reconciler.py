@@ -195,15 +195,33 @@ def _cost_reset() -> None:
         _COST_DELETE[1] = 0
 
 
-def _cost_report() -> None:
+def _cost_report() -> str:
     with _STATE_LOCK:
         lists = sorted(_COST_LIST.items(), key=lambda kv: -kv[1])
         lt = sum(v for _, v in lists)
         dt, dn = _COST_DELETE
     top = ", ".join(f"{p}={s:.0f}s" for (_, p), s in lists[:6] if s >= 2)
-    print(f"  [cost] listing {lt:.0f}s ({len(lists)} collections"
-          + (f"; top: {top}" if top else "")
-          + f") · deletes {dt:.0f}s/{dn}건", flush=True)
+    msg = (f"[cost] listing {lt:.0f}s ({len(lists)} collections"
+           + (f"; top: {top}" if top else "")
+           + f") · deletes {dt:.0f}s/{dn}건")
+    print(f"  {msg}", flush=True)
+    return msg
+
+
+def _oplog_emit(stage: str, status: str, detail: str = "") -> None:
+    """스윕 진행상황을 oplog 마일스톤으로 미러링 (best-effort — 실패해도
+    스윕을 절대 깨지 않는다).
+
+    배경 (오너 2026-07-18 "왜 자원정리를 이리 오래하고 있는건가?"): 런의
+    lifecycle 이벤트는 oplog(runs/<rid>/res/)에 남지만 스윕 단계는 아무
+    이벤트도 안 남겨서, 원격 세션에서는 마지막 lifecycle-end 이후 ~20분이
+    완전한 블랙박스였다. 라운드별 wall/비용/판정을 마일스톤으로 흘리면
+    "어디서 시간이 갔는지"를 콘솔2 stdout 없이도 진단할 수 있다."""
+    try:
+        from core import oplog
+        oplog.emit(stage, status, detail, job="sweep")
+    except Exception:  # noqa: BLE001 — 계측이 스윕 실패의 원인이 되면 안 됨
+        pass
 
 
 def _list_all(client, service, path):
@@ -672,6 +690,7 @@ def _reset_campaign_state() -> None:
     _DELETED_THIS_SWEEP.clear()
     _DELETE_ISSUED.clear()
     _STUCK.clear()
+    _STUCK_LOC.clear()
     _REGION_CLIENTS.clear()
     _LAST_PICKED.clear()
     _LIST_CACHE.clear()
@@ -747,6 +766,7 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
             if iid and iid in _DELETE_ISSUED:
                 _STUCK[iid] = "persists after delete (un-deletable: dependency "
                 _STUCK[iid] += "or IAM-gated child)"
+                _STUCK_LOC[iid] = (service, path, _name_of(it))
                 print(f"  stuck: {iid} ({_name_of(it) or path}) — "
                       f"deleted in a prior round but still listed; not retrying")
                 continue
@@ -818,6 +838,11 @@ _DELETED_THIS_SWEEP: set = set()
 # retry so the sweep CONVERGES instead of looping.
 _DELETE_ISSUED: set = set()   # ids we have issued a DELETE for this campaign
 _STUCK: dict = {}             # id -> reason, for items still listed after delete
+_STUCK_LOC: dict = {}         # id -> (service, path, name) — 스윕 말미 second-
+                              # chance 재시도용 위치 (마킹 시점에만 알 수 있다:
+                              # stuck 아이템은 picked에서 걸러져 _LAST_PICKED에
+                              # 안 남는다). _select 경유 stuck만 기록 — bespoke
+                              # 삭제(log-groups bulk 등)는 재시도 대상이 아니다.
 _PROGRESS_THIS_ROUND = [0]    # genuinely-gone deletions in the current round
                               # (boxed so run_sweep can reset/read it per round)
 _INPROGRESS_THIS_ROUND = [0]  # owned items observed mid-async-deletion (state
@@ -2912,6 +2937,40 @@ def _rm_ghost_report(client) -> None:
               "유령 여부 판정 보류)")
 
 
+def _second_chance_stuck(client) -> int:
+    """스윕 말미 1회: ``_STUCK`` 아이템에 DELETE를 한 번 더 발사한다.
+
+    stuck 마킹은 "이전 라운드에 delete를 발사했는데 여전히 목록에 남음"인데,
+    그 잔존이 마킹 시점의 일시적 의존 때문이었으면(예: IGW를 물던 FW rule /
+    자식이 이후 패스·라운드에서 비워짐) 스윕이 끝난 지금은 지워진다 — 실측
+    20260718 스윕: IGW_regrvpcsh6a5af376 가 stuck으로 남았고 스윕 종료 직후
+    수동 DELETE가 즉시 202→404 했다. 재시도는 아이템당 정확히 1회, 재나열·
+    대기 없음 (bounded) — 2xx/404면 _STUCK에서 제거해 최종 리포트가 진짜
+    un-deletable만 담게 한다. _select 경유 stuck(위치 기록 있음)만 대상;
+    bespoke 삭제 컬렉션(log-groups bulk 등)은 위치가 없어 자연 제외된다.
+    소유권 게이트는 이미 통과한 아이템만 _STUCK에 들어오므로 여기서 약화되지
+    않는다."""
+    with _STATE_LOCK:
+        targets = [(iid, _STUCK_LOC[iid]) for iid in list(_STUCK)
+                   if iid in _STUCK_LOC]
+    if not targets:
+        return 0
+    print(f"--- second-chance: {len(targets)} stuck item(s), one more DELETE "
+          f"each (dependency may have drained since marking) ---")
+    reclaimed = 0
+    for iid, (service, path, name) in targets:
+        st, _ = _delete_resp(client, service, f"{path}/{iid}")
+        if st is not None and (200 <= st < 300 or st == 404):
+            reclaimed += 1
+            with _STATE_LOCK:
+                _STUCK.pop(iid, None)
+                _STUCK_LOC.pop(iid, None)
+            print(f"  reclaimed: {name or iid} ({path}) -> {st}")
+        else:
+            print(f"  still stuck: {name or iid} ({path}) -> {st}")
+    return reclaimed
+
+
 def _leftover_report(client) -> None:
     """The "이슈로 남은 자원 리포트" (owner 2026-07-14): when the sweep STOPS with
     resources still present — an async-deleting leaf mid-drain, or a genuinely
@@ -2992,6 +3051,8 @@ def main() -> int:
     round_sleep = int(os.environ.get("SCP_SWEEP_ROUND_SLEEP_S", "12"))
     report_leftovers = False
     inprog_grants = 0   # consecutive grant-inprog rounds (drives the backoff)
+    _sweep_t0 = time.monotonic()
+    _oplog_emit("sweep", "start", f"rounds-cap={rounds}")
     for rnd in range(1, rounds + 1):
         print(f"--- sweep round {rnd} ---", flush=True)
         _PROGRESS_THIS_ROUND[0] = 0          # reset genuine-teardown counter
@@ -2999,9 +3060,9 @@ def main() -> int:
         _cost_reset()
         _rnd_t0 = time.monotonic()
         reported = run_sweep(client)
-        print(f"  [cost] round {rnd} wall {time.monotonic() - _rnd_t0:.0f}s",
-              flush=True)
-        _cost_report()
+        _rnd_wall = time.monotonic() - _rnd_t0
+        print(f"  [cost] round {rnd} wall {_rnd_wall:.0f}s", flush=True)
+        _cost_msg = _cost_report()
         genuine = _PROGRESS_THIS_ROUND[0]
         inprog = _INPROGRESS_THIS_ROUND[0]
         # Machine-readable genuine tally per round: consumers (console2 클린업
@@ -3021,6 +3082,10 @@ def main() -> int:
         # 409-blocked dependents need the next round; grant it (still bounded
         # by the SCP_SWEEP_ROUNDS cap).
         verdict = _round_verdict(genuine, reported, inprog)
+        _oplog_emit("sweep-round", "info",
+                    f"round={rnd} wall={_rnd_wall:.0f}s genuine={genuine} "
+                    f"inprog={inprog} reported={reported} verdict={verdict} "
+                    f"· {_cost_msg}")
         if verdict == "continue":
             inprog_grants = 0   # real progress — reset the in-progress backoff
         if verdict == "stop":
@@ -3072,6 +3137,17 @@ def main() -> int:
         # pass retries their now-unblocked dependents.
         if nowait and rnd < rounds:
             time.sleep(round_sleep)
+    # Second-chance: stuck 아이템은 마킹 시점의 일시적 의존이 이후 라운드에서
+    # 비워졌을 수 있다 — 딱 1회 더 DELETE (20260718 IGW 실측). 리포트보다
+    # 먼저: 회수된 아이템은 최종 리포트에서 빠져야 한다.
+    if _STUCK:
+        try:
+            reclaimed = _second_chance_stuck(client)
+            if reclaimed:
+                _oplog_emit("sweep-second-chance", "info",
+                            f"reclaimed={reclaimed} still-stuck={len(_STUCK)}")
+        except Exception as exc:  # noqa: BLE001 — 재시도가 스윕을 깨면 안 됨
+            print(f"  second-chance error (ignored): {exc}")
     # 이슈로 남은 자원 리포트 (owner 2026-07-14): the sweep stopped with
     # resources still present — a leaf mid-drain (VPC cap already clear) or a
     # deceptive re-list — so enumerate what survives instead of ending silently.
@@ -3087,6 +3163,9 @@ def main() -> int:
               f"(reported, not forced) ---")
         for iid, reason in _STUCK.items():
             print(f"  stuck: {iid} ({reason})")
+    _oplog_emit("sweep", "end",
+                f"wall={time.monotonic() - _sweep_t0:.0f}s stuck={len(_STUCK)}"
+                f"{' leftovers-reported' if report_leftovers else ''}")
     return 0
 
 
