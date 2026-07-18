@@ -3820,6 +3820,28 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   (waiver + conformance '인증 승격 절차 미문서'), 안 뜨면 백엔드 인증 연동
   결함(티켓). 오너 확인 대기.
 
+- **2026-07-18 추가 증거 (오너 콘솔 스크린샷 2장 + 스토어 대조):**
+  1. **set↔unset 비대칭 정량 확정**: 같은 클러스터·같은 HMAC 서명으로
+     `setbackup`(POST /v1/clusters/{id}/backups)은 5엔진 전부 2xx 다수
+     (verified store 관측: mysql 29·pg 40·cachestore 23·mariadb 22·epas 21)인데
+     `unsetbackup`(DELETE 동일 경로)·`removebackuphistories`(PUT /backup-histories)만
+     401 AuthNFailed — 클라이언트 서명 결함이면 POST도 죽었어야 하므로 소거.
+  2. **콘솔의 백업 해제는 DELETE가 아니라 '백업 수정' 모달의 [사용] 체크 해제**
+     (= set/modify 플레인) — 즉 콘솔은 unsetbackup DELETE를 애초에 호출하지 않는
+     것으로 보이며, DELETE /backups는 콘솔 등가 경로가 없는 고아 엔드포인트일
+     가능성. 백업 수정 모달에는 본인인증 UI 없음(단, '백업 이력 삭제' 경로는
+     별도 — 판별 미완).
+  3. **searchengine도 동일 401 재현** (오너 스크린샷, DELETE /backups·PUT
+     /backup-histories) — 패밀리가 DBaaS 5엔진+searchengine = 6상품으로 확장.
+  4. unsetbackup 문서 모델: 바디/쿼리 없음, 401이 정식 응답 코드로 등재되나
+     사유 미기술. 문서 상세 페이지는 여전히 SPA 셸(재확인 2026-07-18).
+- **판별 잔여 1건 (오너 10초 확인)**: 콘솔에서 **백업 이력 삭제**(히스토리
+  개별 삭제)를 시도할 때 본인인증(문자/OTP) 팝업이 뜨는가?
+  ⓐ 뜨면 → API 한계 확정: waiver(unsatisfiable-flow) + conformance '인증 승격
+  절차 미문서' finding. ⓑ 안 뜨고 콘솔로 삭제되면 → 그 시점 네트워크 탭의 실제
+  호출(메서드/경로/헤더)을 캡처하면 API 401과의 차이가 바로 나옴 — 백엔드 인증
+  연동 결함(SDS 티켓) 확정.
+
 ## run 6ebd 판정 — subnet 체인 CIDR·PLS 레인·500 3종 (2026-07-16)
 
 - **run 6ebd: 115 passed / 3 failed / 2 skipped** — 직전 런 실패였던 vpn·

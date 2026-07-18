@@ -223,6 +223,69 @@
       "classification": "Product Bug",
       "since": "2026-06-24",
       "note": "PrivateLink Service teardown DEADLOCK. SCF PLS can get permanently stuck in CREATING state (privatelink_service_id stays null for hours). PUT .../configurations/privatelink-services {privatelink_service_enabled:false} -> 400 scp-cloud-function.privatelink-service-not-allow-state-error ('deactivation not allowed when Creating state'). DELETE /v1/cloud-functions/{id} -> 400 scp-cloud-function.function-not-deletable-error ('Deleting allowed only when PrivateLink Service is disabled and PrivateLink Endpoint does not exist'). => stuck-CREATING PLS can neither be disabled nor force the function to delete: the function is un-teardownable via API. Live-confirmed 2026-06-24 HEAVY PL run on regrw5trg57f68be7 (9e231b01e2394d7aaa8dcca218e770cb) + regrw5trgd7ff680d (3aac2e34203a42cab56b089336bbd18d); both still stranded. Needs backend timeout of the CREATING state or console/support intervention."
+    },
+    {
+      "key": "database/mariadb/mariadbunsetbackup",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "database/epas/epasunsetbackup",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "database/cachestore/cachestoreunsetbackup",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineunsetbackup",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineremovebackuphistories",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "database/mysql/mysqlremovebackuphistories",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "database/mariadb/mariadbremovebackuphistories",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "database/postgresql/postgresqlremovebackuphistories",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "database/epas/epasremovebackuphistories",
+      "status": 401,
+      "type": "Product Bug (pending SDS inquiry)",
+      "since": "2026-07-16",
+      "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
     }
   ]
 }
