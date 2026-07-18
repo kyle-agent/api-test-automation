@@ -1,5 +1,94 @@
 {
-  "new": [],
+  "new": [
+    {
+      "endpoint": "database/mysql/mysqlupgrademajorversion",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/setalertnotifications",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "param-naming"
+      ]
+    },
+    {
+      "endpoint": "database/sqlserver/sqlserveradddrsecondary",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "database/mariadb/mariadbupgrademajorversion",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/createloggroupexporttask",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "networking/security-group/createaddressgroup",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "networking/vpc/createpublicip",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "networking/security-group/setaddressgroup",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "no-success-schema"
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/listalertnotifications",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "param-naming"
+      ]
+    },
+    {
+      "endpoint": "security/kms/kmssetaclcidr",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "container/ske/setnodepoolpreferredips",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    }
+  ],
   "regressed": [],
   "fixed": []
 }
