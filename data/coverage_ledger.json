@@ -68,36 +68,62 @@
     },
     {
       "service": "epas",
-      "covered": 4,
-      "total": 47,
-      "gap": 43,
+      "covered": 40,
+      "total": 49,
+      "gap": 9,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "epas: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [
+        "unsetbackup/removebackuphistories 401 Dbaas.Unauthorized.AuthNFailed — 전 엔진 공통 백엔드 PF (2026-07-16 재확인, 바디 정상 확인 후에도 401)",
+        "register/set/unregister-log-export-config 500 ContactAdmin — 백엔드 PF",
+        "exportlog 400 InvalidLogType(alert/audit/slow 전부) — 등록된 log-export-config 전제 추정(등록 자체가 PF 500), 엔진 공통 클래스",
+        "upgrademajorversion: 미도달(이번 런 미포함 — 다음 레버)",
+        "switchover/createrestore/otherregionreplica: 유예"
+      ],
+      "next_levers": [
+        "major-upgrade 스텝 추가 검토",
+        "exportlog: PF 해소 후"
+      ],
+      "notes": "2026-07-16 svccov-epas: epas-cluster-version-upgrade(31스텝) 라이브 pass — patchminorversion 202/showinstance 200/manualbackup 202 신규 2xx. 401/500 PF 재확인.",
+      "updated": "2026-07-16T18:40:00Z"
     },
     {
       "service": "mariadb",
-      "covered": 4,
-      "total": 46,
-      "gap": 42,
+      "covered": 40,
+      "total": 49,
+      "gap": 9,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "mariadb: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [
+        "unsetbackup/removebackuphistories 401 Dbaas.Unauthorized.AuthNFailed — 전 엔진 공통 백엔드 PF (2026-07-16 재확인, 바디 정상 확인 후에도 401)",
+        "register/set/unregister-log-export-config 500 ContactAdmin — 백엔드 PF",
+        "exportlog 400 InvalidLogType(alert/audit/slow 전부) — 등록된 log-export-config 전제 추정(등록 자체가 PF 500), 엔진 공통 클래스",
+        "switchover/createrestore/createotherregionreplica: 유예(비용/ha)"
+      ],
+      "next_levers": [
+        "exportlog: PF 해소 후"
+      ],
+      "notes": "2026-07-16 svccov-mariadb: mariadb-cluster-version-upgrade(mysql 이식) 라이브 1 passed 29:13 — 동일 4키 신규 2xx. 11.4 major는 minor 2개(mid=contents[1]), create body utf8/2866/audit_enabled bool. 티어다운 404 검증.",
+      "updated": "2026-07-16T18:40:00Z"
     },
     {
       "service": "mysql",
-      "covered": 3,
-      "total": 45,
-      "gap": 42,
+      "covered": 39,
+      "total": 48,
+      "gap": 9,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "mysql: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [
+        "unsetbackup/removebackuphistories 401 Dbaas.Unauthorized.AuthNFailed — 전 엔진 공통 백엔드 PF (2026-07-16 재확인, 바디 정상 확인 후에도 401)",
+        "register/set/unregister-log-export-config 500 ContactAdmin — 백엔드 PF",
+        "exportlog 400 InvalidLogType(alert/audit/slow 전부) — 등록된 log-export-config 전제 추정(등록 자체가 PF 500), 엔진 공통 클래스",
+        "switchover: 단일노드 404(ha_enabled 필요, 비용)",
+        "createrestore/createotherregionreplica: 추가 클러스터 과금, 유예",
+        "replica 가족 4키: 전용 클러스터 필요, 유예"
+      ],
+      "next_levers": [
+        "exportlog: log-export-config PF 해소 후 재시도",
+        "ha_enabled=true create 변형(switchover)"
+      ],
+      "notes": "2026-07-16 svccov-mysql: mysql-cluster-version-upgrade 신설(구8.0.41 create→8.4.5 major→8.4.7 patch) 라이브 2런 pass — upgrademajorversion/patchminorversion/showinstance/manualbackup 신규 2xx. patch 바디 backup_before_upgrade 필수(문서 예시 누락), removebackuphistories 바디는 backup_history_number(오타 수리).",
+      "updated": "2026-07-16T18:40:00Z"
     },
     {
       "service": "baremetal-blockstorage",
@@ -187,20 +213,20 @@
     },
     {
       "service": "cachestore",
-      "covered": 6,
-      "total": 32,
-      "gap": 26,
+      "covered": 28,
+      "total": 33,
+      "gap": 5,
       "heavy": true,
       "blockers": [
-        "heavy-prereq: 4 id-bound cluster GETs (backuphistories/commands/parametervalues/showcluster) need live cluster_id (0 clusters; 404 with placeholder).",
-        "heavy-prereq: showrequest needs request_id from async op (/v1/requests 403); 400 with placeholder.",
-        "heavy-prereq: 21 mutating need MUTATIONS+RUN_HEAVY + live cluster; cachestore-cluster-subops-guarded models them."
+        "unsetbackup/removebackuphistories 401 Dbaas.Unauthorized.AuthNFailed — 전 엔진 공통 백엔드 PF (2026-07-16 재확인, 바디 정상 확인 후에도 401)",
+        "patchminorversion: 400 (이번 런 실패 — 버전 핀/바디 트리아지 필요, 에이전트 보고 대기)",
+        "createrestore/switchovercluster: 유예(비용/ha)"
       ],
       "next_levers": [
-        "HEAVY+MUTATIONS: cachestore-cluster-subops-guarded -> ~27/32 (remove-backup-histories has known 401-with-valid-HMAC quirk)"
+        "patch-minor 400 응답 전문 트리아지 후 재시도"
       ],
-      "notes": "4->6/32. NEW: listengineversionproperties (read_chain) + listparameters (dbaas_parameter_group_id from /v1/parameter-groups). /v1/parameters needs dbaas_parameter_group_id (not parameter_group_id). 2 param groups (Redis 7, Valkey 8). cluster sub-GETs 404 with placeholder (routed OK). Added dbaas_parameter_group_id to probe_reads.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "2026-07-16 svccov-cache: showinstance 200 신규 2xx. patch-minor는 400(구minor create→patch 전략 적용에도) — 원인 트리아지 다음 세션.",
+      "updated": "2026-07-16T18:40:00Z"
     },
     {
       "service": "resourcemanager",
