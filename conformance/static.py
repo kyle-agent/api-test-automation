@@ -99,6 +99,11 @@ def analyze_docs(*, emit_findings: bool = True) -> dict:
     are endpoint-scoped. Returns the grouped findings dict.
     """
     cat = _load(CATALOG, [])
+    # Catalog entries whose doc page failed to resolve (e.g. a live 404 on the
+    # docs site) carry http_path=None; they have no route to analyse, so skip
+    # them here rather than crash (mirrors spec.coverage_gap.load_catalog —
+    # spec.summary already surfaces them separately as "unresolved").
+    cat = [e for e in cat if e.get("http_path")]
     docs = _load(DOCS, {"endpoints": {}, "models": {}})
     eps = docs.get("endpoints", {})
     models = docs.get("models", {})
@@ -313,7 +318,11 @@ def build(*, emit_findings: bool = True) -> dict:
     Returns the assembled conformance dict.
     """
     cat = _load(F / "api_catalog.json", [])
-    keys = {e["key"] for e in cat}
+    # Same unresolved-endpoint carve-out as analyze_docs()/spec.coverage_gap —
+    # an entry with no http_path was never evaluated, so counting it "green"
+    # (evaluated-clean) here would understate the true denominator elsewhere
+    # in the pipeline (dashboard.build's load_catalog already excludes it).
+    keys = {e["key"] for e in cat if e.get("http_path")}
     findings = _load(F / "findings.json", {})
     val = _load(F / "validation_findings.json", {})
 

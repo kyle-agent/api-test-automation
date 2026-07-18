@@ -65,7 +65,7 @@
         "PUT": 64
       },
       "set": {
-        "PUT": 101,
+        "PUT": 107,
         "POST": 2,
         "PATCH": 9
       },
@@ -407,6 +407,17 @@
         "database/postgresql/postgresqlsetservertype",
         "database/sqlserver/sqlserversetservertype"
       ],
+      "GET /v1/clusters/{cluster_id}/instances/{instance_name}": [
+        "data-analytics/eventstreams/eventstreamsshowinstance",
+        "data-analytics/searchengine/searchengineshowinstance",
+        "data-analytics/vertica/verticashowinstance",
+        "database/cachestore/cachestoreshowinstance",
+        "database/epas/epasshowinstance",
+        "database/mariadb/mariadbshowinstance",
+        "database/mysql/mysqlshowinstance",
+        "database/postgresql/postgresqlshowinstance",
+        "database/sqlserver/sqlservershowinstance"
+      ],
       "GET /v1/requests/{request_id}": [
         "data-analytics/eventstreams/eventstreamsshowrequest",
         "data-analytics/searchengine/searchengineshowrequest",
@@ -499,6 +510,14 @@
         "database/mysql/mysqllistbackuphistories",
         "database/postgresql/postgresqllistbackuphistories",
         "database/sqlserver/sqlserverlistbackuphistories"
+      ],
+      "POST /v1/clusters/{cluster_id}/backups/manual": [
+        "data-analytics/searchengine/searchenginemanualbackup",
+        "database/epas/epasmanualbackup",
+        "database/mariadb/mariadbmanualbackup",
+        "database/mysql/mysqlmanualbackup",
+        "database/postgresql/postgresqlmanualbackup",
+        "database/sqlserver/sqlservermanualbackup"
       ],
       "PUT /v1/clusters/{cluster_id}/backup-histories": [
         "data-analytics/searchengine/searchengineremovebackuphistories",
@@ -643,6 +662,10 @@
         "database/mysql/mysqlupgradekernel",
         "database/postgresql/postgresqlupgradekernel"
       ],
+      "PUT /v1/clusters/{cluster_id}/major-version-upgrade": [
+        "database/mariadb/mariadbupgrademajorversion",
+        "database/mysql/mysqlupgrademajorversion"
+      ],
       "POST /v1/groups": [
         "management/iam-identity-center/creategroup",
         "management/iam/creategroup"
@@ -705,6 +728,7 @@
       ],
       "cachestore, epas, eventstreams, mariadb, mysql, postgresql, searchengine, sqlserver, vertica": [
         "DELETE /v1/clusters/{cluster_id}/maintenance",
+        "GET /v1/clusters/{cluster_id}/instances/{instance_name}",
         "GET /v1/engine-versions",
         "GET /v1/engine-versions/{dbaas_engine_version_id}/properties",
         "GET /v1/requests/{request_id}",
@@ -768,6 +792,10 @@
     "items": {
       "bare_id": [
         [
+          "management/servicewatch/listalertnotifications",
+          "/v1/alerts/{id}/notifications"
+        ],
+        [
           "management/servicewatch/setalert",
           "/v1/alerts/{id}"
         ],
@@ -778,6 +806,10 @@
         [
           "management/servicewatch/setalertdescription",
           "/v1/alerts/{id}/description"
+        ],
+        [
+          "management/servicewatch/setalertnotifications",
+          "/v1/alerts/{id}/notifications"
         ],
         [
           "management/servicewatch/showalert",
@@ -833,7 +865,12 @@
   },
   "missing-endpoint-description": {
     "title": "Docs: endpoints with an empty Description",
-    "items": []
+    "items": [
+      [
+        "networking/cssdlan/setexternalcssdlannetworkchangeinfo",
+        "https://docs.e.samsungsdscloud.com/apireference/networking/cssdlan/apis/setexternalcssdlannetworkchangeinfo/1.0/"
+      ]
+    ]
   },
   "missing-param-description": {
     "title": "Docs: path/query parameters with no description",
@@ -842,7 +879,7 @@
   "no-error-response-schema": {
     "title": "Docs: error responses (4xx/5xx) never document a response body/schema",
     "items": {
-      "endpoints_without_any_error_schema": 1370,
+      "endpoints_without_any_error_schema": 1414,
       "endpoints_with_some_error_schema": 1,
       "sample": [
         "compute/virtualserver/showvirtualserverpassword",
@@ -2246,16 +2283,60 @@
         "storage/parallel-filestorage/restoresnapshot",
         "storage/parallel-filestorage/setaccessrule",
         "storage/parallel-filestorage/setvolumecapacity",
-        "storage/parallel-filestorage/showvolume"
+        "storage/parallel-filestorage/showvolume",
+        "container/ske/setnodepoolpreferredips",
+        "data-analytics/eventstreams/eventstreamsshowinstance",
+        "data-analytics/searchengine/searchenginemanualbackup",
+        "data-analytics/searchengine/searchengineshowinstance",
+        "data-analytics/vertica/verticashowinstance",
+        "database/cachestore/cachestoreshowinstance",
+        "database/epas/epasmanualbackup",
+        "database/epas/epasshowinstance",
+        "database/mariadb/mariadbmanualbackup",
+        "database/mariadb/mariadbshowinstance",
+        "database/mariadb/mariadbupgrademajorversion",
+        "database/mysql/mysqlmanualbackup",
+        "database/mysql/mysqlshowinstance",
+        "database/mysql/mysqlupgrademajorversion",
+        "database/postgresql/postgresqlmanualbackup",
+        "database/postgresql/postgresqlshowinstance",
+        "database/sqlserver/sqlserveradddrsecondary",
+        "database/sqlserver/sqlserverlistdrsecondaries",
+        "database/sqlserver/sqlservermanualbackup",
+        "database/sqlserver/sqlserverpromotedrsecondary",
+        "database/sqlserver/sqlservershowinstance",
+        "database/sqlserver/sqlserversyncdrsecondarystate",
+        "management/servicewatch/createloggroupexporttask",
+        "management/servicewatch/listalertnotifications",
+        "management/servicewatch/listalerts",
+        "management/servicewatch/listnamespacebyalerts",
+        "management/servicewatch/setalertnotifications",
+        "management/servicewatch/showalertlevelcountsbyservice",
+        "networking/loadbalancer/setlblistenercertificate",
+        "networking/loadbalancer/setlblistenerresource",
+        "networking/loadbalancer/setlblistenerrule",
+        "networking/security-group/addaddressgroupcidrs",
+        "networking/security-group/createaddressgroup",
+        "networking/security-group/deleteaddressgroup",
+        "networking/security-group/listaddressgroupcidrs",
+        "networking/security-group/listaddressgroups",
+        "networking/security-group/removeaddressgroupcidrs",
+        "networking/security-group/setaddressgroup",
+        "networking/security-group/showaddressgroup",
+        "security/configinspection/getchecklistversion",
+        "security/kms/kmssetaclcidr",
+        "security/kms/kmssetprivateacl",
+        "storage/archivestorage/deletearchivingpolicy",
+        "storage/filestorage/listvolumereplicationzones"
       ]
     }
   },
   "no-success-response-schema": {
     "title": "Docs: success (2xx) response documents no schema",
     "by_method": {
-      "DELETE": 131,
+      "DELETE": 133,
       "POST": 22,
-      "PUT": 25,
+      "PUT": 26,
       "GET": 7
     },
     "items": [
@@ -2522,7 +2603,7 @@
       [
         "compute/virtualserver/updateserverinterface",
         "PUT",
-        "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/updateserverinterface/1.3/"
+        "https://docs.e.samsungsdscloud.com/apireference/compute/virtualserver/apis/updateserverinterface/1.4/"
       ],
       [
         "compute/virtualserver/updateservervolume",
@@ -2652,12 +2733,12 @@
       [
         "data-analytics/data-flow/createdataflow",
         "POST",
-        "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-flow/apis/createdataflow/1.1/"
+        "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-flow/apis/createdataflow/1.2/"
       ],
       [
         "data-analytics/data-flow/createdataflowserviceconsole",
         "POST",
-        "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-flow/apis/createdataflowserviceconsole/1.1/"
+        "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-flow/apis/createdataflowserviceconsole/1.2/"
       ],
       [
         "data-analytics/data-flow/deletedataflow",
@@ -2687,12 +2768,12 @@
       [
         "data-analytics/data-ops/createdataops",
         "POST",
-        "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-ops/apis/createdataops/1.1/"
+        "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-ops/apis/createdataops/1.2/"
       ],
       [
         "data-analytics/data-ops/createdataopsservice",
         "POST",
-        "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-ops/apis/createdataopsservice/1.1/"
+        "https://docs.e.samsungsdscloud.com/apireference/data-analytics/data-ops/apis/createdataopsservice/1.2/"
       ],
       [
         "data-analytics/data-ops/deletedataopsservice",
@@ -3183,6 +3264,21 @@
         "storage/parallel-filestorage/setvolumecapacity",
         "PUT",
         "https://docs.e.samsungsdscloud.com/apireference/storage/parallel-filestorage/apis/setvolumecapacity/1.0/"
+      ],
+      [
+        "networking/security-group/deleteaddressgroup",
+        "DELETE",
+        "https://docs.e.samsungsdscloud.com/apireference/networking/security-group/apis/deleteaddressgroup/1.1/"
+      ],
+      [
+        "networking/security-group/setaddressgroup",
+        "PUT",
+        "https://docs.e.samsungsdscloud.com/apireference/networking/security-group/apis/setaddressgroup/1.1/"
+      ],
+      [
+        "storage/archivestorage/deletearchivingpolicy",
+        "DELETE",
+        "https://docs.e.samsungsdscloud.com/apireference/storage/archivestorage/apis/deletearchivingpolicy/1.2/"
       ]
     ]
   },
@@ -3197,8 +3293,8 @@
   "model-fields-no-description": {
     "title": "Docs: model fields with no description",
     "items": {
-      "total_fields_missing_desc": 489,
-      "models_affected": 432,
+      "total_fields_missing_desc": 525,
+      "models_affected": 463,
       "sample": [
         [
           "compute/virtualserver/serverpasswordrequest",
@@ -6000,6 +6096,197 @@
           "storage/parallel-filestorage/volumelistresponse",
           [
             "parallel_filestorages"
+          ]
+        ],
+        [
+          "networking/loadbalancer/lblistenercreaterequestv1dot4",
+          [
+            "listener"
+          ]
+        ],
+        [
+          "networking/loadbalancer/loadbalancercreaterequestv1dot4",
+          [
+            "loadbalancer"
+          ]
+        ],
+        [
+          "security/configinspection/diagnosisobjectrequestv1dot3",
+          [
+            "auth_key_request",
+            "schedule_request"
+          ]
+        ],
+        [
+          "storage/filestorage/volumecreaterequestv1dot2",
+          [
+            "tags"
+          ]
+        ],
+        [
+          "storage/parallel-filestorage/volumecreaterequestv1dot1",
+          [
+            "tags"
+          ]
+        ],
+        [
+          "container/ske/clustershowresponsev1dot5",
+          [
+            "cluster"
+          ]
+        ],
+        [
+          "container/ske/nodepoolshowresponsev1dot5",
+          [
+            "nodepool"
+          ]
+        ],
+        [
+          "database/cachestore/redisclusterdetailresponsev1dot1",
+          [
+            "init_config_option",
+            "instance_groups"
+          ]
+        ],
+        [
+          "database/sqlserver/sqlserverclusterdetailresponsev1dot1",
+          [
+            "init_config_option",
+            "instance_groups"
+          ]
+        ],
+        [
+          "management/servicewatch/alertnotificationspageresponse",
+          [
+            "alert_notifications"
+          ]
+        ],
+        [
+          "management/servicewatch/namespacelistbyalertsresponse",
+          [
+            "namespaces"
+          ]
+        ],
+        [
+          "networking/loadbalancer/lblistenercertificatesetrequest",
+          [
+            "listener"
+          ]
+        ],
+        [
+          "networking/loadbalancer/lblistenerresourcesetrequest",
+          [
+            "listener"
+          ]
+        ],
+        [
+          "networking/loadbalancer/lblistenerrulesetrequest",
+          [
+            "listener"
+          ]
+        ],
+        [
+          "networking/loadbalancer/lblistenershowresponsev1dot4",
+          [
+            "listener"
+          ]
+        ],
+        [
+          "networking/loadbalancer/loadbalancerlistresponsev1dot4",
+          [
+            "loadbalancers"
+          ]
+        ],
+        [
+          "networking/loadbalancer/loadbalancershowresponsev1dot4",
+          [
+            "loadbalancer"
+          ]
+        ],
+        [
+          "networking/loadbalancer/memberwithhealthstatelistresponsev1dot4",
+          [
+            "members"
+          ]
+        ],
+        [
+          "networking/security-group/addressgrouplistresponse",
+          [
+            "address_groups"
+          ]
+        ],
+        [
+          "networking/security-group/addressgroupshowresponse",
+          [
+            "address_group"
+          ]
+        ],
+        [
+          "networking/security-group/securitygrouprulelistresponsev1dot1",
+          [
+            "security_group_rules"
+          ]
+        ],
+        [
+          "networking/security-group/securitygroupruleshowresponsev1dot1",
+          [
+            "security_group_rule"
+          ]
+        ],
+        [
+          "security/configinspection/checklistversionresponse",
+          [
+            "contents"
+          ]
+        ],
+        [
+          "security/configinspection/configinspectionlistresponsev1dot3",
+          [
+            "summary_responses"
+          ]
+        ],
+        [
+          "security/configinspection/diagnosisobjectdetailresponsev1dot3",
+          [
+            "auth_key_responses",
+            "schedule_response",
+            "summary_responses"
+          ]
+        ],
+        [
+          "security/configinspection/diagnosisresultdetailresponsev1dot3",
+          [
+            "result_detail_list"
+          ]
+        ],
+        [
+          "security/configinspection/diagnosisresultlistresponsev1dot3",
+          [
+            "diagnosis_result_responses"
+          ]
+        ],
+        [
+          "security/kms/keyshowresponseincludeprivateaclandsrnv1dot4",
+          [
+            "key"
+          ]
+        ],
+        [
+          "security/kms/keyshowresponsev1dot4",
+          [
+            "key"
+          ]
+        ],
+        [
+          "storage/filestorage/replicationlistresponsev1dot2",
+          [
+            "replications"
+          ]
+        ],
+        [
+          "storage/filestorage/volumelistresponsev1dot2",
+          [
+            "filestorages"
           ]
         ]
       ]

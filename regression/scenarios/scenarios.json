@@ -695,8 +695,13 @@
             409,
             404
           ],
-          "wait": 30,
-          "_note": "BLIND-SETTLE 접합 2026-07-16 (run 7a26: method/path 없는 단독 wait 스텝은 엔진이 step['path'] KeyError로 크래시 — 22호출 fail 0인데 lifecycle failed의 원인): delete 스텝 선행 wait:30으로 접음. || READ-PLANE BUG 우회 2026-07-16 (라이브 프로브 실증): PRIVATE subnet은 생성(v1.3 enum) 202 성공하지만 show/list가 v1.2 enum(GENERAL/LOCAL/VPC_ENDPOINT)이라 404 'Not found with ID With Invalid Type' — API로 읽을 수 없는 유령 (conformance 중대 결함, req-65a36c09…). show-poll 대신 30s 블라인드 settle; 삭제는 정상(202 실증)."
+          "_note": "DELETE-LADDER 2026-07-18 (run 5c89 실측: 30s 블라인드 대기로는 부족 — subnet ACTIVE 전이 직렬화 4~5분인데 PRIVATE는 읽기 플레인 버그로 상태 확인 불가 → CREATING 중 DELETE 400 사망): 30s×20 재시도로 '삭제 가능해질 때까지' 대기. 400/409만 재시도라 WAF-안전. || BLIND-SETTLE 접합 2026-07-16 (run 7a26: method/path 없는 단독 wait 스텝은 엔진이 step['path'] KeyError로 크래시 — 22호출 fail 0인데 lifecycle failed의 원인): delete 스텝 선행 wait:30으로 접음. || READ-PLANE BUG 우회 2026-07-16 (라이브 프로브 실증): PRIVATE subnet은 생성(v1.3 enum) 202 성공하지만 show/list가 v1.2 enum(GENERAL/LOCAL/VPC_ENDPOINT)이라 404 'Not found with ID With Invalid Type' — API로 읽을 수 없는 유령 (conformance 중대 결함, req-65a36c09…). show-poll 대신 30s 블라인드 settle; 삭제는 정상(202 실증).",
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 20,
+          "retry_interval": 30
         },
         {
           "name": "wait-subnet-private-gone",
@@ -5215,7 +5220,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5286,7 +5291,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5331,7 +5336,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5375,7 +5380,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5435,7 +5440,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5483,7 +5488,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5526,7 +5531,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5588,7 +5593,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5739,7 +5744,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5793,7 +5798,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5864,7 +5869,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5906,7 +5911,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -5947,7 +5952,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6001,7 +6006,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6059,7 +6064,7 @@
             "refire": {
               "method": "DELETE",
               "path": "/v1/clusters/{cluster_id}",
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "DELETE_FAILED",
                 "ERROR_DELETING",
@@ -6361,7 +6366,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6465,7 +6470,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6532,7 +6537,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6608,7 +6613,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6686,7 +6691,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6767,7 +6772,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6895,7 +6900,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6941,7 +6946,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -6995,7 +7000,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -7066,7 +7071,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -7107,7 +7112,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -7147,7 +7152,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -7201,7 +7206,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -7259,7 +7264,7 @@
             "refire": {
               "method": "DELETE",
               "path": "/v1/clusters/{cluster_id}",
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "DELETE_FAILED",
                 "ERROR_DELETING",
@@ -7791,7 +7796,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -7821,7 +7826,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -7851,7 +7856,7 @@
           "poll": {
             "field": "$.service_state",
             "refire": {
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "UNKNOWN"
               ],
@@ -7977,7 +7982,7 @@
             "refire": {
               "method": "DELETE",
               "path": "/v1/clusters/{maria_cid}",
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "DELETE_FAILED",
                 "ERROR_DELETING",
@@ -8007,7 +8012,7 @@
             "refire": {
               "method": "DELETE",
               "path": "/v1/clusters/{epas_cid}",
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "DELETE_FAILED",
                 "ERROR_DELETING",
@@ -8037,7 +8042,7 @@
             "refire": {
               "method": "DELETE",
               "path": "/v1/clusters/{cache_cid}",
-              "field": "$.service_state",
+              "field": "$.cluster.service_state",
               "when": [
                 "DELETE_FAILED",
                 "ERROR_DELETING",

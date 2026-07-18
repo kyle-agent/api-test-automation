@@ -139,6 +139,11 @@ def findings_to_conf(findings: list[dict]) -> dict:
 
 def load_catalog(path):
     cat = json.load(open(path))
+    # Catalog entries whose doc page failed to resolve (e.g. a live 404 on the
+    # docs site) carry http_path=None; they have no route to normalise, so skip
+    # them here rather than crash (mirrors spec.coverage_gap.load_catalog —
+    # spec.summary already surfaces them separately as "unresolved").
+    cat = [e for e in cat if e.get("http_path")]
     for e in cat:
         e["_norm"] = norm_path(e["http_path"])
     return cat
