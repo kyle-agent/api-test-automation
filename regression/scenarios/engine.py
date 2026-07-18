@@ -807,7 +807,16 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
                     pass
                 return resp
         if refire and refire_left > 0 and resp.status < 400 and resp.body:
+            # 엔벨로프 이중화 (2026-07-18 실측: dbaas show 바디가 엔진별로
+            # 플랫($.service_state, eventstreams)과 엔벨로프($.cluster.
+            # service_state, postgresql)로 갈린다) — 설정 필드가 빗나가면
+            # cluster-엔벨로프를 토글한 변형도 본다. refire 불발 웨지 방지.
             _state = _jsonpath_get(resp.body, refire["field"])
+            if _state is None:
+                _f = refire["field"]
+                _alt = ("$." + _f[len("$.cluster."):] if _f.startswith("$.cluster.")
+                        else "$.cluster." + _f[2:] if _f.startswith("$.") else _f)
+                _state = _jsonpath_get(resp.body, _alt)
             if _state in refire.get("when", []):
                 refire_left -= 1
                 _rpath = _fill(refire["path"], ctx)

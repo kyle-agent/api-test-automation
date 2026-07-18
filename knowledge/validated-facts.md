@@ -3935,3 +3935,14 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - 수동 재-DELETE는 202 즉시 수락 (FAILED 상태 재삭제 즉효라는 기지 사실 재확인).
 - nvs PRIVATE: 30s 블라인드로는 ACTIVE 직렬화(4~5분)를 못 기다림 + 읽기 불가
   → delete를 400/409 사다리(30s×20)로 '삭제 가능해질 때까지' 대기로 전환.
+
+## dbaas show 엔벨로프는 엔진별 상이 + UNKNOWN 복구 실측 (2026-07-18)
+
+- **show 바디 구조가 엔진별로 다르다**: eventstreams=플랫($.service_state),
+  postgresql=엔벨로프($.cluster.service_state) — refire/폴 필드를 데이터로
+  일괄 통일하면 반대쪽이 깨진다. 엔진이 refire 필드 미스 시 cluster-엔벨로프
+  토글 변형을 재시도하도록 이중화 (data는 불변).
+- **UNKNOWN 웨지 복구 실측**: es 클러스터가 stop/start 서브옵 후 45분
+  service_state=UNKNOWN → `POST /v1/clusters/{id}/sync-state` 202 → 수십 초
+  내 RUNNING 복귀. UNKNOWN을 보면 sync-state가 정답 (엔진 refire when에
+  UNKNOWN+sync-state 배선된 폴은 자동, 아니면 수동).
