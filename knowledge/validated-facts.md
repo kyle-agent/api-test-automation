@@ -3841,6 +3841,11 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   절차 미문서' finding. ⓑ 안 뜨고 콘솔로 삭제되면 → 그 시점 네트워크 탭의 실제
   호출(메서드/경로/헤더)을 캡처하면 API 401과의 차이가 바로 나옴 — 백엔드 인증
   연동 결함(SDS 티켓) 확정.
+- **판별 완료 (2026-07-18, 오너 콘솔 실측 — ⓐ 확정)**: 백업 이력(파일) 삭제
+  모달이 "로그인 사용자의 휴대전화로 인증 번호가 발송됩니다" — **SMS 본인인증
+  필수**. Open API에 이 인증 승격 컨텍스트 전달 수단 없음 → 401은 설계상 한계.
+  처분: PF-48 등재 + unsetbackup/removebackuphistories 패밀리 waiver
+  (unsatisfiable-flow) 오너 승인 대기. 코드 재시도 영구 금지.
 
 ## run 6ebd 판정 — subnet 체인 CIDR·PLS 레인·500 3종 (2026-07-16)
 
