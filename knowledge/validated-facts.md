@@ -4118,3 +4118,16 @@ OWNER-DECISION 45 · FIX-PENDING-VALIDATION 6(aimlops) · 진성 수리대상 ~9
   배선. 좌초 복구 절차: PLE CANCEL→delete → fn delete → PLS delete (전부 2xx 실측).
 - **dns lifecycle 그린(30:02)**: activateprivatedns 202가 엔진 경유 공식 기록
   (norm_path 호스트-스트립로 카탈로그 귀속), east1 teardown 스텝 작동, 양 리전 0.
+
+### 누수 사후분석 + 감시 교훈 (run e401c/e401e)
+
+- **VPC 잔류 근본원인**: privatelink lifecycle 중단(approve 500 미-expect) 시
+  cleanup 등록은 전부 발화했으나 **PLE 인터락(REQUESTING은 CANCEL 없이 삭제
+  불가 → PLS 409 → subnet/vpc 연쇄 409)**에 cleanup의 3×20s 사다리가 패배.
+  수리: ①500을 expects에 편입해 중단 자체 제거(티어다운 스텝 도달 보장),
+  ②CANCEL-선행 티어다운 스텝(apigw+scf) 배선, ③잔여는 reconciler(TTL 만료
+  후)가 회수. 수동 좌초 복구 전 절차는 위 privatelink 블록.
+- **감시 함정**: `/v1/vpcs` list 엔벨로프는 `vpcs[]`+`count` (`contents` 아님)
+  — contents 가정 코드는 **항상 거짓 0**을 보고한다(이번 세션 자체 점검이 이
+  함정에 빠져 watcher가 실누수를 잡아줌). scf PLE list의 id 필드는
+  `endpoint_id`. private-dns는 `private_dns[]`. 리스트 파싱은 raw 확인 후.
