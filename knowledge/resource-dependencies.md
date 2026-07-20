@@ -1,5 +1,12 @@
 # Resource dependency & attach/detach test patterns (confirmed domain knowledge)
 
+> **스냅샷 주의 (2026-07-20 재대조):** 아래 "Current coverage vs gaps" 표와
+> "Proposed scenario work"는 **2026-06-09 기준**이다 — 이후 vs-port 6체인
+> (create-port-subnet→map SG→attach/detach→delete-port-subnet), 볼륨 transfer
+> 흡수 등으로 상당수 갭이 닫혔다. 현행 정본은 `knowledge/formal/resources/`
+> (모델) + `regression/scenarios/lifecycles/` (구현)이며, 이 문서는 패턴
+> 설명(창조 순서 DAG·attach/detach 원칙)의 배경 자료로 남긴다.
+
 > Confirmed creation-order prerequisites and attach/detach lifecycles the CRUD
 > scenarios must exercise. Recorded in git so scenarios encode real dependency
 > order (a create that omits a prerequisite is a wrong test, not a backend bug).

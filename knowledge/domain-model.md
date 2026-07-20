@@ -5,7 +5,8 @@ The shape of the platform the suite tests. Source of truth for counts:
 
 ## Scale
 
-- **1,372 endpoints**, all resolved (0 unresolved).
+- **1,416 endpoints** (2026-07 spec bump), 1,415 resolved / 1 unresolved —
+  live: `python -m spec.summary`.
 - 15 categories per the docs; **13** present in the catalog today.
 - Methods: GET 527 · POST 383 · PUT 244 · DELETE 209 · PATCH 9.
 
