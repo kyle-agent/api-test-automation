@@ -35,9 +35,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "reports" / "results"
 OUT_DIR = ROOT / "reports" / "optimizer"        # per-run reports (ephemeral, gitignored)
-# Trend history lives under data/ (TRACKED) so multi-day/cross-session analysis
-# survives container resets — reports/ is gitignored. The optimizer agent commits
-# new rows as part of its normal run.
+# Trend history lives under data/optimizer/ but history.jsonl itself is
+# GITIGNORED (.gitignore — 2026-07 cleanup decision): rows survive only within
+# one container's lifetime unless the optimizer agent deliberately commits a
+# curated snapshot. Cross-day trending therefore needs the committed
+# durations.json / reports, not this file. (Docstring corrected 2026-07-20 —
+# it previously claimed TRACKED.)
 HIST = ROOT / "data" / "optimizer" / "history.jsonl"
 
 
@@ -83,8 +86,25 @@ def analyze(obs: list[dict], n_workers: int) -> dict:
     cats = Counter(o.get("category") for o in obs)
     sources = Counter(o.get("source") for o in obs)
     total = len(obs)
-    fails = [o for o in obs if o.get("category") == "fail"]
+    all_fails = [o for o in obs if o.get("category") == "fail"]
     softs = [o for o in obs if o.get("category") == "soft"]
+
+    # Baseline-aware fail accounting (optimizer lead 2026-07-20): known/muted
+    # backend bugs (data/baselines/known_issues.json — same source dashboard/
+    # build.py consults) must not re-flag as RECURRING every run, and the
+    # scenario-alias twin row ("lifecycle:step" key) of the same HTTP call must
+    # not double-count. fail_rate == the ACTIONABLE rate; the muted/alias
+    # volume is reported separately as fail_known.
+    try:
+        with open(Path(__file__).resolve().parent.parent
+                  / "data" / "baselines" / "known_issues.json") as _bf:
+            _baselined = {i.get("key") for i in json.load(_bf).get("issues", [])}
+    except Exception:
+        _baselined = set()
+    fails = [o for o in all_fails
+             if ":" not in (o.get("endpoint_key") or "")
+             and o.get("endpoint_key") not in _baselined]
+    fail_known = len(all_fails) - len(fails)
 
     # recurring problems: same endpoint failing/softing repeatedly == a fixable
     # pattern (missing param default, wrong body) rather than a one-off.
@@ -113,7 +133,8 @@ def analyze(obs: list[dict], n_workers: int) -> dict:
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "total": total,
-        "ok": cats.get("ok", 0), "soft": cats.get("soft", 0), "fail": cats.get("fail", 0),
+        "ok": cats.get("ok", 0), "soft": cats.get("soft", 0), "fail": len(fails),
+        "fail_known": fail_known,
         "fail_rate": round(len(fails) / total, 4) if total else 0.0,
         "mean_ms": round(statistics.mean(elapsed), 1) if elapsed else 0.0,
         "p95_ms": round(_percentile(elapsed, 95), 1),
@@ -222,8 +243,12 @@ def _leads(a: dict, audit: dict | None) -> list[str]:
                      f"serializing. Raise -n, or split long scenarios so workers don't idle.")
     if a["fail_by_ep"]:
         top = ", ".join(f"{k}×{n}" for k, n in a["fail_by_ep"][:5])
-        leads.append(f"RECURRING FAILS: {top} — fix at the source (param default, "
-                     f"body shape, or baseline if a real backend bug).")
+        leads.append(f"RECURRING FAILS (actionable, baseline-excluded): {top} — fix "
+                     f"at the source (param default, body shape, or baseline if a "
+                     f"real backend bug).")
+    if a.get("fail_known"):
+        leads.append(f"KNOWN/MUTED FAILS: {a['fail_known']} observation(s) matched "
+                     f"known_issues.json or were alias twins — excluded from fail_rate.")
     if a["p95_ms"] and a["mean_ms"] and a["p95_ms"] > 4 * a["mean_ms"]:
         leads.append(f"LONG TAIL: p95 {a['p95_ms']}ms ≫ mean {a['mean_ms']}ms — a "
                      f"few slow endpoints dominate wall-time; see slowest[] (retry/timeout tune).")

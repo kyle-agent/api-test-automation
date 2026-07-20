@@ -258,6 +258,13 @@
       "type": "Product Bug (pending SDS inquiry)",
       "since": "2026-07-16",
       "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
+    },
+    {
+      "key": "application-service/apigateway/approveprivatelinkendpoint",
+      "status": 500,
+      "type": "Product Bug",
+      "since": "2026-07-20",
+      "note": "PF-52: PUT /v1/privatelink-endpoints/{id}/approval → 500 ContactAdminForAssistance on a settled REQUESTING PLE (MANUAL PLS, valid PRIVATE api_id) — REQUESTING settle gate + 4x10s retry ladder exhausted every attempt (runs 20260720-local-e401c/e401e). Same-account approve works on the vpc twin family (2026-06-24) → apigw approval-plane specific. scf sibling (compute/scf/approveprivatelinkendpoint) baselined 2026-06-24. Un-baseline when SDS resolves; request/CANCEL/RE_REQUEST 200s stay live evidence."
     }
   ],
   "_resolved_note_2026_07_20": "registerlogexportconfig 4엔진 known-issue 해제: '500 ContactAdmin PF'의 진범은 요청 바디의 access_key/secret_key 빈 문자열(500-on-empty-input 클래스)이었음 — {scp_access_key} 토큰화 후 run 20260720-local-e401f에서 4엔진 register/set/export/unregister 전 키 202 라이브 검증. 빈 입력에 500을 주는 백엔드 행위 자체는 conformance 결함으로 존치(500-on-empty-input class)."
