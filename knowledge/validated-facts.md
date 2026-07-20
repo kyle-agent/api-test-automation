@@ -4103,3 +4103,18 @@ OWNER-DECISION 45 · FIX-PENDING-VALIDATION 6(aimlops) · 진성 수리대상 ~9
 - **servicewatch ingest**: 등록 네임스페이스가 listmetricinfos(POST /v1/metrics,
   {"namespace_name":...})로 count 18 조회되는 상태에서도 전 표현 400 → PF-50
   등재 (기존 07-16 exact-match 실험의 격상판).
+
+### privatelink 최종 판정 (run e401e, 3차)
+
+- **apigw**: PLS 202·PLE create/set 200·request(CANCEL→RE_REQUEST) 200×2 그린.
+  **approve = PF-52 확정** — REQUESTING settle 게이트+500 사다리 후에도 전 시도
+  500 ContactAdmin (vpc 패밀리 approve는 같은계정 2xx라 apigw 승인 플레인 고유).
+  connect 2키는 ACTIVE 도달 불가 연쇄(승인 결함 해소 시 자동 회수). 티어다운
+  인터락 검증: REQUESTING delete 400 → CANCEL 200→CANCELED→delete 204 (배선 완료).
+- **scf**: create PLE 200(MANUAL로 처음 뚫림)·request 200×2. **approve/connect =
+  PF-53 확정** (같은 id에 request 200 vs approval/connection 404 — lookup-scope
+  분열, 사전 선언 판정 기준 충족). LIST의 id 필드는 `endpoint_id`(id 아님).
+  scf PLE 삭제도 REQUESTING 400 → CANCEL 탈출 검증, cancel-before-delete-scf-ple
+  배선. 좌초 복구 절차: PLE CANCEL→delete → fn delete → PLS delete (전부 2xx 실측).
+- **dns lifecycle 그린(30:02)**: activateprivatedns 202가 엔진 경유 공식 기록
+  (norm_path 호스트-스트립로 카탈로그 귀속), east1 teardown 스텝 작동, 양 리전 0.

@@ -11,18 +11,38 @@
           "name": "list-volumes",
           "method": "GET",
           "path": "/v1/volumes",
-          "expect_status": [200],
-          "capture_soft": {"volume_id": "$.parallel_filestorages[0].id"},
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "volume_id": "$.parallel_filestorages[0].id"
+          },
           "_note": "LIVE 200 2026-06-29 (재확인 2026-07-08: {count:0, parallel_filestorages:[]}). Routed to parallel-filestorage host via lifecycle service (storage/parallel-filestorage). capture_soft volume_id 추가(2026-07-08): 계정에 PFS 볼륨이 존재하면 아래 list-access-rules가 실ID로 200을 얻도록 공급."
         },
         {
           "name": "list-access-rules",
           "method": "GET",
           "path": "/v1/volumes/{volume_id}/access-rules",
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "optional": true,
           "group": "pfs-read",
           "_note": "GAP 편입 2026-07-08 (storage/parallel-filestorage/listaccessrule, b-class id-bound read). pfs는 verify 생성 체인 부재(쓰기 전부 probe 레인) — 실ID 공급원 없음: 기존 볼륨이 있을 때만 200, 계정 볼륨 0개(live 2026-07-08)면 {volume_id} 미해석 → 리터럴 세그먼트로 호출되어 404 (live 캘리브레이션 2026-07-08: 가짜 uuid·리터럴 {volume_id} 모두 404 parallel-filestorage.Notfound.volume). expect [200,404]+optional로 어느 쪽이든 기록만 하고 런은 안 깨짐. 상시 200 전환은 PFS 볼륨(1TB+, billable) verify 체인 신설이 전제 — C4 과제."
+        },
+        {
+          "name": "list-snapshots",
+          "method": "GET",
+          "path": "/v1/snapshots?volume_id={volume_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "pfs-read",
+          "_note": "GAP 편입 2026-07-20 (storage/parallel-filestorage/listsnapshots). 라이브 판정: bare 호출은 400 ValidationError 'volume_id Field required'(필수 쿼리), 정형 id면 볼륨-스코프 정상 의미론(가짜 id는 404 Notfound.volume). 계정 볼륨 0(PFS 볼륨=과금, waiver 후보)이라 {volume_id} 미해석 리터럴 → 404 기록. 볼륨이 생기는 순간 실ID로 200."
         }
       ]
     },
@@ -38,7 +58,14 @@
           "method": "PUT",
           "path": "/v1/volumes/00000000-0000-0000-0000-0000{unique}/access-rules",
           "json": {},
-          "expect_status": [400, 401, 403, 404, 409, 422],
+          "expect_status": [
+            400,
+            401,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "pfs-c2-waiver",
           "_note": "waiver 이행: 호출 증거(4xx). PUT /v1/volumes/{volume_id}/access-rules (setaccessrule) — {unique}(8-hex 빌트인)로 끝나는 존재하지 않는 uuid + body {} → 404 기대(같은 path GET 가짜 uuid live 404 2026-07-08). expect에 2xx 불포함: 만에 하나 2xx면 시끄럽게 실패해야 함(가짜 id라 구조적으로 불가)."

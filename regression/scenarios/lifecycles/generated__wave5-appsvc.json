@@ -1303,6 +1303,45 @@
           "_note": "run-0099: function DEPLOYING/PLE CREATING 중 400(409 의미) — settle 사다리."
         },
         {
+          "name": "cancel-before-delete-scf-ple",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/request",
+          "json": {
+            "type": "CANCEL"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "scf-ple",
+          "_note": "scf PLE도 REQUESTING은 삭제 불가(2026-07-20 실측: CANCEL 200→CANCELED→delete 204→fn 204→PLS 202 라이브 검증). 다른 상태면 400 무해. LIST의 id 필드는 endpoint_id."
+        },
+        {
+          "name": "wait-scf-ple-canceled",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints",
+          "expect_status": [
+            200,
+            404
+          ],
+          "optional": true,
+          "group": "scf-ple",
+          "poll": {
+            "field": "$.privatelink_endpoints[0].state",
+            "until": [
+              "CANCELED"
+            ],
+            "timeout": 120,
+            "interval": 10,
+            "allow_timeout": true
+          }
+        },
+        {
           "name": "delete-scf-privatelink-endpoint",
           "service": "scf",
           "method": "DELETE",
