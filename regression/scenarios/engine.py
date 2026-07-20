@@ -1077,6 +1077,9 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # 치환과 함께 사용: "{epoch_now}" 단독 값은 int로 들어간다.
         "epoch_now": str(int(time.time())),
         "epoch_1h_ago": str(int(time.time()) - 3600),
+        # OTLP 계열(servicewatch /v1/metrics/custom)은 time_unix_nano 나노초 —
+        # 하드코딩 과거값은 ingest 400의 원인 (2026-07-20 트리아지).
+        "epoch_now_ns": str(int(time.time()) * 1_000_000_000),
         # cloudmonitoring event/v2 계열은 (a) datetime 형식(…T00:00:00.000Z)만
         # 받고 (b) queryEndDt가 미래면 400 InvalidInputValue — 라이브 이분탐색
         # 실증 2026-07-11 (date-only도, 오늘 23:59Z 끝도 400; 1시간 전 끝은 200).

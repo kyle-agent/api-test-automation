@@ -284,7 +284,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs",
           "json": {
-            "access_key": "",
+            "access_key": "{scp_access_key}",
             "bucket_name": "regrcoveragebucket",
             "delete_on_export": true,
             "log_type": "general",
@@ -292,7 +292,7 @@
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
-            "secret_key": ""
+            "secret_key": "{scp_secret_key}"
           },
           "expect_status": [
             200,
@@ -312,13 +312,13 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
           "json": {
-            "access_key": "",
+            "access_key": "{scp_access_key}",
             "delete_on_export": true,
             "schedule_day_of_month": "28",
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
-            "secret_key": ""
+            "secret_key": "{scp_secret_key}"
           },
           "expect_status": [
             200,
@@ -1201,6 +1201,125 @@
           }
         },
         {
+          "name": "create-restore",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {
+            "allowable_ip_addresses": [],
+            "backup_history_number": "{backup_history_number}",
+            "backup_recovery_time": "",
+            "block_storage_groups": [],
+            "instance_name_prefix": "regrrst",
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "name": "regrrst{ualpha}",
+            "server_type_name": "{db_server_type}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "restore",
+          "capture_soft": {
+            "restored_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{restored_cluster_id}"
+          },
+          "_note": "database/postgresql/postgresqlcreaterestore frontier (400: placeholder/absent backup_history_number all prior runs). Real {backup_history_number} captured 2 steps up from the VERIFIED manual-backup; restore = full re-provision of a NEW cluster (~9-10min p50) deleted in-group below + cleanup belt. Tolerant expect: first live attempt records without red."
+        },
+        {
+          "name": "wait-restored-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{restored_cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "restore",
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{restored_cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "delete-restored-cluster",
+          "method": "DELETE",
+          "path": "/v1/clusters/{restored_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "restore",
+          "retry_on_status": [
+            400,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "wait-restored-gone",
+          "method": "GET",
+          "path": "/v1/clusters/{restored_cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "optional": true,
+          "group": "restore",
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 900,
+            "interval": 30
+          }
+        },
+        {
           "name": "remove-backup-histories",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
@@ -1249,7 +1368,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs",
           "json": {
-            "access_key": "",
+            "access_key": "{scp_access_key}",
             "bucket_name": "apitest-logsink",
             "delete_on_export": true,
             "log_type": "alert",
@@ -1257,7 +1376,7 @@
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
-            "secret_key": ""
+            "secret_key": "{scp_secret_key}"
           },
           "expect_status": [
             200,
@@ -1338,13 +1457,13 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
           "json": {
-            "access_key": "",
+            "access_key": "{scp_access_key}",
             "delete_on_export": true,
             "schedule_day_of_month": null,
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "WEEK",
             "schedule_hour": "12",
-            "secret_key": ""
+            "secret_key": "{scp_secret_key}"
           },
           "expect_status": [
             200,
@@ -1434,6 +1553,63 @@
           ],
           "optional": true,
           "group": "minor-patch",
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "patch-minor-version-bare",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {
+            "backup_before_upgrade": false,
+            "software_version": "17.7"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "minor-patch-bare",
+          "_note": "postgresqlpatchminorversion attempt 2/2: bare numeric '17.7'. Differential: epas twin (bare 16.11) VERIFIED run 6954; pg catalog-verbatim 'COMMUNITY 17.7' 400'd same run — pg is the only engine whose catalog software_version carries a product prefix. Hardcoded = newest COMMUNITY 17 minor live 2026-07-20; re-derive on catalog churn. If attempt 1 already 2xx'd this records the known 400 Unpatchable (tolerated)."
+        },
+        {
+          "name": "wait-after-minor-patch-bare",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "minor-patch-bare",
           "poll": {
             "field": "$.service_state",
             "until": [

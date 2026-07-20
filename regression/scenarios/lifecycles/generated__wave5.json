@@ -509,7 +509,7 @@
                                   }
                                 }
                               ],
-                              "time_unix_nano": 1780272000000000000
+                              "time_unix_nano": "{epoch_now_ns}"
                             }
                           ]
                         }
@@ -524,7 +524,7 @@
             202,
             400
           ],
-          "_note": "live 400 {message: SWT_CUSTOM_NAMESPACE} (run 27452095757, run a690 재현). 판정 2026-07-16 (soft-4xx 원인규명, 라이브 프로브 9종 소진): attribute key(namespace/service.namespace/scp.namespace/Namespace), value(MyCustom/regr·regr·MyCustom/filestorage), datapoint-level namespace, 빈 attributes, camelCase 전신, 현재 timestamp — 전부 동일 400 SWT_CUSTOM_NAMESPACE. 바디 형태 무관 + 같은 네임스페이스의 meta 생성 200·data readback 200(status Completed) 실측 → 메타 플레인엔 네임스페이스가 실존하나 ingest 플레인이 계정/에이전트 등록 수준에서 거부하는 것으로 판정 (콘솔 ServiceWatch agent 프로비저닝 전제 유력 — owner 확인 필요, 바디 수리로는 해소 불가). [202,400] 관용 유지"
+          "_note": "live 400 {message: SWT_CUSTOM_NAMESPACE} (run 27452095757, run a690 재현). 판정 2026-07-16 (soft-4xx 원인규명, 라이브 프로브 9종 소진): attribute key(namespace/service.namespace/scp.namespace/Namespace), value(MyCustom/regr·regr·MyCustom/filestorage), datapoint-level namespace, 빈 attributes, camelCase 전신, 현재 timestamp — 전부 동일 400 SWT_CUSTOM_NAMESPACE. 바디 형태 무관 + 같은 네임스페이스의 meta 생성 200·data readback 200(status Completed) 실측 → 메타 플레인엔 네임스페이스가 실존하나 ingest 플레인이 계정/에이전트 등록 수준에서 거부하는 것으로 판정 (콘솔 ServiceWatch agent 프로비저닝 전제 유력 — owner 확인 필요, 바디 수리로는 해소 불가). [202,400] 관용 유지 | 2026-07-20: time_unix_nano 동적화({epoch_now_ns}) — 하드코딩 2026-06-01 스탬프가 ingest 400의 유력 원인(meta 등록은 66회 2xx 검증, scope/ns 정상). 프로버 실증: scope 필수+미등록 ns는 SWT_CUSTOM_NAMESPACE. | 2026-07-20 판정: PF-확정급 — meta 등록 200+조회 가능(count 18)인데 OTLP ingest는 namespace/namespace_name/service.namespace attr·scope.name 바인딩·top-level namespace·fresh timestamp 전부 400 SWT_CUSTOM_NAMESPACE (req-4965d0e6 계열). 네임스페이스 바인딩 규약 미공개/백엔드 결함 — SDS 문의감. 400 톨러런트 유지, 해소 시 자동 fold."
         },
         {
           "name": "verify-sw-custom-metric-meta-data-readback",
@@ -532,8 +532,8 @@
           "method": "POST",
           "path": "/v1/metrics/data",
           "json": {
-            "start": 1780271700,
-            "end": 1780272900,
+            "start": "{epoch_1h_ago}",
+            "end": "{epoch_now}",
             "period": 300,
             "statistic_type": "AVG",
             "metrics": [
@@ -546,7 +546,8 @@
           },
           "expect_status": [
             200
-          ]
+          ],
+          "_note": "2026-07-20: 조회창 동적화 {epoch_1h_ago}~{epoch_now}."
         }
       ]
     },

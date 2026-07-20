@@ -4002,3 +4002,81 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   백엔드 지연 자체라 (VM-ERROR 2026-07-13 재발 방지 게이트 유지 필수)
   안전히 줄일 여지가 사실상 없다. nvs 내부 직렬성은 same-VPC subnet 전환
   직렬화(백엔드) 때문이라 오버랩 불가 — 병렬화 제안 기각.
+
+## 2026-07-20 — 오류건(404/401 등) 프론티어 전수 트리아지 + 멀티에이전트 수리 배치 (세션 error-404-401-testing)
+
+**입력**: 07-18 런(06f4db3) endpoint_status 1,342키 중 오류 456 → waiver 315·known 37
+제외 172 → **verified_endpoints 교차로 "never-2xx 프론티어" 130키** 확정.
+5-에이전트 병렬 트리아지(전수 이력감사·소형 라이브프로브·DB 5엔진·backup·privatelink)
++ 리드 직접 프로브. **전수 분류: BLOCKED-PF 35 · BLOCKED-ENTITLEMENT 40 ·
+OWNER-DECISION 45 · FIX-PENDING-VALIDATION 6(aimlops) · 진성 수리대상 ~9클러스터.**
+
+### 라이브로 새로 확정한 사실 (이 세션 실측)
+
+- **certificatemanager 키 파서 = PF-49**: EC P-256 PKCS#8도 400 invalid-key
+  (req-9823c351) — RSA-2048 PKCS#1/#8·4096 전멸(프로브 에이전트)과 합쳐 표준
+  OpenSSL 자재 전 형식 거부 확정. 엔진의 RSA 생성 경로는 유지(콘솔 자재 대조는 오너).
+- **servicewatch OTLP ingest = PF-50**: meta 등록 200 + listmetricinfos(POST
+  /v1/metrics, body {"namespace_name":...})에서 count 18로 조회되는데 ingest
+  (/v1/metrics/custom)는 namespace·namespace_name·service.namespace attr·
+  scope.name·top-level 전 표현 + fresh time_unix_nano에도 400 SWT_CUSTOM_NAMESPACE.
+  수리 3종은 반영 유지(meta先행 순서·unit Bytes→Count 통일·{epoch_now_ns} 동적
+  타임스탬프 — 엔진/validator에 epoch_now_ns 토큰 신설).
+- **sts**: assumerole 404→**403 Sts.UnauthorizedToAssumeRole** (실존 role_indicator
+  `e:<acct>:<role>` 정형 확립; 자기신뢰 trust로도 403 = org 위임정책 게이트),
+  assumerolewithsaml 400 AudienceRestrictionNotFound(경로/파싱 정상, 실 IdP 필요),
+  objectstoreauthorization **500 PF-51**.
+- **private-dns activate 의미론 (라이브 실측)**: create 직후 same-region activate =
+  400 `max-count-exceed`(activate가 리전 슬롯을 새로 소비), 타리전(kr-east1)
+  activate(CREATING 중) = 400 `modifying-other-regions`("완료까지 대기") — **타리전
+  경로가 정규 의미론**임을 백엔드가 직접 확인. ACTIVE 후 kr-east1 재시도 결과는
+  pdns_probe_result.json(스크래치) 판정. delete는 CREATING 중 400 invalid-state
+  (사다리 필요). list 엔벨로프는 `private_dns[]`(contents 아님), id는
+  `private_dns.id`, 프로비저닝 수 분 소요.
+- **scf codefile 차단판정 뒤집힘**: GET /v1/cloud-functions/runtimes에 **Java 17
+  실존** (sample-codes 부재는 런타임 가용성 근거 아님) — codes/file은 plain JSON
+  (class_name/method_name, obs_url 옵션), multipart 아님 → 엔진 갭 아님.
+  gen-wave5-scf-triggers에 xcov-codefile-java 그룹(자가 Java fn 생성→적용→삭제) 편입.
+- **secretsmanager createsecretsmanagerkmskey = 2026-07 스펙에서 공식 제거**
+  (kms 관리가 setkmsid로 대체) — 카탈로그 잔존키. 커버리지 분모 처리 필요(waiver
+  or 카탈로그 정리, 오너).
+- **organization 403 본문 확보**: IAM Deny 디코드 = "[IAM] not allowed by
+  delegation policy(organization)" — 멤버 계정 위임정책 차단 확정(12키 waiver 후보).
+- **cloud-ml = 라우트 미프로비저닝**: 익명 Spring 404 (전 경로) — 계정/환경에
+  cloud-ml 서비스 자체가 없음(8키 waiver 후보).
+- **eventstreams 프로비저닝 PF는 해소 상태** (2026-07-15 capacity 수리, ess1v2m4)
+  — addinstances 404는 "클러스터 부재 시 리터럴 id" 캐스케이드. 다음 subops-full
+  런에서 실 클러스터로 판정.
+
+### 반영한 수리 (오프라인 validate 0 err)
+
+- **DB 5엔진**: ① createrestore 400 근본원인 = placeholder `backup_history_number`
+  ("202501010000"·mysql은 필드 자체 누락) → 4개 relational version-upgrade에
+  restore 4스텝 그룹(실 백업번호 캡처→restore→settle→삭제) 삽입. ② pg
+  patchminorversion 격리차 = software_version의 **"COMMUNITY " 접두어**(catalog
+  그대로 쓴 유일 엔진; epas bare 16.11은 6954에서 검증) → bare "17.7" 2차 시도
+  스텝. ③ log-export 13스텝 access_key/secret_key 빈문자열 → {scp_access_key}
+  토큰(500-on-empty-input 클래스 제거; register가 클린 입력으로도 500이면 PF 재확정 완결).
+- **backup**: createbackup 500 = docs 예제 가짜 UUID + 이중차단 discovery
+  (VM_IMAGE 타깃리스트 500 PF 재확인 · FILESYSTEM은 agent-gated
+  NotFoundCreatedBackupAgent) → **direct-uuid 전략**(server_uuid={server_id},
+  server_guid 옵션 생략) bk-vm-policy 13스텝 그룹을 gen-heavy-vs-netops에 편입
+  (fs-vm-access 패턴 미러, 3그룹 분리로 느린 FULL잡이 delete를 못 막게).
+  404 8건은 백업 부재 캐스케이드 — create 2xx 시 동일 런에서 연쇄 해제.
+- **privatelink 상태머신**: 근본원인 = PLS `approval_type:"AUTO"`가 REQUESTING
+  상태를 선점 → approve/request 구조적 불능. **MANUAL 전환 + CANCEL(REQUESTING)
+  →RE_REQUEST(CANCELED)→APPROVE→ACTIVE settle→DISCONNECT→RECONNECT 재배열**
+  (apigw + scf 두 패밀리, gen-wave5-apigw-privatelink). 승인은 같은 계정
+  provider-side로 가능(vpc 패밀리 2026-06-24 검증) — 2계정 불필요.
+
+### 남는 오너 콜 (STOP-6 매칭)
+
+- waiver 후보 일괄: org 12 · cloud-ml 8 · scr 19(PF-37) · sts 3 · configinspection
+  5(콘솔 전용 auth_key) · secretvault 1(Sv* 벤더 헤더) · kms transit 1 ·
+  quota showquotarequest 1(콘솔 전용) · secretsmanager 제거키 1 · billingplan 4
+  (과금 약정) · PFS 2(볼륨 과금) · devopsservice 2(admin-user 미보유) 등.
+- 과금 결정: quick-query 8 · DB cross-region replica 4 · switchover HA 5 ·
+  backup restore 2(신규 서버 생성).
+- heavy 판정 런 필요: DB 레인 `(cluster-version-upgrade or cluster-subops-a) and
+  not cachestore`(공유 VPC 1, 최대 +21키) · vs-netops 레인(bk-vm-policy 판정,
+  공유 VPC 1) · aimlops 명시선택 런(6키, PF-33 수리 대기).

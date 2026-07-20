@@ -1034,6 +1034,281 @@
           "_note": "403 'Action definition is not found' (run 27450089575) — 미정의 IAM action 제품 결함 클래스 4번째 사례 (PF-15; log-streams·api-key·fs-snapshot read와 동일)"
         },
         {
+          "name": "bk-probe-targets-vmimage",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE&server_name=regrsrv{unique}",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "expect_status": [
+            200,
+            500
+          ],
+          "capture_soft": {
+            "bk_vmimage_uuid": "$.contents[0].server_uuid",
+            "bk_vmimage_guid": "$.contents[0].server_guid"
+          },
+          "_note": "Known-issue re-check (known_issues.json storage/backup/getbackuptargetlist, Product Bug since 2026-06-20; re-confirmed live 500 ContactAdminForAssistance 2026-07-20 req-7fe36dbd): the VM_IMAGE target list 500s regardless of live servers, yet it is the DOCUMENTED discovery path for the AGENTLESS VM_IMAGE create below. expect [200,500] records without red; capture_soft fills only if SDS ever fixes it (then prefer these uuids over the direct {server_id} strategy)."
+        },
+        {
+          "name": "bk-probe-targets-filesystem",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "expect_status": [
+            200,
+            500
+          ],
+          "poll": {
+            "field": "$.count",
+            "until": [
+              1
+            ],
+            "timeout": 180,
+            "interval": 30,
+            "allow_timeout": true,
+            "give_up_status": [
+              400,
+              401,
+              403,
+              404,
+              500
+            ]
+          },
+          "capture_soft": {
+            "bk_fs_uuid": "$.contents[0].server_uuid",
+            "bk_fs_guid": "$.contents[0].server_guid"
+          },
+          "_note": "ADJUDICATION probe (agent-gate vs registration-lag, the open IB-014 question that has skipped gen-heavy-backup's backup-policy group 3 runs straight): by this point in the lane the VM has been ACTIVE ~15-30min, far beyond every poll window gen-heavy-backup ever burned (300s -> 588s/600s -> 780s). count still 0 here => FILESYSTEM targets list ONLY agent-installed servers (matches live 2026-07-20 check-filesystem-duplication 404 Backup.NotFoundCreatedBackupAgent + the 2026-06-10 agent owner-waiver) => retire the lag theory, shrink gen-heavy-backup's 780s poll. count=1 => lag theory wins after all. allow_timeout:true (2026-07-14 NOT-READY gate escape hatch) + capture_soft + 500 tolerated so an empty list or transient error can NEVER fail this step or skip the group - the create below does NOT depend on this lookup."
+        },
+        {
+          "name": "create-backup-policy-vm",
+          "service": "backup",
+          "method": "POST",
+          "path": "/v1/backups",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "json": {
+            "name": "regrbk{unique}",
+            "policy_category": "AGENTLESS",
+            "policy_type": "VM_IMAGE",
+            "server_category": "VIRTUAL_SERVER",
+            "server_uuid": "{server_id}",
+            "region": "{region}",
+            "retention_period": "WEEK_2",
+            "dr_enabled": false,
+            "encrypt_enabled": true,
+            "schedules": [
+              {
+                "frequency": "DAILY",
+                "start_time": "09:00:00",
+                "type": "FULL"
+              }
+            ],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "backup_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/backups/{backup_id}",
+            "service": "backup"
+          },
+          "_note": "storage/backup/createbackup frontier (500 folded 2026-06-25, docs-example-UUID era - never yet attempted with a real server). DIRECT-UUID strategy: server_uuid={server_id}, the live VS id from this lane's spine (same identifier space: backup-agent create resolves this field against VS inventory - Backup.NotFoundVirtualServerForSearchError, facts 2026-07-02). server_guid is OPTIONAL+nullable in models[storage/backup/backupcreaterequest1dot2] and discoverable ONLY via the double-blocked target list (VM_IMAGE=500 Product Bug, FILESYSTEM=agent-gated) => omitted. filesystem_paths/is_all_filesystem omitted (FILESYSTEM-plane fields; the docs example mixes them into a VM_IMAGE body but empty-body probe proved validation is field-presence only - 6x'Field required' = exactly the 6 required fields). Outcome matrix: 2xx => frontier open, family below runs; 404 NotFoundVirtualServer => VS id != server_uuid, revisit discovery; 500 with a REAL live server => definitive VM_IMAGE-plane Product Bug evidence for the SDS inquiry (same class as getbackuptargetlist VM_IMAGE). Strict expect + optional: any non-2xx records the observation and group-skips without red."
+        },
+        {
+          "name": "wait-backup-policy-vm",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 15
+          },
+          "_note": "Create->AVAILABLE settle unobserved (first live calibration); 900s cap mirrors gen-heavy-backup."
+        },
+        {
+          "name": "verify-bk-set-schedules",
+          "service": "backup",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/schedules",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "json": {
+            "schedules": [
+              {
+                "frequency": "DAILY",
+                "start_time": "10:00:00",
+                "type": "FULL"
+              }
+            ]
+          },
+          "expect_status": [
+            200
+          ],
+          "_note": "storage/backup/setbackupschedules frontier (pure 404 cascade victim - first attempt against a real backup_id)."
+        },
+        {
+          "name": "verify-bk-update-retention",
+          "service": "backup",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/retention-period",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "json": {
+            "retention_period": "MONTH_1"
+          },
+          "expect_status": [
+            200
+          ],
+          "_note": "storage/backup/updateretentionperiod frontier (404 cascade victim). WEEK_2 -> MONTH_1 per gen-heavy-backup precedent; policy is deleted this run so retention never bills."
+        },
+        {
+          "name": "verify-bk-set-filesystem-path",
+          "service": "backup",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/filesystem-path",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "json": {
+            "backup_filesystem_paths": [
+              "/"
+            ],
+            "is_all_filesystem": false
+          },
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "_note": "storage/backup/setfilesystempath frontier - agent/FILESYSTEM-plane op per userguide; on this AGENTLESS VM_IMAGE policy 400/404 is the likely by-design ceiling (live 2026-07-20 error class Backup.NotFoundCreatedBackupAgent). Recorded to settle it either way."
+        },
+        {
+          "name": "verify-bk-update-replication",
+          "service": "backup",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/replication",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "json": {
+            "dr_enabled": false
+          },
+          "expect_status": [
+            200,
+            400
+          ],
+          "_note": "storage/backup/updatereplicationuse frontier - replication is Agent-Backup-only per userguide, 400 likely AGENTLESS ceiling. dr_enabled:false is a no-op; NEVER flip true (kr-west1-b -> kr-east1-a is the live DR pair per /v1/backups/region-relationship; cross-region replication is billable)."
+        },
+        {
+          "name": "verify-bk-check-fs-dup-real-server",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/check-filesystem-duplication?filesystem_path=/&server_uuid={server_id}",
+          "optional": true,
+          "group": "bk-vm-policy",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "_note": "storage/backup/checkfilesystemduplication frontier (400 folded 2026-06-24). LIVE 2026-07-20 with a well-formed docs uuid: 404 Backup.NotFoundCreatedBackupAgent 'Backup Agent for this Server has not been created yet.' (req-41d4cbb7) - the op is AGENT-GATED. Against a REAL live server: 200 would mean the gate is inventory-presence, 404 again = definitive agent-waiver-family evidence."
+        },
+        {
+          "name": "create-backup-manual-vm",
+          "service": "backup",
+          "method": "POST",
+          "path": "/v1/backups/{backup_id}/manual-backup",
+          "optional": true,
+          "group": "bk-vm-manual",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "storage/backup/manualbackup frontier. Userguide: manual backup always runs as FULL. SEPARATE group from bk-vm-policy so a slow FULL job can never skip the delete steps in bk-vm-teardown. If create-backup-policy-vm failed, {backup_id} stays literal -> one recorded 404 (today's cascade class) and this group fails softly."
+        },
+        {
+          "name": "wait-backup-manual-vm",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "optional": true,
+          "group": "bk-vm-manual",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "AVAILABLE"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          },
+          "_note": "FULL image backup of the fresh 104GB-volume ubuntu VM - duration UNOBSERVED; this run is the calibration (gen-heavy-backup budgeted the same 3600s). Timeout -> group bk-vm-manual fails non-red and bk-vm-teardown's delete absorbs the in-flight job via its retry ladder. Feeds optimizer durations - expect vs-netops makespan +15-75min this run."
+        },
+        {
+          "name": "delete-backup-policy-vm",
+          "service": "backup",
+          "method": "DELETE",
+          "path": "/v1/backups/{backup_id}",
+          "optional": true,
+          "destructive": true,
+          "group": "bk-vm-teardown",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "_note": "storage/backup/deletebackup frontier. THIRD group: runs whether bk-vm-policy or bk-vm-manual failed. If create never captured, fires once with literal {backup_id} -> 404 in expect (records, passes). 40x30s ladder absorbs an in-flight FULL job holding the policy (gen-heavy-backup precedent); create's cleanup entry is the double-backstop."
+        },
+        {
+          "name": "wait-backup-policy-gone",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "optional": true,
+          "group": "bk-vm-teardown",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 15
+          },
+          "_note": "gone-poll (exempt from the 2026-07-14 NOT-READY gate by design); sweep/reconciler backstop if the policy outlives the cap. Keeps delete-server (later in the lane) from meeting a policy-attached 409 wall."
+        },
+        {
           "name": "delete-volume-attachment",
           "service": "virtualserver",
           "method": "DELETE",

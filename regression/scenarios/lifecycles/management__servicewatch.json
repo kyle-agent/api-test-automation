@@ -368,12 +368,36 @@
       "_note": "Light ingest-only coverage for the remaining servicewatch write endpoints that POST data rather than create addressable resources (no capture / no teardown needed): custom metrics + metric meta (OTLP-shaped), metric-data chart image render, custom log-stream collect, and OTLP log-events ingestion. All bodies grounded from data/api_bodies.json (createcustommetrics, createcustommetricmetas, downloadmetricdataimage, createcustomlogstream, createcustomlogevents). Each step is optional + its own group with a broad expect_status so a 4xx/empty-payload rejection still records coverage for the endpoint without failing the lifecycle. The OTLP-attribute sample bodies carry empty-string fields straight from the doc and are likely rejected at runtime — coverage is recorded on the call regardless.",
       "steps": [
         {
+          "name": "create-custom-metric-meta",
+          "method": "POST",
+          "path": "/v1/metrics/custom/meta",
+          "group": "custom-metric-meta",
+          "optional": true,
+          "_note": "createcustommetricmetas FIX 2026-07-16 (svccov session, live-verified 200): dimension key changed 'image_id' -> 'resource_id'. Live 400 was {code: BadRequest, detail: 'resource_id is required dimension.'} — MetricMetaDto.dimensions must include the literal 'resource_id' dimension key (matches knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta node, which already had this right). FIX 2 (svccov session): metricName/namespace de-{unique}'d to FIXED values — there is NO delete API for custom metric metas (account-permanent, billed beyond the free-10/month per userguide), so the old '{unique}'-suffixed names meant every CI run minted a brand-new undeletable metric definition. Fixed names let repeated runs reuse the same one instead of accumulating quota.",
+          "json": {
+            "metricMetas": [
+              {
+                "descriptionEn": "regression custom metric meta",
+                "descriptionKo": "regression custom metric meta",
+                "dimensions": [
+                  ["resource_id"]
+                ],
+                "metricName": "Custom_regr_probe_count",
+                "storageResolution": 60,
+                "unit": "Count"
+              }
+            ],
+            "namespace": "MyCustom/regr"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
           "name": "create-custom-metrics",
           "method": "POST",
           "path": "/v1/metrics/custom",
           "group": "custom-metrics",
           "optional": true,
-          "_note": "createcustommetrics: OTLP body. FIX (2026-06-20): time_unix_nano changed from stale 2025-07-30 epoch to 1780272000000000000 (2026-06-01 UTC, matches resource model; ~15mo retention per userguide). as_double changed to as_int (docs: 'metric type can only be gauge or sum, exactly one value' -> integer preferred). resource.attributes key 'namespace' is a routing hypothesis (resource model note: 'namespace 라우팅 키가 미상'). Broad expect_status tolerates 400 if routing is wrong. See resource model knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta notes. INVESTIGATED 2026-07-16 (svccov session, still BLOCKED): tested the hypothesis that the ingest namespace must exactly match a namespace already registered via createcustommetricmetas (this lifecycle's create-custom-metric-meta uses 'MyCustom/regr{unique}' but this step hardcodes 'MyCustom/regr' with no suffix — a plausible mismatch). Live probe: registered meta with namespace='MyCustom/probefix' (200 OK, confirms the separate 'resource_id is required dimension' fix), then immediately POSTed /v1/metrics/custom with resource.attributes namespace='MyCustom/probefix' (exact match) -> STILL 400 {message: SWT_CUSTOM_NAMESPACE}. Rules out the naming-mismatch theory; the OTLP resource.attributes routing key/shape genuinely differs from 'namespace'+string_value (doc's own request_example shows an EMPTY placeholder key, confirming SCP has not published the real key). Classify as blocked/needs-owner-knowledge (ServiceWatch Agent config schema, not discoverable via API docs) — do not keep re-guessing without a hint from support/console.",
+          "_note": "createcustommetrics: OTLP body. FIX (2026-06-20): time_unix_nano changed from stale 2025-07-30 epoch to 1780272000000000000 (2026-06-01 UTC, matches resource model; ~15mo retention per userguide). as_double changed to as_int (docs: 'metric type can only be gauge or sum, exactly one value' -> integer preferred). resource.attributes key 'namespace' is a routing hypothesis (resource model note: 'namespace 라우팅 키가 미상'). Broad expect_status tolerates 400 if routing is wrong. See resource model knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta notes. INVESTIGATED 2026-07-16 (svccov session, still BLOCKED): tested the hypothesis that the ingest namespace must exactly match a namespace already registered via createcustommetricmetas (this lifecycle's create-custom-metric-meta uses 'MyCustom/regr{unique}' but this step hardcodes 'MyCustom/regr' with no suffix — a plausible mismatch). Live probe: registered meta with namespace='MyCustom/probefix' (200 OK, confirms the separate 'resource_id is required dimension' fix), then immediately POSTed /v1/metrics/custom with resource.attributes namespace='MyCustom/probefix' (exact match) -> STILL 400 {message: SWT_CUSTOM_NAMESPACE}. Rules out the naming-mismatch theory; the OTLP resource.attributes routing key/shape genuinely differs from 'namespace'+string_value (doc's own request_example shows an EMPTY placeholder key, confirming SCP has not published the real key). Classify as blocked/needs-owner-knowledge (ServiceWatch Agent config schema, not discoverable via API docs) — do not keep re-guessing without a hint from support/console. RE-CONFIRMED+ESCALATED 2026-07-20 (PF-50): meta IS queryable post-register (POST /v1/metrics {namespace_name:MyCustom/regr} -> count 18) yet ingest 400s for namespace/namespace_name/service.namespace attrs, scope.name binding, top-level namespace AND fresh {epoch_now_ns} timestamps. Step order fixed meta-first + meta unit Bytes->Count unified this session; 400 stays tolerated pending SDS.",
           "json": {
             "resource_metrics": [
               {
@@ -404,7 +428,7 @@
                                   }
                                 }
                               ],
-                              "time_unix_nano": 1780272000000000000
+                              "time_unix_nano": "{epoch_now_ns}"
                             }
                           ]
                         },
@@ -420,30 +444,6 @@
                 ]
               }
             ]
-          },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
-        },
-        {
-          "name": "create-custom-metric-meta",
-          "method": "POST",
-          "path": "/v1/metrics/custom/meta",
-          "group": "custom-metric-meta",
-          "optional": true,
-          "_note": "createcustommetricmetas FIX 2026-07-16 (svccov session, live-verified 200): dimension key changed 'image_id' -> 'resource_id'. Live 400 was {code: BadRequest, detail: 'resource_id is required dimension.'} — MetricMetaDto.dimensions must include the literal 'resource_id' dimension key (matches knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta node, which already had this right). FIX 2 (svccov session): metricName/namespace de-{unique}'d to FIXED values — there is NO delete API for custom metric metas (account-permanent, billed beyond the free-10/month per userguide), so the old '{unique}'-suffixed names meant every CI run minted a brand-new undeletable metric definition. Fixed names let repeated runs reuse the same one instead of accumulating quota.",
-          "json": {
-            "metricMetas": [
-              {
-                "descriptionEn": "regression custom metric meta",
-                "descriptionKo": "regression custom metric meta",
-                "dimensions": [
-                  ["resource_id"]
-                ],
-                "metricName": "Custom_regr_probe_count",
-                "storageResolution": 60,
-                "unit": "Bytes"
-              }
-            ],
-            "namespace": "MyCustom/regr"
           },
           "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
         },

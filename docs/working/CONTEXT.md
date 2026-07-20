@@ -114,7 +114,30 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-07-20 — 리포 전체 정리, branch `claude/repository-cleanup-bqil1u`,
+- **CURRENT (2026-07-20 — 오류 프론티어 130키 전수 트리아지+수리 배치, branch
+  `claude/error-404-401-testing-3vr67s`, 오너 지시 "404/401 오류건 직접 테스트로
+  해결가능건 발굴 + 멀티에이전트·VPC캡 고려 자율 커버리지"):** 5-에이전트 병렬
+  트리아지(이력감사 130키 전수·소형 라이브프로브 18키·DB 5엔진 26키·backup
+  10키·privatelink/scf/CI 12키) + 리드 직접 프로브로 **never-2xx 프론티어 130키
+  전수 분류: PF 35 · 엔타이틀 40 · 오너결정 45 · 검증대기 6 · 수리반영 ~9클러스터**.
+  ① 수리 반영(전부 validate 0 err): DB createrestore 4엔진(실 backup_history_number
+  캡처 체인)·pg patchminor bare "17.7" 2차시도·log-export 13스텝 access_key 토큰화·
+  **privatelink AUTO→MANUAL+상태머신 재배열**(apigw/scf, CANCEL→RE_REQUEST→APPROVE→
+  DISCONNECT→RECONNECT)·scf xcov-codefile-java 그룹(Java 17 실존 확인, 차단판정
+  뒤집음)·backup bk-vm-policy 13스텝(direct-uuid, vs-netops 편입)·servicewatch
+  meta先행+unit통일+{epoch_now_ns}(엔진/validator 토큰 신설). ② 라이브 실측 신규
+  확정: **PF-49**(certmanager 키파서 EC P-256도 거부)·**PF-50**(SW OTLP ingest
+  네임스페이스 바인딩 불능 — meta 등록·조회 정상인데 전 표현 400)·**PF-51**(sts
+  objectstoreauthorization 500)·sts 403 위임정책·org 403 디코드·cloud-ml 라우트
+  부재·secretsmanager kms-key 스펙 제거·private-dns activate 타리전 의미론(레시피
+  판정은 pdns 프로브 결과로). 상세: `knowledge/validated-facts.md` 2026-07-20 블록.
+  **▶ 다음 착수(리터럴)**: heavy 판정 레인 2개 — DB:
+  `SCP_RUN_HEAVY=true SCP_ALLOW_MUTATIONS=true SCP_ALLOW_DESTRUCTIVE=true python -m pytest tests/crud -m crud -k "(cluster-version-upgrade or cluster-subops-a) and not cachestore" -q`
+  (공유 VPC 1, 최대 +21키) → vs-netops: 동일 게이트 `-k gen-heavy-vs-netops`
+  (bk-vm-policy 판정, makespan +15~75분). 콘솔2 선택 실행도 동등. 라이트 재검증
+  (privatelink/scf-java)은 이 세션에서 실행. waiver 후보 ~60키 목록은
+  validated-facts 블록 참조(오너 승인 대기).
+- **PRIOR (2026-07-20 — 리포 전체 정리, branch `claude/repository-cleanup-bqil1u`,
   오너 지시 "흩어진 정보 모으고 미사용 소스/문서 정리"):** ① **`docs/archive/`
   tier 신설** — superseded 문서 33건 이동(핸드오프 11 · 플랜 7 · 트래커 9 ·
   ROADMAP/M6-DESIGN/IA 3 · working 낱개 3) + **CONTEXT.md 다이어트 1,138→~220줄** (과거 블록은
@@ -169,44 +192,6 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   오너 컨펌 대기 · apigw/scf privatelink 5키=AUTO-approval 상태머신 라이브 런 관찰
   트리아지 필요(블라인드 코드 불가). 상세: `knowledge/validated-facts.md` 2026-07-13
   배치① 블록. ⚠️ knowledge/validated-facts.md:2453 고아 병합마커(`>>>>>>>`) 제거함.
-- **HANDOFF (2026-07-13 밤 — svc-coverage-improvement 세션 마감, main=`a746ea36`,
-  오너 "다른 세션에서 이어서"):** run-923a→892a→543a→c373 4연속 트리아지로 서비스
-  커버리지 4xx 대량 수리 완료 (상세: `knowledge/validated-facts.md` 2026-07-11~13
-  블록들). **c373(최신 main 첫 풀런) 판정: 3라운드 수리 전부 라이브 그린** —
-  rmtags SRN b64·cloudmonitoring 날짜·fifo dedup·secretsmanager reveal·vs-netops
-  IGW adopt-or-create·peering rule·DC 체인·DB resize. 마지막 반영분: http_client
-  429 재시도(vpc burst 스로틀 5건 제거)·scf time={1,3,12}·lb-members IGW
-  adopt-or-create. **PF 확정 2건** (SDS 문의감): DB register-log-export 500
-  (형식 통과+실존 버킷으로도 5엔진 ContactAdmin) · eventstreams 프로비저닝 5연속
-  FAILED(버전 무관). **▶ 다음 세션 착수점 — "①배치: 코드로 즉시 노려볼 4xx ~18키"
-  (정찰 완료, 미착수):**
-  1. **DB patch-minor-version 5엔진** (5키): "Unpatchable(자기버전)" 확정 →
-     **구버전 create→신버전 patch** 전략. mysql `GET /v1/engine-versions` contents
-     [0]=8.4.6(현재)·[1]=8.4.5(구) 실측 — create-cluster의 dbaas_engine_version_id를
-     [1]로 바꾸고 patch의 software_version을 [0]으로. cachestore는 patch json이
-     `{dbaas_engine:redis, software_version:7.2.11}` 하드코딩(다른 4엔진은
-     `{software_version}` 토큰) — 별도. **주의: create body 변경 = heavy 재프로비저닝,
-     신중히**. C4 버전축(C4-PARAM-COVERAGE.md)과 한 몸이니 함께 설계 권장.
-  2. **cloudmonitoring show-event-policy 3키** (histories·notifications·detail):
-     계정에 이벤트 정책 0이라 리터럴 400 → `gen-cm-event-policy`
-     (generated__light-batch2.json)에 정책 생존 창 읽기 편입.
-  3. **apigw/scf privatelink 5키**: gen-wave5-apigw-privatelink의 approve/connect/
-     request — apigw `cannot-use-region-api`, scf `endpoint-not-found`. 순서/전제
-     트리아지 1회 필요 (7/10 PLE 체인 그린의 나머지).
-  4. 소소한 것: **database-mysql-cluster set-block-storage-size**(subops-full의
-     DATA 그룹 재캡처 수리 미이식 — 5분) · **eventstreams showrequest**(es-create
-     202의 request_id 캡처→즉시 read) · **cachestore set-commands**('maxmemory-policy'
-     수정불가 → cachestorelistcommands에서 modifiable=true 커맨드 캡처,
-     modifycommandrequest={commands:[{id,name,new_value}]}) · **kms
-     updatemanagedkeydescription**(managed key 목록→실 id) · **filestorage
-     setaccessrule**(VM id 요구 `VirtualServerNotFound` → VM 있는 lifecycle로).
-  **②오너 결정 영역**: VS private-static-nat 2키(gen-private-nat에 VS interface
-  편입)·data-flow/ops/quick-query 7키(실 클러스터 전제 create, 과금)·switchover 2키
-  (ha_enabled=true 실험 or waiver). **③차단 확정 ~43키**: scr(이미지/PF-37/quota)·
-  DB 401 backup family 8·log-export/setparameters 500 PF·import-image·
-  updateimagemember·password PF-17·approvalvpcpeering(same-account)·org 403 —
-  waiver 심사 or SDS 문의(오너). **미완 대기**: eventstreams·DB-log-export PF는
-  다음 콘솔 런이 재확인만(수리 불가). C4 파라미터 커버리지는 오너 컨펌 대기.
 - **(과거 히스토리는 아카이브로)** 2026-06-10 ~ 2026-07-11 의 세션 로그 블록
   전부는 [`docs/archive/CONTEXT-history.md`](../archive/CONTEXT-history.md)로
   **verbatim 이동** (2026-07-20 리포 정리). 이 섹션은 "최신 CURRENT + 직전

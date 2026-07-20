@@ -149,13 +149,13 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
           "json": {
-            "access_key": "",
+            "access_key": "{scp_access_key}",
             "delete_on_export": true,
             "schedule_day_of_month": "28",
             "schedule_day_of_week": "MON",
             "schedule_frequency_type": "DAY",
             "schedule_hour": "12",
-            "secret_key": ""
+            "secret_key": "{scp_secret_key}"
           },
           "expect_status": [
             200,
@@ -1120,6 +1120,125 @@
             "backup_history_number": "$.contents[0].backup_history_number"
           },
           "_note": "feeds cleanup-backup-histories's REQUIRED field (see next step's note)."
+        },
+        {
+          "name": "create-restore",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {
+            "allowable_ip_addresses": [],
+            "backup_history_number": "{backup_history_number}",
+            "backup_recovery_time": "",
+            "block_storage_groups": [],
+            "instance_name_prefix": "regrrst",
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "name": "regrrst{ualpha}",
+            "server_type_name": "{db_server_type}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "restore",
+          "capture_soft": {
+            "restored_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{restored_cluster_id}"
+          },
+          "_note": "database/mysql/mysqlcreaterestore frontier (400: placeholder/absent backup_history_number all prior runs). Real {backup_history_number} captured 2 steps up from the VERIFIED manual-backup; restore = full re-provision of a NEW cluster (~9-10min p50) deleted in-group below + cleanup belt. Tolerant expect: first live attempt records without red."
+        },
+        {
+          "name": "wait-restored-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{restored_cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "restore",
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 20,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{restored_cluster_id}/sync-state",
+              "max": 2
+            }
+          }
+        },
+        {
+          "name": "delete-restored-cluster",
+          "method": "DELETE",
+          "path": "/v1/clusters/{restored_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "restore",
+          "retry_on_status": [
+            400,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "wait-restored-gone",
+          "method": "GET",
+          "path": "/v1/clusters/{restored_cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "optional": true,
+          "group": "restore",
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 900,
+            "interval": 30
+          }
         },
         {
           "name": "cleanup-backup-histories",
