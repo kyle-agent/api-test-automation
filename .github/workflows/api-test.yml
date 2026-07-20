@@ -1136,9 +1136,11 @@ jobs:
           # /platform — RETIRED (2026-07-20 repo cleanup): the legacy poc
           # scenario-viz static console is gone (poc/ removed); its role is
           # covered by /ia-demo/ (controlplane.build_ia_demo) + the console2
-          # static bundle. The last-published /platform copy on dashboard-data
-          # is left frozen — purge with `rm -rf "$dd/platform"` when the owner
-          # confirms nobody bookmarks it.
+          # static bundle. Owner approved the purge (2026-07-20): the stale
+          # /platform, /poc and /local-run-demo copies were deleted from
+          # dashboard-data; the rm below keeps a stale clone from resurrecting
+          # them (publishing is otherwise non-destructive — same as catalog/).
+          rm -rf "$dd/platform" "$dd/poc" "$dd/local-run-demo"
           # nojekyll so GitHub Pages serves the raw HTML as-is
           touch "$dd/.nojekyll"
           cd "$dd"
