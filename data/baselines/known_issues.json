@@ -99,13 +99,6 @@
       "note": "PUT archive-config -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, mariadb-cluster-subops-guarded set-archive). ContactAdmin-class backend fault on a DB sub-op; the guarded lifecycle soft-skips and still records coverage. Tracked upstream, not a suite regression."
     },
     {
-      "key": "database/mariadb/mariadbregisterlogexportconfig",
-      "status": 500,
-      "classification": "Product Bug",
-      "since": "2026-06-18",
-      "note": "POST log-export-config -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, mariadb-cluster-subops-guarded register-log-export-config). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
-    },
-    {
       "key": "database/mariadb/mariadbupgradekernel",
       "status": 500,
       "classification": "Product Bug",
@@ -118,13 +111,6 @@
       "classification": "Product Bug",
       "since": "2026-06-18",
       "note": "PUT archive-config -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, epas-cluster-subops-guarded set-archive). ContactAdmin-class backend fault on a DB sub-op. Tracked upstream, not a suite regression."
-    },
-    {
-      "key": "database/epas/epasregisterlogexportconfig",
-      "status": 500,
-      "classification": "Product Bug",
-      "since": "2026-06-18",
-      "note": "POST log-export-config -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, epas-cluster-subops-guarded register-log-export-config). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
     },
     {
       "key": "database/epas/epasupgradekernel",
@@ -148,25 +134,11 @@
       "note": "PUT archive-config -> 500 ContactAdminForAssistance against a real live cluster (mysql-cluster-subops-guarded set-archive). Same ContactAdmin-class backend fault as the mariadb/epas/postgresql setarchiveconfig siblings; the guarded lifecycle soft-skips and still records coverage. Tracked upstream, not a suite regression."
     },
     {
-      "key": "database/mysql/mysqlregisterlogexportconfig",
-      "status": 500,
-      "classification": "Product Bug",
-      "since": "2026-06-19",
-      "note": "POST log-export-config -> 500 ContactAdminForAssistance against a real live cluster (mysql-cluster-subops-guarded register-log-export-config). Same ContactAdmin-class backend fault as the mariadb/epas/postgresql registerlogexportconfig siblings. Tracked upstream, not a suite regression."
-    },
-    {
       "key": "database/postgresql/postgresqlsetarchiveconfig",
       "status": 500,
       "classification": "Product Bug",
       "since": "2026-06-18",
       "note": "PUT archive-config -> 500 ContactAdminForAssistance (heavy n6 DBaaS run, postgresql-cluster-subops-guarded set-archive). ContactAdmin-class backend fault on a DB sub-op. Tracked upstream, not a suite regression."
-    },
-    {
-      "key": "database/postgresql/postgresqlregisterlogexportconfig",
-      "status": 500,
-      "classification": "Product Bug",
-      "since": "2026-06-18",
-      "note": "POST log-export-config -> 500 ContactAdminForAssistance (heavy n6 DBaaS run, postgresql-cluster-subops-guarded register-log-export-config). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
     },
     {
       "key": "database/postgresql/postgresqlupgradekernel",
@@ -287,5 +259,6 @@
       "since": "2026-07-16",
       "note": "401 Dbaas.Unauthorized.AuthNFailed with valid HMAC — backup-family asymmetry: setbackup POST on the SAME path/cluster/signing 2xx's across all engines while DELETE /backups + PUT /backup-histories 401. Console disables backup via the '백업 수정' modal's 사용 checkbox (set/modify plane), so the DELETE appears to have no console-equivalent path. Family spans mysql/mariadb/postgresql/epas/cachestore/searchengine (owner screenshots 2026-07-18). Pending discriminator: does console backup-HISTORY deletion pop identity re-verification? — see knowledge/validated-facts.md 2026-07-16 block."
     }
-  ]
+  ],
+  "_resolved_note_2026_07_20": "registerlogexportconfig 4엔진 known-issue 해제: '500 ContactAdmin PF'의 진범은 요청 바디의 access_key/secret_key 빈 문자열(500-on-empty-input 클래스)이었음 — {scp_access_key} 토큰화 후 run 20260720-local-e401f에서 4엔진 register/set/export/unregister 전 키 202 라이브 검증. 빈 입력에 500을 주는 백엔드 행위 자체는 conformance 결함으로 존치(500-on-empty-input class)."
 }

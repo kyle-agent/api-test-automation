@@ -772,7 +772,6 @@
           "json": {
             "allowable_ip_addresses": [],
             "backup_history_number": "202501010000",
-            "backup_recovery_time": "",
             "block_storage_groups": [],
             "instance_name_prefix": "regrrst",
             "maintenance_option": {
@@ -795,7 +794,8 @@
             422
           ],
           "optional": true,
-          "group": "restore"
+          "group": "restore",
+          "_note": "e401f 판정: 400 value_error 진범 = backup_recovery_time:\"\"(빈 문자열) — 가짜-id 검증 프로브로 필드 제거 시 유효(404 flip) 확정, 제거. (PITR 쓸 때만 유효 타임스탬프로.)"
         }
       ]
     },
@@ -1318,7 +1318,6 @@
           "json": {
             "allowable_ip_addresses": [],
             "backup_history_number": "{backup_history_number}",
-            "backup_recovery_time": "",
             "block_storage_groups": [],
             "instance_name_prefix": "regrrst",
             "maintenance_option": {
@@ -1349,7 +1348,7 @@
             "method": "DELETE",
             "path": "/v1/clusters/{restored_cluster_id}"
           },
-          "_note": "database/epas/epascreaterestore frontier (400: placeholder/absent backup_history_number all prior runs). Real {backup_history_number} captured 2 steps up from the VERIFIED manual-backup; restore = full re-provision of a NEW cluster (~9-10min p50) deleted in-group below + cleanup belt. Tolerant expect: first live attempt records without red."
+          "_note": "database/epas/epascreaterestore frontier (400: placeholder/absent backup_history_number all prior runs). Real {backup_history_number} captured 2 steps up from the VERIFIED manual-backup; restore = full re-provision of a NEW cluster (~9-10min p50) deleted in-group below + cleanup belt. Tolerant expect: first live attempt records without red. | e401f 판정: 400 value_error 진범 = backup_recovery_time:\"\"(빈 문자열) — 가짜-id 검증 프로브로 필드 제거 시 유효(404 flip) 확정, 제거. (PITR 쓸 때만 유효 타임스탬프로.)"
         },
         {
           "name": "wait-restored-cluster",

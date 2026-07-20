@@ -4131,3 +4131,26 @@ OWNER-DECISION 45 · FIX-PENDING-VALIDATION 6(aimlops) · 진성 수리대상 ~9
   — contents 가정 코드는 **항상 거짓 0**을 보고한다(이번 세션 자체 점검이 이
   함정에 빠져 watcher가 실누수를 잡아줌). scf PLE list의 id 필드는
   `endpoint_id`. private-dns는 `private_dns[]`. 리스트 파싱은 raw 확인 후.
+
+### DB heavy 레인 최종 판정 (run e401f — 8/8 passed, 3:13:38, watcher HEALTHY)
+
+- **log-export 패밀리 16/16 전 키 202** (4엔진 × register/set/export/unregister).
+  **"register 500 = 백엔드 PF" 판정 공식 철회**: 진범은 바디의 access_key/
+  secret_key 빈 문자열(500-on-empty-input) — 토큰화만으로 전 체인 관통.
+  known_issues 4건 해제(파일 내 _resolved_note). 빈 입력에 500을 주는 행위
+  자체는 conformance 결함으로 존치. exportlog의 나머지 enum 400들은 등록되지
+  않은 log_type에 대한 정상 거절(키는 2xx 확보).
+- **createrestore 400 근본원인 확정**: `backup_recovery_time: ""` 빈 문자열이
+  value_error의 전부 — 가짜-id 프로브 이분탐색으로 필드 제거 시 검증 통과(404
+  flip) 실증. 4엔진 restore 바디에서 제거 반영(guarded 포함 7스텝). **다음
+  heavy 런이 실 2xx 판정** (구조는 이제 유효 확정).
+- **pg patchminorversion — 어휘 가설 반증**: bare "17.7"은 400 "Software version
+  is not POSTGRESQL" (catalog-verbatim "COMMUNITY 17.7"이 정답 형식). 실패의
+  실체는 400 `Dbaas.ValidationError.ExistInprogress`(선행 비동기 요청 큐,
+  service_state와 별개 축) → bare 시도 제거 + verbatim에 400 사다리 8×30s.
+  mysql/mariadb의 이번 런 "Software version is not X" 400은 업그레이드 후
+  토큰 재해석 이슈로 기록만(두 키는 6954 기검증). **epas patchminorversion은
+  이번 런 202 신규 확보.**
+- 레인 종료 후 계정: 클러스터 0(4엔진)·공유 VPC 자가 철거. reconciler로
+  wave5 잔류 VPC 2개 회수 → **VPC 0/5 클린**. stuck log-group 12건은 기존
+  IAM-gated 클래스(변동 없음).

@@ -114,29 +114,31 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-07-20 — 오류 프론티어 130키 전수 트리아지+수리 배치, branch
-  `claude/error-404-401-testing-3vr67s`, 오너 지시 "404/401 오류건 직접 테스트로
-  해결가능건 발굴 + 멀티에이전트·VPC캡 고려 자율 커버리지"):** 5-에이전트 병렬
-  트리아지(이력감사 130키 전수·소형 라이브프로브 18키·DB 5엔진 26키·backup
-  10키·privatelink/scf/CI 12키) + 리드 직접 프로브로 **never-2xx 프론티어 130키
-  전수 분류: PF 35 · 엔타이틀 40 · 오너결정 45 · 검증대기 6 · 수리반영 ~9클러스터**.
-  ① 수리 반영(전부 validate 0 err): DB createrestore 4엔진(실 backup_history_number
-  캡처 체인)·pg patchminor bare "17.7" 2차시도·log-export 13스텝 access_key 토큰화·
-  **privatelink AUTO→MANUAL+상태머신 재배열**(apigw/scf, CANCEL→RE_REQUEST→APPROVE→
-  DISCONNECT→RECONNECT)·scf xcov-codefile-java 그룹(Java 17 실존 확인, 차단판정
-  뒤집음)·backup bk-vm-policy 13스텝(direct-uuid, vs-netops 편입)·servicewatch
-  meta先행+unit통일+{epoch_now_ns}(엔진/validator 토큰 신설). ② 라이브 실측 신규
-  확정: **PF-49**(certmanager 키파서 EC P-256도 거부)·**PF-50**(SW OTLP ingest
-  네임스페이스 바인딩 불능 — meta 등록·조회 정상인데 전 표현 400)·**PF-51**(sts
-  objectstoreauthorization 500)·sts 403 위임정책·org 403 디코드·cloud-ml 라우트
-  부재·secretsmanager kms-key 스펙 제거·private-dns activate 타리전 의미론(레시피
-  판정은 pdns 프로브 결과로). 상세: `knowledge/validated-facts.md` 2026-07-20 블록.
-  **▶ 다음 착수(리터럴)**: heavy 판정 레인 2개 — DB:
-  `SCP_RUN_HEAVY=true SCP_ALLOW_MUTATIONS=true SCP_ALLOW_DESTRUCTIVE=true python -m pytest tests/crud -m crud -k "(cluster-version-upgrade or cluster-subops-a) and not cachestore" -q`
-  (공유 VPC 1, 최대 +21키) → vs-netops: 동일 게이트 `-k gen-heavy-vs-netops`
-  (bk-vm-policy 판정, makespan +15~75분). 콘솔2 선택 실행도 동등. 라이트 재검증
-  (privatelink/scf-java)은 이 세션에서 실행. waiver 후보 ~60키 목록은
-  validated-facts 블록 참조(오너 승인 대기).
+- **CURRENT (2026-07-20 — 오류 프론티어 130키 전수 트리아지+라이브 격파 세션 완결,
+  branch `claude/error-404-401-testing-3vr67s`, 오너 지시 "404/401 직접 테스트
+  해결 + 멀티에이전트·VPC캡 자율 커버리지"):** 5-에이전트 트리아지(이력감사
+  130키 전수·라이브프로브 18키·DB 26키·backup 10키·privatelink 12키) + 리드
+  직접 프로브 + **로컬 라이브 검증 런 6회**(light 3·heavy dns 1·heavy DB 레인
+  8-lifecycle 3:13:38 — 전부 green, watcher HEALTHY, 종료 후 VPC 0/5 클린).
+  ① **라이브 격파 15+키**: log-export 4엔진 16키 전 202("register 500 PF"는
+  빈 access_key 오판 — known_issues 4건 해제), scf setcloudfunctioncodefile 202
+  (Java 17, 차단판정 뒤집음), dns activateprivatedns 202(크로스리전 의미론
+  실증+엔진 귀속), apigw requestprivatelinkendpoint 200×2, epas patchminor 202,
+  + 회수(createprivatelinkservice IP버그·scf create/request PLE). ② **PF 신규
+  5건**: PF-49 certmanager 키파서(EC P-256도 거부)·PF-50 SW OTLP ingest·PF-51
+  sts objstore 500·PF-52 apigw approve 500(settle 후에도)·PF-53 scf approval
+  lookup-scope 분열. ③ **원인 확정+수리 반영(다음 heavy 런 판정)**: createrestore
+  400 = backup_recovery_time:"" (가짜-id 프로브 실증, 4엔진 제거) · pg patchminor
+  = ExistInprogress(어휘 아님 — verbatim+400사다리) · backup bk-vm-policy 13스텝
+  (direct-uuid) · privatelink 티어다운 인터락(CANCEL-선행, 좌초 복구 절차 검증).
+  ④ 전수 분류: PF 35 · 엔타이틀 40 · 오너결정 45 · aimlops 검증대기 6 —
+  **waiver 후보 제안서 `docs/working/trackers/WAIVER-CANDIDATES-2026-07-20.md`
+  (오너 승인 대기)**. 상세: validated-facts 2026-07-20 블록(애드엔덤 3개 포함).
+  **▶ 다음 착수(리터럴)**: ⓐ vs-netops 레인 판정 —
+  `SCP_RUN_HEAVY=true SCP_ALLOW_MUTATIONS=true SCP_ALLOW_DESTRUCTIVE=true python -m pytest tests/crud -m crud -k gen-heavy-vs-netops -q`
+  (bk-vm-policy 13스텝 = backup 9키 + makespan +15~75분), ⓑ 다음 DB 레인에서
+  createrestore 4키+pg patchminor 실 2xx 판정(수리 반영분), ⓒ waiver 제안서
+  오너 리뷰, ⓓ apigw approve 500(PF-52)·scf 404(PF-53) SDS 문의.
 - **PRIOR (2026-07-20 — 리포 전체 정리, branch `claude/repository-cleanup-bqil1u`,
   오너 지시 "흩어진 정보 모으고 미사용 소스/문서 정리"):** ① **`docs/archive/`
   tier 신설** — superseded 문서 33건 이동(핸드오프 11 · 플랜 7 · 트래커 9 ·

@@ -741,7 +741,6 @@
           "json": {
             "allowable_ip_addresses": [],
             "backup_history_number": "202501010000",
-            "backup_recovery_time": "",
             "block_storage_groups": [],
             "instance_name_prefix": "regrrst",
             "maintenance_option": {
@@ -764,7 +763,8 @@
             422
           ],
           "optional": true,
-          "group": "restore"
+          "group": "restore",
+          "_note": "e401f 판정: 400 value_error 진범 = backup_recovery_time:\"\"(빈 문자열) — 가짜-id 검증 프로브로 필드 제거 시 유효(404 flip) 확정, 제거. (PITR 쓸 때만 유효 타임스탬프로.)"
         }
       ]
     },
@@ -1207,7 +1207,6 @@
           "json": {
             "allowable_ip_addresses": [],
             "backup_history_number": "{backup_history_number}",
-            "backup_recovery_time": "",
             "block_storage_groups": [],
             "instance_name_prefix": "regrrst",
             "maintenance_option": {
@@ -1238,7 +1237,7 @@
             "method": "DELETE",
             "path": "/v1/clusters/{restored_cluster_id}"
           },
-          "_note": "database/postgresql/postgresqlcreaterestore frontier (400: placeholder/absent backup_history_number all prior runs). Real {backup_history_number} captured 2 steps up from the VERIFIED manual-backup; restore = full re-provision of a NEW cluster (~9-10min p50) deleted in-group below + cleanup belt. Tolerant expect: first live attempt records without red."
+          "_note": "database/postgresql/postgresqlcreaterestore frontier (400: placeholder/absent backup_history_number all prior runs). Real {backup_history_number} captured 2 steps up from the VERIFIED manual-backup; restore = full re-provision of a NEW cluster (~9-10min p50) deleted in-group below + cleanup belt. Tolerant expect: first live attempt records without red. | e401f 판정: 400 value_error 진범 = backup_recovery_time:\"\"(빈 문자열) — 가짜-id 검증 프로브로 필드 제거 시 유효(404 flip) 확정, 제거. (PITR 쓸 때만 유효 타임스탬프로.)"
         },
         {
           "name": "wait-restored-cluster",
@@ -1540,7 +1539,12 @@
           ],
           "optional": true,
           "group": "minor-patch",
-          "_note": "gap postgresqlpatchminorversion -- targets engine_version_target_software (COMMUNITY 17.7, the newest minor of the SAME major the cluster was created on) -- genuinely newer than the cluster's own current version, unlike the known-blocked pattern of resending the cluster's OWN current version (400 'Unpatchable version')."
+          "_note": "gap postgresqlpatchminorversion -- targets engine_version_target_software (COMMUNITY 17.7, the newest minor of the SAME major the cluster was created on) -- genuinely newer than the cluster's own current version, unlike the known-blocked pattern of resending the cluster's OWN current version (400 'Unpatchable version'). | e401f 판정 — 어휘 아님: bare \"17.7\"은 400 \"Software version is not POSTGRESQL\"(catalog-verbatim \"COMMUNITY 17.7\"이 정답), 실패 원인은 400 Dbaas.ValidationError.ExistInprogress(선행 비동기 요청 큐 미배수, service_state와 별개) → 400 사다리 8x30s로 흡수. epas는 이번 런 202.",
+          "retry_on_status": [
+            400
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-after-minor-patch",
@@ -1553,63 +1557,6 @@
           ],
           "optional": true,
           "group": "minor-patch",
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 1800,
-            "interval": 30,
-            "give_up_status": [
-              400,
-              404
-            ],
-            "refire": {
-              "field": "$.service_state",
-              "when": [
-                "UNKNOWN"
-              ],
-              "method": "POST",
-              "path": "/v1/clusters/{cluster_id}/sync-state",
-              "max": 2
-            }
-          }
-        },
-        {
-          "name": "patch-minor-version-bare",
-          "method": "PUT",
-          "path": "/v1/clusters/{cluster_id}/patch",
-          "json": {
-            "backup_before_upgrade": false,
-            "software_version": "17.7"
-          },
-          "expect_status": [
-            200,
-            201,
-            202,
-            400,
-            403,
-            404,
-            409,
-            422
-          ],
-          "optional": true,
-          "group": "minor-patch-bare",
-          "_note": "postgresqlpatchminorversion attempt 2/2: bare numeric '17.7'. Differential: epas twin (bare 16.11) VERIFIED run 6954; pg catalog-verbatim 'COMMUNITY 17.7' 400'd same run — pg is the only engine whose catalog software_version carries a product prefix. Hardcoded = newest COMMUNITY 17 minor live 2026-07-20; re-derive on catalog churn. If attempt 1 already 2xx'd this records the known 400 Unpatchable (tolerated)."
-        },
-        {
-          "name": "wait-after-minor-patch-bare",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200,
-            400,
-            404
-          ],
-          "optional": true,
-          "group": "minor-patch-bare",
           "poll": {
             "field": "$.service_state",
             "until": [
