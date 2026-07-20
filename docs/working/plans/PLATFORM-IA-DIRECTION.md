@@ -11,7 +11,9 @@ for: owner + platform
 ## 한 줄 요약 (정정)
 
 이 방향("**한 그래프를 단계마다 다른 얼굴로**")은 **새 발명이 아니라, 이미 결정되고
-절반쯤 구현된** `poc/scenario-viz/PLATFORM-PLAN.md`다(owner 2026-06-15 결정). 진짜 문제는
+절반쯤 구현된** [`docs/archive/scenario-viz-PLATFORM-PLAN.md`](../../archive/scenario-viz-PLATFORM-PLAN.md)다
+(owner 2026-06-15 결정; 원 위치 poc/scenario-viz/ — 2026-07-20 리포 정리로 poc 은퇴,
+문서만 아카이브 이관). 진짜 문제는
 같은 일을 **두 앱(controlplane + console2)이 따로** 하고 있어 흐름이 쪼개져 보이는 것.
 → **새로 그리지 말고, 이미 있는 둘을 한 흐름으로 수렴**하고(면 1), **공개 커버리지
 대시보드는 별도 유지**(면 2)하면 된다.
@@ -164,8 +166,10 @@ subnet:
 - **console2** = **실행·리포트만 더 잘** 만든 **별도 앱**(static SPA). 선택→Plan→실행→리포트 4스테이지,
   레이어드-DAG 캔버스(줌/스윔레인), simulate/live, R1 진행·R2 리소스·R3 API·R4 로그. **UX가 폴리시됨.**
 - **dashboard** = 커버리지·conformance **공개 정적 페이지**(Pages) + `ops.html` 라이브 ops.
-- **poc/scenario-viz** = 위 "한 그래프 + 오버레이" 아이디어를 **검증·구현한 곳**.
-  `PLATFORM-PLAN.md`에 **P0~P4 구현 완료**로 기록(composer.graph_view/focus_view/dependents,
+- **poc/scenario-viz** = 위 "한 그래프 + 오버레이" 아이디어를 **검증·구현한 곳**
+  (2026-07-20 리포 정리로 **은퇴·제거** — 코드는 git 이력, 계획 문서는
+  [`docs/archive/scenario-viz-PLATFORM-PLAN.md`](../../archive/scenario-viz-PLATFORM-PLAN.md)).
+  그 문서에 **P0~P4 구현 완료**로 기록(composer.graph_view/focus_view/dependents,
   공용 graph.js, 정적 catalog/plan/run/report).
 
 **그래서 쪼개져 보이는 진짜 이유:** 폴리시된 실행 UX(console2)와 저작/카탈로그(controlplane)가

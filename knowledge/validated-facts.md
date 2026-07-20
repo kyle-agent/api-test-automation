@@ -439,7 +439,7 @@ cachestore/postgresql `PUT .../backup-histories`, mysql/postgresql
 `DELETE .../backups` — while sibling sub-ops on the same cluster path 400.
 Also 401: the two query-param GETs (`scr check-duplication/name`, devops
 `check-duplication`) — suspect HMAC-vs-query-string signing on our side.
-Triage: `docs/working/handoffs/HANDOFF-fail-new-triage.md`.
+Triage: `docs/archive/handoffs/HANDOFF-fail-new-triage.md`.
 
 **Sweep/cleanup behavior (run ca493bd sweep log):**
 - `/v1/log-groups`: **15 listed / 0 deletable** every round — the per-service
@@ -526,8 +526,8 @@ sweep 마일스톤만 누락된 원인.)
 
 > conf: 0.3 · seen: 2026-06-11 · obs: 1
 
-> Levers ①③④ of `docs/working/handoffs/SESSION-HANDOFF-run6-and-ops.md`; full analysis in
-> `docs/working/plans/COVERAGE-WAVE-PLAN.md`. Promote after a live 2xx.
+> Levers ①③④ of `docs/archive/handoffs/SESSION-HANDOFF-run6-and-ops.md`; full analysis in
+> `docs/archive/plans/COVERAGE-WAVE-PLAN.md`. Promote after a live 2xx.
 
 - **gap_write 32 = 100% waived/disabled** (idc 19 blast-radius + archivestorage 13
   entitlement) — no authorable write gap remains; static ceiling moved by getid
@@ -640,7 +640,7 @@ SCP API exposes no DELETE — parent/cluster delete reclaims, or op is fire-and-
 
 ## Tier-0 LIGHT run (27725293499, 2026-06-18) — findings
 > conf: 0.8 · seen: 2026-06-18 · obs: 1 (run 27725293499, kr-west1)
-First coverage-max dispatch (`docs/working/plans/COVERAGE-MAX-PLAN.md` Tier 0). Result:
+First coverage-max dispatch (`docs/archive/plans/COVERAGE-MAX-PLAN.md` Tier 0). Result:
 **134 passed / 2 failed / 27 skipped** (adopt-CRUD 44m; smoke+read-chains ✅).
 - **`heavy=false` in `.github/run-request` did NOT propagate to the env** — the
   adopt-CRUD job ran with `SCP_RUN_HEAVY: true` and the heavy ids in `ADOPT_K`.

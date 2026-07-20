@@ -317,7 +317,7 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 
 | # | 작업 | AI 역할 | 비고 |
 |---|---|---|---|
-| B1 | **실패 triage 자동화** | new-fail을 분류: ① 환경/할당량 이슈 ② spec 변경 ③ 테스트(body) 버그 ④ 진짜 regression. known_issues 갱신·재실행·시나리오 수정 PR을 각각 제안 | 현재 `docs/working/handoffs/HANDOFF-fail-new-triage.md` 수작업의 자동화 — **가장 먼저 만들 것**. run을 블로킹하지 않는 비동기 후처리 |
+| B1 | **실패 triage 자동화** | new-fail을 분류: ① 환경/할당량 이슈 ② spec 변경 ③ 테스트(body) 버그 ④ 진짜 regression. known_issues 갱신·재실행·시나리오 수정 PR을 각각 제안 | 현재 `docs/archive/handoffs/HANDOFF-fail-new-triage.md` 수작업의 자동화 — **가장 먼저 만들 것**. run을 블로킹하지 않는 비동기 후처리 |
 | B2 | 리포트 자연어 요약 | run 결과 → 경영/팀 보고용 한 문단 + 주요 변화 하이라이트, 알림에 첨부 | 저비용·즉시 효과 |
 | B3 | 테스트 버그 자동수정 PR | triage가 ③으로 판정한 건의 시나리오 JSON 수정 PR 생성 → 사람 리뷰 | B1의 확장, 사람 게이트 필수 |
 
@@ -521,7 +521,7 @@ Phase 로드맵 정본은 `docs/ARCHITECTURE.md` §Direction. 아래 마일스�
       notes에 문서화(콘솔-전용 id → M5 Planning 폼 입력 경로)
 - [x] **R3 검증 웨이브 2 + heavy 윈도우** (2026-06-12) — vpc-free 체인
       9종으로 id-bound GET verify 레버 실행(gap_getid 151→130,
-      `docs/working/plans/COVERAGE-GETID-PLAN.md`): 웨이브 2 3회전(27399448835 →
+      `docs/archive/plans/COVERAGE-GETID-PLAN.md`): 웨이브 2 3회전(27399448835 →
       27401527554 → 27417986669) + heavy 2회전(+rev 3 디스패치,
       27421363609). 합성 roster **안정 green ~10개**(pilot/vslight/apigw/
       dashboard/queue/sec/rg/iam/scf/volume), heavy VS 체인은 서버 폐포 +
@@ -556,7 +556,7 @@ Phase 로드맵 정본은 `docs/ARCHITECTURE.md` §Direction. 아래 마일스�
 > 구현체: `tools/new_service.py`(M6a) · `regression/scenarios/targets.py`
 > selector→compose(M6b/c) · `core/oplog.py emit_plan` + ops 오버레이(M6d) ·
 > 확정 IA 수렴 + 발행 rebase 통일(M6e) · `docs/agent-team.md` 운영 루프 +
-> IMPROVEMENT-BACKLOG(M6f). 상세 설계 전문: `docs/M6-DESIGN.md`(superseded).
+> IMPROVEMENT-BACKLOG(M6f). 상세 설계 전문: `docs/archive/M6-DESIGN.md`(superseded).
 
 <details>
 <summary>owner 비전(2026-06-13) 원문 + M6a~f 항목</summary>
@@ -613,7 +613,8 @@ Phase 로드맵 정본은 `docs/ARCHITECTURE.md` §Direction. 아래 마일스�
 ### UI 비고 (2026-06-12)
 controlplane UI는 owner 목업에 따라 **Overview → Plan → Run → Report
 (+ Knowledge)** IA로 재설계됐고(설계 시스템·ctxbar·report 탭), 같은 화면들이
-`controlplane/static_export.py`로 Pages `/platform/`에 정적 export된다
+`controlplane/static_export.py`로 Pages `/platform/`에 정적 export됐다
+(이 export와 모듈은 이후 은퇴 — 2026-07-20 리포 정리에서 모듈 삭제)
 (노드별 read-only 폼 포함, 모든 메뉴 클릭 가능 — 액션 버튼은 "서버 전용" 배너).
 라이브 관제는 `dashboard/ops.html`이 제공: 모델에서 파생한 의존순서 자원 트리,
 run 종료 시 **정리 무결성 verdict** (테스트중/잔존/정리실패/삭제), in-flight 전용
@@ -621,9 +622,9 @@ run pill + 히스토리 행 선택, S3 listing pagination(1000-key 캡 해소),
 `oplog-test-*` 개발 prefix 필터, 전 시각 KST 표기(대시보드 헤더
 `dashboard/build.py` 포함) — `docs/OPS-DASHBOARD.md`.
 
-### IA reorg (2026-06-17) — 정식 IA는 `docs/IA.md`
+### IA reorg (2026-06-17) — 정식 IA는 `docs/archive/IA.md`
 플랫폼 IA를 정리해 surface 중복을 제거했다. 정보 구조의 단일 소스는
-**[`docs/IA.md`](IA.md)** 이며, 위 비고의 화면 설명 중 아래는 이 reorg로 갱신됐다:
+**[`docs/archive/IA.md`](archive/IA.md)** 이며, 위 비고의 화면 설명 중 아래는 이 reorg로 갱신됐다:
 
 - **두 런타임**: 정적 대시보드(Pages) = 정식 **Results + Ops**, 라이브
   control plane = 인터랙티브 **Plan + Run + 저작**.
@@ -639,7 +640,8 @@ run pill + 히스토리 행 선택, S3 listing pagination(1000-key 캡 해소),
 - **Report**는 정식 대시보드를 임베드(탭 summary/dashboard/runs/triage); 옛
   coverage/conformance/trends 재렌더 탭 제거.
 - **Ops** `ops.html` DEP map은 빌드 생성(수동 paste 폐지),
-  static_export PAGES는 새 IA에 정렬하고 per-file `view/*` fan-out을 제거.
+  static_export PAGES는 새 IA에 정렬하고 per-file `view/*` fan-out을 제거
+  (이후 static_export 자체가 은퇴·삭제됨 — 2026-07-20).
 
 </details>
 

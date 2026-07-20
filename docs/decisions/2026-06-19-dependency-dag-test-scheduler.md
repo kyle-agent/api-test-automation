@@ -33,7 +33,7 @@ DAG. Adopt incrementally:
   Remaining: the `.github/workflows/api-test.yml` cutover (enable the flag, drop the
   `regression-vpc-crud` serial job, fold `VPC_CRUD_K` into the parallel pool) — drafted
   but needs a flag-on heavy run to validate (peak concurrent VPCs ≤ 5, 0 survivors)
-  before merge; do NOT blind-merge (see `docs/working/trackers/run-parallelism-optimization.md` #3).
+  before merge; do NOT blind-merge (see `docs/archive/trackers/run-parallelism-optimization.md` #3).
 - **1.0** custom DAG runner replacing xdist (leaf-set → closure → topological waves →
   budgets throttle), consuming `suites/*.yaml` / `--service` selections as the leaf set
 
@@ -64,7 +64,7 @@ DAG. Adopt incrementally:
 Revisit if multi-service combination tests and selective/suite runs don't materialize
 (then the 2-lane split is adequate and the 1.0 runner isn't worth the build), or if
 pytest-xdist gains dependency-aware scheduling, or if `dependencies.json` proves too
-incomplete to drive a real scheduler. Cross-link: `docs/working/trackers/run-parallelism-optimization.md`.
+incomplete to drive a real scheduler. Cross-link: `docs/archive/trackers/run-parallelism-optimization.md`.
 
 ## As-built (2026-06-20)
 

@@ -192,7 +192,7 @@
 
 ## 5. 병합 — console2 디자인 백로그 (2026-06-22 리뷰에서 이관, 2026-07-04)
 
-> 출처: `docs/working/console2-ia-ux-review.md` (SUPERSEDED — 잔여 backlog는 이
+> 출처: `docs/archive/console2-ia-ux-review.md` (SUPERSEDED — 잔여 backlog는 이
 > 절이 정본). 원본 ID(Q*/B*) 유지. 원본에서 이미 DONE인 항목(Q1·Q2 build-1/2 ·
 > B1 `f73afadb` · B2 `6f5ae673` · B4 Suite ▾ · B6 착수)은 원본에 역사로 남기고
 > 여기엔 **미완 항목만** 옮긴다. 북극성 원칙(원본 §4): **구성 DAG는 plan/live/

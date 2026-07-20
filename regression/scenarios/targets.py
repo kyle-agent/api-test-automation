@@ -1,7 +1,7 @@
 """Target selector layer (M6b/M6c) — selector specs -> node-id lists.
 
 A *thin* interpreter that sits ON TOP of ``composer.plan()``/``compose()``
-(docs/M6-DESIGN.md §B.1).  ``compose()``/``plan()`` only accept a flat list of
+(docs/archive/M6-DESIGN.md §B.1).  ``compose()``/``plan()`` only accept a flat list of
 node ids; humans and agents want to say "all of service X" or "every CRUD
 node".  ``expand_targets(spec)`` resolves a selector string into a sorted,
 de-duplicated list of node ids and hands it straight to the composer — it does

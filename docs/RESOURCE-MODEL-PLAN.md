@@ -288,7 +288,7 @@ AI task-초안: `drafts/taskdef-<category>__<service>-<ts>.yaml` (사람 검토 
 
 > **이관 (2026-07-04, C2 정비).** 2026-06-12 시점의 웨이브 로그 전문(통과
 > roster · 제품 결함 최초 기록 · 합성-차단 클래스)은
-> [`docs/working/trackers/R3-WAVES-2026-06.md`](working/trackers/R3-WAVES-2026-06.md)
+> [`docs/archive/trackers/R3-WAVES-2026-06.md`](archive/trackers/R3-WAVES-2026-06.md)
 > 로 옮겼다 — 이 문서는 **설계 정본**으로 유지한다.
 >
 > 살아있는 단일 출처들:

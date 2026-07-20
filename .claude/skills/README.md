@@ -32,7 +32,7 @@ a parallel, conflicting system:
 | `team-init` | already a multi-agent team (`docs/agent-team.md` + roles) |
 | `session-start` | `START_HERE.md` + `docs/working/CONTEXT.md` already do this |
 | `session-checkpoint` | `docs/working/handoffs/` + `data/coordination/ledger.json` |
-| `project-init` | `docs/ROADMAP.md` / `docs/ARCHITECTURE.md` already exist (overwrite risk) |
+| `project-init` | `docs/archive/ROADMAP.md` / `docs/ARCHITECTURE.md` already exist (overwrite risk) |
 | `collab-audit` | generic; low priority |
 
 **Note — ideas were still mined from these.** We skipped the *skills*, but

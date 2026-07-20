@@ -18,6 +18,8 @@ for: v2-session (별도 세션 전담)
    (P2C-22~24는 완료·반영됨, P2C-25는 결정 대기).
 3. legacy 콘솔 `poc/scenario-viz/` — "같은 그래프, 오버레이만 교체" 원칙과
    환경 스트립·정의/사실 패널의 원형 (이식 검토: 2026-07-09 UX 에이전트 보고).
+   2026-07-20 리포 정리로 제거됨 — 코드는 git 이력(`git show`), 계획 문서는
+   `docs/archive/scenario-viz-PLATFORM-PLAN.md`.
 
 ## 방식 — 스트랭글러 (fork/장기 브랜치 아님)
 

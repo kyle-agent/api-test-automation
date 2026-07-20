@@ -25,9 +25,8 @@ sitting on one shared **kernel**.
 │  ├─ authoring (M3): validate→write→local-git-commit pipeline for suites,      │
 │  │            profiles, scenarios, knowledge (+ quota simulation warnings)    │
 │  ├─ reporting: run history, per-run snapshot restore, run-A-vs-B compare      │
-│  ├─ AI seams (ai_pipelines.py): triage (B1), summaries (B2), spec-impact (A1),│
-│  │            scenario/task drafts (A2), fact extraction (A3) — draft-only    │
-│  └─ static_export.py → Pages /platform/ (read-only static export of the UI)   │
+│  └─ AI seams (ai_pipelines.py): triage (B1), summaries (B2), spec-impact (A1),│
+│               scenario/task drafts (A2), fact extraction (A3) — draft-only    │
 └──────────────┬───────────────────────────────────────────────┬───────────────┘
                │ dispatch / commands                 heartbeat / │ results
 ┌──────────────▼────────────── Execution Plane ──────────────────▼──────────────┐
@@ -86,7 +85,7 @@ deterministic (AI sits at authoring time and post-run only).
    The 1.0 scheduler replaces the two hard-coded xdist lanes (ADOPT-parallel /
    VPC-CRUD-serial) with **one dependency graph** read by four overlays — Catalog →
    Plan → Run → Optimize. `catalog_planner` works the full resource model
-   (`composer.load_model`, ~275 nodes) to map a selected resource node to its
+   (`composer.load_model`, ~283 nodes) to map a selected resource node to its
    dependency closure and the lifecycles that exercise it; `catalog_run` chains that
    to execution (`--target X`); `dag_planner` turns the resulting leaf set into
    cap-safe topological waves (provision shared roots / free-parallel / adopt /
@@ -111,8 +110,8 @@ deterministic (AI sits at authoring time and post-run only).
 ## The M5 composer layer (resource model → scenarios)
 
 Axis-1 scenarios are no longer only hand-written. The **resource-task model**
-(`knowledge/formal/resources/*.yaml` — 275 nodes / 60 YAML files (59 services +
-`_groups.yaml`), readable codes
+(`knowledge/formal/resources/*.yaml` — 283 nodes / 60 YAML files (59 services +
+`_groups.yaml`; live count `python knowledge/formal/validate.py`), readable codes
 `<cat>-<group>-<resource>` such as `nw-vpc-vpc`, groups in `_groups.yaml`)
 declares per resource: its dependency requirements (`requires`, incl. `one_of`
 branches, `count` multiplicity and console-issued `credential` prerequisites),
@@ -211,7 +210,7 @@ conformance/ static runtime baseline   rules/
 cleanup/     reconciler
 dashboard/   build (index + per-service drilldowns)  ops.html (live ops view)
 controlplane/ app dispatch scheduler authoring triage ai_pipelines/ai_routes
-             resource_routes snapshots compare static_export  templates/
+             resource_routes snapshots compare templates/
 runner/      worker.py (M4 same-host executor)
 suites/      environments/   named suites · environment profiles (data)
 knowledge/   formal/{services,cross-service,flows,combo-scenarios,resources/}
@@ -225,7 +224,7 @@ reports/     per-run output (gitignored): results/*.jsonl, registry/*.jsonl, das
 
 ## Direction — phases (ROADMAP.md 병합, 2026-07-04)
 
-> Merged from `docs/ROADMAP.md` + `docs/M6-DESIGN.md` (both superseded by this
+> Merged from `docs/archive/ROADMAP.md` + `docs/archive/M6-DESIGN.md` (both superseded by this
 > section). **Numbers are never read from this file** — re-measure with
 > `python -m spec.summary` / `python -m spec.coverage_gap`; current state lives
 > in `docs/working/CONTEXT.md`. Platform milestones (M0–M5): `docs/PLATFORM-PLAN.md`.

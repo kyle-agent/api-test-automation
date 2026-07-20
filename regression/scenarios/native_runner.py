@@ -61,7 +61,7 @@ def _durations() -> dict:
 # 안 된다 (owner 2026-07-13: 긴 soft-의존 태스크 container-ske-cluster-nodepool
 # (34.6m)을 dependent-last로 t=16분에 미뤄 makespan 50.7분 — 실제로는 다른
 # 라이프사이클을 안 기다리는데 벌점만 먹음. 진짜 inter-lifecycle 의존만 뒤로 →
-# 47.7분(최장 태스크 바닥선)으로 수렴). gantt_sim이 같은 집합을 재사용한다.
+# 47.7분(최장 태스크 바닥선)으로 수렴).
 _SHARED_INFRA_KINDS = {"vpc", "subnet", "security-group", "keypair", "image",
                        "server-type", "filestorage-volume", "private-dns"}
 

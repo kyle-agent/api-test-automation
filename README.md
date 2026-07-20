@@ -21,8 +21,9 @@ state: `docs/working/CONTEXT.md`; doc index: `docs/INDEX.md`.
    either way.
 3. **Knowledge & model — [`knowledge/`](knowledge/README.md)** +
    [`knowledge/formal/`](knowledge/formal/FORMAT.md), including the **M5
-   resource-task model** (`knowledge/formal/resources/*.yaml`, 275 nodes /
-   60 YAML files = 59 services + `_groups.yaml`) from which
+   resource-task model** (`knowledge/formal/resources/*.yaml`, 283 nodes /
+   60 YAML files = 59 services + `_groups.yaml` — live count:
+   `python knowledge/formal/validate.py`) from which
    `regression/scenarios/composer.py` *composes* lifecycles — scenarios are
    generated from the model rather than hand-written.
 

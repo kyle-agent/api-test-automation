@@ -19,7 +19,7 @@ run 레코드/스케줄/UI는 두 모드에서 동일합니다. Docker Compose �
 
 정보 구조(IA)의 단일 소스는 **`docs/working/plans/PLATFORM-IA-DIRECTION.md`**
 §"✅ 확정 IA (2026-06-26)" + **§"개정 (2026-07-07)"** 입니다 (오너 확정 후 개정:
-Catalog는 네비 단계에서 우측 유틸 링크로, Modeling이 흡수; 구 `docs/IA.md`는
+Catalog는 네비 단계에서 우측 유틸 링크로, Modeling이 흡수; 구 `docs/archive/IA.md`는
 SUPERSEDED). 두 런타임으로 깔끔히 분리됩니다:
 
 - **정적 대시보드** (GitHub Pages, 면②) — 공개 커버리지·conformance.

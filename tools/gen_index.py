@@ -56,10 +56,10 @@ def rel(p: pathlib.Path) -> str:
     return p.relative_to(DOCS).as_posix()
 
 
-def rows_for(subdir: str) -> list[tuple]:
+def rows_for(subdir: str, recursive: bool = False) -> list[tuple]:
     base = DOCS / subdir if subdir else DOCS
     out = []
-    for p in sorted(base.glob("*.md")):
+    for p in sorted(base.rglob("*.md") if recursive else base.glob("*.md")):
         if p.name == "INDEX.md":
             continue
         st, aud, summ = parse(p)
@@ -84,6 +84,7 @@ def render() -> str:
         ("Working — handoffs", rows_for("working/handoffs")),
         ("Working — trackers", rows_for("working/trackers")),
         ("Decisions (ADR)", rows_for("decisions")),
+        ("Archive — frozen history (`docs/archive/`, 정본 아님)", rows_for("archive", recursive=True)),
     ]
     total = sum(len(r) for _, r in tiers)
     active = sum(1 for _, r in tiers for row in r if row[1] == "active")

@@ -17,10 +17,13 @@ existed under a different var name). It also reads ``core.catalog.load_catalog()
 (endpoint set) and ``data/api_docs.json`` (required query params). It writes two
 artifacts and prints a summary:
 
-  * ``docs/working/trackers/READ-REACHABILITY.md``  — dated per-service report (the durable gap map).
+  * ``docs/working/trackers/READ-REACHABILITY.md``  — dated per-service report (the
+    durable gap map; the 2026-06-18 snapshot was archived to
+    ``docs/archive/trackers/READ-REACHABILITY.md`` — regenerating writes a fresh
+    working-tier report).
   * ``reports/read_reachability.json`` — machine-readable verdict rows (gitignored dir).
 
-Cross-reference: ``docs/working/plans/COVERAGE-GETID-PLAN.md`` §7 (probe_reads UNDER-SEEDING) and
+Cross-reference: ``docs/archive/plans/COVERAGE-GETID-PLAN.md`` §7 (probe_reads UNDER-SEEDING) and
 its "Piece 1 — engine auto-probe" / "Piece 2" / "Piece 3" subsections. The
 ``model-gap`` list here IS Piece 3's worklist.
 
@@ -65,7 +68,7 @@ from regression.scenarios import composer
 ROOT = Path(__file__).resolve().parent.parent
 API_DOCS_PATH = ROOT / "data" / "api_docs.json"
 SIDECAR_PATH = ROOT / "data" / "api_catalog_params.json"
-MD_OUT = ROOT / "docs" / "READ-REACHABILITY.md"
+MD_OUT = ROOT / "docs" / "working" / "trackers" / "READ-REACHABILITY.md"
 JSON_OUT = ROOT / "reports" / "read_reachability.json"
 
 # Same placeholder regex the engine uses (regression/scenarios/engine.py:_probe_reads
@@ -302,7 +305,7 @@ def render_markdown(rows_by_service, skipped_no_model) -> str:
                  f"join (`data/api_catalog_params.json` authoritative producers) — "
                  f"no network, no engine, no live model.")
     lines.append(">")
-    lines.append("> Cross-ref: `docs/working/plans/COVERAGE-GETID-PLAN.md` §7 (probe_reads "
+    lines.append("> Cross-ref: `docs/archive/plans/COVERAGE-GETID-PLAN.md` §7 (probe_reads "
                  "UNDER-SEEDING — the create→조회 gap) and its Piece 1 (engine "
                  "auto-probe), Piece 2 (this report), Piece 3 (burn down "
                  "model-gaps). The **model-gap** section below is Piece 3's worklist.")

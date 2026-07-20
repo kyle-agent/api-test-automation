@@ -501,7 +501,7 @@ def finalize(history_path: str = "dashboard/history.jsonl") -> bool:
 # Plan-manifest (M6d) — the INTENDED dependency chain, uploaded ONCE at run
 # start as runs/<run_id>/plan.json (parallel to runs/<id>/res/*.json). The ops
 # viewer pre-draws plan.order as grey placeholders and lights them up as the
-# matching `created` resource events arrive (docs/M6-DESIGN.md §C).
+# matching `created` resource events arrive (docs/archive/M6-DESIGN.md §C).
 # ---------------------------------------------------------------------------
 import re as _re
 

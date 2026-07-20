@@ -102,8 +102,10 @@ _CT = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf
 # model: categories -> services -> resources (+ deps & endpoints) + lifecycles
 # --------------------------------------------------------------------------- #
 def _norm_requires(task: dict):
-    """Mirror poc/scenario-viz/build_data.norm_requires + composer keying so the
-    same viz.js consumes this model: AND refs, one_of branch groups, credentials."""
+    """Normalize task ``requires`` into the composer keying the graph views
+    consume: AND refs, one_of branch groups, credentials. (Same shape the
+    retired poc build_data.norm_requires produced — keep them aligned if that
+    ever resurfaces from git history.)"""
     and_deps, groups, creds = [], [], []
     for entry in task.get("requires") or []:
         if isinstance(entry, str):

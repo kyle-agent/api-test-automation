@@ -17,7 +17,7 @@ why anything still isn't covered so next run resumes from there.
 
 Role spec: `docs/agent-team.md` (per-service expert template). Runtime + safety +
 the improved platform you run on (VPC budget, gates-default-on, `spec.failures`):
-`docs/working/coverage-session-brief.md`. Your service's durable facts:
+`docs/archive/coverage-session-brief.md`. Your service's durable facts:
 `knowledge/services.md`. Your resumable state: your row in
 `data/coverage_ledger.json` (`blockers`, `next_levers`).
 

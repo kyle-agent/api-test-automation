@@ -257,4 +257,4 @@ min=4, ceiling=20, interval=15s.
 
 See also: the ADR
 [`docs/decisions/2026-06-19-dependency-dag-test-scheduler.md`](decisions/2026-06-19-dependency-dag-test-scheduler.md)
-and [`docs/working/trackers/run-parallelism-optimization.md`](run-parallelism-optimization.md).
+and [`docs/archive/trackers/run-parallelism-optimization.md`](archive/trackers/run-parallelism-optimization.md).

@@ -1694,7 +1694,7 @@ if(@@CRUDFAIL@@>0){crudFilter='fail';showList();renderSum();renderCrud();}
 # build injects a FRESH kind→parent dependency map (computed from the resource
 # model) between these markers and writes the result to <outdir>/ops.html, so
 # the published viewer can never go stale (retires the old manual gen_dep_map
-# paste — see docs/IA.md WS3 / docs/OPS-DASHBOARD.md).
+# paste — see docs/archive/IA.md WS3 / docs/OPS-DASHBOARD.md).
 
 OPS_TEMPLATE = os.path.join(os.path.dirname(__file__), "ops.html")
 _DEP_BEGIN = "// ---- DEP-MAP"

@@ -59,7 +59,7 @@ safety gates. Re-derive flags with the snippet at the bottom.
 > **29 lifecycles total** (24 enabled, 3 disabled here + the heavy ones gated by
 > `SCP_RUN_HEAVY`). The setter-coverage expansion (26 write steps, in-place
 > updates) added in the trusting-curie merge lives inside several existing
-> lifecycles as extra steps — see `docs/working/handoffs/HANDOFF-crud-setter-validation.md`.
+> lifecycles as extra steps — see `docs/archive/handoffs/HANDOFF-crud-setter-validation.md`.
 
 ## Coverage gap (drive AXIS 1 to 100%)
 
@@ -145,7 +145,7 @@ ceiling into measured coverage.
 
 ## Coverage expansion — 2026-06-11 (levers ①③④, docs-derived)
 
-No new lifecycles; existing ones extended (see `docs/working/plans/COVERAGE-WAVE-PLAN.md`):
+No new lifecycles; existing ones extended (see `docs/archive/plans/COVERAGE-WAVE-PLAN.md`):
 
 - **DBaaS sub-op window prep (①)**: `database-mysql-cluster` + `database-postgresql-cluster`
   gained conservative-only window groups (`mysql-subop-window`/`mysql-restart`/

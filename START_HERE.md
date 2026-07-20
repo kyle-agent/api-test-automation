@@ -7,12 +7,14 @@
 
 This repository is the **SCP API Regression Test Platform**: it tests the
 **Samsung Cloud Platform (SCP) Open APIs**
-(13 categories / ~60 services / **1,372 endpoints**) along two axes —
+(13 categories / ~60 services / **1,416 endpoints** as of the 2026-07 spec bump —
+trust `python -m spec.summary` over this number) along two axes —
 **regression** ("does it work?") and **conformance** ("is it well designed &
 AI-usable?") — and wraps them in a **control plane**
 ([`controlplane/`](controlplane/README.md): dispatch, schedule, live tracking,
 intervention, history/compare, AI seams) plus the **M5 resource-task model**
-([`knowledge/formal/resources/`](knowledge/formal/), 275 nodes / 60 service files) from which
+([`knowledge/formal/resources/`](knowledge/formal/), 283 nodes / 59 service files —
+live count: `python knowledge/formal/validate.py`) from which
 scenarios are *composed* (`regression/scenarios/composer.py`). The engineering
 is done by **a team of AI agents** (this is a *multi-agent* project) whose
 roles, operating model, context and execution harness are documented in
@@ -31,9 +33,9 @@ is accumulated under [`knowledge/`](knowledge/).
    from **static analysis + real runtime probes**.
 
 See [`README.md`](README.md) and [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the
-implementation blueprint, and [`ROADMAP.md`](docs/ROADMAP.md) for the phase plan
-(coverage 100% → scheduled regression → dedicated-server runs). This file does
-not duplicate them.
+implementation blueprint — its §"Direction — phases" carries the phase plan
+(coverage 100% → scheduled regression → dedicated-server runs; the old
+`ROADMAP.md` is archived under `docs/archive/`). This file does not duplicate them.
 
 ## Fresh-container bootstrap (Claude-on-the-web) — read before running anything
 
@@ -138,4 +140,4 @@ the first three automatically on every web session; the rest are gotchas to know
 | `cleanup/` | Tag-scoped reconciler (guaranteed teardown) |
 | `data/` | Catalog, request bodies, docs, baselines (incl. `coverage_waivers.json`); `coordination/ledger.json` = campaign blackboard |
 | `reports/` | Per-run output (gitignored): `results/*.jsonl`, dashboard, junit |
-| `docs/` | Design specs (ARCHITECTURE · agent-team · scheduler-system · …) + `working/` (handoffs · trackers · plans) + `decisions/` — see `docs/INDEX.md` |
+| `docs/` | Design specs (ARCHITECTURE · agent-team · scheduler-system · …) + `working/` (handoffs · trackers · plans) + `decisions/` + `archive/` (frozen history — 정본 아님) — see `docs/INDEX.md` |
