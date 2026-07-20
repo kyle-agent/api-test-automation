@@ -83,8 +83,14 @@ _CATALOG = load_catalog()
 
 def _norm_path(p: str) -> str:
     """Collapse templated id segments to '*' (mirrors dashboard.norm_path) so a
-    lifecycle step's templated path can be matched back to its catalog endpoint."""
-    p = (p or "").split("?")[0].strip("/")
+    lifecycle step's templated path can be matched back to its catalog endpoint.
+    Absolute URLs (cross-region steps, e.g. private-dns activate on the DR
+    region host) are stripped to their path so they still attribute to the
+    catalog key — the service comes from the step's own service field."""
+    p = (p or "").split("?")[0]
+    if p.startswith("http"):
+        p = "/" + p.split("://", 1)[-1].split("/", 1)[-1] if "/" in p.split("://", 1)[-1] else ""
+    p = p.strip("/")
     return "/".join("*" if "{" in s else s for s in p.split("/"))
 
 

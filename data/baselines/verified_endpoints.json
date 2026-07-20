@@ -504,17 +504,17 @@
     "path": "/v1/apis/{api_id}/access-controls"
   },
   "application-service/apigateway/createapi": {
-    "count": 233,
+    "count": 236,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/apis",
     "path": "/v1/apis"
   },
   "application-service/apigateway/createapideployment": {
-    "count": 178,
+    "count": 179,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/apis/*/deployments",
     "path": "/v1/apis/{api_id}/deployments"
@@ -536,9 +536,9 @@
     "path": "/v1/apis/{api_id}/auths"
   },
   "application-service/apigateway/createmethod": {
-    "count": 178,
+    "count": 179,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/apis/*/resources/*/methods",
     "path": "/v1/apis/{api_id}/resources/{resource_id}/methods"
@@ -552,9 +552,9 @@
     "path": "/v1/privatelink-endpoints"
   },
   "application-service/apigateway/createresource": {
-    "count": 207,
+    "count": 208,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/apis/*/resources/*",
     "path": "/v1/apis/{api_id}/resources/{root_resource_id}"
@@ -584,9 +584,9 @@
     "path": "/v1/apis/{api_id}/access-controls/{access_control_id}"
   },
   "application-service/apigateway/deleteapi": {
-    "count": 225,
+    "count": 227,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/apis/*",
     "path": "/v1/apis/{api_id}"
@@ -608,9 +608,9 @@
     "path": "/v1/apis/{api_id}/auths/{auth_id}"
   },
   "application-service/apigateway/deletemethod": {
-    "count": 176,
+    "count": 177,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/apis/*/resources/*/methods/*",
     "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}"
@@ -624,9 +624,9 @@
     "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}"
   },
   "application-service/apigateway/deleteresource": {
-    "count": 205,
+    "count": 206,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/apis/*/resources/*",
     "path": "/v1/apis/{api_id}/resources/{resource_id}"
@@ -2352,17 +2352,17 @@
     "path": "/v1/cloud-functions/check-duplication"
   },
   "compute/scf/createcloudfunction": {
-    "count": 167,
+    "count": 170,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/cloud-functions",
     "path": "/v1/cloud-functions"
   },
   "compute/scf/createcloudfunctionapigatewaytrigger": {
-    "count": 45,
+    "count": 46,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/triggers/apigateway",
     "path": "/v1/triggers/apigateway"
@@ -2384,17 +2384,17 @@
     "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints"
   },
   "compute/scf/deletecloudfunction": {
-    "count": 159,
+    "count": 162,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/cloud-functions/*",
-    "path": "/v1/cloud-functions/{cloud_function_id}"
+    "path": "/v1/cloud-functions/{java_fn_id}"
   },
   "compute/scf/deletecloudfunctiontrigger": {
-    "count": 97,
+    "count": 98,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/triggers/*",
     "path": "/v1/triggers/{trigger_id}"
@@ -2470,6 +2470,14 @@
     "method": "PUT",
     "norm_path": "v1/cloud-functions/*/configurations/privatelink-endpoints/*/request",
     "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/request"
+  },
+  "compute/scf/setcloudfunctioncodefile": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "PUT",
+    "norm_path": "v1/cloud-functions/*/codes/file",
+    "path": "/v1/cloud-functions/{java_fn_id}/codes/file"
   },
   "compute/scf/setresourcepolicy": {
     "count": 48,
@@ -11367,18 +11375,122 @@
     "norm_path": "v1/apis/*/usage-plans/*",
     "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}"
   },
+  "gen-wave5-apigw-privatelink:create-api": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/apis",
+    "path": "/v1/apis"
+  },
+  "gen-wave5-apigw-privatelink:create-function": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/cloud-functions",
+    "path": "/v1/cloud-functions"
+  },
+  "gen-wave5-apigw-privatelink:create-private-api": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/apis",
+    "path": "/v1/apis"
+  },
+  "gen-wave5-apigw-privatelink:create-subnet": {
+    "count": 2,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/subnets",
+    "path": "/v1/subnets"
+  },
+  "gen-wave5-apigw-privatelink:create-vpc": {
+    "count": 2,
+    "first_run": "",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/vpcs",
+    "path": "/v1/vpcs"
+  },
+  "gen-wave5-apigw-privatelink:delete-api": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/apis/*",
+    "path": "/v1/apis/{api_id}"
+  },
+  "gen-wave5-apigw-privatelink:delete-function": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/cloud-functions/*",
+    "path": "/v1/cloud-functions/{cloud_function_id}"
+  },
+  "gen-wave5-apigw-privatelink:delete-subnet": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/subnets/*",
+    "path": "/v1/subnets/{subnet_id}"
+  },
+  "gen-wave5-apigw-privatelink:delete-vpc": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
+  },
+  "gen-wave5-apigw-privatelink:list-apigw-privatelink-endpoints": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/privatelink-endpoints",
+    "path": "/v1/privatelink-endpoints"
+  },
+  "gen-wave5-apigw-privatelink:wait-function": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/cloud-functions/*",
+    "path": "/v1/cloud-functions/{cloud_function_id}"
+  },
+  "gen-wave5-apigw-privatelink:wait-function-after-pl-service": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/cloud-functions/*",
+    "path": "/v1/cloud-functions/{cloud_function_id}"
+  },
+  "gen-wave5-apigw-privatelink:wait-function-before-delete": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/cloud-functions/*",
+    "path": "/v1/cloud-functions/{cloud_function_id}"
+  },
   "gen-wave5-apigw-privatelink:wait-subnet": {
-    "count": 6,
+    "count": 7,
     "first_run": "27645841461",
-    "last_run": "28648339307",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
   },
   "gen-wave5-apigw-privatelink:wait-vpc": {
-    "count": 6,
+    "count": 8,
     "first_run": "27645841461",
-    "last_run": "28648339307",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -11608,140 +11720,188 @@
     "path": "/v1/policies/{policy_id_2}/bindings"
   },
   "gen-wave5-scf-triggers:create-api": {
-    "count": 26,
+    "count": 27,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/apis",
     "path": "/v1/apis"
   },
   "gen-wave5-scf-triggers:create-apigateway-trigger": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/triggers/apigateway",
     "path": "/v1/triggers/apigateway"
   },
   "gen-wave5-scf-triggers:create-deployment": {
-    "count": 26,
+    "count": 27,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/apis/*/deployments",
     "path": "/v1/apis/{api_id}/deployments"
   },
   "gen-wave5-scf-triggers:create-function": {
-    "count": 29,
+    "count": 30,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
+    "method": "POST",
+    "norm_path": "v1/cloud-functions",
+    "path": "/v1/cloud-functions"
+  },
+  "gen-wave5-scf-triggers:create-java-fn": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/cloud-functions",
     "path": "/v1/cloud-functions"
   },
   "gen-wave5-scf-triggers:create-method": {
-    "count": 26,
+    "count": 27,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/apis/*/resources/*/methods",
     "path": "/v1/apis/{api_id}/resources/{resource_id}/methods"
   },
   "gen-wave5-scf-triggers:create-resource": {
-    "count": 26,
+    "count": 27,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/apis/*/resources/*",
     "path": "/v1/apis/{api_id}/resources/{root_resource_id}"
   },
   "gen-wave5-scf-triggers:delete-api": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/apis/*",
     "path": "/v1/apis/{api_id}"
   },
   "gen-wave5-scf-triggers:delete-function": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/cloud-functions/*",
     "path": "/v1/cloud-functions/{cloud_function_id}"
   },
+  "gen-wave5-scf-triggers:delete-java-fn": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "DELETE",
+    "norm_path": "v1/cloud-functions/*",
+    "path": "/v1/cloud-functions/{java_fn_id}"
+  },
   "gen-wave5-scf-triggers:delete-method": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/apis/*/resources/*/methods/*",
     "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}"
   },
   "gen-wave5-scf-triggers:delete-resource": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/apis/*/resources/*",
     "path": "/v1/apis/{api_id}/resources/{resource_id}"
   },
   "gen-wave5-scf-triggers:delete-trigger": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/triggers/*",
     "path": "/v1/triggers/{trigger_id}"
   },
   "gen-wave5-scf-triggers:find-root-resource": {
-    "count": 26,
+    "count": 27,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/apis/*/resources",
     "path": "/v1/apis/{api_id}/resources"
   },
   "gen-wave5-scf-triggers:list-triggers": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/triggers",
     "path": "/v1/triggers?cloud_function_id={cloud_function_id}"
   },
+  "gen-wave5-scf-triggers:set-code-file": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "PUT",
+    "norm_path": "v1/cloud-functions/*/codes/file",
+    "path": "/v1/cloud-functions/{java_fn_id}/codes/file"
+  },
+  "gen-wave5-scf-triggers:show-function-logs": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/cloud-functions/*/logs",
+    "path": "/v1/cloud-functions/{cloud_function_id}/logs?time=1"
+  },
+  "gen-wave5-scf-triggers:show-function-metrics": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/cloud-functions/*/metrics",
+    "path": "/v1/cloud-functions/{cloud_function_id}/metrics?time=1"
+  },
   "gen-wave5-scf-triggers:show-trigger": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/triggers/*",
     "path": "/v1/triggers/{trigger_id}"
   },
   "gen-wave5-scf-triggers:wait-function": {
-    "count": 29,
+    "count": 30,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/cloud-functions/*",
     "path": "/v1/cloud-functions/{cloud_function_id}"
   },
   "gen-wave5-scf-triggers:wait-function-after-code": {
-    "count": 29,
+    "count": 30,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/cloud-functions/*",
     "path": "/v1/cloud-functions/{cloud_function_id}"
   },
   "gen-wave5-scf-triggers:wait-function-before-delete": {
-    "count": 25,
+    "count": 26,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "",
     "method": "GET",
     "norm_path": "v1/cloud-functions/*",
     "path": "/v1/cloud-functions/{cloud_function_id}"
+  },
+  "gen-wave5-scf-triggers:wait-java-fn": {
+    "count": 1,
+    "first_run": "",
+    "last_run": "",
+    "method": "GET",
+    "norm_path": "v1/cloud-functions/*",
+    "path": "/v1/cloud-functions/{java_fn_id}"
   },
   "gen-wave5-swatch-custom-log:create-log-group": {
     "count": 25,
@@ -11792,7 +11952,7 @@
     "path": "/v1/log-groups/log-streams/log-events"
   },
   "gen-wave5-swatch-custom-metric:create-sw-custom-metric-meta": {
-    "count": 22,
+    "count": 23,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -11800,7 +11960,7 @@
     "path": "/v1/metrics/custom/meta"
   },
   "gen-wave5-swatch-custom-metric:verify-sw-custom-metric-meta-data-readback": {
-    "count": 22,
+    "count": 23,
     "first_run": "27583285457",
     "last_run": "",
     "method": "POST",
@@ -14064,9 +14224,9 @@
     "path": "/v1/log-groups/log-streams/collect/custom"
   },
   "management/servicewatch/createcustommetricmetas": {
-    "count": 66,
+    "count": 68,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/metrics/custom/meta",
     "path": "/v1/metrics/custom/meta"
@@ -14184,9 +14344,9 @@
     "path": "/v1/log-groups"
   },
   "management/servicewatch/listmetricdata": {
-    "count": 108,
+    "count": 109,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/metrics/data",
     "path": "/v1/metrics/data"
@@ -17240,9 +17400,9 @@
     "path": "/v1/publicips"
   },
   "networking/vpc/createsubnet": {
-    "count": 214,
+    "count": 216,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/subnets",
     "path": "/v1/subnets"
@@ -17320,9 +17480,9 @@
     "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
   },
   "networking/vpc/createvpc": {
-    "count": 221,
+    "count": 223,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "POST",
     "norm_path": "v1/vpcs",
     "path": "/v1/vpcs"
@@ -17408,9 +17568,9 @@
     "path": "/v1/publicips/{publicip_id}"
   },
   "networking/vpc/deletesubnet": {
-    "count": 145,
+    "count": 146,
     "first_run": "27593608514",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
@@ -17488,9 +17648,9 @@
     "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}"
   },
   "networking/vpc/deletevpc": {
-    "count": 147,
+    "count": 148,
     "first_run": "27583285457",
-    "last_run": "20260718-123101-6954",
+    "last_run": "",
     "method": "DELETE",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -20072,7 +20232,7 @@
     "path": "/v1/alerts/{alert_id}/description"
   },
   "servicewatch-custom-ingest:create-custom-metric-meta": {
-    "count": 12,
+    "count": 13,
     "first_run": "",
     "last_run": "",
     "method": "POST",

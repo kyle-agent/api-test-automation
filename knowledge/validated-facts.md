@@ -4080,3 +4080,26 @@ OWNER-DECISION 45 · FIX-PENDING-VALIDATION 6(aimlops) · 진성 수리대상 ~9
 - heavy 판정 런 필요: DB 레인 `(cluster-version-upgrade or cluster-subops-a) and
   not cachestore`(공유 VPC 1, 최대 +21키) · vs-netops 레인(bk-vm-policy 판정,
   공유 VPC 1) · aimlops 명시선택 런(6키, PF-33 수리 대기).
+
+### 애드엔덤 (같은 날 라이브 판정 확정분)
+
+- **activateprivatedns 202 확정** (probe regrpdnsprb1): kr-east1 POST
+  /v1/private-dns/activate → **202** + created_by:system 리전 실체 신규 id.
+  전체 의미론: ①같은리전 activate=400 max-count-exceed(생성이 리전 슬롯 점유),
+  ②타리전은 상대 리전이 CREATING/DELETING 중이면 400 modifying-other-regions
+  (재시도 해소), ③리전 실체는 **리전별 삭제 필수**(west delete가 east를 연쇄하지
+  않음 — east1 잔존 실측 후 별도 DELETE 202), ④ACTIVE 도달 ~14분(느림),
+  ⑤list 엔벨로프 `private_dns[]`·`count`, id는 `private_dns.id`. 반영:
+  networking-dns-hosted-zone-private + heavy-shared-networking 양쪽 activate를
+  east1 절대 URL+400 사다리로, east1 teardown 2스텝 선행 배치. 엔진/validator
+  `_norm_path` 절대URL 호스트-스트립 추가(크로스리전 스텝의 카탈로그 키 귀속).
+- **scf setcloudfunctioncodefile 202 확정** (run e401b): Java:17 fn 생성→
+  PUT codes/file {class_name, method_name} → **202** → 삭제 204. 프론티어 격파,
+  verified fold 완료.
+- **privatelink PLS create 400의 진범 = IP 범위** — MANUAL은 유효 enum(백엔드
+  ValidationError가 ['MANUAL','AUTO'] 직접 명시, req-a7091cfc). 실제 원인:
+  lifecycle subnet 10.163.8.0/24인데 PLS 바디가 10.124.0.7/8 잔재 → 범위 밖
+  400 (톨러런트 expect에 가려진 선재 잠복 버그). 10.163.8.7/8 정렬 후 재검증 런.
+- **servicewatch ingest**: 등록 네임스페이스가 listmetricinfos(POST /v1/metrics,
+  {"namespace_name":...})로 count 18 조회되는 상태에서도 전 표현 400 → PF-50
+  등재 (기존 07-16 exact-match 실험의 격상판).

@@ -9719,22 +9719,6 @@
           }
         },
         {
-          "name": "dns-activate",
-          "service": "dns",
-          "group": "dns",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/private-dns/activate",
-          "json": {
-            "name": "regrpdns{ualpha}"
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ]
-        },
-        {
           "name": "dns-privatedns-wait",
           "service": "dns",
           "group": "dns",
@@ -9756,6 +9740,32 @@
             "timeout": 300,
             "interval": 15
           }
+        },
+        {
+          "name": "dns-activate",
+          "service": "dns",
+          "group": "dns",
+          "optional": true,
+          "method": "POST",
+          "path": "https://dns.kr-east1.e.samsungsdscloud.com/v1/private-dns/activate",
+          "json": {
+            "name": "regrpdns{ualpha}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400
+          ],
+          "retry_on_status": [
+            400
+          ],
+          "retries": 10,
+          "retry_interval": 30,
+          "capture_soft": {
+            "pdns_east1_id": "$.private_dns.id"
+          },
+          "_note": "LIVE-VERIFIED 2026-07-20: activate=타리전 재사용 API(east1 202, created_by:system 신규 리전 실체). 같은리전=max-count-exceed, 타리전은 west 수정 중이면 modifying-other-regions 400(사다리 해소). ACTIVE 후 발사되도록 wait 뒤로 이동. east1 실체는 별도 삭제(아래 east1 teardown)."
         },
         {
           "name": "dns-zone-create",
@@ -10057,6 +10067,44 @@
           "retry_interval": 15
         },
         {
+          "name": "dns-privatedns-delete-east1",
+          "method": "DELETE",
+          "path": "https://dns.kr-east1.e.samsungsdscloud.com/v1/private-dns/{pdns_east1_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
+          "retry_on_status": [
+            400
+          ],
+          "retries": 10,
+          "retry_interval": 20,
+          "_note": "east1 리전 실체 선삭제(2026-07-20 실측: west delete로 연쇄되지 않음). 미캡처 시 리터럴 404 무해."
+        },
+        {
+          "name": "dns-privatedns-east1-gone",
+          "method": "GET",
+          "path": "https://dns.kr-east1.e.samsungsdscloud.com/v1/private-dns/{pdns_east1_id}",
+          "optional": true,
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 20
+          },
+          "_note": "east1 드레인 후에야 west delete가 modifying-other-regions를 안 맞음."
+        },
+        {
           "name": "dns-privatedns-delete",
           "service": "dns",
           "group": "dns",
@@ -10066,13 +10114,15 @@
             200,
             202,
             204,
+            400,
             404
           ],
           "destructive": true,
           "retry_on_status": [
+            400,
             409
           ],
-          "retries": 6,
+          "retries": 20,
           "retry_interval": 15
         },
         {

@@ -62,7 +62,10 @@ BUILTINS = {"unique", "ualpha", "region", "today", "today_plus_5y",
 
 
 def _norm_path(p: str) -> str:
-    p = (p or "").split("?")[0].strip("/")
+    p = (p or "").split("?")[0]
+    if p.startswith("http"):  # cross-region absolute-URL step → path part only
+        p = "/" + p.split("://", 1)[-1].split("/", 1)[-1] if "/" in p.split("://", 1)[-1] else ""
+    p = p.strip("/")
     return "/".join("*" if "{" in s else s for s in p.split("/"))
 
 

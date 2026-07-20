@@ -628,6 +628,41 @@
           }
         },
         {
+          "name": "wait-cluster-running-before-add-instances",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "es-instances",
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING"
+            ],
+            "timeout": 600,
+            "interval": 20,
+            "allow_timeout": true,
+            "give_up_status": [
+              400,
+              404
+            ],
+            "refire": {
+              "field": "$.service_state",
+              "when": [
+                "UNKNOWN"
+              ],
+              "method": "POST",
+              "path": "/v1/clusters/{cluster_id}/sync-state",
+              "max": 2
+            }
+          },
+          "_note": "F-diag 2026-07-20: addinstances 404 판정 전제 — add 직전 RUNNING settle+sync-state refire (ES 프로비저닝 PF는 2026-07-15 capacity 수리로 해소, ess1v2m4). RUNNING 클러스터에서도 404 재현 시 상태-스코프 lookup/combined-topology 게이트 의심 → 오류바디 채집 후 PF 판정."
+        },
+        {
           "name": "add-instances",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/add-instances",

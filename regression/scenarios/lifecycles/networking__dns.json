@@ -176,14 +176,20 @@
         {
           "name": "activate-private-dns",
           "method": "POST",
-          "path": "/v1/private-dns/activate",
+          "path": "https://dns.kr-east1.e.samsungsdscloud.com/v1/private-dns/activate",
           "group": "pdns",
           "optional": true,
           "json": {
             "name": "regrpdns{ualpha}"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409],
-          "_note": "COVERAGE-2026-07-16: activateprivatedns (dns gap key). Docs (data/api_docs.json PrivateDnsActivateRequest): body is just {name: 3-20 char pattern ^[a-zA-Z0-9-]*$}. Per knowledge/services.md, activate is documented for RE-USING an already-created account-global private-dns NAME in ANOTHER region; calling it on the SAME name in the SAME (creation) region right after create is untested live -- tolerant expect_status covers both an idempotent 2xx and a same-region/already-active 4xx. Uses the exact 'regrpdns{ualpha}' name create-private-dns used ({ualpha} is a single stable per-run token, so no separate capture needed). Placed after wait-private-dns-active (state ACTIVE) so the name is guaranteed to exist."
+          "retry_on_status": [400],
+          "retries": 10,
+          "retry_interval": 30,
+          "capture_soft": {
+            "pdns_east1_id": "$.private_dns.id"
+          },
+          "_note": "LIVE-VERIFIED 2026-07-20 (probe regrpdnsprb1): activate = 타리전 재사용 API가 정답. 같은 리전 activate는 400 max-count-exceed(리전 슬롯을 create가 이미 점유), kr-east1 POST는 202 + created_by:system 리전 실체 신규 id 반환. 크로스리전 직렬화: 서쪽이 CREATING/DELETING 중이면 400 modifying-other-regions(재시도로 해소 — 사다리 10x30s). ACTIVE settle 후 배치 유지 필수. 실체는 리전별 삭제 필요 -> delete-private-dns-east1 단계가 티어다운 담당. kr-east1은 라이브 DR 페어(/v1/backups/region-relationship) — env/리전 변경 시 재도출."
         },
         {
           "name": "connect-vpc-to-private-dns",
@@ -368,15 +374,38 @@
           }
         },
         {
+          "name": "delete-private-dns-east1",
+          "method": "DELETE",
+          "path": "https://dns.kr-east1.e.samsungsdscloud.com/v1/private-dns/{pdns_east1_id}",
+          "group": "pdns",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 404],
+          "retry_on_status": [400],
+          "retries": 10,
+          "retry_interval": 20,
+          "_note": "activate가 만든 kr-east1 리전 실체는 west1 delete로 연쇄 삭제되지 않음(2026-07-20 실측) — east1 먼저 삭제(서쪽 idle 상태라 즉시 202), 미캡처 시 리터럴 토큰 1회 404로 무해 통과."
+        },
+        {
+          "name": "wait-private-dns-east1-gone",
+          "method": "GET",
+          "path": "https://dns.kr-east1.e.samsungsdscloud.com/v1/private-dns/{pdns_east1_id}",
+          "group": "pdns",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 600, "interval": 20},
+          "_note": "east1 드레인 완료를 기다려야 west1 delete가 modifying-other-regions 400을 안 맞는다."
+        },
+        {
           "name": "delete-private-dns",
           "method": "DELETE",
           "path": "/v1/private-dns/{private_dns_id}",
           "group": "pdns",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 404, 409],
-          "retry_on_status": [409],
-          "retries": 10,
+          "expect_status": [200, 202, 204, 400, 404, 409],
+          "retry_on_status": [400, 409],
+          "retries": 20,
           "retry_interval": 30
         },
         {

@@ -625,14 +625,14 @@
           "service": "vpc",
           "method": "POST",
           "path": "/v1/privatelink-services",
-          "_note": "UNPROVEN — first live exercise of PrivateLinkServiceCreateRequest. approval_type AUTO so downstream endpoint requests self-approve; connected_resource_type IP with two free IPs inside the subnet /24 (no LB/VM needed). 202 PrivateLinkServiceShowResponse. 2026-07-08 전런 수리(ip-overlap 근본원인): 구 IP(10.163.8.5/.10)는 자체 서브넷(10.163.8.0/24) 기준값인데 create-subnet이 adopt:subnet이라 전런에선 공유 서브넷(10.124.0.0/24, engine._SHARED_SUBNET_CIDR)로 치환돼 CIDR 밖 → 400 ip-address-overlap. ADOPT-class 고정 IP 재호밍 규칙(knowledge/domain-constraints.md)대로 10.124.0.7/.8로 정정 — fixed_ip_map 선점분(.5/.6 vpc-privatelink-service, .20 vpc-endpoint, .30/.31 lb-members-nat, .100~.102 lb 기본값)과 비충돌(전 시나리오 grep 확인 2026-07-08; dependencies.json fixed_ip_map에 .7/.8 등재는 후속). 듀얼모드 주의(validated-facts.md): 공유 인프라 없는 단독(자가 생성 10.163.8.0/24) 실행에선 이 IP가 역으로 대역 밖 400 → optional+group이라 privatelink-service 그룹 스킵으로 관용되고, xdist 전런에선 IB-049가 자가 생성을 막아 adopt 모드가 유일 경로. | 2026-07-20: AUTO->MANUAL — AUTO pre-empts the REQUESTING state so approve/request/connect are structurally un-2xx-able (privatelink state machine live-proven 2026-06-24 vpc family). MANUAL: create->REQUESTING->CANCEL->CANCELED->RE_REQUEST->REQUESTING->APPROVE->ACTIVE->DISCONNECT->RECONNECT.",
+          "_note": "UNPROVEN — first live exercise of PrivateLinkServiceCreateRequest. approval_type AUTO so downstream endpoint requests self-approve; connected_resource_type IP with two free IPs inside the subnet /24 (no LB/VM needed). 202 PrivateLinkServiceShowResponse. 2026-07-08 전런 수리(ip-overlap 근본원인): 구 IP(10.163.8.5/.10)는 자체 서브넷(10.163.8.0/24) 기준값인데 create-subnet이 adopt:subnet이라 전런에선 공유 서브넷(10.124.0.0/24, engine._SHARED_SUBNET_CIDR)로 치환돼 CIDR 밖 → 400 ip-address-overlap. ADOPT-class 고정 IP 재호밍 규칙(knowledge/domain-constraints.md)대로 10.124.0.7/.8로 정정 — fixed_ip_map 선점분(.5/.6 vpc-privatelink-service, .20 vpc-endpoint, .30/.31 lb-members-nat, .100~.102 lb 기본값)과 비충돌(전 시나리오 grep 확인 2026-07-08; dependencies.json fixed_ip_map에 .7/.8 등재는 후속). 듀얼모드 주의(validated-facts.md): 공유 인프라 없는 단독(자가 생성 10.163.8.0/24) 실행에선 이 IP가 역으로 대역 밖 400 → optional+group이라 privatelink-service 그룹 스킵으로 관용되고, xdist 전런에선 IB-049가 자가 생성을 막아 adopt 모드가 유일 경로. | 2026-07-20: AUTO->MANUAL — AUTO pre-empts the REQUESTING state so approve/request/connect are structurally un-2xx-able (privatelink state machine live-proven 2026-06-24 vpc family). MANUAL: create->REQUESTING->CANCEL->CANCELED->RE_REQUEST->REQUESTING->APPROVE->ACTIVE->DISCONNECT->RECONNECT. | 2026-07-20 라이브 판정 2건: (a) MANUAL은 유효 enum(백엔드 ValidationError가 [MANUAL, AUTO] 직접 명시, req-a7091cfc), (b) 진짜 400 원인은 IP가 subnet 10.163.8.0/24 밖(10.124.0.x 잔재) — 10.163.8.7/8로 정렬. 톨러런트 expect가 가리던 선재 잠복 버그.",
           "json": {
             "name": "regrpls{ualpha}",
             "description": "API regression wave5 privatelink service",
             "approval_type": "MANUAL",
             "connected_resource_type": "IP",
-            "connected_resource_ip_address": "10.124.0.8",
-            "service_ip_address": "10.124.0.7",
+            "connected_resource_ip_address": "10.163.8.8",
+            "service_ip_address": "10.163.8.7",
             "subnet_id": "{subnet_id}",
             "tags": []
           },
@@ -842,11 +842,32 @@
           "group": "apigw-ple-actions"
         },
         {
+          "name": "wait-apigw-ple-requesting",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/privatelink-endpoints/{ple_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.privatelink_endpoint.status",
+            "until": [
+              "REQUESTING"
+            ],
+            "timeout": 180,
+            "interval": 10,
+            "allow_timeout": true
+          },
+          "optional": true,
+          "group": "apigw-ple-actions",
+          "_note": "2026-07-20 run e401c: RE_REQUEST 200 직후 즉발 approve가 500 — 전이 상태 창. REQUESTING settle 후 approve."
+        },
+        {
           "name": "approve-apigw-privatelink-endpoint",
           "service": "apigateway",
           "method": "PUT",
           "path": "/v1/privatelink-endpoints/{ple_id}/approval",
-          "_note": "GATED PROBE — PrivateLinkEndpointApprovalRequest {api_id, type APPROVE|REJECT}. With approval_type AUTO the endpoint may already be approved -> 4xx tolerated; the op still records. If live shows MANUAL flow is needed, flip the privatelink-service to MANUAL and approve here. REWIRE 2026-07-16 (C/D 합동, run a690+e68b): api_id를 REGION api에서 {private_api_id}(create-private-api)로 교체 — REGION api_id는 400 cannot-use-region-api 확정.",
+          "_note": "GATED PROBE — PrivateLinkEndpointApprovalRequest {api_id, type APPROVE|REJECT}. With approval_type AUTO the endpoint may already be approved -> 4xx tolerated; the op still records. If live shows MANUAL flow is needed, flip the privatelink-service to MANUAL and approve here. REWIRE 2026-07-16 (C/D 합동, run a690+e68b): api_id를 REGION api에서 {private_api_id}(create-private-api)로 교체 — REGION api_id는 400 cannot-use-region-api 확정. | e401c: 즉발 500(전이 창) → REQUESTING 게이트 선행 + 500 재시도 사다리. 안정 상태에서도 500이면 PF 판정.",
           "json": {
             "api_id": "{private_api_id}",
             "type": "APPROVE"
@@ -856,12 +877,14 @@
             202,
             400,
             404,
-            409
+            409,
+            500
           ],
           "optional": true,
           "group": "apigw-ple-actions",
           "retry_on_status": [
-            400
+            400,
+            500
           ],
           "retries": 4,
           "retry_interval": 10
@@ -933,6 +956,47 @@
           "retry_interval": 10
         },
         {
+          "name": "cancel-before-delete-apigw-ple",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{ple_id}/request",
+          "json": {
+            "type": "CANCEL"
+          },
+          "expect_status": [
+            200,
+            202,
+            400
+          ],
+          "optional": true,
+          "group": "apigw-ple",
+          "_note": "teardown 인터락 해소(2026-07-20 실측): REQUESTING PLE는 delete가 400 invalid-deletable-state, PLS delete는 409 exist-connected-endpoint — CANCEL(200)→CANCELED에서 delete 204→PLS 202로 라이브 검증. approve 실패로 REQUESTING에 머문 경우를 정확히 커버; 다른 상태면 400 무해."
+        },
+        {
+          "name": "wait-apigw-ple-deletable",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/privatelink-endpoints/{ple_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "field": "$.privatelink_endpoint.status",
+            "until": [
+              "CANCELED",
+              "ACTIVE",
+              "DISCONNECTED",
+              "REJECTED"
+            ],
+            "timeout": 120,
+            "interval": 10,
+            "allow_timeout": true
+          },
+          "optional": true,
+          "group": "apigw-ple"
+        },
+        {
           "name": "delete-apigw-privatelink-endpoint",
           "service": "apigateway",
           "method": "DELETE",
@@ -950,8 +1014,8 @@
             409,
             500
           ],
-          "retries": 6,
-          "retry_interval": 20
+          "retries": 10,
+          "retry_interval": 15
         },
         {
           "name": "create-function",
@@ -1173,12 +1237,14 @@
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "scf-ple-actions",
           "retry_on_status": [
-            400
+            400,
+            500
           ],
           "retries": 8,
           "retry_interval": 15,
@@ -1381,7 +1447,7 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/privatelink-services/{pls_id}",
-          "_note": "must come after both consumer endpoints are gone — 409 retried while endpoint teardown settles.",
+          "_note": "must come after both consumer endpoints are gone — 409 retried while endpoint teardown settles. | 409 exist-connected-endpoint는 PLE 드레인 대기 — 사다리.",
           "expect_status": [
             200,
             202,
