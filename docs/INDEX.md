@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 77 docs · 29 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 80 docs · 29 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -78,14 +78,17 @@
 | [`archive/handoffs/HANDOFF-2026-06-19-coverage-and-watcher.md`](archive/handoffs/HANDOFF-2026-06-19-coverage-and-watcher.md) | all | Handoff — 2026-06-19 (Claude remote): coverage push, per-service agents, live-watcher |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
 | [`archive/handoffs/HANDOFF-2026-06-19-platform-and-coverage.md`](archive/handoffs/HANDOFF-2026-06-19-platform-and-coverage.md) | all | Handoff — 2026-06-19 (session 2): platform fixes + coverage round |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
 | [`archive/handoffs/HANDOFF-2026-06-20-cutover-validation.md`](archive/handoffs/HANDOFF-2026-06-20-cutover-validation.md) | all | Handoff — 2026-06-20: scheduler v0.5 cutover LIVE-VALIDATED + path to 1.0 |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
+| [`archive/handoffs/HANDOFF-2026-06-25-abc-tracks.md`](archive/handoffs/HANDOFF-2026-06-25-abc-tracks.md) | all | HANDOFF — 2026-06-25 EOD · A/B/C execution session |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
 | [`archive/handoffs/SESSION-HANDOFF.md`](archive/handoffs/SESSION-HANDOFF.md) | all | SESSION HANDOFF — 2026-06-17 ~01:00 UTC |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
 | [`archive/plans/COVERAGE-GETID-PLAN.md`](archive/plans/COVERAGE-GETID-PLAN.md) | coverage | the id-bound GET gap, classified and attacked |  superseded (2026-06-12 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체) |
+| [`archive/plans/COVERAGE-TO-100-2026-06-25.md`](archive/plans/COVERAGE-TO-100-2026-06-25.md) | all | Coverage → 100% master plan (2026-06-25) |  superseded (2026-06-25 스냅샷 플랜 — CAMPAIGN-C3-100이 대체) |
 | [`archive/plans/COVERAGE-WAVE-PLAN.md`](archive/plans/COVERAGE-WAVE-PLAN.md) | coverage | the remaining static gap, prioritized |  superseded (2026-06-11 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체) |
 | [`archive/plans/IA-BUILD-CONTRACT.md`](archive/plans/IA-BUILD-CONTRACT.md) | the IA-build agents (Catalog · Modeling · Reporting) + integration owner | IA build contract — "그림 하나, 여러 얼굴" parallel build |  superseded (이행 완료된 빌드 계약 — 확정 IA 빌드 완료) |
 | [`archive/plans/PARALLEL-EXECUTION-PLAN.md`](archive/plans/PARALLEL-EXECUTION-PLAN.md) | all | Parallel execution plan — staged foundations + per-VPC lanes (DRAFT) |  superseded (드래프트 설계 — 1.0 의존-DAG 스케줄러로 실현됨) |
 | [`archive/plans/PLATFORM-CONVERGENCE.md`](archive/plans/PLATFORM-CONVERGENCE.md) | owner + platform | 수렴 계획 — console2 → controlplane (척추 흡수) |  superseded (이행 완료된 수렴 계획 — console2가 척추에 흡수됨) |
 | [`archive/plans/PROBE-READS-PLAN.md`](archive/plans/PROBE-READS-PLAN.md) | coverage | where the probe-read principle still needs applying |  superseded (2026-06-15 스냅샷 워크리스트 — 커버리지 캠페인 정본으로 대체) |
 | [`archive/scenario-viz-PLATFORM-PLAN.md`](archive/scenario-viz-PLATFORM-PLAN.md) | all | 실제 플랫폼 반영 계획 — 합성 시나리오 그래프 UI |  superseded (poc/scenario-viz 은퇴와 함께 아카이브 — 확정 IA 정본은 docs/working/plans/PLATFORM-IA-DIRECTION.md §확정IA) |
+| [`archive/terraform-api-coverage-gap-2026-06-09.md`](archive/terraform-api-coverage-gap-2026-06-09.md) | all | Samsung Cloud Platform v2 — API ↔ Terraform Provider 커버리지 갭 상세 리포트 |  superseded (2026-06-09 일자 분석 스냅샷 — 카탈로그는 이후 1,416으로 버전업) |
 | [`archive/trackers/CATALOG-VALIDATION-STATUS.md`](archive/trackers/CATALOG-VALIDATION-STATUS.md) | coverage | 검증 되었는지 보고 (verification track) |  superseded (2026-06-17 측정 스냅샷 — 수치 stale; 재생성: python -m tools.catalog_status) |
 | [`archive/trackers/COVERAGE-C3-ANALYSIS-2026-06-20.md`](archive/trackers/COVERAGE-C3-ANALYSIS-2026-06-20.md) | coverage | C3 Coverage Analysis & Plan — 2026-06-20 |  superseded (2026-06-20 분석 스냅샷 — 커버리지 캠페인 정본으로 대체) |
 | [`archive/trackers/POSTRUN-2026-06-20-fullheavy.md`](archive/trackers/POSTRUN-2026-06-20-fullheavy.md) | orchestrator | Post-run Analysis: Full Heavy DAG Run — 2026-06-20 |  superseded (2026-06-20 run 1회분 사후 분석 스냅샷) |
