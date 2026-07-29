@@ -437,11 +437,14 @@ def _jsonpath_get(obj, expr: str):
     return cur
 
 
-def _capture(body, expr):
+def _capture(body, expr, ctx=None):
     """Capture a value from a response. `expr` is a JSONPath string or a filter
     object selecting a list element matching field prefixes:
         {"list": "$.server_types", "where_prefix": {"id": "s"},
          "where_not_prefix": {"id": "g"}, "get": "id"}
+    ``ctx``가 주어지면 where_prefix/where_not_prefix의 문자열 값에 {token}
+    치환을 적용한다 (2026-07-29: 오퍼링 자원부족 대응 — 서버타입 세대 필터를
+    env로 핀할 수 있게. 예: "{db_server_type_filter}" → Standard-2).
     Optional smallest-first selection (2026-07-15, owner "제일 작은 사이즈"):
         {"list": "$.contents", "min_by": ["cpu_core", "memory_gb"],
          "get": "name", "nth": 0}
@@ -456,6 +459,12 @@ def _capture(body, expr):
     items = _jsonpath_get(body, expr["list"]) or []
     where = expr.get("where_prefix", {})
     wnot = expr.get("where_not_prefix", {})
+    if ctx:
+        where = {k: (_fill(v, ctx) if isinstance(v, str) else v)
+                 for k, v in where.items()}
+        wnot = {k: (_fill(v, ctx) if isinstance(v, str) else
+                    [_fill(p, ctx) for p in v] if isinstance(v, list) else v)
+                for k, v in wnot.items()}
     kept = []
     for item in items:
         if not isinstance(item, dict):
@@ -514,6 +523,24 @@ def _default_zone(region: str) -> str:
     if z:
         return z
     return f"{region}-b" if region == "kr-west1" else f"{region}-a"
+
+
+def _vs_server_type_prefix() -> str:
+    """{vs_server_type_prefix} — VS계열 find-server-type의 where_prefix id
+    기본값. 오퍼링 자원부족 대응 (2026-07-29 run 3b65: 기저 VM 풀 고갈로
+    전 DB 클러스터 create 202 후 ~2분 내 FAILED; 오너 확인 "신규 VM은 s2
+    타입으로"): SCP_VS_SERVER_TYPE_PREFIX=s2 로 세대를 핀. 기본 "s" = 현행
+    (첫 s* 타입, g*=GPU 제외)."""
+    return os.environ.get("SCP_VS_SERVER_TYPE_PREFIX", "").strip() or "s"
+
+
+def _db_server_type_filter() -> str:
+    """{db_server_type_filter} — DBaaS find-server-type의 where_prefix type
+    기본값 (min_by cpu/mem와 결합해 해당 세대 최소 사이즈 선택). 기본
+    "Standard-1" = 현행 검증계. 자원부족 오퍼링에선 SCP_DB_SERVER_TYPE=
+    Standard-2 등으로 핀 (정확한 문자열은 대상의 GET /v1/server-types 응답
+    type 값으로 확인)."""
+    return os.environ.get("SCP_DB_SERVER_TYPE", "").strip() or "Standard-1"
 
 
 def _fill(template: str, ctx: dict) -> str:
@@ -1079,6 +1106,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # {zone} — 가용영역 (2026-07-29 신설: east 오퍼링 실측에서 존 리터럴
         # 하드코딩이 교차-리전 400 InvalidAvailabilityZone을 만든 게 계기).
         "zone": _default_zone(cfg.region),
+        # 서버타입 세대 핀 (2026-07-29 — 오퍼링 자원부족 대응; capture 필터의
+        # where_prefix 값에서 {token}으로 소비된다).
+        "vs_server_type_prefix": _vs_server_type_prefix(),
+        "db_server_type_filter": _db_server_type_filter(),
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
         # ISO YYYY-MM-DD dates for endpoints that take a bounded report/metric
@@ -1676,7 +1707,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                       f"-> treating as success")
             if status_ok:
                 for var, expr in step.get("capture", {}).items():
-                    if _capture(resp.body, expr) is None:
+                    if _capture(resp.body, expr, ctx) is None:
                         status_ok = False
                         break
             if not status_ok and step.get("optional"):
@@ -1718,14 +1749,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 reserved["vpc"] = max(0, reserved.get("vpc", 0) - 1)
 
             for var, expr in step.get("capture", {}).items():
-                val = _capture(resp.body, expr)
+                val = _capture(resp.body, expr, ctx)
                 assert val is not None, (
                     f"could not capture '{var}' via {expr!r} from {step['name']} "
                     f"response\n{resp.raw_text[:500]}")
                 ctx[var] = str(val)
 
             for var, expr in step.get("capture_soft", {}).items():
-                val = _capture(resp.body, expr)
+                val = _capture(resp.body, expr, ctx)
                 if val is None:
                     print(f"  soft-capture '{var}' via {expr!r} found nothing "
                           f"from '{step['name']}' — dependent probe(s) skipped")
@@ -1739,7 +1770,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             _skey = _catalog_key_for(step.get("method"), step.get("path"), step_service)
             if _skey and _skey in _PRODUCER_OF:
                 _rt, _cap = _PRODUCER_OF[_skey]
-                _idv = _capture(resp.body, _cap) if _cap else None
+                _idv = _capture(resp.body, _cap, ctx) if _cap else None
                 if _idv is None:   # fall back to a value the lifecycle just captured
                     for _v in step.get("capture", {}):
                         if _v in ctx:

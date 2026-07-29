@@ -65,3 +65,10 @@ Key fields (see `core/profiles.py` for the full schema):
    "그 서버의 CURRENT"를 테스트하라 (구버전 오퍼링에 신버전 핀 = 406 폭풍;
    업그레이드 전/후 비교 런은 양쪽 다 PIN=false로 동일 조건 유지).
    상세: `docs/API-VERSIONING.md`.
+4. **가용영역/서버타입이 다르면 env 토큰으로 핀**:
+   - `SCP_ZONE=<존>` — 존 규칙이 다른 리전 (기본: kr-west1→`-b`, 그 외→`-a`
+     — 실측 기반 자동).
+   - `SCP_VS_SERVER_TYPE_PREFIX=s2` · `SCP_DB_SERVER_TYPE=Standard-2` —
+     특정 세대 풀만 자원이 있는 오퍼링 (2026-07-29 west1 실측: s1 풀 고갈로
+     전 DB 클러스터 FAILED, "신규 VM은 s2로"). 정확한 type 문자열은 대상의
+     `GET /v1/server-types` 응답으로 확인.
