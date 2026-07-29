@@ -34,3 +34,30 @@ Key fields (see `core/profiles.py` for the full schema):
   makes a production profile read-only by construction.
 * `quota_overrides:` — per-account resource caps, exported as
   `SCP_BUDGET_LIMITS` and merged over `core/budgets.py` defaults.
+
+## 다른 오퍼링/계정으로 전환할 때 체크리스트 (2026-07-29 실전 검증)
+
+`SCP_ACCESS_KEY/SECRET`·`SCP_REGION/ENV`를 새 대상으로 바꾸면 **테스트 자체는
+자기충족**이다 — 단 아래 3가지만 알면 된다:
+
+1. **oplog 미러만 수동 조치** (유일한 교차-계정 고정 자원). 영구 버킷
+   `apitest-oplog-permanent`는 기존 검증계 소유라, 새 자격으로는
+   `IncorrectUserXAuthTokenException`으로 미러가 실패한다(런은 계속됨 —
+   best-effort). 콘솔 띄우는 셸에 3종 세트를 추가:
+   ```bash
+   export SCP_OPLOG_ACCESS_KEY=<기존 검증계 AK>   # 둘 다 있어야 발동
+   export SCP_OPLOG_SECRET_KEY=<기존 검증계 SK>
+   export SCP_OPLOG_S3_ENDPOINT=https://object-store.kr-west1.e.samsungsdscloud.com
+   ```
+   (endpoint 기본값은 현재 `SCP_REGION/ENV`에서 합성되므로 키만 바꾸면
+   새 오퍼링 호스트에 기존 키로 인증하게 된다 — 반드시 같이 고정.)
+2. **시나리오용 버킷은 전부 자동** — `shared_infra`가 런 시작 시 현재 테스트
+   계정 키로 `apitest-logsink`(DB log-export·DC firewall 로깅·loggingaudit
+   trail·network-logging)와 qcow2 이미지 자산(버킷+객체, git `assets/` 원본)을
+   멱등 ensure한다. `SCP_OPLOG_*` 오버라이드는 이 둘에 **의도적으로 미적용**
+   ("새 계정 자기충족"). placeholder 버킷(`regrcoveragebucket` 등)은 관용
+   스텝이라 무시. 실패 시 stderr `[shared_infra] ... ensure 실패` 확인.
+3. **대상의 API 버전이 다르면** `SCP_API_VERSION_PIN=false`로 핀을 꺼서
+   "그 서버의 CURRENT"를 테스트하라 (구버전 오퍼링에 신버전 핀 = 406 폭풍;
+   업그레이드 전/후 비교 런은 양쪽 다 PIN=false로 동일 조건 유지).
+   상세: `docs/API-VERSIONING.md`.
