@@ -1119,7 +1119,7 @@ jobs:
           cp reports/dashboard/ops.html "$dd"/ops.html 2>/dev/null || cp dashboard/ops.html "$dd"/ 2>/dev/null || true
           # NOTE: the duplicate view-only platform/ static export
           # (controlplane.static_export -> reports/platform-static -> "$dd"/platform)
-          # was RETIRED (IA.md V5; the module itself was deleted in the 2026-07-20
+          # was RETIRED (IA.md V5; the module itself was deleted in the 2026-07-29
           # repo cleanup). The separate static catalog/ export was also
           # RETIRED — the console Catalog tab (/platform, below) is now the
           # canonical platform static read face. Purge any stale catalog/ left on
@@ -1133,10 +1133,10 @@ jobs:
           cp data/conformance.json "$dd"/ 2>/dev/null || true
           cp data/conformance_baseline.json "$dd"/ 2>/dev/null || true
           cp reports/conformance_new.json "$dd"/ 2>/dev/null || true
-          # /platform — RETIRED (2026-07-20 repo cleanup): the legacy poc
+          # /platform — RETIRED (2026-07-29 repo cleanup): the legacy poc
           # scenario-viz static console is gone (poc/ removed); its role is
           # covered by /ia-demo/ (controlplane.build_ia_demo) + the console2
-          # static bundle. Owner approved the purge (2026-07-20): the stale
+          # static bundle. Owner approved the purge (2026-07-29): the stale
           # /platform, /poc and /local-run-demo copies were deleted from
           # dashboard-data; the rm below keeps a stale clone from resurrecting
           # them (publishing is otherwise non-destructive — same as catalog/).

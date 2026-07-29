@@ -144,7 +144,7 @@ for: orchestrator
 3. C11(CATALOG-VALIDATION-STATUS 수치)은 다음 `tools.catalog_status` 재생성 때 자연 해소.
 4. C2 착수 시 §4 표를 작업 목록으로 사용.
 
-## 6. 집행 결과 (2026-07-20 리포 정리 세션 — 오너 지시 "전체 repository 정리")
+## 6. 집행 결과 (2026-07-29 리포 정리 세션 — 오너 지시 "전체 repository 정리")
 
 | # | 판정 | 실행 내용 |
 |---|---|---|
@@ -157,4 +157,4 @@ for: orchestrator
 | R7 | **집행** | R1에 포함 |
 | R8 | **집행** | `tools/sample_data.py` 삭제 (poc 동반) |
 | R9 | **유지** | `regression/scr_docker_probe.py`는 `api-test.yml:618` gated 스텝(`docker_probe=true`)이 여전히 실행 — 활성 |
-| 추가 | **집행** | `tools/gantt_sim.py`·`tools/loop_cycle.py`(참조 0)·`controlplane/static_export.py`(자칭 tombstone)·`drafts/compose_wave5.py`·`recompose_ib042.py`(1회성, 참조 0) 삭제. `docs/archive/` 신설 — superseded 문서 33건 이동 + CONTEXT.md 히스토리 분리(1,138→~220줄). `docs/quotas-and-budgets.md` → `knowledge/quotas-and-budgets.md` 병합(단일화). 상세: `docs/decisions/2026-07-20-repo-cleanup-archive-tier.md` |
+| 추가 | **집행** | `tools/gantt_sim.py`·`tools/loop_cycle.py`(참조 0)·`controlplane/static_export.py`(자칭 tombstone)·`drafts/compose_wave5.py`·`recompose_ib042.py`(1회성, 참조 0) 삭제. `docs/archive/` 신설 — superseded 문서 33건 이동 + CONTEXT.md 히스토리 분리(1,138→~220줄). `docs/quotas-and-budgets.md` → `knowledge/quotas-and-budgets.md` 병합(단일화). 상세: `docs/decisions/2026-07-29-repo-cleanup-archive-tier.md` |

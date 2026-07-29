@@ -3,7 +3,7 @@ status: superseded (2026-06-09 일자 분석 스냅샷 — 카탈로그는 이�
 for: all
 ---
 
-> **아카이브 구제 (2026-07-20 리포 정리).** 미머지 브랜치 `claude/festive-cori-pb4ytf`에만
+> **아카이브 구제 (2026-07-29 리포 정리).** 미머지 브랜치 `claude/festive-cori-pb4ytf`에만
 > 존재하던 문서를 브랜치 삭제 전 보존 이관. API↔Terraform Provider 갭 분석 원본 (유일본).
 
 # Samsung Cloud Platform v2 — API ↔ Terraform Provider 커버리지 갭 상세 리포트

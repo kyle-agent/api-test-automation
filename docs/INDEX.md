@@ -10,7 +10,7 @@
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | all | SCP API Regression Test Platform — Architecture | 🟢 active |
 | [`COVERAGE-CRITERIA.md`](COVERAGE-CRITERIA.md) | all | Coverage criteria — what does "100%" mean? | 🟢 active |
 | [`DEPLOY.md`](DEPLOY.md) | human-ops | 호스트 불문 단일 패키지 배포 runbook (M4) | 🟢 active |
-| [`HANDOVER-2026-07-20.md`](HANDOVER-2026-07-20.md) | all | 인수인계 — SCP API 회귀 테스트 플랫폼 (2026-07-20 기준) | 🟢 active |
+| [`HANDOVER-2026-07-29.md`](HANDOVER-2026-07-29.md) | all | 인수인계 — SCP API 회귀 테스트 플랫폼 (2026-07-29 기준) | 🟢 active |
 | [`OPS-DASHBOARD.md`](OPS-DASHBOARD.md) | human-ops | Ops dashboard — 영구 oplog 버킷(apitest-oplog-permanent) + 정적 뷰어 | 🟢 active |
 | [`PLATFORM-PLAN.md`](PLATFORM-PLAN.md) | all | SCP API Regression Test Platform — 업그레이드 계획 | 🟢 active |
 | [`RESOURCE-MODEL-PLAN.md`](RESOURCE-MODEL-PLAN.md) | all | 자원 모델 기반 시나리오 합성 (Resource Task Model) — 설계 | 🟢 active |
@@ -46,7 +46,7 @@
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
 | [`working/trackers/COMPLETENESS-AUDIT-2026-07-08.md`](working/trackers/COMPLETENESS-AUDIT-2026-07-08.md) | owner | Completeness Audit — 서비스별 catalog 전량이 시나리오 합집합에서 테스트되는가 (2026-07-08) |  active (2026-07-08 오프라인 정적 감사 — owner 편입 worklist) |
-| [`working/trackers/DEDUP-AUDIT-2026-07-08.md`](working/trackers/DEDUP-AUDIT-2026-07-08.md) | owner | DEDUP Audit — 단위 서비스 선택 시 lifecycle 최소중복 전수 확인 (2026-07-08) |  done (오너 결정 2026-07-08 반영·집행 — §B "모두 추천 방향으로" + §C ①pg 2기 현행 유지 ②members-nat 은퇴 ③gen-wave2-scr 은퇴 ④gen-wave2-volume 은퇴 ⑤shared-dbaas 현행 유지; status 정정 2026-07-20) |
+| [`working/trackers/DEDUP-AUDIT-2026-07-08.md`](working/trackers/DEDUP-AUDIT-2026-07-08.md) | owner | DEDUP Audit — 단위 서비스 선택 시 lifecycle 최소중복 전수 확인 (2026-07-08) |  done (오너 결정 2026-07-08 반영·집행 — §B "모두 추천 방향으로" + §C ①pg 2기 현행 유지 ②members-nat 은퇴 ③gen-wave2-scr 은퇴 ④gen-wave2-volume 은퇴 ⑤shared-dbaas 현행 유지; status 정정 2026-07-29) |
 | [`working/trackers/IMPROVEMENT-BACKLOG.md`](working/trackers/IMPROVEMENT-BACKLOG.md) | orchestrator | Planner가 유지하는 개선 계획 | 🟢 active |
 | [`working/trackers/LIVE-READINESS-GATES.md`](working/trackers/LIVE-READINESS-GATES.md) | all | disabled-lifecycle inventory (IB-023) | 🟢 active |
 | [`working/trackers/PRODUCT-FINDINGS.md`](working/trackers/PRODUCT-FINDINGS.md) | validation | consolidated ledger of product/API findings | 🟢 active |
@@ -63,7 +63,7 @@
 |-----|-----|---------|--------|
 | [`decisions/2026-06-19-dependency-dag-test-scheduler.md`](decisions/2026-06-19-dependency-dag-test-scheduler.md) | all | Dependency-DAG test scheduler (replacing the xdist 2-lane split) | 🟢 accepted |
 | [`decisions/2026-06-20-docs-restructure.md`](decisions/2026-06-20-docs-restructure.md) | all | Restructure docs/: carve out a working/ tier (keep stable specs at root); dissolve the bespoke agents/ dir into .claude/agents | 🟢 accepted |
-| [`decisions/2026-07-20-repo-cleanup-archive-tier.md`](decisions/2026-07-20-repo-cleanup-archive-tier.md) | all | Repo cleanup: docs/archive tier + retirement of poc and dead tools | 🟢 accepted |
+| [`decisions/2026-07-29-repo-cleanup-archive-tier.md`](decisions/2026-07-29-repo-cleanup-archive-tier.md) | all | Repo cleanup: docs/archive tier + retirement of poc and dead tools | 🟢 accepted |
 
 ## Archive — frozen history (`docs/archive/`, 정본 아님)
 | Doc | For | Summary | Status |

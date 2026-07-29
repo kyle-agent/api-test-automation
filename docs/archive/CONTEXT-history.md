@@ -6,7 +6,7 @@ superseded_by: ../working/CONTEXT.md
 
 # CONTEXT history — 과거 세션 로그 (2026-06-10 ~ 2026-07-11, frozen)
 
-> `docs/working/CONTEXT.md` "Current state" 섹션에서 2026-07-20 리포 정리 때
+> `docs/working/CONTEXT.md` "Current state" 섹션에서 2026-07-29 리포 정리 때
 > **verbatim 이동**한 과거 블록들 (최신이 위). CONTEXT는 "짧고 현재만" 원칙을
 > 복원했고, 밀려나는 블록은 계속 이 파일 상단에 쌓인다. 내부 상대 링크는 이동
 > 전 경로(docs/working/) 기준이라 깨져 있을 수 있다 — 필요하면 git 이력이 정본.

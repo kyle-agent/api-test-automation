@@ -10,7 +10,7 @@ branch: claude/upbeat-ritchie-ieus5u
 
 # CAMPAIGN-C3-100 — Waiver 제안 통합 (오너 결정용)
 
-> **현황 주 (2026-07-20):** 이 문서의 수치는 **07-07 기준**(waiver 261건)이다.
+> **현황 주 (2026-07-29):** 이 문서의 수치는 **07-07 기준**(waiver 261건)이다.
 > 이후 일괄 심사와 별개로 개별 승인이 진행돼 현재 **315건**: backup-401 PF-48
 > 10키(오너 승인 07-18) · CDN 8키 unsatisfiable-flow(07-13) · data-flow/ops
 > 34키 entitlement(07-14) · VS lock/unlock 2키(07-08). 클래스 5(PF-500 cascade

@@ -4,7 +4,7 @@ for: all
 superseded_by: ../working/plans/PLATFORM-IA-DIRECTION.md
 ---
 
-> **아카이브 (2026-07-20 리포 정리).** 원 위치 `poc/scenario-viz/PLATFORM-PLAN.md`.
+> **아카이브 (2026-07-29 리포 정리).** 원 위치 `poc/scenario-viz/PLATFORM-PLAN.md`.
 > 오너 2026-06-15 결정으로 "한 그래프 + 오버레이" 원칙의 계보 정본이었고,
 > PLATFORM-IA-DIRECTION·CX-IA-DESIGN이 이 문서를 인용한다. poc/ 자체는 제거됨
 > (기능은 /ia-demo/ + console2 static이 대체) — 코드는 git 이력에 있다.

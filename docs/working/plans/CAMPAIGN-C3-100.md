@@ -266,7 +266,7 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   delete→publicip detach→igw), vpce check-i* 신규 오류. junit 수리 검증됨
   (HB5부터 실제 junit). 플랫폼: IA 개정 구현(Modeling이 Catalog 흡수, d7e56c92
   ~675596e3) + Testing 실행 중심 재배치(43a85eec) — 오너 화면 피드백 반영.
-- 2026-07-20: **C1 잔여 집행 완료** (리포 정리 세션, 오너 지시 "전체 repository
+- 2026-07-29: **C1 잔여 집행 완료** (리포 정리 세션, 오너 지시 "전체 repository
   정리", branch `claude/repository-cleanup-bqil1u`): 보류였던 **poc/scenario-viz
   은퇴** (api-test.yml `/platform` 발행 스텝 제거 — Pages 기발행 사본 동결,
   `scenario-viz-PLATFORM-PLAN.md`만 `docs/archive/` 이관) + `docs/archive/` tier
@@ -274,4 +274,4 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   소스 삭제(sample_data·gantt_sim·loop_cycle·static_export·mockups·drafts 1회성 2종).
   재판정: tracked `reports/runtime_*.json` **유지**(conformance live-confirmed 입력,
   cbfec854 이후 — C1 당시 "untrack 무위험" 판정은 stale). 상세:
-  REPO-AUDIT-2026-07-04.md §6 + `docs/decisions/2026-07-20-repo-cleanup-archive-tier.md`.
+  REPO-AUDIT-2026-07-04.md §6 + `docs/decisions/2026-07-29-repo-cleanup-archive-tier.md`.

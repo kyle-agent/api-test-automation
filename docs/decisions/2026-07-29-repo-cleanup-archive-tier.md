@@ -1,6 +1,6 @@
 # Repo cleanup: docs/archive tier + retirement of poc and dead tools
 
-**Date:** 2026-07-20
+**Date:** 2026-07-29
 **Status:** Accepted
 **Deciders:** owner (지시: "전체 repository 정리 — 흩어져 있는 정보 모으고, 사용하지 않는 소스/문서 정리") + cleanup 세션 (branch `claude/repository-cleanup-bqil1u`)
 
@@ -19,7 +19,7 @@ formal-모델 파싱이 실제로 계속 깨져 수리비 발생)와 같은 주�
 `docs/archive/` tier를 신설해 superseded 문서 33건(핸드오프 11 · 플랜 7 · 트래커 9 ·
 루트 설계 3 · working 낱개 3 + CONTEXT 히스토리)을 **삭제 아닌 이동**으로 동결하고, CONTEXT.md를
 "최신 CURRENT + 직전 핸드오프 2~3개"로 다이어트한다(밀려나는 블록은 히스토리
-파일 상단으로). 죽은 소스는 참조 재검증(2026-07-20 전수 grep) 후 **삭제**한다:
+파일 상단으로). 죽은 소스는 참조 재검증(2026-07-29 전수 grep) 후 **삭제**한다:
 `poc/` 전체(+api-test.yml `/platform` 발행 스텝 제거; `scenario-viz/PLATFORM-PLAN.md`
 만 archive로 이관), `tools/{sample_data,gantt_sim,loop_cycle}.py`,
 `drafts/{compose_wave5,recompose_ib042}.py`, `controlplane/static_export.py`,

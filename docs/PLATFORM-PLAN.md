@@ -614,7 +614,7 @@ Phase 로드맵 정본은 `docs/ARCHITECTURE.md` §Direction. 아래 마일스�
 controlplane UI는 owner 목업에 따라 **Overview → Plan → Run → Report
 (+ Knowledge)** IA로 재설계됐고(설계 시스템·ctxbar·report 탭), 같은 화면들이
 `controlplane/static_export.py`로 Pages `/platform/`에 정적 export됐다
-(이 export와 모듈은 이후 은퇴 — 2026-07-20 리포 정리에서 모듈 삭제)
+(이 export와 모듈은 이후 은퇴 — 2026-07-29 리포 정리에서 모듈 삭제)
 (노드별 read-only 폼 포함, 모든 메뉴 클릭 가능 — 액션 버튼은 "서버 전용" 배너).
 라이브 관제는 `dashboard/ops.html`이 제공: 모델에서 파생한 의존순서 자원 트리,
 run 종료 시 **정리 무결성 verdict** (테스트중/잔존/정리실패/삭제), in-flight 전용
@@ -641,7 +641,7 @@ run pill + 히스토리 행 선택, S3 listing pagination(1000-key 캡 해소),
   coverage/conformance/trends 재렌더 탭 제거.
 - **Ops** `ops.html` DEP map은 빌드 생성(수동 paste 폐지),
   static_export PAGES는 새 IA에 정렬하고 per-file `view/*` fan-out을 제거
-  (이후 static_export 자체가 은퇴·삭제됨 — 2026-07-20).
+  (이후 static_export 자체가 은퇴·삭제됨 — 2026-07-29).
 
 </details>
 

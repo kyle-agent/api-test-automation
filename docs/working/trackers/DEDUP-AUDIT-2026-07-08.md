@@ -1,5 +1,5 @@
 ---
-status: done (오너 결정 2026-07-08 반영·집행 — §B "모두 추천 방향으로" + §C ①pg 2기 현행 유지 ②members-nat 은퇴 ③gen-wave2-scr 은퇴 ④gen-wave2-volume 은퇴 ⑤shared-dbaas 현행 유지; status 정정 2026-07-20)
+status: done (오너 결정 2026-07-08 반영·집행 — §B "모두 추천 방향으로" + §C ①pg 2기 현행 유지 ②members-nat 은퇴 ③gen-wave2-scr 은퇴 ④gen-wave2-volume 은퇴 ⑤shared-dbaas 현행 유지; status 정정 2026-07-29)
 for: owner
 method: deterministic offline (console2 selection semantics + lifecycle surface diff)
 ---

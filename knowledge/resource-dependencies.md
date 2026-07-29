@@ -1,6 +1,6 @@
 # Resource dependency & attach/detach test patterns (confirmed domain knowledge)
 
-> **스냅샷 주의 (2026-07-20 재대조):** 아래 "Current coverage vs gaps" 표와
+> **스냅샷 주의 (2026-07-29 재대조):** 아래 "Current coverage vs gaps" 표와
 > "Proposed scenario work"는 **2026-06-09 기준**이다 — 이후 vs-port 6체인
 > (create-port-subnet→map SG→attach/detach→delete-port-subnet), 볼륨 transfer
 > 흡수 등으로 상당수 갭이 닫혔다. 현행 정본은 `knowledge/formal/resources/`

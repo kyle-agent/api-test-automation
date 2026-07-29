@@ -15,7 +15,7 @@
 - **VPC max = 5** — 현행 정본: `core/budgets.py:DEFAULT_LIMITS["vpc"]=5`
   (VALIDATED — live error "The number(5) of VPCs ... exceeded", run 27306490231)
   + `dependencies.json:vpc_schedule.vpc_limit=5`. *(이 문서가 한때 "3으로 정정"을
-  기록했으나 그 관측은 이후 계정/시점에서 5로 재실측·코드 반영됨 — 2026-07-20
+  기록했으나 그 관측은 이후 계정/시점에서 5로 재실측·코드 반영됨 — 2026-07-29
   재대조. 캡이 다시 달라지면 budgets.py를 먼저 고치고 여기 갱신할 것.)*
 - A run must never hold more live VPCs than the cap at once, *including*
   lingering async-deletes. The shared VPC counts as 1 while alive.

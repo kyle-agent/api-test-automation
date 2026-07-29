@@ -9,7 +9,7 @@ A quota becomes a *budget kind* only when it is wired into `dependencies.json`
 quotas are tracked in §"Documentation-only quotas" below and in
 `knowledge/formal/cross-service.yaml` (`quotas:` section) until then.
 
-> 2026-07-20 통합: 구 `docs/quotas-and-budgets.md`(IB-038 때 신설)를 이 파일로
+> 2026-07-29 통합: 구 `docs/quotas-and-budgets.md`(IB-038 때 신설)를 이 파일로
 > 병합 — 같은 주제의 문서 2개가 docs/와 knowledge/에 흩어져 있던 것을 단일화.
 
 ## Budget kinds enforced at runtime (`core/budgets.py` DEFAULT_LIMITS)

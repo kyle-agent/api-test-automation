@@ -3,7 +3,7 @@ status: superseded (historical handoff — current state lives in docs/working/C
 for: all
 ---
 
-> **아카이브 구제 (2026-07-20 리포 정리).** 미머지 브랜치 `claude/tender-babbage-c5y458`에만
+> **아카이브 구제 (2026-07-29 리포 정리).** 미머지 브랜치 `claude/tender-babbage-c5y458`에만
 > 존재하던 문서를 브랜치 삭제 전 보존 이관. 2026-06-25 A/B/C 트랙 세션 핸드오프 (main에 미반영이었음).
 
 ---
