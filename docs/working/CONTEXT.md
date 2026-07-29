@@ -114,7 +114,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-07-20 — 리포 전체 정리, branch `claude/repository-cleanup-bqil1u`,
+- **CURRENT (2026-07-29 — 리포 전체 정리, branch `claude/repository-cleanup-bqil1u`,
   오너 지시 "흩어진 정보 모으고 미사용 소스/문서 정리"):** ① **`docs/archive/`
   tier 신설** — superseded 문서 33건 이동(핸드오프 11 · 플랜 7 · 트래커 9 ·
   ROADMAP/M6-DESIGN/IA 3 · working 낱개 3) + **CONTEXT.md 다이어트 1,138→~220줄** (과거 블록은
@@ -130,9 +130,21 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   MD_OUT 경로 드리프트 수리. ④ **재판정 2건**: tracked `reports/runtime_*.json`
   유지(conformance/static.py의 live-confirmed 입력 — 구감사 R5 반려) ·
   `scr_docker_probe.py` 유지(CI gated 스텝 활성). 결정 기록:
-  `docs/decisions/2026-07-20-repo-cleanup-archive-tier.md`, 집행 대장:
-  REPO-AUDIT-2026-07-04.md §6. **다음 작업 큐는 아래 07-16 블록 그대로**
-  (a690 실패 분석 + lb/asg/fw 판정 + durations 재확인).
+  `docs/decisions/2026-07-29-repo-cleanup-archive-tier.md`, 집행 대장:
+  REPO-AUDIT-2026-07-04.md §6. ⑤ **런 bd2a(20260729-081847, 124 lifecycle
+  121pass) 트리아지**: fail 3 원인 확정 — (a) scr-repo-borrow 쿼터 레이스의
+  진짜 뿌리 = 형제 container-scr-registry의 **public-endpoint PUT이
+  NON_VISIBILITY 레지스트리를 VISIBILITY 레인으로 편입**(가시성 레인 분리 붕괴,
+  실측 타임라인) → 사다리 45s×6→×11(8.3분) + 최종 403 expect 편입(쿼터=skip)
+  수리; (b) gen-newapi-addressgroup·security-kms-transit-crypto의 create 500
+  ContactAdmin = 2026-07 버전업 신설 API의 서버측 미개통 의심 → **PF-49/50**
+  (동종: quick-query 500·PLE approval 500); (c) DBaaS kernel/major-upgrade
+  PUT 405 ×7 = 과거 PUT 2xx였던 op의 메서드 회귀 → **PF-51** (문서는 여전히
+  PUT). 부수 관측: heavy-shared-networking private-dns 400 max-count(캡 3 소진
+  — 계정 잔존 사전 확인 필요) · filestorage-volume setaccessrule 404는 배치①
+  편입 전 잔재 스텝. **다음 작업 큐는 아래 07-16 블록 그대로**
+  (a690 실패 분석 + lb/asg/fw 판정 + durations 재확인) + bd2a 수리/PF 3건
+  다음 런 재확인.
 - **PRIOR (2026-07-16 — 신규 테스트 계정, main=`c5393399`):** 오너가 계정을
   수동 정리 후 **전체 런 a690 진행 중** (127 lifecycles, 01:54Z~). 이 세션에서
   main 반영 완료: ① fe88 12건 실패 전원 원인확정+수리 (406 핀 클래스 3 ·
@@ -209,7 +221,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   다음 콘솔 런이 재확인만(수리 불가). C4 파라미터 커버리지는 오너 컨펌 대기.
 - **(과거 히스토리는 아카이브로)** 2026-06-10 ~ 2026-07-11 의 세션 로그 블록
   전부는 [`docs/archive/CONTEXT-history.md`](../archive/CONTEXT-history.md)로
-  **verbatim 이동** (2026-07-20 리포 정리). 이 섹션은 "최신 CURRENT + 직전
+  **verbatim 이동** (2026-07-29 리포 정리). 이 섹션은 "최신 CURRENT + 직전
   핸드오프 2~3개"만 유지한다 — 새 블록을 추가할 때 밀려나는 오래된 블록은
   히스토리 파일 **상단**에 옮겨 붙여라 (역시 verbatim, 최신이 위).
 
