@@ -16,7 +16,7 @@
             "name": "regrfsr{unique}",
             "protocol": "NFS",
             "type_name": "HDD",
-            "zone": "kr-west1-b"
+            "zone": "{zone}"
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot2): zone은 신규 REQUIRED — 누락 시 400 'Field required', 엉뚱한 값이면 400 filestorage.BadRequest.Invalid.zone (둘 다 라이브 실측 2026-07-15). zone=kr-west1-b LIVE VALIDATED 2026-07-15: create 202(응답이 zone 에코) → available → delete 202 → 404. kr-west1-b를 쓰는 이유: GET /v1/replications/zones (신규 lookup, 라이브 실측) 기준 HDD/replication의 복제 가능 쌍이 kr-west1-b↔kr-east1-a 뿐 — kr-west1-a는 대상 zone이 비어(zones:[]) 이 라이프사이클의 create-replication이 불가능해진다.",
           "expect_status": [200, 201, 202],

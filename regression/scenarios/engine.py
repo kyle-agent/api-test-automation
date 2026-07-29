@@ -503,6 +503,19 @@ def _apply_b64_fields(step: dict, body):
     return body
 
 
+def _default_zone(region: str) -> str:
+    """{zone} 토큰의 가용영역 기본값. SCP_ZONE env가 최우선; 없으면 리전별
+    실측 유일 존 — kr-west1→'kr-west1-b' (kr-west1-a는 400 invalid-zone,
+    LIVE 2026-07-15 notes), 그 외→'<region>-a' (kr-east1 유효 존
+    ['kr-east1-a'] — east 오퍼링 run 20260729-234245-18da의 400
+    InvalidAvailabilityZone 에러 열거 실측). 새 리전에서 둘 다 틀리면
+    environments/ 프로파일 env:로 SCP_ZONE을 핀할 것."""
+    z = os.environ.get("SCP_ZONE", "").strip()
+    if z:
+        return z
+    return f"{region}-b" if region == "kr-west1" else f"{region}-a"
+
+
 def _fill(template: str, ctx: dict) -> str:
     def _sub(m):
         key = m.group(1)
@@ -1063,6 +1076,9 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         "unique": _u,
         "ualpha": "".join(chr(ord("a") + int(c, 16)) for c in _u),  # 8 alpha chars
         "region": cfg.region,
+        # {zone} — 가용영역 (2026-07-29 신설: east 오퍼링 실측에서 존 리터럴
+        # 하드코딩이 교차-리전 400 InvalidAvailabilityZone을 만든 게 계기).
+        "zone": _default_zone(cfg.region),
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
         # ISO YYYY-MM-DD dates for endpoints that take a bounded report/metric

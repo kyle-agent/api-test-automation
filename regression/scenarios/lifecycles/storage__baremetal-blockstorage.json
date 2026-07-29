@@ -28,7 +28,7 @@
                 "object_type": "BM"
               }
             ],
-            "zone": "kr-west1-b",
+            "zone": "{zone}",
             "tags": []
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot4): zone 신규 REQUIRED. 라이브 실측 2026-07-15 (생성 금지 — BM 종속이라 400 detail로 판정): zone 누락 → 400 'Zone input is required.'; zone=kr-west1-a 포함 → 400이 BaremetalBlockStorage.NoServersRequest('No servers have been requested.')로 진행 = zone이 스키마 단계를 통과하고 기존 KNOWN-BLOCKED(attachments 1..8 BM 필수) 단계로 넘어감. zone 값 자체의 최종 유효성은 BM 서버 확보 후 2xx로만 증명 가능. | 2026-07-16: attachments []→[{env:SCP_BM_SERVER_ID}] — lifecycle이 requires_env로 게이트되므로 이 스텝이 실행될 때는 항상 실 BM 서버 id가 주입된다 (빈 attachments의 NoServersRequest 400은 게이트로 대체).",
@@ -279,7 +279,7 @@
             "cycle": "5MIN",
             "name": "regrbsrepl{unique}",
             "region": "kr-west1",
-            "zone": "kr-west1-b"
+            "zone": "{zone}"
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeReplicationCreateRequestV1Dot4): zone 신규 REQUIRED (region은 유지 — filestorage와 달리 제거 안 됨). 값은 docs Example(kr-west1/kr-west1-a); 체인이 KNOWN-BLOCKED라 called-only.",
           "expect_status": [
@@ -519,7 +519,7 @@
                 "object_type": "BM"
               }
             ],
-            "zone": "kr-west1-b",
+            "zone": "{zone}",
             "tags": []
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot4): zone 신규 REQUIRED — create-volume(blockstorage-volume) _note의 400-detail 판정 참조 (zone 누락 400 'Zone input is required.' / 포함 시 NoServersRequest 단계로 진행, 라이브 실측).",
@@ -568,7 +568,7 @@
             "volume_ids": [
               "{member_volume_id}"
             ],
-            "zone": "kr-west1-b",
+            "zone": "{zone}",
             "tags": []
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeGroupCreationRequestV1Dot4): zone 신규 REQUIRED (docs 정본; Example kr-west1-a). 멤버 볼륨 create가 KNOWN-BLOCKED(BM attachments)라 이 스텝은 여전히 called-only — zone 값의 라이브 검증은 멤버 볼륨 2xx 이후 과제.",
@@ -804,7 +804,7 @@
             "name": "regrbsvgrepl{unique}",
             "region": "kr-west1",
             "replication_volume_name_prefix": "dr",
-            "zone": "kr-west1-b"
+            "zone": "{zone}"
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeGroupReplicationCreateRequestV1Dot4): zone 신규 REQUIRED (region 유지). 값은 docs Example; 체인이 KNOWN-BLOCKED라 called-only.",
           "expect_status": [

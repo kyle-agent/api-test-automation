@@ -15,7 +15,7 @@
           "json": {
             "name": "regrpfs{ualpha}",
             "capacity_tb": 1,
-            "zone": "kr-west1-b",
+            "zone": "{zone}",
             "tags": []
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot1): zone 신규 REQUIRED — 누락 시 400 'Field required' (라이브 실측 2026-07-15). zone=kr-west1-a는 스키마 단계 통과 라이브 실측 (zone 포함 + 규칙 위반 name 프로브 → 400이 name 에러만 반환 = zone 수용). 실제 2xx 생성은 reachability-only 정책대로 미검증(billable).",

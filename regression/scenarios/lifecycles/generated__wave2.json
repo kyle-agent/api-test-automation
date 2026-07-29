@@ -408,7 +408,7 @@
             "name": "regrfs{unique}",
             "protocol": "NFS",
             "type_name": "HDD",
-            "zone": "kr-west1-b"
+            "zone": "{zone}"
           },
           "_note": "SPEC BUMP 2026-07-15 (VolumeCreateRequestV1Dot2): zone 신규 REQUIRED (누락 시 400 'Field required' 라이브 실측). zone=kr-west1-b는 2026-07-15 라이브 검증값 (create 202→delete 202→404) — storage__filestorage.json create-volume과 동일.",
           "expect_status": [
