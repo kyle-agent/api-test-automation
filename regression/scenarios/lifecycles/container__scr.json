@@ -38,6 +38,7 @@
             201,
             202,
             400,
+            403,
             409,
             422
           ],
@@ -52,11 +53,11 @@
             "path": "/v1/container-registries/{created_registry_id}",
             "service": "scr"
           },
-          "_note": "WAF 주의 2026-07-16 (run 7a26 실측: 20s×30 사다리의 동일 바디 반복 POST가 보안 게이트웨이 차단 유발 — 417 + HTML 'Request Rejected' Support ID 3232170405160507975): 사다리를 45s×6으로 축소. 1차 방어는 가시성 레인 분리(public 폴백)라 사다리는 드물게만 발동. || VISIBILITY-LANE 분리 2026-07-16 (오너 제공 문서: 'Account별 최대 2개 — 가시성 유형별 1개'): container-scr-registry가 NON_VISIBILITY 1EA를 쓰므로 borrow 폴백은 PUBLIC_VISIBILITY(별도 1EA)로 생성 — 쿼터 레이스 원천 소멸 + public 변형 create 커버리지 확보. 403 사다리(20s×30)는 2차 벨트로 유지. public 레지스트리 하위 repo 동작은 미검증 — 다음 런 판정. || QUOTA-RACE 수리 2026-07-16 (run c72e 실측 403 CONTAINER_REGISTRY.NON_VISIBILITY.MAX_COUNT 1EA, req-9423b4ce…): container-scr-registry가 쿼터 1개를 점유한 창에서 borrow가 돌면 빌릴 것도 없고 fallback create도 403 → 20s×12 사다리로 상대 lifecycle 종료+쿼터 해제 지연(D 실측 ~3분)을 흡수. dependencies.json의 직렬화 에지와 2중 방어. || Fires only usefully when borrow missed (registry quota=1: with a registry present this 4xxes on quota/duplication, capture_soft misses, borrowed registry_id survives). Body per container/scr/containerregistrycreaterequest (name/private_acl_enabled/private_acl_resources/public_acl_resources/public_visible_enabled required; name pattern ^[a-z][a-z0-9]*$ — regr{unique} fits, {unique} is 8 lowercase hex). LIVE 201 2026-07-15 ({id, message, state:Creating}). created_registry_id marks OUR registry so teardown never touches a borrowed one.",
+          "_note": "WAF 주의 2026-07-16 (run 7a26 실측: 20s×30 사다리의 동일 바디 반복 POST가 보안 게이트웨이 차단 유발 — 417 + HTML 'Request Rejected' Support ID 3232170405160507975): 사다리를 45s×6으로 축소. 1차 방어는 가시성 레인 분리(public 폴백)라 사다리는 드물게만 발동. || VISIBILITY-LANE 분리 2026-07-16 (오너 제공 문서: 'Account별 최대 2개 — 가시성 유형별 1개'): container-scr-registry가 NON_VISIBILITY 1EA를 쓰므로 borrow 폴백은 PUBLIC_VISIBILITY(별도 1EA)로 생성 — 쿼터 레이스 원천 소멸 + public 변형 create 커버리지 확보. 403 사다리(20s×30)는 2차 벨트로 유지. public 레지스트리 하위 repo 동작은 미검증 — 다음 런 판정. || QUOTA-RACE 수리 2026-07-16 (run c72e 실측 403 CONTAINER_REGISTRY.NON_VISIBILITY.MAX_COUNT 1EA, req-9423b4ce…): container-scr-registry가 쿼터 1개를 점유한 창에서 borrow가 돌면 빌릴 것도 없고 fallback create도 403 → 20s×12 사다리로 상대 lifecycle 종료+쿼터 해제 지연(D 실측 ~3분)을 흡수. dependencies.json의 직렬화 에지와 2중 방어. || Fires only usefully when borrow missed (registry quota=1: with a registry present this 4xxes on quota/duplication, capture_soft misses, borrowed registry_id survives). Body per container/scr/containerregistrycreaterequest (name/private_acl_enabled/private_acl_resources/public_acl_resources/public_visible_enabled required; name pattern ^[a-z][a-z0-9]*$ — regr{unique} fits, {unique} is 8 lowercase hex). LIVE 201 2026-07-15 ({id, message, state:Creating}). created_registry_id marks OUR registry so teardown never touches a borrowed one. || LANE-COLLAPSE 수리 2026-07-29 (run bd2a 실측, req-30da7cc7): 가시성 레인 분리가 형제의 **registry-update-public-endpoint PUT(23:23:03)** 때문에 붕괴 — NON_VISIBILITY로 만든 형제 레지스트리가 public-endpoint enable 순간 VISIBILITY 레인을 점유해, 폴백 public 생성(23:24:10)이 403 CONTAINER_REGISTRY.VISIBILITY.MAX.COUNT 1EA. 형제 종료·해제는 23:27:05(gone) — 기존 사다리 45s×6(≈4.5분)이 19초 차이로 미달. 수리 2종: ① 사다리 45s×11(≈8.3분 — 형제 전체 점유 창 실측 ~7.7분 초과) ② 최종 403을 expect_status에 편입 = 쿼터 고갈 라운드는 그룹 하드페일이 아니라 soft-skip 종착(Hard Rule 6 skip-not-fail; 커버리지는 다음 라운드에 회수). 주의: _note의 'dependencies.json 직렬화 에지'는 실존하지 않음(2026-07-29 확인) — 사다리가 유일한 시간 방어.",
           "retry_on_status": [
             403
           ],
-          "retries": 6,
+          "retries": 11,
           "retry_interval": 45
         },
         {
