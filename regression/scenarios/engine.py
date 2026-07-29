@@ -534,13 +534,46 @@ def _vs_server_type_prefix() -> str:
     return os.environ.get("SCP_VS_SERVER_TYPE_PREFIX", "").strip() or "s"
 
 
+def _db_server_type_name_prefix(service: str = "") -> str:
+    """{db_server_type_name_prefix} — DBaaS find-server-type의 name where_prefix.
+    기본 ""(빈 prefix = no-op, 전체 매치). 세대가 type이 아니라 **이름**에
+    실린 오퍼링용 (2026-07-30 실측: DB=db2v{cpu}m{mem} · eventstreams=
+    ess2v{cpu}m{mem} — 패밀리마다 접두가 다름!). 값 형식:
+      * 평문 "db2" — 모든 DBaaS 스텝에 동일 적용 (단일 패밀리 런용)
+      * 맵 "mysql=db2,eventstreams=ess2,*=db2" — lifecycle service별 적용
+        (혼합 런용; '*' = 미등재 서비스 기본값)
+    풀네임(db2v2m4)을 주면 정확 핀. 대부분의 경우 이름 핀 대신
+    SCP_DB_SERVER_TYPE="*"(type 필터 해제)가 더 간단하다 — min_by가 각
+    패밀리의 최소 사이즈를 자동 선택."""
+    raw = os.environ.get("SCP_DB_SERVER_TYPE_NAME_PREFIX", "").strip()
+    if not raw or "=" not in raw:
+        return raw
+    m = {}
+    for part in raw.split(","):
+        k, _, v = part.partition("=")
+        m[k.strip()] = v.strip()
+    svc = (service or "").split("/")[-1].strip()
+    return m.get(svc, m.get("*", ""))
+
+
 def _db_server_type_filter() -> str:
     """{db_server_type_filter} — DBaaS find-server-type의 where_prefix type
     기본값 (min_by cpu/mem와 결합해 해당 세대 최소 사이즈 선택). 기본
-    "Standard-1" = 현행 검증계. 자원부족 오퍼링에선 SCP_DB_SERVER_TYPE=
-    Standard-2 등으로 핀 (정확한 문자열은 대상의 GET /v1/server-types 응답
-    type 값으로 확인)."""
-    return os.environ.get("SCP_DB_SERVER_TYPE", "").strip() or "Standard-1"
+    "Standard-1" = 현행 검증계. 우선순위:
+    ① SCP_DB_SERVER_TYPE 명시 시 그 값 ("*"/"any" = 필터 해제)
+    ② 이름 핀(SCP_DB_SERVER_TYPE_NAME_PREFIX)이 켜져 있으면 **자동 해제**("")
+       — 세대가 type이 아니라 이름(db2v2m4 꼴)에 실린 오퍼링에서 type 필터가
+       교집합을 비워버리는 것 방지 (2026-07-30 실측: UI 타입 라벨
+       'Standard(db2)', 노드명 db2v{cpu}m{mem})
+    ③ 기본 "Standard-1" (검증계 현행). 빈 prefix는 no-op(전체 매치)이다."""
+    v = os.environ.get("SCP_DB_SERVER_TYPE", "").strip()
+    if v:
+        return "" if v in ("*", "any") else v
+    # 판정은 env 원문 기준 — 맵 형식(mysql=db2,…)은 서비스별로 값이 갈리므로
+    # resolved 값이 아니라 "이름 핀이 켜져 있는가"로 해제한다.
+    if os.environ.get("SCP_DB_SERVER_TYPE_NAME_PREFIX", "").strip():
+        return ""
+    return "Standard-1"
 
 
 def _fill(template: str, ctx: dict) -> str:
@@ -1110,6 +1143,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # where_prefix 값에서 {token}으로 소비된다).
         "vs_server_type_prefix": _vs_server_type_prefix(),
         "db_server_type_filter": _db_server_type_filter(),
+        "db_server_type_name_prefix":
+            _db_server_type_name_prefix(lifecycle.get("service", "")),
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
         # ISO YYYY-MM-DD dates for endpoints that take a bounded report/metric

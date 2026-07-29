@@ -68,7 +68,13 @@ Key fields (see `core/profiles.py` for the full schema):
 4. **가용영역/서버타입이 다르면 env 토큰으로 핀**:
    - `SCP_ZONE=<존>` — 존 규칙이 다른 리전 (기본: kr-west1→`-b`, 그 외→`-a`
      — 실측 기반 자동).
-   - `SCP_VS_SERVER_TYPE_PREFIX=s2` · `SCP_DB_SERVER_TYPE=Standard-2` —
-     특정 세대 풀만 자원이 있는 오퍼링 (2026-07-29 west1 실측: s1 풀 고갈로
-     전 DB 클러스터 FAILED, "신규 VM은 s2로"). 정확한 type 문자열은 대상의
-     `GET /v1/server-types` 응답으로 확인.
+   - 서버타입 세대가 다른 오퍼링 (2026-07-29 west1 실측: s1 풀 고갈로 전
+     DB 클러스터 FAILED, "신규 VM은 s2로"; 노드명은 패밀리별 —
+     VM `s2v{cpu}m{mem}` · DB `db2v…` · eventstreams `ess2v…`):
+     - VM: `SCP_VS_SERVER_TYPE_PREFIX=s2` (풀네임 `s2v1m2` = 정확 핀)
+     - DBaaS **권장**: `SCP_DB_SERVER_TYPE="*"` — type 필터(기본 Standard-1)
+       해제; min_by가 각 패밀리의 최소 사이즈(db2v2m4·ess2v2m4)를 자동 선택
+     - 응답에 구세대가 섞여 또 자원부족이 나면 이름 핀:
+       `SCP_DB_SERVER_TYPE_NAME_PREFIX="mysql=db2,eventstreams=ess2,*=db2"`
+       (평문 "db2" = 전 스텝 동일; 맵 = lifecycle service별; 이름 핀 시
+       type 필터 자동 해제)

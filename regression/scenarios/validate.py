@@ -55,6 +55,7 @@ STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
 METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 BUILTINS = {"unique", "ualpha", "region", "zone",
             "vs_server_type_prefix", "db_server_type_filter",
+            "db_server_type_name_prefix",
             "today", "today_plus_5y",
             "scp_access_key", "scp_secret_key",
             "iso_today", "iso_29d_ago", "epoch_now", "epoch_1h_ago",
