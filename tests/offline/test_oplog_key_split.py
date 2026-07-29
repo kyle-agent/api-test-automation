@@ -61,6 +61,24 @@ def test_test_keys_cfg_ignores_oplog_override(monkeypatch):
     assert cfg["secret"] == "test-account-secret"
 
 
+def test_test_keys_cfg_ignores_endpoint_pin(monkeypatch):
+    """keys="test"는 SCP_OPLOG_S3_ENDPOINT 핀도 따라가지 않는다 — 키 가드와
+    동일한 오배치 방지. 2026-07-29 타 오퍼링 실측(run 11f2): 미러용 구-계정
+    endpoint 핀이 logsink ensure까지 끌고 가 "새 계정 키 × 구 계정 호스트"
+    인증 실패 → 버킷 미생성 → network-logging create 400 storage-invalid-bucket.
+    픽스처 endpoint는 항상 현재 SCP_REGION/ENV 합성 규약."""
+    _env(monkeypatch)
+    monkeypatch.setenv("SCP_OPLOG_S3_ENDPOINT",
+                       "https://object-store.kr-west1.e.samsungsdscloud.com")
+    monkeypatch.setenv("SCP_REGION", "kr-east1")
+    monkeypatch.setenv("SCP_ENV", "x")
+    cfg = oplog._cfg(keys="test")
+    assert cfg["endpoint"] == "https://object-store.kr-east1.x.samsungsdscloud.com"
+    # 미러("oplog") 모드는 핀을 그대로 따른다 (기존 시맨틱 무회귀)
+    cfg2 = oplog._cfg()
+    assert cfg2["endpoint"] == "https://object-store.kr-west1.e.samsungsdscloud.com"
+
+
 # ── oplog 버킷 auto-ensure (멱등, 최초 1회, best-effort) ─────────────────────
 
 class _FakeClient:

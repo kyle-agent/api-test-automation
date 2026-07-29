@@ -82,7 +82,14 @@ def _cfg(keys: str = "oplog"):
     else:
         access = (os.getenv("SCP_ACCESS_KEY") or "").strip()   # ② 테스트 계정
         secret = (os.getenv("SCP_SECRET_KEY") or "").strip()
-    endpoint = os.getenv("SCP_OPLOG_S3_ENDPOINT", "").strip()
+    # SCP_OPLOG_S3_ENDPOINT는 **미러("oplog") 전용** — keys="test"(logsink·
+    # image-asset 픽스처)는 키 오버라이드와 마찬가지로 endpoint 핀도 따라가지
+    # 않는다. 2026-07-29 타 오퍼링 실측: 미러용으로 구 계정 endpoint를 핀하자
+    # logsink ensure가 "새 계정 키 × 구 계정 호스트"로 나가 인증 실패 →
+    # 버킷 미생성 → network-logging create 400 storage-invalid-bucket (run 11f2,
+    # req-e6dde979). 픽스처는 항상 현재 SCP_REGION/ENV의 호스트 규약을 쓴다.
+    endpoint = "" if keys == "test" else os.getenv(
+        "SCP_OPLOG_S3_ENDPOINT", "").strip()
     if not endpoint:
         # per-service host convention; override via SCP_OPLOG_S3_ENDPOINT with
         # the Public URL from the Object Storage detail page if this guess is

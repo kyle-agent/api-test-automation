@@ -50,7 +50,11 @@ Key fields (see `core/profiles.py` for the full schema):
    export SCP_OPLOG_S3_ENDPOINT=https://object-store.kr-west1.e.samsungsdscloud.com
    ```
    (endpoint 기본값은 현재 `SCP_REGION/ENV`에서 합성되므로 키만 바꾸면
-   새 오퍼링 호스트에 기존 키로 인증하게 된다 — 반드시 같이 고정.)
+   새 오퍼링 호스트에 기존 키로 인증하게 된다 — 반드시 같이 고정.
+   이 endpoint 핀은 **미러 전용**이다: 2026-07-29 수리로 keys="test" 픽스처
+   (logsink·image-asset)는 핀을 따라가지 않는다 — 수리 전 코드로 돌리면
+   logsink ensure가 구-계정 호스트로 새어 나가 network-logging 계열이
+   400 storage-invalid-bucket이 난다. run 11f2 실측.)
 2. **시나리오용 버킷은 전부 자동** — `shared_infra`가 런 시작 시 현재 테스트
    계정 키로 `apitest-logsink`(DB log-export·DC firewall 로깅·loggingaudit
    trail·network-logging)와 qcow2 이미지 자산(버킷+객체, git `assets/` 원본)을
