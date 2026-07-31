@@ -1037,6 +1037,24 @@
           "group": "load-balancer"
         },
         {
+          "name": "recheck-subnet-before-hc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "_note": "PF-52 회피 게이트 (2026-07-30 오너 실측, 타 오퍼링 west1): subnet이 non-ACTIVE인 창(선행 LB create/PUT·subnet-VIP 생성이 subnet을 재전이)에서 lb-health-check를 만들면 서버가 수락 후 **영구 Creating 행** — 거부도 수렴도 안 하는 상태머신 트랩. 최초 wait-subnet만으론 부족(SCP 공통 '자식 op가 부모 재전이' 클래스 — TGW/VPN/DNS와 동일). hc-create 직전 ACTIVE 재확인이 회피책."
+        },
+        {
           "name": "create-lb-health-check",
           "service": "loadbalancer",
           "method": "POST",
