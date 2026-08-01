@@ -2678,6 +2678,38 @@ def run_sweep(client) -> int:
         tid = it.get("id")
         if not tid:
             continue
+        # 0) firewalls + firewall-connection FIRST (2026-07-31 오너 실측, 타
+        #    오퍼링 west1: uplink firewall FW_regrtgw…이 Active 연결로 남아
+        #    TGW delete가 400 → 연결 VPC/subnet까지 연쇄 잔존. 시나리오의
+        #    관용 커버리지 delete는 soft 캡처 미스 시 못 지우므로 리컨사일러가
+        #    사다리를 소유한다: firewalls → firewall-connections(컬렉션 레벨
+        #    DELETE — per-id 경로 없음) → vpc-connections → TGW. firewall id
+        #    소스는 TGW show의 firewall_ids (GET 목록 엔드포인트 자체가 없음;
+        #    HB4d 실측 — 문자열 "['id']" 렌더 가능성 방어 파싱). Owned-safe:
+        #    _select 소유 게이트를 통과한 TGW의 자식만.
+        fw_ids, fw_conn_state = [], ""
+        try:
+            _tgs = c.get(f"/v1/transit-gateways/{tid}", service="vpc").body or {}
+            _tg = _tgs.get("transit_gateway") or _tgs
+            raw = _tg.get("firewall_ids") or []
+            if isinstance(raw, str):
+                raw = [s.strip(" '\"") for s in raw.strip("[]").split(",")]
+            fw_ids = [f for f in raw if isinstance(f, str) and f]
+            fw_conn_state = str(_tg.get("firewall_connection_state") or "")
+        except Exception:
+            pass
+        for fwid in fw_ids:
+            fst = _delete(
+                c, "vpc", f"/v1/transit-gateways/{tid}/firewalls/{fwid}")
+            if _note_progress(fst):
+                deleted += 1
+            print(f"  tgw-firewall {fwid} (tgw {tid}) delete -> {fst}")
+        if fw_ids or fw_conn_state.upper() in ("ACTIVE", "INACTIVE"):
+            fcst = _delete(
+                c, "vpc", f"/v1/transit-gateways/{tid}/firewall-connections")
+            if _note_progress(fcst):
+                deleted += 1
+            print(f"  tgw-firewall-connection (tgw {tid}) delete -> {fcst}")
         # 1) reap this owned TGW's vpc-connections (children; they block both
         #    the TGW delete and the connected VPC's delete). Owned-safe: only
         #    children of a TGW that already passed _select's ownership gate.
