@@ -49,6 +49,7 @@ STATUS_ENUM = {"done-modeled", "timing-gated", "blocked-engine",
 STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
              "expect_status", "capture", "capture_soft", "cleanup", "poll",
              "wait", "retries", "retry_interval", "retry_on_status",
+             "retry_on_error_code",
              "group", "optional", "destructive", "adopt", "probe_reads",
              "action", "input", "output", "values", "json_b64_fields", "skip",
              "_note", "_comment"}

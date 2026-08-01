@@ -4,13 +4,75 @@ for: all
 superseded_by: ../working/CONTEXT.md
 ---
 
-# CONTEXT history — 과거 세션 로그 (2026-06-10 ~ 2026-07-11, frozen)
+# CONTEXT history — 과거 세션 로그 (2026-06-10 ~ 2026-07-13, frozen)
 
 > `docs/working/CONTEXT.md` "Current state" 섹션에서 2026-07-29 리포 정리 때
 > **verbatim 이동**한 과거 블록들 (최신이 위). CONTEXT는 "짧고 현재만" 원칙을
 > 복원했고, 밀려나는 블록은 계속 이 파일 상단에 쌓인다. 내부 상대 링크는 이동
 > 전 경로(docs/working/) 기준이라 깨져 있을 수 있다 — 필요하면 git 이력이 정본.
 
+- **HANDOFF (2026-07-13 — api-test-coverage-gzukh0 세션, 배치 ① 착수):** 인계된
+  "①배치 코드로 즉시 노려볼 4xx"를 착수. **코드 수리 4종 반영**(전부 heavy라
+  실 2xx는 다음 SCP_RUN_HEAVY 콘솔 런 판정; validate 0 err, offline 550 pass —
+  기존 실패 2건 test_console2.fold/test_docs_index는 무관·기존):
+  ① **mysql·postgresql setblockstoragesize** — create body가 OS 롤 block-storage-group
+  만 만들어 resize 시 400 InvalidBlockStorageRoleType. subops-full 검증 패턴 이식:
+  add-block-storages(DATA)→settle→bsg_data_id 재캡처→DATA 그룹 resize (scenarios.json
+  database-mysql-cluster/database-postgresql-cluster; mysql엔 instance_group_id 캡처
+  추가). ② **eventstreams showrequest** — es-create 202의 request_id를 es-wait
+  직전에 `GET /v1/requests/{request_id}`로 즉시 read (async-FAIL해도 request 레코드
+  존재 → 2xx; 유일 경로, list 미노출). ③ **cachestore set-commands** — modifiable
+  아닌 maxmemory-policy 하드코딩 제거, listcommands에서 `where_prefix modifiable=true`
+  실 커맨드 캡처→applied_value no-op 되돌림. ④ **filestorage setaccessrule**
+  (오너 지시 "VM dependency 걸어 테스트") — 단독 lifecycle은 VM 0대라 404
+  VirtualServerNotFound; **gen-heavy-vs-netops(ACTIVE VM 상비)에 filestorage NFS
+  볼륨+setaccessrule(add/remove) optional 그룹 `fs-vm-access` 편입**, object_id=
+  {server_id} 실 VM. 모든 filestorage 스텝 `service:filestorage` 필수(볼륨 경로가
+  virtualserver와 충돌), 토큰 fs_volume_id. **라이브 read-only 재확인 → 블로커 확정
+  2종**(코드 수리 불가): kms managed key `GET /v1/managed-kms/transit`→count:0(영구,
+  create API 없음) · cloudmonitoring event-policy 400+등록 리소스 0(2026-09 단종,
+  투자 금지). **미착수(사유별)**: DB patch-minor 5엔진=heavy create body 변경+C4
+  오너 컨펌 대기 · apigw/scf privatelink 5키=AUTO-approval 상태머신 라이브 런 관찰
+  트리아지 필요(블라인드 코드 불가). 상세: `knowledge/validated-facts.md` 2026-07-13
+  배치① 블록. ⚠️ knowledge/validated-facts.md:2453 고아 병합마커(`>>>>>>>`) 제거함.
+- **HANDOFF (2026-07-13 밤 — svc-coverage-improvement 세션 마감, main=`a746ea36`,
+  오너 "다른 세션에서 이어서"):** run-923a→892a→543a→c373 4연속 트리아지로 서비스
+  커버리지 4xx 대량 수리 완료 (상세: `knowledge/validated-facts.md` 2026-07-11~13
+  블록들). **c373(최신 main 첫 풀런) 판정: 3라운드 수리 전부 라이브 그린** —
+  rmtags SRN b64·cloudmonitoring 날짜·fifo dedup·secretsmanager reveal·vs-netops
+  IGW adopt-or-create·peering rule·DC 체인·DB resize. 마지막 반영분: http_client
+  429 재시도(vpc burst 스로틀 5건 제거)·scf time={1,3,12}·lb-members IGW
+  adopt-or-create. **PF 확정 2건** (SDS 문의감): DB register-log-export 500
+  (형식 통과+실존 버킷으로도 5엔진 ContactAdmin) · eventstreams 프로비저닝 5연속
+  FAILED(버전 무관). **▶ 다음 세션 착수점 — "①배치: 코드로 즉시 노려볼 4xx ~18키"
+  (정찰 완료, 미착수):**
+  1. **DB patch-minor-version 5엔진** (5키): "Unpatchable(자기버전)" 확정 →
+     **구버전 create→신버전 patch** 전략. mysql `GET /v1/engine-versions` contents
+     [0]=8.4.6(현재)·[1]=8.4.5(구) 실측 — create-cluster의 dbaas_engine_version_id를
+     [1]로 바꾸고 patch의 software_version을 [0]으로. cachestore는 patch json이
+     `{dbaas_engine:redis, software_version:7.2.11}` 하드코딩(다른 4엔진은
+     `{software_version}` 토큰) — 별도. **주의: create body 변경 = heavy 재프로비저닝,
+     신중히**. C4 버전축(C4-PARAM-COVERAGE.md)과 한 몸이니 함께 설계 권장.
+  2. **cloudmonitoring show-event-policy 3키** (histories·notifications·detail):
+     계정에 이벤트 정책 0이라 리터럴 400 → `gen-cm-event-policy`
+     (generated__light-batch2.json)에 정책 생존 창 읽기 편입.
+  3. **apigw/scf privatelink 5키**: gen-wave5-apigw-privatelink의 approve/connect/
+     request — apigw `cannot-use-region-api`, scf `endpoint-not-found`. 순서/전제
+     트리아지 1회 필요 (7/10 PLE 체인 그린의 나머지).
+  4. 소소한 것: **database-mysql-cluster set-block-storage-size**(subops-full의
+     DATA 그룹 재캡처 수리 미이식 — 5분) · **eventstreams showrequest**(es-create
+     202의 request_id 캡처→즉시 read) · **cachestore set-commands**('maxmemory-policy'
+     수정불가 → cachestorelistcommands에서 modifiable=true 커맨드 캡처,
+     modifycommandrequest={commands:[{id,name,new_value}]}) · **kms
+     updatemanagedkeydescription**(managed key 목록→실 id) · **filestorage
+     setaccessrule**(VM id 요구 `VirtualServerNotFound` → VM 있는 lifecycle로).
+  **②오너 결정 영역**: VS private-static-nat 2키(gen-private-nat에 VS interface
+  편입)·data-flow/ops/quick-query 7키(실 클러스터 전제 create, 과금)·switchover 2키
+  (ha_enabled=true 실험 or waiver). **③차단 확정 ~43키**: scr(이미지/PF-37/quota)·
+  DB 401 backup family 8·log-export/setparameters 500 PF·import-image·
+  updateimagemember·password PF-17·approvalvpcpeering(same-account)·org 403 —
+  waiver 심사 or SDS 문의(오너). **미완 대기**: eventstreams·DB-log-export PF는
+  다음 콘솔 런이 재확인만(수리 불가). C4 파라미터 커버리지는 오너 컨펌 대기.
 - **LATEST (2026-07-11 밤 — 이 세션 마감, main과 66a89de4에서 합류, 세션 인수인계. 오너: "다른 세션에서 이어서"):**
   검증 **2,431** (run-923a fold까지). **③일차 확정**: run-923a(119종·112pass·56.7분)에서
   iam-user 가족 7키 완전 검증(404-soft 클래스 종결) · private-nat 403 gone-폴 적중

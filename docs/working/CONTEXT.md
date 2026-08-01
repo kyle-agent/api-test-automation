@@ -114,7 +114,25 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-07-29 — 리포 전체 정리, branch `claude/repository-cleanup-bqil1u`,
+- **CURRENT (2026-08-01 — s2 오퍼링 업그레이드 전/후 캠페인, 오너 콘솔 반복 런):**
+  오퍼링(west1, 존 `-a`, 서버타입 s2/db2/ess2 세대) 부분런 반복 중 — env 레시피
+  정본은 `environments/README.md` 전환 체크리스트 (oplog 3종 · PIN=false ·
+  SCP_ZONE · SCP_VS_SERVER_TYPE_PREFIX=s2 · DB 이름 핀). 금일 main 반영 2건:
+  ① `31bf5e78` 서버타입/존 이식성 — VS 캡처 8곳 min_by(첫 매치가 s2v10m120을
+  집던 결함), `{vs_server_type}` 토큰 신설(리터럴 create 6곳+billingplan 견적 2+
+  resize 제외목록 1; PREFIX에서 s2→s2v1m2 유도), `{region}-b` 준-리터럴 14곳→
+  `{zone}`, 리터럴 가드 테스트 2종. (VM 400 InvalidServerType.Zone "모순 메시지"는
+  오너 .env 존 값 이상으로 판명 — PF 미등재.) ② run 3ebe 실측 **PF-53**: 같은 초
+  병렬 POST /v1/clusters 5발 중 2발만 400 `Dbaas.RbacCreateError` "Try again."
+  (서버측 RBAC 프로비저닝 동시성 레이스의 400 오분류) → 엔진
+  `retry_on_error_code` 신설(바디 코드 일치시만 재시도, ±25% 지터로 재충돌 방지)
+  + DBaaS-패밀리 create 19곳 장착. **다음 런 판정 큐**: RbacCreateError 사다리
+  실효 · database-postgresql-cluster 실패 원인(생성 1 후 ~4분 내 cleanup —
+  artifact 대기) · PF-49/50/51 지속 여부 · scr borrow 사다리 · hc 500 사다리 ·
+  TGW fw 사다리 · gen-vpc-endpoint 409 직렬화(미수리). 업그레이드 전/후 비교
+  리포트는 양쪽 풀런 완료 시 (계정 픽스처 클래스 제외: gen-wave3-support 404 ×2 ·
+  rm tag-rg 403).
+- **PRIOR (2026-07-29 — 리포 전체 정리, branch `claude/repository-cleanup-bqil1u`,
   오너 지시 "흩어진 정보 모으고 미사용 소스/문서 정리"):** ① **`docs/archive/`
   tier 신설** — superseded 문서 33건 이동(핸드오프 11 · 플랜 7 · 트래커 9 ·
   ROADMAP/M6-DESIGN/IA 3 · working 낱개 3) + **CONTEXT.md 다이어트 1,138→~220줄** (과거 블록은
@@ -157,68 +175,6 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   (라이브 201/204/404 검증), ⑤ gen-cloudml-chain waiver(blocked-owner, 오너
   지시). 카탈로그 1,416 (위 at-a-glance 갱신됨). 다음: a690 종료 시 실패
   분석 + lb/asg/fw 수리 판정 + durations 재확인.
-- **HANDOFF (2026-07-13 — api-test-coverage-gzukh0 세션, 배치 ① 착수):** 인계된
-  "①배치 코드로 즉시 노려볼 4xx"를 착수. **코드 수리 4종 반영**(전부 heavy라
-  실 2xx는 다음 SCP_RUN_HEAVY 콘솔 런 판정; validate 0 err, offline 550 pass —
-  기존 실패 2건 test_console2.fold/test_docs_index는 무관·기존):
-  ① **mysql·postgresql setblockstoragesize** — create body가 OS 롤 block-storage-group
-  만 만들어 resize 시 400 InvalidBlockStorageRoleType. subops-full 검증 패턴 이식:
-  add-block-storages(DATA)→settle→bsg_data_id 재캡처→DATA 그룹 resize (scenarios.json
-  database-mysql-cluster/database-postgresql-cluster; mysql엔 instance_group_id 캡처
-  추가). ② **eventstreams showrequest** — es-create 202의 request_id를 es-wait
-  직전에 `GET /v1/requests/{request_id}`로 즉시 read (async-FAIL해도 request 레코드
-  존재 → 2xx; 유일 경로, list 미노출). ③ **cachestore set-commands** — modifiable
-  아닌 maxmemory-policy 하드코딩 제거, listcommands에서 `where_prefix modifiable=true`
-  실 커맨드 캡처→applied_value no-op 되돌림. ④ **filestorage setaccessrule**
-  (오너 지시 "VM dependency 걸어 테스트") — 단독 lifecycle은 VM 0대라 404
-  VirtualServerNotFound; **gen-heavy-vs-netops(ACTIVE VM 상비)에 filestorage NFS
-  볼륨+setaccessrule(add/remove) optional 그룹 `fs-vm-access` 편입**, object_id=
-  {server_id} 실 VM. 모든 filestorage 스텝 `service:filestorage` 필수(볼륨 경로가
-  virtualserver와 충돌), 토큰 fs_volume_id. **라이브 read-only 재확인 → 블로커 확정
-  2종**(코드 수리 불가): kms managed key `GET /v1/managed-kms/transit`→count:0(영구,
-  create API 없음) · cloudmonitoring event-policy 400+등록 리소스 0(2026-09 단종,
-  투자 금지). **미착수(사유별)**: DB patch-minor 5엔진=heavy create body 변경+C4
-  오너 컨펌 대기 · apigw/scf privatelink 5키=AUTO-approval 상태머신 라이브 런 관찰
-  트리아지 필요(블라인드 코드 불가). 상세: `knowledge/validated-facts.md` 2026-07-13
-  배치① 블록. ⚠️ knowledge/validated-facts.md:2453 고아 병합마커(`>>>>>>>`) 제거함.
-- **HANDOFF (2026-07-13 밤 — svc-coverage-improvement 세션 마감, main=`a746ea36`,
-  오너 "다른 세션에서 이어서"):** run-923a→892a→543a→c373 4연속 트리아지로 서비스
-  커버리지 4xx 대량 수리 완료 (상세: `knowledge/validated-facts.md` 2026-07-11~13
-  블록들). **c373(최신 main 첫 풀런) 판정: 3라운드 수리 전부 라이브 그린** —
-  rmtags SRN b64·cloudmonitoring 날짜·fifo dedup·secretsmanager reveal·vs-netops
-  IGW adopt-or-create·peering rule·DC 체인·DB resize. 마지막 반영분: http_client
-  429 재시도(vpc burst 스로틀 5건 제거)·scf time={1,3,12}·lb-members IGW
-  adopt-or-create. **PF 확정 2건** (SDS 문의감): DB register-log-export 500
-  (형식 통과+실존 버킷으로도 5엔진 ContactAdmin) · eventstreams 프로비저닝 5연속
-  FAILED(버전 무관). **▶ 다음 세션 착수점 — "①배치: 코드로 즉시 노려볼 4xx ~18키"
-  (정찰 완료, 미착수):**
-  1. **DB patch-minor-version 5엔진** (5키): "Unpatchable(자기버전)" 확정 →
-     **구버전 create→신버전 patch** 전략. mysql `GET /v1/engine-versions` contents
-     [0]=8.4.6(현재)·[1]=8.4.5(구) 실측 — create-cluster의 dbaas_engine_version_id를
-     [1]로 바꾸고 patch의 software_version을 [0]으로. cachestore는 patch json이
-     `{dbaas_engine:redis, software_version:7.2.11}` 하드코딩(다른 4엔진은
-     `{software_version}` 토큰) — 별도. **주의: create body 변경 = heavy 재프로비저닝,
-     신중히**. C4 버전축(C4-PARAM-COVERAGE.md)과 한 몸이니 함께 설계 권장.
-  2. **cloudmonitoring show-event-policy 3키** (histories·notifications·detail):
-     계정에 이벤트 정책 0이라 리터럴 400 → `gen-cm-event-policy`
-     (generated__light-batch2.json)에 정책 생존 창 읽기 편입.
-  3. **apigw/scf privatelink 5키**: gen-wave5-apigw-privatelink의 approve/connect/
-     request — apigw `cannot-use-region-api`, scf `endpoint-not-found`. 순서/전제
-     트리아지 1회 필요 (7/10 PLE 체인 그린의 나머지).
-  4. 소소한 것: **database-mysql-cluster set-block-storage-size**(subops-full의
-     DATA 그룹 재캡처 수리 미이식 — 5분) · **eventstreams showrequest**(es-create
-     202의 request_id 캡처→즉시 read) · **cachestore set-commands**('maxmemory-policy'
-     수정불가 → cachestorelistcommands에서 modifiable=true 커맨드 캡처,
-     modifycommandrequest={commands:[{id,name,new_value}]}) · **kms
-     updatemanagedkeydescription**(managed key 목록→실 id) · **filestorage
-     setaccessrule**(VM id 요구 `VirtualServerNotFound` → VM 있는 lifecycle로).
-  **②오너 결정 영역**: VS private-static-nat 2키(gen-private-nat에 VS interface
-  편입)·data-flow/ops/quick-query 7키(실 클러스터 전제 create, 과금)·switchover 2키
-  (ha_enabled=true 실험 or waiver). **③차단 확정 ~43키**: scr(이미지/PF-37/quota)·
-  DB 401 backup family 8·log-export/setparameters 500 PF·import-image·
-  updateimagemember·password PF-17·approvalvpcpeering(same-account)·org 403 —
-  waiver 심사 or SDS 문의(오너). **미완 대기**: eventstreams·DB-log-export PF는
-  다음 콘솔 런이 재확인만(수리 불가). C4 파라미터 커버리지는 오너 컨펌 대기.
 - **(과거 히스토리는 아카이브로)** 2026-06-10 ~ 2026-07-11 의 세션 로그 블록
   전부는 [`docs/archive/CONTEXT-history.md`](../archive/CONTEXT-history.md)로
   **verbatim 이동** (2026-07-29 리포 정리). 이 섹션은 "최신 CURRENT + 직전

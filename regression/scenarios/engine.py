@@ -36,6 +36,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -804,10 +805,26 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     # 전 요청 공통으로 처리한다 (run-c373 수리, 2026-07-13 — 병렬 세션이
     # 클라이언트 레벨로 먼저 반영) — 엔진 레벨 중복 백오프는 두지 않는다.
     ros = _as_status_list(step.get("retry_on_status"))
-    if ros:
+    # retry_on_error_code: HTTP 상태가 아니라 **바디 에러 코드**로 판정하는 조건부
+    # 사다리 (2026-08-01 실측 Dbaas.RbacCreateError — 서버가 일시 오류를 400
+    # BadRequest + "Try again." 프로즈로 뱉는 클래스). blanket retry_on_status
+    # [400]은 진짜 검증 400까지 재시도해 결함을 가리고 시간을 태우므로, 명시된
+    # 코드일 때만 사다리를 태운다. 4xx/5xx 무관 — 코드 일치가 기준.
+    roc = step.get("retry_on_error_code") or []
+    roc = [roc] if isinstance(roc, str) else list(roc)
+
+    def _err_code_retryable(r) -> bool:
+        if not roc or r.status < 400:
+            return False
+        b = getattr(r, "body", None)
+        errs = b.get("errors") if isinstance(b, dict) else None
+        return any(isinstance(e, dict) and e.get("code") in roc
+                   for e in errs or [])
+
+    if ros or roc:
         attempts = int(step.get("retries", 4))
         interval = float(step.get("retry_interval", 15))
-        while resp.status in ros and attempts > 0:
+        while (resp.status in ros or _err_code_retryable(resp)) and attempts > 0:
             # 플랫폼 중단 명령은 재시도 사다리 **도중에도** 듣는다 (2026-07-11
             # 오너 실측: 40×30s 사다리에 물린 시나리오가 ⏹로 안 끊겼음 —
             # 종전에는 폴 루프만 명령을 확인했다). 비소비 peek만 쓴다:
@@ -817,7 +834,16 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
                 print(f"  step '{step.get('name')}': platform command — "
                       f"abandoning retry ladder ({attempts} attempts left)")
                 break
-            time.sleep(interval)
+            if resp.status not in ros:
+                # 코드-사다리 경로만 ±25% 지터: 실측(run 3ebe)에서 같은 초에
+                # 병렬 발사된 create 5발 중 2발이 동시 거절됐다 — 고정 간격
+                # 재시도는 그 2발을 다시 같은 순간에 충돌시킨다. 상태-사다리는
+                # 기존 결정적 간격 유지 (timing-gated 오프라인 테스트 보호).
+                print(f"  step '{step.get('name')}': retryable error code on "
+                      f"HTTP {resp.status} — ladder ({attempts} attempts left)")
+                time.sleep(interval * (0.75 + random.random() * 0.5))
+            else:
+                time.sleep(interval)
             resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
             attempts -= 1
