@@ -1205,7 +1205,7 @@
           ],
           "optional": true,
           "group": "lb-members-chain",
-          "_note": "REPAIR 2026-07-08 (live run, 첫실측): 400 scp-loadbalancer.lb-health-checks.SubnetNotAssociatedWithLoadBalancer — health-check 는 대상 subnet 에 Load Balancer 가 이미 존재해야 생성 가능 (CONFIRMED: knowledge/services.md 'Health-check ↔ load-balancer creation ORDER constraint' HB4 run 28738115294 · knowledge/validated-facts.md). 이 lifecycle 은 설계상 no-load-balancer light 미러라 공유 GENERAL subnet 에는 LB 가 없어 구조적으로 2xx 불가 — light role(비과금) 불변 규칙상 LB 를 여기 추가할 수 없으므로 gen-heavy-lb-members(wave5-net, LB-first 재배열) 가 C3 검증을 담당하고, 이 스텝은 optional+400 관용 + 의존 체인 공유 그룹(lb-members-chain)으로 격리 — 캡처 미스 시 그룹 skip(런 non-red), R3 이 LB-연계 subnet 을 공급하면 그대로 2xx 로 살아난다 (gen-heavy-lb-members 의 기존 C2 패턴 복사).",
+          "_note": "REPAIR 2026-07-08 (live run, 첫실측): 400 scp-loadbalancer.lb-health-checks.SubnetNotAssociatedWithLoadBalancer — health-check 는 대상 subnet 에 Load Balancer 가 이미 존재해야 생성 가능 (CONFIRMED: knowledge/services.md 'Health-check ↔ load-balancer creation ORDER constraint' HB4 run 28738115294 · knowledge/validated-facts.md). 이 lifecycle 은 설계상 no-load-balancer light 미러라 공유 GENERAL subnet 에는 LB 가 없어 구조적으로 2xx 불가 — light role(비과금) 불변 규칙상 LB 를 여기 추가할 수 없으므로 gen-heavy-lb-members(wave5-net, LB-first 재배열) 가 C3 검증을 담당하고, 이 스텝은 optional+400 관용 + 의존 체인 공유 그룹(lb-members-chain)으로 격리 — 캡처 미스 시 그룹 skip(런 non-red), R3 이 LB-연계 subnet 을 공급하면 그대로 2xx 로 살아난다 (gen-heavy-lb-members 의 기존 C2 패턴 복사). || 500-사다리 2026-08-01 (run 5e3f 실측, req-8571a7db): subnet이 VPC 플레인에서 ACTIVE여도 LB 서비스의 파티션 메타데이터 전파 전이면 hc create가 500 scp-loadbalancer.common.search-partition-error로 즉사 — PF-52의 두 번째 얼굴(수락-후-행 vs 500-거절, 같은 뿌리 = 교차서비스 전파 지연). 30s×6 사다리로 전파 창 흡수. heavy 체인 2개는 recheck-subnet 게이트 후 10~17s create가 정상 통과(5e3f) — 이 light 체인만 subnet 생성 직후라 창에 걸린다.",
           "capture": {
             "lb_health_check_id": "$.lb_health_check.id"
           },
@@ -1213,7 +1213,12 @@
             "method": "DELETE",
             "path": "/v1/lb-health-checks/{lb_health_check_id}",
             "service": "loadbalancer"
-          }
+          },
+          "retry_on_status": [
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 30
         },
         {
           "name": "create-lb-server-group",

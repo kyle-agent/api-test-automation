@@ -281,6 +281,8 @@ _SWEEP_COLLECTIONS: tuple = (
     ("iam", "/v1/policies"),
     ("kms", "/v1/kms/transit"),
     ("loadbalancer", "/v1/loadbalancers"),      # holder 탐지(_HOLDER_COLLS)
+    ("loadbalancer", "/v1/lb-server-groups"),   # 독립 리소스 — LB cascade 안 됨
+    ("loadbalancer", "/v1/lb-health-checks"),   # 〃 (PF-52 좀비 hc 회수)
     ("queueservice", "/v1/queues"),
     ("resourcemanager", "/v1/resource-groups"),
     ("scf", "/v1/cloud-functions"),
@@ -385,6 +387,10 @@ _TYPE_TO_COLL: dict = {
     ("vpc", "vpc-peering"): ("vpc", "/v1/vpc-peerings"),
     ("loadbalancer", "loadbalancer"): ("loadbalancer", "/v1/loadbalancers"),
     ("loadbalancer", "load-balancer"): ("loadbalancer", "/v1/loadbalancers"),
+    ("loadbalancer", "lb-server-group"):
+        ("loadbalancer", "/v1/lb-server-groups"),
+    ("loadbalancer", "lb-health-check"):
+        ("loadbalancer", "/v1/lb-health-checks"),
     ("security-group", "security-group"):
         ("security-group", "/v1/security-groups"),
     ("ske", "cluster"): ("ske", "/v1/clusters"),
@@ -1976,6 +1982,21 @@ def _pass_certs_queues_sgs(c) -> int:
         if it.get("id") and _delete(
                 c, "security-group",
                 f"/v1/security-groups/{it['id']}"):
+            deleted += 1
+    # LB server-groups → health-checks (2026-08-01 오너 실측, 타 오퍼링:
+    # lb-health-check는 LB 종속이 아닌 **독립 리소스**(create body가
+    # subnet_id/vpc_id만 참조)라 LB delete로 cascade되지 않는데, 스윕에
+    # 컬렉션 자체가 없어 Creating-행 hc(PF-52)가 영구 잔존했다. server-group이
+    # hc를 참조하므로 sg 먼저 — hc delete 409는 다음 라운드가 줍는다.
+    for it in _select(c, "loadbalancer", "/v1/lb-server-groups",
+                      name_prefixes=("regrsg", "zznetsg")):
+        if it.get("id") and _delete(
+                c, "loadbalancer", f"/v1/lb-server-groups/{it['id']}"):
+            deleted += 1
+    for it in _select(c, "loadbalancer", "/v1/lb-health-checks",
+                      name_prefixes=("regrhc", "zznethc")):
+        if it.get("id") and _delete(
+                c, "loadbalancer", f"/v1/lb-health-checks/{it['id']}"):
             deleted += 1
     return deleted
 
