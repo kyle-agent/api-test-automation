@@ -67,11 +67,17 @@ Key fields (see `core/profiles.py` for the full schema):
    상세: `docs/API-VERSIONING.md`.
 4. **가용영역/서버타입이 다르면 env 토큰으로 핀**:
    - `SCP_ZONE=<존>` — 존 규칙이 다른 리전 (기본: kr-west1→`-b`, 그 외→`-a`
-     — 실측 기반 자동).
+     — 실측 기반 자동). 2026-08-01부터 시나리오의 `{region}-b` 준-리터럴도
+     전부 `{zone}` 토큰이라 이 env가 모든 존 값을 지배한다.
    - 서버타입 세대가 다른 오퍼링 (2026-07-29 west1 실측: s1 풀 고갈로 전
      DB 클러스터 FAILED, "신규 VM은 s2로"; 노드명은 패밀리별 —
      VM `s2v{cpu}m{mem}` · DB `db2v…` · eventstreams `ess2v…`):
-     - VM: `SCP_VS_SERVER_TYPE_PREFIX=s2` (풀네임 `s2v1m2` = 정확 핀)
+     - VM: `SCP_VS_SERVER_TYPE_PREFIX=s2` 하나로 충분 — 캡처 스텝은 min_by가
+       s2 최소(s2v1m2)를 집고(2026-08-01: min_by 없던 VS 캡처가 첫 매치
+       s2v10m120을 집던 결함 수리), 타입을 바디에 박던 create 6곳은
+       `{vs_server_type}` 토큰이 접두에서 바닥을 유도(s2→`s2v1m2`).
+       풀네임 접두(`s2v1m2`) = 정확 핀; 유도가 틀리는 오퍼링은
+       `SCP_VS_SERVER_TYPE=<풀네임>`으로 명시 오버라이드.
      - DBaaS **권장**: `SCP_DB_SERVER_TYPE="*"` — type 필터(기본 Standard-1)
        해제; min_by가 각 패밀리의 최소 사이즈(db2v2m4·ess2v2m4)를 자동 선택
      - 응답에 구세대가 섞여 또 자원부족이 나면 이름 핀:

@@ -32,13 +32,16 @@ def test_scp_zone_env_wins(monkeypatch):
 
 def test_no_literal_zone_hardcodes_left():
     """값 위치의 존 리터럴이 남아 있으면 교차-리전 400이 재발한다 — _note
-    (역사 증거 프로즈)만 허용. 새 스텝은 "{zone}" 토큰을 쓸 것."""
+    (역사 증거 프로즈)만 허용. 새 스텝은 "{zone}" 토큰을 쓸 것.
+    "{region}-b" 꼴도 금지 (2026-08-01: SCP_ZONE 핀을 우회하는 준-리터럴 —
+    west1 오퍼링(존 -a)에서 14곳이 -b로 직행하던 잔존 클래스)."""
     root = pathlib.Path(engine.__file__).resolve().parent
     files = list((root / "lifecycles").glob("*.json")) + [root / "scenarios.json"]
     bad = []
     for p in files:
         for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
-            if ("kr-west1-b" in line and '"_note"' not in line
-                    and '"_comment"' not in line):
+            if '"_note"' in line or '"_comment"' in line:
+                continue
+            if "kr-west1-b" in line or '"{region}-a"' in line or '"{region}-b"' in line:
                 bad.append(f"{p.name}:{i}")
-    assert not bad, f"존 리터럴 하드코딩 잔존 (값 위치): {bad}"
+    assert not bad, f"존 리터럴/준-리터럴 하드코딩 잔존 (값 위치): {bad}"

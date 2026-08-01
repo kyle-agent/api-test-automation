@@ -54,7 +54,7 @@
           "json": {
             "contract_type": "01",
             "os_type": "opensource",
-            "server_type": "s1v1m2",
+            "server_type": "{vs_server_type}",
             "service_id": "VIRTUAL_SERVER"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
@@ -77,7 +77,7 @@
           "path": "/v1/planned-computes/{planned_compute_id}",
           "json": {
             "action": "SERVER_TYPE_CHANGE",
-            "server_type": "s1v1m2"
+            "server_type": "{vs_server_type}"
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,

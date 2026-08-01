@@ -180,13 +180,17 @@
               "where_not_prefix": {
                 "id": [
                   "g",
-                  "s1v1m2"
+                  "{vs_server_type}"
                 ]
               },
-              "get": "id"
+              "get": "id",
+              "min_by": [
+                "vcpus",
+                "ram"
+              ]
             }
           },
-          "_note": "Resize target: first standard s-type that is NOT the create type s1v1m2 and NOT a g/GPU type. s1v1m2 is the smallest standard size (v1m2 = 1 vCPU/2GB, ladder floor per docs + billingplan css ladder), so any other s-type is a valid larger/different type (expected s1v2m4-class). HARD capture placed BEFORE the billable create-server on purpose: an account with no second s-type fails fast here instead of churning a VM."
+          "_note": "Resize target: smallest (min_by) standard s-type that is NOT the create type {vs_server_type} (default s1v1m2, ladder floor per docs + billingplan css ladder) and NOT a g/GPU type — expected s1v2m4-class on 검증계, s2v2m4-class when SCP_VS_SERVER_TYPE_PREFIX=s2 (2026-08-01: prefix pins the pool AND derives the create type, so the exclusion tracks it via token). HARD capture placed BEFORE the billable create-server on purpose: an account with no second s-type fails fast here instead of churning a VM."
         },
         {
           "name": "create-server",
@@ -195,11 +199,11 @@
           "json": {
             "name": "regrvasrv{unique}",
             "image_id": "{image_id}",
-            "server_type_id": "s1v1m2",
+            "server_type_id": "{vs_server_type}",
             "keypair_name": "regrvakey{unique}",
             "product_category": "compute",
             "product_offering": "virtual_server",
-            "zone": "{region}-b",
+            "zone": "{zone}",
             "networks": [
               {
                 "subnet_id": "{subnet_id}"

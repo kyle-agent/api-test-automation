@@ -63,7 +63,11 @@
               "where_not_prefix": {
                 "id": "g"
               },
-              "get": "id"
+              "get": "id",
+              "min_by": [
+                "vcpus",
+                "ram"
+              ]
             }
           }
         },
@@ -187,7 +191,7 @@
           "method": "POST",
           "path": "/v1/servers",
           "json": {
-            "zone": "{region}-b",
+            "zone": "{zone}",
             "name": "regrsrv{unique}",
             "image_id": "{image_id}",
             "server_type_id": "{server_type_id}",
@@ -714,7 +718,11 @@
               "where_not_prefix": {
                 "id": "g"
               },
-              "get": "id"
+              "get": "id",
+              "min_by": [
+                "vcpus",
+                "ram"
+              ]
             }
           }
         },

@@ -63,7 +63,11 @@
               "where_not_prefix": {
                 "id": "g"
               },
-              "get": "id"
+              "get": "id",
+              "min_by": [
+                "vcpus",
+                "ram"
+              ]
             }
           }
         },
@@ -79,7 +83,7 @@
             "volume_type": "SSD_Provisioned",
             "max_iops": 10000,
             "max_throughput": 500,
-            "zone": "{region}-b",
+            "zone": "{zone}",
             "tags": []
           },
           "_note": "SPEC-DIFF-20260715 §2① (VolumeCreateRequestV1Dot4): zone became REQUIRED (without it: 400 ValidationError 'Field zone is invalid', req-c7986e34). zone convention '{region}-b' — LIVE 2026-07-15: this account/region has exactly ONE availability zone 'kr-west1-b' (volume create with the docs-example 'kr-west1-a' 400d Volume.InvalidAvailabilityZone (must be one of availability zones: ['kr-west1-b'], req-e8a99e6e)); the docs example kr-west1-a is NOT valid here. LIVE-PROVEN 2026-07-15: probe volume (size 8, SSD, zone kr-west1-b) returned 202 (response echoes zone), reached state available, DELETE 202, post-delete GET 404 confirmed (id a072b758).",
@@ -245,7 +249,7 @@
             "keypair_name": "regrkey{unique}",
             "product_category": "compute",
             "product_offering": "virtual_server",
-            "zone": "{region}-b",
+            "zone": "{zone}",
             "networks": [
               {
                 "subnet_id": "{subnet_id}"
@@ -305,7 +309,7 @@
             "name": "regrfsvm{unique}",
             "protocol": "NFS",
             "type_name": "HDD",
-            "zone": "{region}-b"
+            "zone": "{zone}"
           },
           "expect_status": [
             200,
@@ -957,7 +961,7 @@
           "method": "POST",
           "path": "/v1/publicips",
           "json": {
-            "zone": "{region}-b",
+            "zone": "{zone}",
             "description": "API regression suite",
             "type": "IGW",
             "tags": []

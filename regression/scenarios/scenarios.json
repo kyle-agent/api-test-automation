@@ -2764,7 +2764,11 @@
               "where_not_prefix": {
                 "id": "g"
               },
-              "get": "id"
+              "get": "id",
+              "min_by": [
+                "vcpus",
+                "ram"
+              ]
             }
           }
         },
@@ -3139,7 +3143,7 @@
             "desired_node_count": "1",
             "min_node_count": "1",
             "max_node_count": "2",
-            "server_type_id": "s1v1m2",
+            "server_type_id": "{vs_server_type}",
             "image_os": "ubuntu",
             "image_os_version": "22.04",
             "keypair_name": "regrkey{unique}",
@@ -3147,7 +3151,7 @@
             "volume_type_name": "SSD",
             "is_auto_recovery": "false",
             "is_auto_scale": "false",
-            "zone": "{region}-b"
+            "zone": "{zone}"
           },
           "expect_status": [
             200,
@@ -3910,7 +3914,11 @@
               "where_not_prefix": {
                 "id": "g"
               },
-              "get": "id"
+              "get": "id",
+              "min_by": [
+                "vcpus",
+                "ram"
+              ]
             }
           }
         },

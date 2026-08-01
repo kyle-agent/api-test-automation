@@ -534,6 +534,29 @@ def _vs_server_type_prefix() -> str:
     return os.environ.get("SCP_VS_SERVER_TYPE_PREFIX", "").strip() or "s"
 
 
+def _vs_server_type() -> str:
+    """{vs_server_type} — 하드코딩 create 바디의 VS 서버타입 리터럴(구 s1v1m2)의
+    토큰화 (2026-08-01, s2 오퍼링 실측: s1 풀 고갈이라 리터럴 create 클래스가
+    전멸하는 문제 — 캡처 기반 스텝은 {vs_server_type_prefix}+min_by로 이미
+    해결됐지만 6개 lifecycle이 타입을 바디에 직접 박고 있었다). 우선순위:
+    ① SCP_VS_SERVER_TYPE 명시 시 그 값 (임의 오퍼링용 탈출구)
+    ② SCP_VS_SERVER_TYPE_PREFIX에서 유도 — 풀네임 꼴(s2v1m2)이면 그대로,
+       세대 접두(s2)면 이름 문법 바닥 v1m2를 붙인다 (VM 노드명
+       s{gen}v{cpu}m{mem}, 2026-08-01 오너 픽커 실측: s2v1m2 존재).
+       => 오퍼링 레시피는 PREFIX=s2 하나로 캡처·리터럴 둘 다 커버.
+    ③ 기본 "s1v1m2" (검증계 현행 바닥 타입)."""
+    v = os.environ.get("SCP_VS_SERVER_TYPE", "").strip()
+    if v:
+        return v
+    pfx = os.environ.get("SCP_VS_SERVER_TYPE_PREFIX", "").strip()
+    if pfx:
+        if re.fullmatch(r"s\d+v\d+m\d+", pfx):
+            return pfx
+        if re.fullmatch(r"s\d+", pfx):
+            return f"{pfx}v1m2"
+    return "s1v1m2"
+
+
 def _db_server_type_name_prefix(service: str = "") -> str:
     """{db_server_type_name_prefix} — DBaaS find-server-type의 name where_prefix.
     기본 ""(빈 prefix = no-op, 전체 매치). 세대가 type이 아니라 **이름**에
@@ -1142,6 +1165,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # 서버타입 세대 핀 (2026-07-29 — 오퍼링 자원부족 대응; capture 필터의
         # where_prefix 값에서 {token}으로 소비된다).
         "vs_server_type_prefix": _vs_server_type_prefix(),
+        "vs_server_type": _vs_server_type(),
         "db_server_type_filter": _db_server_type_filter(),
         "db_server_type_name_prefix":
             _db_server_type_name_prefix(lifecycle.get("service", "")),

@@ -63,7 +63,7 @@
           "json": {
             "name": "regrasglc{unique}",
             "image_id": "{lc_image_id}",
-            "server_type_id": "s1v1m2",
+            "server_type_id": "{vs_server_type}",
             "keypair_name": "{asg_keypair_name}",
             "volumes": [
               {
@@ -216,7 +216,7 @@
             "state_check_delay_time": 300,
             "use_lb_state_check": false,
             "placement_strategy": "balanced",
-            "zones": ["{region}-b"],
+            "zones": ["{zone}"],
             "subnet_ids": ["{asg_subnet_id}"],
             "security_group_ids": ["{asg_sg_id}"],
             "tags": []

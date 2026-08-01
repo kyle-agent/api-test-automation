@@ -60,7 +60,11 @@
               "where_not_prefix": {
                 "id": "g"
               },
-              "get": "id"
+              "get": "id",
+              "min_by": [
+                "vcpus",
+                "ram"
+              ]
             }
           }
         },
@@ -286,7 +290,7 @@
           "method": "POST",
           "path": "/v1/volumes",
           "json": {
-            "zone": "{region}-b",
+            "zone": "{zone}",
             "name": "regrfs{unique}",
             "protocol": "NFS",
             "type_name": "HDD"

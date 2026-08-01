@@ -8,6 +8,8 @@ engine._capture가 ctx를 받아 필터 값의 {token}을 치환한다.
 """
 from __future__ import annotations
 
+import pathlib
+
 from regression.scenarios import engine
 
 
@@ -99,3 +101,62 @@ def test_capture_without_ctx_unchanged():
     body = {"server_types": [{"id": "s1.small"}]}
     expr = {"list": "$.server_types", "where_prefix": {"id": "s"}, "get": "id"}
     assert engine._capture(body, expr) == "s1.small"
+
+
+def test_vs_server_type_default(monkeypatch):
+    """{vs_server_type} — 하드코딩 create 바디의 타입 리터럴 토큰 (2026-08-01,
+    s2 오퍼링: s1 풀 고갈로 리터럴 s1v1m2 create 클래스 6곳 전멸이 계기)."""
+    monkeypatch.delenv("SCP_VS_SERVER_TYPE", raising=False)
+    monkeypatch.delenv("SCP_VS_SERVER_TYPE_PREFIX", raising=False)
+    assert engine._vs_server_type() == "s1v1m2"
+
+
+def test_vs_server_type_explicit_env_wins(monkeypatch):
+    monkeypatch.setenv("SCP_VS_SERVER_TYPE", "x9v9m99")
+    monkeypatch.setenv("SCP_VS_SERVER_TYPE_PREFIX", "s2")
+    assert engine._vs_server_type() == "x9v9m99"
+
+
+def test_vs_server_type_derives_from_prefix(monkeypatch):
+    """PREFIX 하나로 캡처 스텝(min_by 최소)과 리터럴 create 스텝이 같은 세대를
+    보게 한다 — 세대 접두면 이름 문법 바닥 v1m2를 붙이고(s2→s2v1m2, 오너 픽커
+    실측 존재), 풀네임이면 그대로, 문법 밖이면 기본으로 안전 후퇴."""
+    monkeypatch.delenv("SCP_VS_SERVER_TYPE", raising=False)
+    monkeypatch.setenv("SCP_VS_SERVER_TYPE_PREFIX", "s2")
+    assert engine._vs_server_type() == "s2v1m2"
+    monkeypatch.setenv("SCP_VS_SERVER_TYPE_PREFIX", "s2v4m8")
+    assert engine._vs_server_type() == "s2v4m8"
+    monkeypatch.setenv("SCP_VS_SERVER_TYPE_PREFIX", "std")
+    assert engine._vs_server_type() == "s1v1m2"
+
+
+def test_capture_fills_token_inside_where_not_list():
+    """virtualserver-actions resize 캡처: 제외 목록의 create 타입이 토큰이라
+    PREFIX 핀을 따라간다 — s2 핀이면 s2v1m2(=create)를 빼고 다음 최소를 집는다."""
+    body = {"server_types": [
+        {"id": "g1v4m32", "vcpus": 4, "ram": 32},
+        {"id": "s2v1m2", "vcpus": 1, "ram": 2},
+        {"id": "s2v2m4", "vcpus": 2, "ram": 4},
+        {"id": "s2v4m8", "vcpus": 4, "ram": 8},
+    ]}
+    expr = {"list": "$.server_types",
+            "where_prefix": {"id": "{vs_server_type_prefix}"},
+            "where_not_prefix": {"id": ["g", "{vs_server_type}"]},
+            "get": "id", "min_by": ["vcpus", "ram"]}
+    ctx = {"vs_server_type_prefix": "s2", "vs_server_type": "s2v1m2"}
+    assert engine._capture(body, expr, ctx) == "s2v2m4"
+
+
+def test_no_literal_vs_server_type_hardcodes_left():
+    """값 위치의 s{n}v{c}m{m} 타입 리터럴 금지 (_note 프로즈만 허용) — 리터럴은
+    SCP_VS_SERVER_TYPE(_PREFIX) 핀을 우회해 세대 교체 오퍼링에서 재발한다."""
+    root = pathlib.Path(engine.__file__).resolve().parent
+    files = list((root / "lifecycles").glob("*.json")) + [root / "scenarios.json"]
+    bad = []
+    for p in files:
+        for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            if '"_note"' in line or '"_comment"' in line:
+                continue
+            if '"s1v1m2"' in line:
+                bad.append(f"{p.name}:{i}")
+    assert not bad, f"VS 서버타입 리터럴 잔존 (값 위치): {bad}"

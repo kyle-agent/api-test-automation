@@ -65,7 +65,11 @@
               "where_not_prefix": {
                 "id": "g"
               },
-              "get": "id"
+              "get": "id",
+              "min_by": [
+                "vcpus",
+                "ram"
+              ]
             }
           }
         },
@@ -244,7 +248,7 @@
             "use_lb_state_check": false,
             "placement_strategy": "balanced",
             "zones": [
-              "{region}-b"
+              "{zone}"
             ],
             "subnet_ids": [
               "{subnet_id}"
@@ -624,7 +628,9 @@
           "json": {
             "name": "regr-rg-{unique}",
             "description": "created by API regression suite",
-            "resource_types": ["resourcemanager:resource-group"]
+            "resource_types": [
+              "resourcemanager:resource-group"
+            ]
           },
           "_note": "SPEC TIGHTENING 2026-07-15 (run fe88): 400 'The resource_types field cannot be null' without it (scp-resourcemanager.resource-group.value-error, req-4a28ed92-98a0-4ae1-8318-0870b2b1a637; correct pin resourcemanager 1.0 — not 406-class). With field: LIVE 201.",
           "expect_status": [
@@ -884,7 +890,9 @@
           "json": {
             "name": "regr-rgb-{unique}",
             "description": "bulk-delete probe",
-            "resource_types": ["resourcemanager:resource-group"]
+            "resource_types": [
+              "resourcemanager:resource-group"
+            ]
           },
           "_note": "SPEC TIGHTENING 2026-07-15 (run fe88): resource_types now required by server (400 value-error without it; not 406-class). See create-resource-group note.",
           "expect_status": [
