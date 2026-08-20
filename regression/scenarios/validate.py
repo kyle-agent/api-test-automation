@@ -57,7 +57,7 @@ METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 BUILTINS = {"unique", "ualpha", "region", "zone",
             "vs_server_type_prefix", "vs_server_type", "db_server_type_filter",
             "db_server_type_name_prefix",
-            "today", "today_plus_5y",
+            "today", "today_plus_5y", "this_month", "zone_alt",
             "scp_access_key", "scp_secret_key",
             "iso_today", "iso_29d_ago", "epoch_now", "epoch_1h_ago",
             "iso_dt_29d_ago", "iso_dt_1h_ago",

@@ -532,7 +532,9 @@
             "firewall_enabled": false,
             "firewall_loggable": false,
             "tags": [],
-            "vpc_id": "{vpc_id}"
+            "vpc_id": "{vpc_id}",
+            "uplink_active_zone": "{zone}",
+            "uplink_standby_zone": "{zone_alt}"
           },
           "expect_status": [
             200,
@@ -547,7 +549,7 @@
             "path": "/v1/direct-connects/{direct_connect_id}",
             "service": "vpc"
           },
-          "_note": "owner 2026-07-10 'private nat는 direct connect와 연결도 가능 — 더 확인': v1 스키마는 direct_connect_id 필수였고 v1.2 예시도 DIRECT_CONNECT — DX가 private-nat의 1급 연결 대상. gen-direct-connect의 라이브 검증 body/캡처 승계 (DX 객체는 실회선 없이 ACTIVE 도달 실증). TGW 경유는 Uplink 물리회선 게이트 확정이라 은퇴 (validated-facts 2026-07-10).",
+          "_note": "owner 2026-07-10 'private nat는 direct connect와 연결도 가능 — 더 확인': v1 스키마는 direct_connect_id 필수였고 v1.2 예시도 DIRECT_CONNECT — DX가 private-nat의 1급 연결 대상. gen-direct-connect의 라이브 검증 body/캡처 승계 (DX 객체는 실회선 없이 ACTIVE 도달 실증). TGW 경유는 Uplink 물리회선 게이트 확정이라 은퇴 (validated-facts 2026-07-10). || REPAIR 2026-08-20 (run 3e67 (2026-08-20)): 400 scp-network.direct-connect.required-zone — uplink_active_zone/uplink_standby_zone now required for multi-zone-mode VPCs (doc body example already carries kr-west1-a/b).",
           "service": "direct-connect"
         },
         {
@@ -868,7 +870,9 @@
             "firewall_enabled": false,
             "firewall_loggable": false,
             "tags": [],
-            "vpc_id": "{vpc_id}"
+            "vpc_id": "{vpc_id}",
+            "uplink_active_zone": "{zone}",
+            "uplink_standby_zone": "{zone_alt}"
           },
           "expect_status": [
             200,
@@ -883,7 +887,7 @@
             "path": "/v1/direct-connects/{direct_connect_id}",
             "service": "direct-connect"
           },
-          "_note": "RETRY LADDER 2026-07-16 (run a690 실측: 4초 사망·자원 0 — routing lifecycle의 DC 2개가 18:03 delete 후에도 서버측 드레인 중이라 18:09 create가 캡/배타 4xx. 같은 바디로 계정이 조용할 때 라이브 프로브 202+전체바디→ACTIVE→delete 202→404 확인 — 엔드포인트 정상, 순수 타이밍). DC 드레인은 수 분 걸리므로 30s×10 사다리로 흡수. DC delete는 CREATING 상태에서 400(라이브 실측)이라 드레인 대기 없이는 재시도가 답. | 원인 확정 2026-07-16 (run e68b 실측, 캠페인 C): 사다리 10×30s(00:21:47→00:27:17) 전량 소진 후에도 400 scp-network.direct-connect.vpc-already-connected 'VPC(ce24c190…) is already connected to other Direct Connect' (req-b0d35738) — 점유자는 같은 메인 공유 VPC 에서 gen-private-nat 이 흘린 DC 82a3621e (00:17:26 created, delete 400 not-deletable 후 wait-gone 300s 타임아웃에도 200 잔존 = 누수). 이중 수리로 해소 예정: (1) lane separation da81a623 — 이 lifecycle 은 vpc#a 로 이주 (e68b 는 디스패치가 커밋보다 먼저라 미반영 상태로 돌았음), (2) gen-private-nat 에 wait-private-nat-gone 게이트 추가(누수 원천 차단). 다음 런에서 202 확인 필요.",
+          "_note": "RETRY LADDER 2026-07-16 (run a690 실측: 4초 사망·자원 0 — routing lifecycle의 DC 2개가 18:03 delete 후에도 서버측 드레인 중이라 18:09 create가 캡/배타 4xx. 같은 바디로 계정이 조용할 때 라이브 프로브 202+전체바디→ACTIVE→delete 202→404 확인 — 엔드포인트 정상, 순수 타이밍). DC 드레인은 수 분 걸리므로 30s×10 사다리로 흡수. DC delete는 CREATING 상태에서 400(라이브 실측)이라 드레인 대기 없이는 재시도가 답. | 원인 확정 2026-07-16 (run e68b 실측, 캠페인 C): 사다리 10×30s(00:21:47→00:27:17) 전량 소진 후에도 400 scp-network.direct-connect.vpc-already-connected 'VPC(ce24c190…) is already connected to other Direct Connect' (req-b0d35738) — 점유자는 같은 메인 공유 VPC 에서 gen-private-nat 이 흘린 DC 82a3621e (00:17:26 created, delete 400 not-deletable 후 wait-gone 300s 타임아웃에도 200 잔존 = 누수). 이중 수리로 해소 예정: (1) lane separation da81a623 — 이 lifecycle 은 vpc#a 로 이주 (e68b 는 디스패치가 커밋보다 먼저라 미반영 상태로 돌았음), (2) gen-private-nat 에 wait-private-nat-gone 게이트 추가(누수 원천 차단). 다음 런에서 202 확인 필요. || REPAIR 2026-08-20 (run 3e67 (2026-08-20)): 400 scp-network.direct-connect.required-zone — uplink_active_zone/uplink_standby_zone now required for multi-zone-mode VPCs (doc body example already carries kr-west1-a/b).",
           "retry_on_status": [
             400,
             409,

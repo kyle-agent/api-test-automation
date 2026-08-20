@@ -1170,10 +1170,12 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            409,
             500
           ],
           "retries": 12,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "_note": "REPAIR 2026-08-20 (run 3e67 (2026-08-20)): delete 409 scp-container-registry.common.creating-cannot-delete — registry stayed CREATING 6+min (repo ops worked meanwhile). 409 joins the 500 ladder (12x30s)."
         },
         {
           "name": "wait-gone",
@@ -8746,12 +8748,49 @@
       "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}]. COVERAGE EXPANSION (not yet dispatch-validated): config/env-vars/url/code PUTs, set+delete resource-policy (Resource:'*' best-effort, 400 tolerated), and update-cronjob-trigger. Each optional+grouped so a rejection isolates. Skipped (need external artifacts/ids): setcloudfunctioncodefile (OBS jar), apigateway trigger, the privatelink-ENDPOINT family. enable/disable-privatelink-service REMOVED (run #5): enabling PL leaves the service in 'Creating' so the in-lifecycle disable 400s, then the function delete 400s with CloudFunctionNotDeletableError — i.e. enabling PL blocks clean teardown. Not worth a stateful PL-service wait for 2 niche PUTs.",
       "steps": [
         {
+          "name": "default-scf-runtime--trigger",
+          "action": "set_const",
+          "values": {
+            "scf_rt_name": "Node.js",
+            "scf_rt_ver": "22"
+          }
+        },
+        {
+          "name": "find-scf-runtime--trigger",
+          "service": null,
+          "method": "GET",
+          "path": "/v1/cloud-functions/runtimes",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "scf_rt_name": {
+              "list": "$.runtimes",
+              "where_prefix": {
+                "name": "Node.js"
+              },
+              "get": "name"
+            },
+            "scf_rt_ver": {
+              "list": "$.runtimes",
+              "where_prefix": {
+                "name": "Node.js"
+              },
+              "get": "version"
+            }
+          },
+          "_note": "REPAIR 2026-08-20 (run 3e67 (2026-08-20)): create 400 scp-cloud-function.invalid-runtime with the DOC-EXAMPLE value 'Node.js:20' verbatim — the valid runtime SET changed (Node 20 EOTS), and the error message still cites the now-invalid example (conformance-worthy). Runtime is now DISCOVERED from GET /v1/cloud-functions/runtimes ({name}:{version} of the first Node.js entry, capture_soft) with a set_const fallback Node.js:22 so the placeholder always resolves."
+        },
+        {
           "name": "create",
           "method": "POST",
           "path": "/v1/cloud-functions",
           "json": {
             "name": "regrscf{unique}",
-            "runtime": "Node.js:20",
+            "runtime": "{scf_rt_name}:{scf_rt_ver}",
             "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
             "tags": []
           },

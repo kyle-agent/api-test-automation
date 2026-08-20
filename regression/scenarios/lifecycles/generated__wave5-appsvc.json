@@ -807,7 +807,7 @@
           "service": "apigateway",
           "method": "PUT",
           "path": "/v1/privatelink-endpoints/{ple_id}/approval",
-          "_note": "GATED PROBE — PrivateLinkEndpointApprovalRequest {api_id, type APPROVE|REJECT}. With approval_type AUTO the endpoint may already be approved -> 4xx tolerated; the op still records. If live shows MANUAL flow is needed, flip the privatelink-service to MANUAL and approve here. REWIRE 2026-07-16 (C/D 합동, run a690+e68b): api_id를 REGION api에서 {private_api_id}(create-private-api)로 교체 — REGION api_id는 400 cannot-use-region-api 확정.",
+          "_note": "GATED PROBE — PrivateLinkEndpointApprovalRequest {api_id, type APPROVE|REJECT}. With approval_type AUTO the endpoint may already be approved -> 4xx tolerated; the op still records. If live shows MANUAL flow is needed, flip the privatelink-service to MANUAL and approve here. REWIRE 2026-07-16 (C/D 합동, run a690+e68b): api_id를 REGION api에서 {private_api_id}(create-private-api)로 교체 — REGION api_id는 400 cannot-use-region-api 확정. || REPAIR 2026-08-20 (run 3e67 (2026-08-20)): approval PUT 500 ContactAdminForAssistance (known 500-on-client-state family, conformance-recorded) — bounded 500 ladder 4x20s.",
           "json": {
             "api_id": "{private_api_id}",
             "type": "APPROVE"
@@ -822,7 +822,12 @@
             422
           ],
           "optional": true,
-          "group": "apigw-ple-actions"
+          "group": "apigw-ple-actions",
+          "retry_on_status": [
+            500
+          ],
+          "retries": 4,
+          "retry_interval": 20
         },
         {
           "name": "connect-apigw-privatelink-endpoint-disconnect",
@@ -930,6 +935,43 @@
           "retry_interval": 20
         },
         {
+          "name": "default-scf-runtime-vatelink",
+          "action": "set_const",
+          "values": {
+            "scf_rt_name": "Node.js",
+            "scf_rt_ver": "22"
+          }
+        },
+        {
+          "name": "find-scf-runtime-vatelink",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/runtimes",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "scf_rt_name": {
+              "list": "$.runtimes",
+              "where_prefix": {
+                "name": "Node.js"
+              },
+              "get": "name"
+            },
+            "scf_rt_ver": {
+              "list": "$.runtimes",
+              "where_prefix": {
+                "name": "Node.js"
+              },
+              "get": "version"
+            }
+          },
+          "_note": "REPAIR 2026-08-20 (run 3e67 (2026-08-20)): create 400 scp-cloud-function.invalid-runtime with the DOC-EXAMPLE value 'Node.js:20' verbatim — the valid runtime SET changed (Node 20 EOTS), and the error message still cites the now-invalid example (conformance-worthy). Runtime is now DISCOVERED from GET /v1/cloud-functions/runtimes ({name}:{version} of the first Node.js entry, capture_soft) with a set_const fallback Node.js:22 so the placeholder always resolves."
+        },
+        {
           "name": "create-function",
           "service": "scf",
           "method": "POST",
@@ -937,7 +979,7 @@
           "_note": "VALIDATED scf-function body. Host for the scf privatelink-endpoint family against the same provider service.",
           "json": {
             "name": "regrw5scf{unique}",
-            "runtime": "Node.js:20",
+            "runtime": "{scf_rt_name}:{scf_rt_ver}",
             "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
             "tags": []
           },
@@ -1229,7 +1271,8 @@
           "group": "scf-ple",
           "destructive": true,
           "retry_on_status": [
-            400
+            400,
+            409
           ],
           "retries": 8,
           "retry_interval": 15
@@ -1421,13 +1464,50 @@
       "_note": "scf trigger + leftovers closure: apigateway trigger with the verbatim ApigatewayTriggerCreateRequest {apigateway_api_id (24-hex = our apigw api id), apigateway_stage_name (dev from stage_type=new), cloud_function_id} — the old coverage probe's guessed body is retired. Trigger DELETE uses the PROVEN json passthrough {cloud_function_id, trigger_type} with the 'apigateway' literal (live 400 on run 27417986669 said type must be 'apigateway' or 'cron'). listcloudfunctiontriggers carries its required cloud_function_id query. logs/metrics ride ?time=1 (undocumented-required param class, 400 tolerated). codes/file is a Java-shaped DTO probed against a Node function -> 4xx expected, owner question to prove it properly.",
       "steps": [
         {
+          "name": "default-scf-runtime-triggers",
+          "action": "set_const",
+          "values": {
+            "scf_rt_name": "Node.js",
+            "scf_rt_ver": "22"
+          }
+        },
+        {
+          "name": "find-scf-runtime-triggers",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/runtimes",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "scf_rt_name": {
+              "list": "$.runtimes",
+              "where_prefix": {
+                "name": "Node.js"
+              },
+              "get": "name"
+            },
+            "scf_rt_ver": {
+              "list": "$.runtimes",
+              "where_prefix": {
+                "name": "Node.js"
+              },
+              "get": "version"
+            }
+          },
+          "_note": "REPAIR 2026-08-20 (run 3e67 (2026-08-20)): create 400 scp-cloud-function.invalid-runtime with the DOC-EXAMPLE value 'Node.js:20' verbatim — the valid runtime SET changed (Node 20 EOTS), and the error message still cites the now-invalid example (conformance-worthy). Runtime is now DISCOVERED from GET /v1/cloud-functions/runtimes ({name}:{version} of the first Node.js entry, capture_soft) with a set_const fallback Node.js:22 so the placeholder always resolves."
+        },
+        {
           "name": "create-function",
           "service": "scf",
           "method": "POST",
           "path": "/v1/cloud-functions",
           "json": {
             "name": "regrw5trg{unique}",
-            "runtime": "Node.js:20",
+            "runtime": "{scf_rt_name}:{scf_rt_ver}",
             "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
             "tags": []
           },

@@ -526,6 +526,19 @@ def _default_zone(region: str) -> str:
     return f"{region}-b" if region == "kr-west1" else f"{region}-a"
 
 
+def _alt_zone(zone: str) -> str:
+    """{zone_alt} — {zone}의 반대편 가용영역 (…-a↔…-b 플립). SCP_ZONE_ALT
+    env가 최우선. run 3e67 (2026-08-20) direct-connect 400 required-zone이
+    계기: VPC가 multi-zone 모드가 되면서 (west1에 두 번째 존이 열린 것으로
+    추정) uplink_active_zone/uplink_standby_zone 쌍이 필수가 됐는데, 존
+    리터럴/준-리터럴은 test_zone_token 규율로 금지라 파생 토큰으로 공급한다.
+    active={zone}(리전별 실측 기본존), standby={zone_alt}."""
+    z = os.environ.get("SCP_ZONE_ALT", "").strip()
+    if z:
+        return z
+    return zone[:-2] + ("-a" if zone.endswith("-b") else "-b")
+
+
 def _vs_server_type_prefix() -> str:
     """{vs_server_type_prefix} — VS계열 find-server-type의 where_prefix id
     기본값. 오퍼링 자원부족 대응 (2026-07-29 run 3b65: 기저 VM 풀 고갈로
@@ -1188,6 +1201,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # {zone} — 가용영역 (2026-07-29 신설: east 오퍼링 실측에서 존 리터럴
         # 하드코딩이 교차-리전 400 InvalidAvailabilityZone을 만든 게 계기).
         "zone": _default_zone(cfg.region),
+        "zone_alt": _alt_zone(_default_zone(cfg.region)),
         # 서버타입 세대 핀 (2026-07-29 — 오퍼링 자원부족 대응; capture 필터의
         # where_prefix 값에서 {token}으로 소비된다).
         "vs_server_type_prefix": _vs_server_type_prefix(),
@@ -1196,6 +1210,11 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         "db_server_type_name_prefix":
             _db_server_type_name_prefix(lifecycle.get("service", "")),
         "today": time.strftime("%Y%m%d", _now),
+        # 달 경계 롤오버 방지 (run 3e67, 2026-08-20): budget create가
+        # start_month "2026-07" 하드코드로 400 ("start month must be the same
+        # as or later than the current month") — 작성 시점의 달이 박제되는
+        # 클래스라 토큰으로만 쓴다.
+        "this_month": time.strftime("%Y-%m", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
         # ISO YYYY-MM-DD dates for endpoints that take a bounded report/metric
         # window. apigateway listreports rejects any range that exceeds 30 days

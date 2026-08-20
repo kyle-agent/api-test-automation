@@ -2557,6 +2557,23 @@
           "_note": "SETTLE 2026-07-16 (관용 4xx 원인규명 캠페인 C, run a690 실측): create-vip-static-nat-ip 202 직후 delete-vip-static-nat-ip 가 400 scp-network.static-nat.not-deletable-state-error 'Static Nat state is not deletable state(Active, Error) : CREATING' — 에러 원문이 삭제 가능 상태를 (Active, Error) 로 명시하므로 그 두 상태까지 settle-poll (wait-vpn-gateway-active HB4c 와 같은 async-create-not-settled 클래스). 필드 경로 $.subnet_vip.static_nat.state 는 refresh-vip-static-nat-id 가 라이브 확인한 show envelope($.subnet_vip.static_nat.id)의 형제 키. 이 settle 로 첫 delete 가 성공하면 후속 delete-vip 409 connected-ports-error(NAT 잔존 캐스케이드, a690 동일 런 실측)도 함께 사라진다. params 없음 = showsubnetvip 커버리지 이중기록 안 함 (show-subnet-vip 담당)."
         },
         {
+          "name": "refresh-vip-connected-port-id",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "connected_port_id": "$.subnet_vip.connected_ports[0].id"
+          },
+          "optional": true,
+          "_note": "REPAIR 2026-08-20 (run 3e67 (2026-08-20)): VIP now arrives with an auto-connected port — create-vip-connected-port 400 already-connected leaves OUR connected_port_id unresolved, delete hits the literal-placeholder 404, delete-vip 409 connected-ports-error, and the NON-optional delete-subnet 409 subnet.related-vip fails the lifecycle. Re-capture the REAL connected_ports[0].id (doc showsubnetvip) right before the delete."
+        },
+        {
           "name": "delete-vip-connected-port",
           "service": "vpc",
           "method": "DELETE",
@@ -2623,7 +2640,7 @@
           "retry_on_status": [
             409
           ],
-          "retries": 8,
+          "retries": 6,
           "retry_interval": 15
         },
         {

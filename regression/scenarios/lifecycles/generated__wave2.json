@@ -166,13 +166,50 @@
           "_note": "GAP 편입 2026-07-08 (compute/scf/checkfunctionnameduplication). create-scf-function 직전 pre-check — create가 쓸 이름 그대로(name=regrscf{unique}, 동일 {unique} ctx) 중복 조회. 필수 쿼리 name (catalog/docs required:true, 누락 시 400). live 200 2026-07-08 ({result:false})."
         },
         {
+          "name": "default-scf-runtime-ave2-scf",
+          "action": "set_const",
+          "values": {
+            "scf_rt_name": "Node.js",
+            "scf_rt_ver": "22"
+          }
+        },
+        {
+          "name": "find-scf-runtime-ave2-scf",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/runtimes",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "capture_soft": {
+            "scf_rt_name": {
+              "list": "$.runtimes",
+              "where_prefix": {
+                "name": "Node.js"
+              },
+              "get": "name"
+            },
+            "scf_rt_ver": {
+              "list": "$.runtimes",
+              "where_prefix": {
+                "name": "Node.js"
+              },
+              "get": "version"
+            }
+          },
+          "_note": "REPAIR 2026-08-20 (run 3e67 (2026-08-20)): create 400 scp-cloud-function.invalid-runtime with the DOC-EXAMPLE value 'Node.js:20' verbatim — the valid runtime SET changed (Node 20 EOTS), and the error message still cites the now-invalid example (conformance-worthy). Runtime is now DISCOVERED from GET /v1/cloud-functions/runtimes ({name}:{version} of the first Node.js entry, capture_soft) with a set_const fallback Node.js:22 so the placeholder always resolves."
+        },
+        {
           "name": "create-scf-function",
           "service": "scf",
           "method": "POST",
           "path": "/v1/cloud-functions",
           "json": {
             "name": "regrscf{unique}",
-            "runtime": "Node.js:20",
+            "runtime": "{scf_rt_name}:{scf_rt_ver}",
             "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
             "tags": []
           },
@@ -349,7 +386,9 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/triggers/{trigger_id}",
-          "retry_on_status": [404],
+          "retry_on_status": [
+            404
+          ],
           "expect_status": [
             200
           ],

@@ -10,7 +10,11 @@
           "name": "list-account-budgets",
           "method": "GET",
           "path": "/v1/budgets/account",
-          "expect_status": [200, 403, 404],
+          "expect_status": [
+            200,
+            403,
+            404
+          ],
           "capture_soft": {
             "budget_id": "$.budgets[0].id"
           },
@@ -30,11 +34,24 @@
             "notifications": {
               "is_use_notification": true,
               "notification_send_period": "FIRST",
-              "receivers": ["kchoic.ai+budget@gmail.com"],
-              "thresholds": [80]
+              "receivers": [
+                "kchoic.ai+budget@gmail.com"
+              ],
+              "thresholds": [
+                80
+              ]
             }
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "capture_soft": {
             "budget_id": "$.budget.id"
           },
@@ -63,11 +80,23 @@
             "notifications": {
               "is_use_notification": true,
               "notification_send_period": "FIRST",
-              "receivers": ["kchoic.ai+budget@gmail.com"],
-              "thresholds": [90]
+              "receivers": [
+                "kchoic.ai+budget@gmail.com"
+              ],
+              "thresholds": [
+                90
+              ]
             }
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "budget-set",
           "_note": "In-place update (setaccountbudget). Body same shape as create (BudgetSetRequest = BudgetCreateRequest). Targets captured/soft-captured id. optional so 4xx records coverage."
@@ -76,7 +105,16 @@
           "name": "delete-account-budget",
           "method": "DELETE",
           "path": "/v1/budgets/account/{budget_id}",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "destructive": true,
           "group": "budget-delete",
@@ -95,7 +133,9 @@
           "name": "list-account-budgets",
           "method": "GET",
           "path": "/v1/budgets/account",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "_note": "strict 전역 read (listaccountbudgets — 함께 verify 편입). live 200 2026-07-08: {budgets:[], count:0, page:0, size:20}. 쿼리 전부 optional. create 직전 단일-budget 제약 사전 확인 지점(비어 있지 않으면 아래 create가 409로 표면화)."
         },
         {
@@ -105,16 +145,24 @@
           "json": {
             "amount": 1000000,
             "name": "regrbud{unique}",
-            "start_month": "2026-07",
+            "start_month": "{this_month}",
             "unit": "MONTHLY",
             "notifications": {
               "is_use_notification": true,
               "notification_send_period": "FIRST",
-              "receivers": ["kchoic.ai+budget@gmail.com"],
-              "thresholds": [80]
+              "receivers": [
+                "kchoic.ai+budget@gmail.com"
+              ],
+              "thresholds": [
+                80
+              ]
             }
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "budget_id": "$.budget.id"
           },
@@ -129,7 +177,10 @@
           "name": "show-account-budget",
           "method": "GET",
           "path": "/v1/budgets/account/{budget_id}",
-          "expect_status": [200, 201],
+          "expect_status": [
+            200,
+            201
+          ],
           "_note": "STRICT show (showaccountbudget — 감사 'Gap = 1' 대상 키, b-class). 방금 create가 캡처한 실 budget_id로 조회(placeholder-id read 금지 규정 충족). docs response는 201 Created로 기재(GET인데 201 — 문서 오류 의심, conformance 후보)라 [200,201] 허용; 4xx/5xx 없음 = strict 유지. 응답 envelope {budget:{...}, notifications:{...}, prevention:{...}}."
         },
         {
@@ -139,16 +190,29 @@
           "json": {
             "amount": 1500000,
             "name": "regrbud{unique}",
-            "start_month": "2026-07",
+            "start_month": "{this_month}",
             "unit": "MONTHLY",
             "notifications": {
               "is_use_notification": true,
               "notification_send_period": "FIRST",
-              "receivers": ["kchoic.ai+budget@gmail.com"],
-              "thresholds": [90]
+              "receivers": [
+                "kchoic.ai+budget@gmail.com"
+              ],
+              "thresholds": [
+                90
+              ]
             }
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "budget-full-set",
           "_note": "setaccountbudget — 자기 소유 budget in-place 수정(BudgetSetRequest = BudgetCreateRequest shape, probe lifecycle note 근거). name은 create와 동일 'regrbud{unique}' 유지 (≤20자 제약 — create 스텝 note 참조; 2026-07-08 400 실측으로 단축). 2xx 라이브 미검증이라 관용+optional로 편입(2xx 확인 후 strict 승급 — 승급해도 create가 strict mutating이라 role은 이미 verify). 이 스텝으로 budget catalog 5/5가 verify 합집합에 편입."
@@ -157,7 +221,11 @@
           "name": "delete-account-budget",
           "method": "DELETE",
           "path": "/v1/budgets/account/{budget_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
           "_note": "STRICT delete (deleteaccountbudget) — 방금 만든 자기 소유 budget_id만 삭제(name-guessing 아님). destructive 게이트."
         }

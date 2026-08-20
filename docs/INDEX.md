@@ -68,7 +68,7 @@
 ## Archive — frozen history (`docs/archive/`, 정본 아님)
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
-| [`archive/CONTEXT-history.md`](archive/CONTEXT-history.md) | all | CONTEXT history — 과거 세션 로그 (2026-06-10 ~ 2026-07-11, frozen) |  superseded (CONTEXT.md 과거 로그 아카이브 — 현재 상태는 docs/working/CONTEXT.md) |
+| [`archive/CONTEXT-history.md`](archive/CONTEXT-history.md) | all | CONTEXT history — 과거 세션 로그 (2026-06-10 ~ 2026-07-13, frozen) |  superseded (CONTEXT.md 과거 로그 아카이브 — 현재 상태는 docs/working/CONTEXT.md) |
 | [`archive/IA.md`](archive/IA.md) | all | one-graph / step-overlay console (v3, 2026-06-17) |  SUPERSEDED (2026-06-26 owner decision) |
 | [`archive/M6-DESIGN.md`](archive/M6-DESIGN.md) | all | M6 설계 — 자율 운영 가능한 SCP API 회귀 테스트 플랫폼 |  superseded (내구 결정은 ARCHITECTURE.md §Autonomy design으로 병합 — 2026-07-04) |
 | [`archive/README.md`](archive/README.md) | all | docs/archive/ — superseded history (frozen) | 🟢 active |

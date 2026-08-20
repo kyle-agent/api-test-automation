@@ -43,7 +43,13 @@
             "method": "DELETE",
             "path": "/v1/kms/transit/{key_id}",
             "service": "kms"
-          }
+          },
+          "retry_on_status": [
+            500
+          ],
+          "retries": 4,
+          "retry_interval": 20,
+          "_note": "REPAIR 2026-08-20 (run 3e67 (2026-08-20)): create 500 scp-security.kms.vault-error (backend Vault hiccup) killed the whole crypto lifecycle in 6s — bounded 500 ladder 4x20s."
         },
         {
           "name": "list",

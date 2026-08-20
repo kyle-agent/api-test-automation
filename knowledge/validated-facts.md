@@ -4017,3 +4017,36 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - `data/spec_diff_latest.json` 마커 생성 (dashboard NEW/UPD 배지 소비용).
 - 문서 호스트(docs.e.samsungsdscloud.com)는 API-플레인 프록시 502와 무관하게
   정상 — 스펙 수집은 프록시 장애 중에도 가능.
+
+## 런 3e67 (2026-08-20, 3주 만의 첫 런) 실패 11건 전수 원인 (req-id는 oplog artifact)
+
+- **SCF invalid-runtime (4곳)**: 문서 예시 그대로의 `"Node.js:20"`이 400
+  `scp-cloud-function.invalid-runtime`으로 거절 — 에러 메시지가 여전히
+  'Node.js:20'을 유효 예시로 인용하면서 거절하는 자기모순 (Node 20 EOTS로
+  유효 런타임 셋이 바뀐 것; 컨포먼스 등재 후보). → GET
+  /v1/cloud-functions/runtimes에서 `{name}:{version}` 동적 발견 +
+  set_const 폴백 Node.js:22.
+- **DC required-zone (2곳)**: multi-zone 모드 VPC에 DC create 시
+  `uplink_active_zone`/`uplink_standby_zone` 필수화 (400
+  scp-network.direct-connect.required-zone; 문서 바디 예시엔 이미 있었음)
+  → {region}-a/-b 추가.
+- **budget 달-롤오버 클래스**: start_month "2026-07" 하드코드 → 8월에 400
+  "start month must be ≥ current month". 엔진 `{this_month}` 토큰 신설
+  (작성 시점 달 박제 금지 규율).
+- **VIP 자동 연결 포트**: subnet VIP가 auto-connected port를 달고 나옴 →
+  create-connected-port 400 already-connected → 우리 id 미해결 → delete-vip
+  409 → **비-optional delete-subnet 409 subnet.related-vip로 lifecycle 사망**.
+  → 삭제 직전 showsubnetvip에서 `$.subnet_vip.connected_ports[0].id` 실측
+  재캡처 + delete-vip 409 사다리.
+- **SCR creating-cannot-delete**: registry가 6분+ CREATING인 채로 repo
+  작업은 되는 상태 → delete 409. 409를 500 사다리(12×30s)에 합류.
+- **KMS vault-error 500**: create가 백엔드 Vault 500으로 6초 만에 전멸 →
+  500 사다리 4×20s (transient).
+- **cachestore 즉시-FAILED**: create 202 후 26초 만에 state=FAILED
+  (terminal-bad) — 백엔드 생성 실패 클래스, 시나리오 무결. 재관측 대상.
+- **apigw PLE approval 500**: ContactAdminForAssistance (기지
+  500-on-client-state 계열) → 승인 500 사다리 + PLE delete 400/409 사다리.
+- **스윕 계측 첫 가동 (런 3e67)**: sweep 마일스톤 정상 발신 — 총 406s,
+  라운드1 327s(나열 77s/51컬렉션, genuine 22 — 3주 잔존+이번 실패 잔재),
+  라운드2 23s, 라운드3 22s 수렴, stuck 1. "스윕이 어디서 느린가"가 이제
+  원격에서 보인다.
