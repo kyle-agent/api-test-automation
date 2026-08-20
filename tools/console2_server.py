@@ -2557,7 +2557,9 @@ def _conformance_worker(rec: dict) -> None:
     전용이었다). 자원 생성 없음 → VPC admission 불요."""
     logp = Path(rec["log"])
     env = {**os.environ, "PYTHONPATH": str(ROOT), "SCP_PROBE_RUNTIME": "true",
-           "SCP_ALLOW_MUTATIONS": "false", "SCP_ALLOW_DESTRUCTIVE": "false"}
+           "SCP_ALLOW_MUTATIONS": "false", "SCP_ALLOW_DESTRUCTIVE": "false",
+           # 프로브는 수십 분짜리 — 버퍼링되면 화면 로그가 끝까지 비어 보인다
+           "PYTHONUNBUFFERED": "1"}
     try:
         with open(logp, "w", encoding="utf-8") as f:
             f.write(f"# console2 CONFORMANCE probes {rec['id']} "
