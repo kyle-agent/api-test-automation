@@ -37,7 +37,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 
 ### 결함 구분
 
-**계약 위반** 195건 · **문서 결손** 366건 · **동작버그(기능 결함 — 버그 트래커 전달 권장)** 2건. 각 결함 행에 구분 표기, CSV에 cls 컬럼.
+**계약 위반** 201건 · **문서 결손** 360건 · **동작버그(기능 결함 — 버그 트래커 전달 권장)** 2건. 각 결함 행에 구분 표기, CSV에 cls 컬럼.
 
 ### 상품군별 통계
 
@@ -144,7 +144,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | `runtime.500-on-client-state` | 9 | 클라이언트가 유발한 상태·입력에 500 반환 | 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만) |
 | `method-verb` | 9 | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | 동사-메서드 정합(조회=GET, 생성=POST 등) |
 | `schema-undocumented-field` | 8 | 실제 응답에 문서에 없는 필드 존재 | 응답 스키마 문서 갱신 |
-| `docs.async-settle-undocumented` | 6 | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | "ACTIVE 도달 후 변경 가능"을 문서에 명시하거나 서버측 큐잉 |
+| `docs.async-settle-undocumented` | 6 | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | 일시-상태 거절은 409로 통일(플랫폼 자체 선례 준용). 보조로 "202=접수, ACTIVE 후 변경 가능" 문서화 |
 | `deprecated` | 4 | DEPRECATED 표기만 있고 대체 API 안내 없음 | 대체 엔드포인트와 제거 일정 명시 |
 | `versioning.doc-version-not-supported` | 3 | 문서에 명시된 API 버전을 서버가 406으로 거절 | 문서-서버 버전 정합 |
 | `notfound-200-list` | 2 | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | 부모 부재 시 404 |
@@ -1181,8 +1181,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/vpc-endpoints`<br>(createvpcendpoint) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: endpoint_ip_address, name, resource_info, resource_key, subnet_id, vpc_id |
 | `POST /v1/vpc-peerings`<br>(createvpcpeering) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: approver_vpc_account_id, approver_vpc_id, name, requester_vpc_id |
 | `POST /v1/vpc-peerings/{vpc_peering_id}/routing-rules`<br>(createvpcpeeringrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: destination_cidr |
-| `DELETE /v1/privatelink-services/{privatelink_service_id}`<br>(deleteprivatelinkservice) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | DELETE while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 20 |
-| `DELETE /v1/vpc-endpoints/{vpc_endpoint_id}`<br>(deletevpcendpoint) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | DELETE while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 20 |
+| `DELETE /v1/privatelink-services/{privatelink_service_id}`<br>(deleteprivatelinkservice) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | DELETE while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 20 |
+| `DELETE /v1/vpc-endpoints/{vpc_endpoint_id}`<br>(deletevpcendpoint) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | DELETE while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 20 |
 | `GET /v1/internet-gateways`<br>(listinternetgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/nat-gateways`<br>(listnatgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/privatelink-endpoints`<br>(listprivatelinkendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
@@ -1194,10 +1194,10 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `GET /v1/vpc-endpoints`<br>(listvpcendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/vpc-peerings`<br>(listvpcpeerings) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/vpcs`<br>(listvpcs) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `PUT /v1/privatelink-services/{privatelink_service_id}`<br>(setprivatelinkservice) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | PUT (set) while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 |
+| `PUT /v1/privatelink-services/{privatelink_service_id}`<br>(setprivatelinkservice) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | PUT (set) while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 |
 | `PUT /v1/publicips/{publicip_id}`<br>(setpublicip) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 | `PUT /v1/subnets/{subnet_id}/vips/{vip_id}`<br>(setsubnetvip) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
-| `PUT /v1/vpc-endpoints/{vpc_endpoint_id}`<br>(setvpcendpoint) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | PUT (set) while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 |
+| `PUT /v1/vpc-endpoints/{vpc_endpoint_id}`<br>(setvpcendpoint) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | PUT (set) while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 |
 
 #### networking/vpn — 6건
 
@@ -1207,8 +1207,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/vpn-tunnels`<br>(createvpntunnel) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, vpn_gateway_id |
 | `GET /v1/vpn-gateways`<br>(listvpngateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/vpn-tunnels`<br>(listvpntunnels) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `PUT /v1/vpn-gateways/{vpn_gateway_id}`<br>(setvpngateway) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | PUT (set) while the resource is still EDITING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측/ |
-| `PUT /v1/vpn-tunnels/{vpn_tunnel_id}`<br>(setvpntunnel) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | PUT (set) while the resource is still EDITING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측/ |
+| `PUT /v1/vpn-gateways/{vpn_gateway_id}`<br>(setvpngateway) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | PUT (set) while the resource is still EDITING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측/ |
+| `PUT /v1/vpn-tunnels/{vpn_tunnel_id}`<br>(setvpntunnel) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | PUT (set) while the resource is still EDITING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측/ |
 
 ### platform
 
