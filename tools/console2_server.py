@@ -2556,8 +2556,14 @@ def _conformance_worker(rec: dict) -> None:
     conformance 어떻게 돌리지?" — 종전에는 로컬 실행 경로가 없어서 세션/CI
     전용이었다). 자원 생성 없음 → VPC admission 불요."""
     logp = Path(rec["log"])
+    # SCP_ALLOW_MUTATIONS=true 인 이유 (실측 2026-08-20 run 4bcd): status/l10n
+    # 프로브는 빈 바디 {} 를 POST/PUT 으로 던져 400 응답을 측정한다 — 클라이언트
+    # 뮤테이션 가드를 닫으면 그 호출들이 MutationBlocked 예외로 전멸해
+    # checked=0/other=146 이 된다 (6월 CI 컨포먼스 잡도 true 로 돌았다).
+    # 실제 생성은 불가능한 바디이고, 진짜 생성계 프로브(validation/schema-live)는
+    # 각자의 이중 게이트가 따로 막는다. destructive 는 계속 false.
     env = {**os.environ, "PYTHONPATH": str(ROOT), "SCP_PROBE_RUNTIME": "true",
-           "SCP_ALLOW_MUTATIONS": "false", "SCP_ALLOW_DESTRUCTIVE": "false",
+           "SCP_ALLOW_MUTATIONS": "true", "SCP_ALLOW_DESTRUCTIVE": "false",
            # 프로브는 수십 분짜리 — 버퍼링되면 화면 로그가 끝까지 비어 보인다
            "PYTHONUNBUFFERED": "1"}
     try:
