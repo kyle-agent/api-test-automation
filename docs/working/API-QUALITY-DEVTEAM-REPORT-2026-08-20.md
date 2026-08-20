@@ -6,54 +6,56 @@
 
 | 판정 | 엔드포인트 수 | 비율 |
 |---|---:|---:|
-| 결함 없음 | 914 | 64.5% |
-| 개선 필요 (YELLOW) | 471 | 33.3% |
+| 결함 없음 | 937 | 66.2% |
+| 개선 필요 (YELLOW) | 448 | 31.6% |
 | 심각 (RED) | 31 | 2.2% |
 
-개별 결함 총 **563건**. 아래 §2의 플랫폼 공통 결함 6종은 별도 집계(개별 판정에 중복 계상하지 않음).
+개별 결함 총 538건 = **확정 508건(본문)** + 검토 필요 30건(§7 부록 — 은닉 설계 가능성 등 논란 여지가 있어 분리). 플랫폼 공통 결함은 §2(확정 4종)와 §7(검토 2종)로 분리 집계.
+
+> 측정 공정성: 존재하지-않는 id는 플랫폼의 두 id 포맷(32-hex·대시 UUID)을 모두 시도해 형식-거절 400 오탐을 제거했고(7건 구제), size/page를 문서화하지 않은 API의 전량 반환(18건)은 결함에서 제외했습니다.
 
 ### 2026-08-20 동적 재검증 diff (6월 첫 측정 대비)
 
 | 항목 | 해소 | 신규 | 잔존 |
 |---|---:|---:|---:|
 | 잘못된 입력에 500 (5xx-on-bad-input) | **2** | 0 | 0 |
-| 부재 리소스 404 비일관 | 0 | 2 | 88 |
-| size 무시(pagination) | 2 | 5 | 52 |
+| 부재 리소스 404 비일관 | 7 | 2 | 81 |
+| size 무시(pagination) | 16 | 1 | 38 |
 
 - **해소 확인**: baremetal-blockstorage createvolume/createvolumegroup — 6월 500 → 현재 400 + 누락 필드명 나열(모범 응답). 플랫폼 수정 확인.
-- 신규 non-404: `ai-ml/aimlops-platform/getaimlopsplatformnodelistv1`, `ai-ml/aimlops-platform/getaimlopsplatformstorageclasseslistv1` · 신규 size무시: `container/scr/listconnectableresources`, `financial-management/billingplan/listplannedcomputeservertypes`, `management/resourcemanager/listtagkeys`, `management/resourcemanager/listtagvalues`, `management/servicewatch/listalerts`
+- 신규 non-404: `ai-ml/aimlops-platform/getaimlopsplatformnodelistv1`, `ai-ml/aimlops-platform/getaimlopsplatformstorageclasseslistv1` · 신규 size무시: `management/servicewatch/listalerts`
 
 ### 메서드별 분포
 
 | 메서드 | 전체 API | 결함 | RED | 결함/100API |
 |---|---:|---:|---:|---:|
-| GET | 546 | 165 | 6 | 30.2 |
+| GET | 546 | 140 | 6 | 25.6 |
 | POST | 393 | 275 | 22 | 70.0 |
 | PUT | 257 | 108 | 2 | 42.0 |
 | DELETE | 211 | 6 | 1 | 2.8 |
 | PATCH | 9 | 9 | 0 | 100.0 |
 
-GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagination) — 문서 기준으론 깨끗해 보여도 자동화 클라이언트에는 실장애물. DELETE가 가장 깨끗(2.8/100).
+GET 확정 결함의 75%는 실호출에서만 드러나는 계열(404 비일관·pagination) — 문서 기준으론 깨끗해 보여도 자동화 클라이언트에는 실장애물. DELETE가 가장 깨끗.
 
 ### 결함 구분
 
-**계약 위반** 201건 · **문서 결손** 360건 · **동작버그(기능 결함 — 버그 트래커 전달 권장)** 2건. 각 결함 행에 구분 표기, CSV에 cls 컬럼.
+**계약 위반** 176건 · **문서 결손** 360건 · **동작버그(기능 결함 — 버그 트래커 전달 권장)** 2건. 각 결함 행에 구분 표기, CSV에 cls 컬럼.
 
 ### 상품군별 통계
 
 | 상품군 | API 수 | RED | YELLOW | 결함 건수 |
 |---|---:|---:|---:|---:|
 | database | 272 | 11 | 51 | 72 |
-| management | 250 | 6 | 94 | 108 |
-| data-analytics | 123 | 5 | 35 | 49 |
+| management | 250 | 6 | 90 | 104 |
+| data-analytics | 123 | 5 | 35 | 47 |
 | networking | 216 | 2 | 74 | 81 |
-| compute | 181 | 2 | 73 | 88 |
-| container | 64 | 2 | 30 | 39 |
-| financial-management | 21 | 2 | 11 | 17 |
-| application-service | 67 | 1 | 26 | 30 |
-| storage | 131 | 0 | 33 | 33 |
-| security | 57 | 0 | 30 | 30 |
-| ai-ml | 21 | 0 | 8 | 10 |
+| compute | 181 | 2 | 69 | 84 |
+| container | 64 | 2 | 26 | 35 |
+| financial-management | 21 | 2 | 5 | 11 |
+| application-service | 67 | 1 | 25 | 29 |
+| storage | 131 | 0 | 32 | 32 |
+| security | 57 | 0 | 29 | 29 |
+| ai-ml | 21 | 0 | 6 | 8 |
 | platform | 7 | 0 | 5 | 5 |
 | devops-tools | 6 | 0 | 1 | 1 |
 
@@ -66,68 +68,65 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | networking/vpc | 95 | 2 | 36 | 39 |
 | management/servicewatch | 37 | 2 | 23 | 26 |
 | management/iam-identity-center | 32 | 2 | 15 | 21 |
-| database/mariadb | 49 | 2 | 9 | 13 |
 | database/mysql | 48 | 2 | 9 | 13 |
+| database/mariadb | 49 | 2 | 9 | 13 |
 | database/epas | 49 | 2 | 8 | 12 |
 | management/cloudmonitoring | 18 | 2 | 4 | 9 |
-| financial-management/billingplan | 10 | 2 | 4 | 8 |
+| financial-management/billingplan | 10 | 2 | 0 | 4 |
 | application-service/apigateway | 55 | 1 | 22 | 26 |
-| container/scr | 39 | 1 | 20 | 24 |
-| container/ske | 25 | 1 | 10 | 15 |
-| data-analytics/data-ops | 17 | 1 | 10 | 14 |
+| container/scr | 39 | 1 | 19 | 23 |
+| data-analytics/data-ops | 17 | 1 | 10 | 13 |
 | database/sqlserver | 44 | 1 | 10 | 12 |
+| container/ske | 25 | 1 | 7 | 12 |
 | database/cachestore | 33 | 1 | 7 | 9 |
 | data-analytics/searchengine | 28 | 1 | 6 | 8 |
 | data-analytics/vertica | 24 | 1 | 5 | 7 |
 | data-analytics/eventstreams | 25 | 1 | 4 | 6 |
 | data-analytics/quick-query | 12 | 1 | 4 | 5 |
-| compute/scf | 36 | 0 | 20 | 21 |
-| management/iam | 62 | 0 | 21 | 21 |
+| management/iam | 62 | 0 | 19 | 19 |
+| compute/scf | 36 | 0 | 18 | 19 |
 | security/kms | 23 | 0 | 15 | 15 |
 | management/organization | 37 | 0 | 11 | 11 |
 | networking/cdn | 9 | 0 | 8 | 11 |
-| data-analytics/data-flow | 17 | 0 | 6 | 9 |
+| data-analytics/data-flow | 17 | 0 | 6 | 8 |
 | storage/archivestorage | 26 | 0 | 8 | 8 |
-| ai-ml/aimlops-platform | 12 | 0 | 6 | 8 |
-| management/resourcemanager | 27 | 0 | 8 | 8 |
 | storage/filestorage | 22 | 0 | 8 | 8 |
-| storage/backup | 31 | 0 | 7 | 7 |
 | networking/dns | 22 | 0 | 7 | 7 |
 | management/cloudcontrol | 15 | 0 | 7 | 7 |
-| storage/baremetal-blockstorage | 41 | 0 | 6 | 6 |
+| management/resourcemanager | 27 | 0 | 6 | 6 |
+| storage/backup | 31 | 0 | 6 | 6 |
+| ai-ml/aimlops-platform | 12 | 0 | 4 | 6 |
 | networking/vpn | 10 | 0 | 6 | 6 |
+| storage/baremetal-blockstorage | 41 | 0 | 6 | 6 |
 | security/secretsmanager | 14 | 0 | 6 | 6 |
-| compute/baremetal | 16 | 0 | 6 | 6 |
 | networking/security-group | 17 | 0 | 5 | 5 |
+| compute/baremetal | 16 | 0 | 5 | 5 |
 | networking/gslb | 10 | 0 | 5 | 5 |
 | storage/parallel-filestorage | 11 | 0 | 4 | 4 |
 | networking/direct-connect | 8 | 0 | 4 | 4 |
-| application-service/queueservice | 12 | 0 | 4 | 4 |
-| compute/multinodegpucluster | 16 | 0 | 4 | 4 |
-| financial-management/costexplorer | 3 | 0 | 2 | 4 |
 | security/certificatemanager | 7 | 0 | 4 | 4 |
+| financial-management/costexplorer | 3 | 0 | 2 | 4 |
+| application-service/queueservice | 12 | 0 | 3 | 3 |
 | financial-management/budget | 5 | 0 | 3 | 3 |
+| compute/multinodegpucluster | 16 | 0 | 3 | 3 |
 | networking/firewall | 8 | 0 | 2 | 3 |
 | platform/sts | 3 | 0 | 3 | 3 |
-| security/secretvault | 5 | 0 | 3 | 3 |
-| management/loggingaudit | 10 | 0 | 2 | 2 |
 | ai-ml/cloud-ml | 9 | 0 | 2 | 2 |
-| management/quota | 4 | 0 | 2 | 2 |
-| financial-management/pricing | 3 | 0 | 2 | 2 |
-| platform/product | 4 | 0 | 2 | 2 |
 | security/configinspection | 8 | 0 | 2 | 2 |
+| management/quota | 4 | 0 | 2 | 2 |
+| platform/product | 4 | 0 | 2 | 2 |
+| management/loggingaudit | 10 | 0 | 2 | 2 |
+| security/secretvault | 5 | 0 | 2 | 2 |
 | networking/loadbalancer | 37 | 0 | 1 | 1 |
-| management/network-logging | 4 | 0 | 1 | 1 |
 | devops-tools/devopsservice | 6 | 0 | 1 | 1 |
+| management/network-logging | 4 | 0 | 1 | 1 |
 
-## 2. 플랫폼 공통 결함 (전 서비스급 영향)
+## 2. 플랫폼 공통 결함 — 확정 (전 서비스급 영향)
 
 | 결함 | 범위 | 무엇이 문제인가 | 기대 동작 |
 |---|---|---|---|
 | `error-schema-undocumented` | 1414 EP | 4xx/5xx 에러 응답 스키마가 문서에 없고, 실제 에러 엔벨로프가 3종 혼재 — 표준 errors[](서비스) · Spring 기본(공통 게이트웨이의 인증 실패 경로) · HTML(엣지 WAF). §5.5 실응답 원문 참조 | 표준 errors[] 스키마 문서화 + 게이트웨이/엣지 포함 엔벨로프 단일화 |
 | `unauth-404` | 58 서비스 | 공통 API 게이트웨이(Spring Cloud Gateway)가 인증 실패를 게이트웨이 기본 포맷으로 반환 — 404 + Spring 기본 엔벨로프({timestamp,path,status,error,requestId}). 58개 서비스 전원 동일 + requestId 프리픽스 서비스 간 재사용으로 게이트웨이 소행 확정. 개별 서비스가 아닌 게이트웨이 수정 대상 | 게이트웨이 에러 핸들러에서 401 + 표준 errors[] 엔벨로프로 변환 |
-| `no-cors` | 58 서비스 | OPTIONS 요청 403, Allow/CORS 헤더 없음 | OPTIONS/CORS 표준 응답 |
-| `accept-language-ignored` | 124 EP | Accept-Language 헤더 무시 — 에러 메시지 영어 고정 | 요청 언어 반영 |
 | `path-collisions` | 78 경로 | 서로 다른 서비스가 동일 method+path 재사용 (네임스페이스 없음) | 경로 네임스페이스 분리 |
 | `model-fields-no-description` | 463 필드 | 모델 필드 설명이 공란 | 필드 설명 작성 |
 
@@ -136,9 +135,9 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | 유형 | 건수 | 무엇이 문제인가 | 기대 동작 |
 |---|---:|---|---|
 | `undiscoverable-params` | 291 | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시 |
-| `notfound-inconsistent` | 75 | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | 부재 리소스는 404로 통일 (또는 은닉 정책이라면 플랫폼 전체 일관 + 문서화) |
-| `pagination` | 57 | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | size개만 반환 + count/page/size 메타 제공. 의도적 전량 반환 API라면 size/page 파라미터를 문서에서 제거 |
 | `no-success-schema` | 55 | 성공(2xx) 응답 스키마가 문서에 없음 | 2xx 응답 바디 스키마 문서화 |
+| `notfound-inconsistent` | 39 | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | 부재 리소스는 404로 통일 (또는 은닉 정책이라면 플랫폼 전체 일관 + 문서화) |
+| `pagination` | 39 | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | size개만 반환 + count/page/size 메타 제공. 의도적 전량 반환 API라면 size/page 파라미터를 문서에서 제거 |
 | `param-naming` | 16 | 경로 파라미터 명명이 표준과 다름 | 리소스명을 포함한 파라미터명 사용(예: {alert_id}) |
 | `opaque-validation` | 13 | 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음 | 에러 응답에 필드명과 위반 내용을 포함 |
 | `runtime.500-on-client-state` | 9 | 클라이언트가 유발한 상태·입력에 500 반환 | 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만) |
@@ -156,7 +155,6 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | `compute.image-sharing-orphan-volume-no-cleanup` | 1 | 공유 과정에서 생성된 임시 볼륨이 공유 중단 시 삭제 불가능(400 반복) 상태로 잔존 | 공유 레코드 소멸 시 파생 임시 볼륨 정리 경로 제공 |
 | `docs.image-share-cancellation-undocumented` | 1 | 공유의 수락/거절/취소가 별도 엔드포인트(updateimagemember)에 있음이 해당 문서에 없음 | 공유 문서에 상대 엔드포인트 상호 참조 |
 | `compute.image-sharing-delete-during-transfer-unguarded` | 1 | 공유 전송 중인 원본 이미지 삭제가 차단 없이 성공(204) → 파생 임시 볼륨 영구 고아화 | 전송 중 원본 삭제를 409로 차단하거나 파생 자원 연쇄 정리 |
-| `errors.rate-limit-non-json` | 1 | 유량 제한 시 JSON 에러 규격이 아닌 HTML 차단 페이지(417) 반환 | 엣지 레벨에서도 표준 JSON 에러 엔벨로프 유지 |
 | `schema-missing-field` | 1 | 문서상 필수 응답 필드가 실제 응답에 없음 | 문서-실응답 정합 |
 | `docs.version-semantics-undocumented` | 1 | 버전에 따라 응답 시맨틱이 다른데(1.1=202+빈 바디) 문서는 1.0 동작만 기술 | 버전별 응답 차이 문서화 |
 | `runtime.empty-collection-404` | 1 | 빈 컬렉션 조회가 404 반환 | 빈 컬렉션은 200 + 빈 배열 |
@@ -384,7 +382,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
   - 기대 동작: 부재 리소스는 404
 
 ### networking/vpc — `GET /v1/subnets` (listsubnets)
-- **[계약] 문제**: 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음
+- **[계약] 문제**: 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음
   - 근거: ignores size=1 (returned 2)
   - 기대 동작: size개만 반환 + count/page/size 메타 제공. 의도적 전량 반환 API라면 size/page 파라미터를 문서에서 제거
 - **[계약] 문제**: 생성(v1.3)은 되는 PRIVATE 타입 서브넷이 조회 계열(v1.2 enum)에서 보이지 않음 — API로 존재를 확인할 수 없는 리소스 발생
@@ -439,13 +437,13 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 무서명 요청에 표준 errors[]가 아닌 프레임워크 기본 바디 + 401이 아닌 404. **58개 서비스 전원이 동일 형태이고, requestId 프리픽스가 서비스 간 재사용됨**(예: 1d493ca5-가 apigateway·queueservice에서, a395fa31-이 scr·data-ops에서 동일) — 개별 서비스가 아니라 **공통 API 게이트웨이(Spring Cloud Gateway 계열)의 기본 에러 핸들러**가 내는 응답으로 판단됩니다. 수정 주체 = 게이트웨이 1곳: 인증 실패를 401 + 표준 errors[] 엔벨로프로 변환.
 
 ```
-{"timestamp":"2026-08-20T10:11:36.800+00:00","path":"/v1/queues","status":404,"error":"Not Found","requestId":"1d493ca5-2809043"}
+{"timestamp":"2026-08-20T11:45:10.162+00:00","path":"/v1/queues","status":404,"error":"Not Found","requestId":"96678483-2801243"}
 ```
 대상: ai-ml/aimlops-platform, ai-ml/cloud-ml, application-service/apigateway, application-service/queueservice, compute/baremetal, compute/multinodegpucluster, compute/scf, compute/virtualserver, container/scr, container/ske, data-analytics/data-flow, data-analytics/data-ops, data-analytics/eventstreams, data-analytics/quick-query, data-analytics/searchengine, data-analytics/vertica, database/cachestore, database/epas, database/mariadb, database/mysql, database/postgresql, database/sqlserver, devops-tools/devopsservice, financial-management/billingplan, financial-management/budget, financial-management/costexplorer, financial-management/pricing, management/cloudcontrol, management/cloudmonitoring, management/iam, management/iam-identity-center, management/loggingaudit, management/network-logging, management/organization, management/quota, management/resourcemanager, management/servicewatch, management/support, networking/cdn, networking/direct-connect, networking/dns, networking/firewall, networking/gslb, networking/loadbalancer, networking/security-group, networking/vpc, networking/vpn, platform/product, security/certificatemanager, security/configinspection, security/kms, security/secretsmanager, security/secretvault, storage/archivestorage, storage/backup, storage/baremetal-blockstorage, storage/filestorage, storage/parallel-filestorage
 
 ### ② 정상 인증 4xx — 표준 errors[] 엔벨로프 (이 형태가 정답이나, 문서에 스키마 없음)
 ```
-{"errors":[{"code":"ValidationError","detail":["Field required"],"global_request_id":"req-fb079650-e947-4ca0-84ee-8c1b5591bf76","links":[],"related_resources":[
+{"errors":[{"code":"ValidationError","detail":["Field required"],"global_request_id":"req-95d5e579-81ef-4ac2-9ef1-68f483fe80b6","links":[],"related_resources":[
 ```
 필드: code / detail / global_request_id / links / related_resources / request_id / status / title — **이 스키마를 API Reference에 공식 문서화하는 것이 개선의 출발점.**
 
@@ -456,29 +454,27 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 **즉시 수정 대상 — billingplan 2건은 파이썬 리스트의 repr을 문자열로 직렬화해 반환** (서버 내부 표현 누출, 필드 단위 파싱 불가):
 
 ```
-{"errors":[{"code":"ValidationError","detail":"['Field required', 'Field required', 'Field required', 'Field required']","global_request_id":"req-b6280fd2-7848-
+{"errors":[{"code":"ValidationError","detail":"['Field required', 'Field required', 'Field required', 'Field required']","global_request_id":"req-dcc9820a-eba1-
 ```
 → RED `errors.detail-python-repr` 로 등재: createplannedcomputes, showcancellationfee. (budget/iam의 문자열 detail 2건은 자연어 문장이라 타입 혼재 항목으로만 분류)
 
 ### ④ 엣지(WAF) 유량 차단 — HTML 페이지 (특정 API 아님, 부록성)
 단시간 다수 요청 시 플랫폼 앞단 WAF가 417 + HTML "Request Rejected"(F5 계열) 반환 — 관측 지점은 SCR 생성이었으나 엣지 공통 동작. 차단 시에도 JSON 엔벨로프 유지가 바람직하나 WAF 관행상 논쟁적.
 
-## 6. 전체 결함 목록 (YELLOW 포함, 상품군→상품별)
+## 6. 확정 결함 전체 목록 (YELLOW 포함, 상품군→상품별)
 
 ### ai-ml
 
-#### ai-ml/aimlops-platform — 8건
+#### ai-ml/aimlops-platform — 6건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/aimlops-platform/clusters/{cluster_id}/check-version`<br>(checkaimlopsplatformversionv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/clusters/{cluster_id}/check-version`<br>(checkaimlopsplatformversionv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes`<br>(getaimlopsplatformnodelistv1) | YELLOW | DEPRECATED 표기만 있고 대체 API 안내 없음 | DEPRECATED endpoint |
-| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes`<br>(getaimlopsplatformnodelistv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes`<br>(getaimlopsplatformnodelistv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses`<br>(getaimlopsplatformstorageclasseslistv1) | YELLOW | DEPRECATED 표기만 있고 대체 API 안내 없음 | DEPRECATED endpoint |
-| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses`<br>(getaimlopsplatformstorageclasseslistv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/aimlops-platform/{release_id}`<br>(getaimlopsplatformv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-namespaces`<br>(validateclusternamespaceforaimlopsplatformv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-resources`<br>(validateclusterresourcesizeforaimlopsplatformv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses`<br>(getaimlopsplatformstorageclasseslistv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-resources`<br>(validateclusterresourcesizeforaimlopsplatformv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### ai-ml/cloud-ml — 2건
 
@@ -489,7 +485,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 ### application-service
 
-#### application-service/apigateway — 26건
+#### application-service/apigateway — 15건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -505,33 +501,21 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/apis/{api_id}/resources/{parent_id}`<br>(createresource) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: path_part |
 | `POST /v1/apis/{api_id}/stages`<br>(createstage) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: deployment_id, stage_name |
 | `POST /v1/apis/{api_id}/usage-plans`<br>(createusageplan) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
-| `GET /v1/apis/{api_id}/access-controls`<br>(listaccesscontrols) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/deployments`<br>(listapideployments) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `GET /v1/apis`<br>(listapis) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): endpoint_type |
-| `GET /v1/apis/{api_id}/auths`<br>(listauths) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/connected-endpoints`<br>(listconnectedprivatelinkendpoints) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/reports`<br>(listreports) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/resources`<br>(listresources) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/stages`<br>(liststages) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/usage-plans`<br>(listusageplans) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `PUT /v1/apis/{api_id}/stages/{stage_name}/deployment`<br>(setstageactivedeployment) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: deployment_id |
-| `GET /v1/apis/{api_id}`<br>(showapi) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `GET /v1/apis/{api_id}`<br>(showapi) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): endpoint_type,privatelink_service_id |
-| `GET /v1/privatelink-endpoints/{privatelink_endpoint_id}`<br>(showprivatelinkendpoint) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/resource-policies`<br>(showresourcepolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 
-#### application-service/queueservice — 4건
+#### application-service/queueservice — 3건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/queues`<br>(createqueue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
-| `GET /v1/queues/{queue_id}/attributes`<br>(getqueueattributes) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/queues/{queue_id}`<br>(showqueue) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/queues/{queue_id}/attributes`<br>(getqueueattributes) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/queues/{queue_id}/description`<br>(updatequeuedescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 
 ### compute
 
-#### compute/baremetal — 6건
+#### compute/baremetal — 5건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -540,40 +524,25 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/baremetals/local-subnet/{baremetal_id}/attach`<br>(attachlocalsubnetbaremetal) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: local_subnet_id |
 | `POST /v1/baremetals`<br>(createbaremetals) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: region_id, image_id, os_user_id, os_user_password, vpc_id, subnet_id |
 | `PUT /v1/baremetals/local-subnet/{baremetal_id}/detach`<br>(detachlocalsubnetbaremetal) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: local_subnet_id, local_subnet_ip |
-| `GET /v1/bm_products`<br>(listbaremetalproducts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 16) |
 
-#### compute/multinodegpucluster — 4건
+#### compute/multinodegpucluster — 3건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/gpu-nodes/{gpu_node_id}/public-nat-ip`<br>(assigngpunodepublicnatip) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: public_ip_address_id |
 | `POST /v1/gpu-nodes`<br>(creategpunodes) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: region_id, image_id, os_user_id, os_user_password, vpc_id, subnet_id |
-| `GET /v1/gpu-nodes/products`<br>(listgpunodeproducts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `POST /v1/cluster-fabrics/modify-members`<br>(modifyclusterfabricmembers) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: after_cluster_fabric_id, before_cluster_fabric_id |
 
-#### compute/scf — 21건
+#### compute/scf — 8건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/cloud-functions`<br>(createcloudfunction) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: content, name, runtime |
 | `POST /v1/triggers/apigateway`<br>(createcloudfunctionapigatewaytrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: apigateway_api_id, apigateway_stage_name, cloud_function_id |
 | `POST /v1/triggers/cronjob`<br>(createcloudfunctioncronjobtrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cloud_function_id, schedule, timezone |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/environment-variables`<br>(listenvironmentvariables) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints`<br>(listprivatelinkendpoint) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/runtimes`<br>(listruntimes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 9) |
-| `GET /v1/cloud-functions/sample-codes`<br>(listsamplecodes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 39) |
 | `PUT /v1/cloud-functions/{cloud_function_id}/codes/file`<br>(setcloudfunctioncodefile) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: class_name, method_name |
-| `GET /v1/cloud-functions/{cloud_function_id}`<br>(showcloudfunction) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/codes`<br>(showcloudfunctioncode) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations`<br>(showcloudfunctionconfiguration) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/logs`<br>(showcloudfunctionlogs) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/metrics`<br>(showcloudfunctionmetrics) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `GET /v1/cloud-functions/{cloud_function_id}/metrics`<br>(showcloudfunctionmetrics) | YELLOW | 문서에 명시된 API 버전을 서버가 406으로 거절 | docs-derived pin 'scf metrics 1.3' -> 406 NoSuchVersion against the product pin (1.4); served via the no-pin fallback (latest current). Confirmed 실측 2026-07-16. |
-| `GET /v1/triggers/{trigger_id}`<br>(showcloudfunctiontrigger) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/config`<br>(showgeneralconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services`<br>(showprivatelinkservice) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/resource-policies`<br>(showresourcepolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/url`<br>(showurlconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/triggers/{trigger_id}`<br>(showcloudfunctiontrigger) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/cloud-functions/{cloud_function_id}/codes`<br>(updatecloudfunctioncode) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: content |
 | `PUT /v1/triggers/cronjob/{trigger_id}`<br>(updatecloudfunctioncronjobtrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cloud_function_id, schedule, timezone |
 
@@ -614,10 +583,10 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `DELETE /v1/servers/{server_id}/security-groups/{security_group_id}`<br>(detachvirtualserversecuritygroup) | YELLOW | DEPRECATED 표기만 있고 대체 API 안내 없음 | DEPRECATED endpoint |
 | `POST /v1/images/{image_id}/import`<br>(importimage) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `GET /v1/auto-scaling-groups/{auto_scaling_group_id}/notifications`<br>(listautoscalinggroupnotifications) | YELLOW | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | sub-resource list of a non-existent parent -> 200 (empty), not 404 |
-| `GET /v1/images`<br>(listimages) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
+| `GET /v1/images`<br>(listimages) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
 | `GET /v1/servers/{server_id}/ips`<br>(listserverips) | YELLOW | 문서에 명시된 API 버전을 서버가 406으로 거절 | docs-derived pin 'virtualserver /v1/servers/{id}/ips 1.3' -> 406 NoSuchVersion against the product pin; served via the no-pin fallback. Confirmed 실측 2026-07-16. |
-| `GET /v1/server-types`<br>(listservertypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 121) |
-| `GET /v1/volume-types`<br>(listvolumetypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
+| `GET /v1/server-types`<br>(listservertypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 121) |
+| `GET /v1/volume-types`<br>(listvolumetypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
 | `POST /v1/servers/{server_id}/lock`<br>(lockvirtualserver) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `POST /v1/servers/{server_id}/reboot`<br>(rebootvirtualserver) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `POST /v1/servers/{server_id}/rebuild`<br>(rebuildvirtualserver) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
@@ -641,17 +610,15 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 ### container
 
-#### container/scr — 24건
+#### container/scr — 22건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `GET /v1/container-registries/{registry_id}`<br>(showregistry) | RED | 클라이언트가 유발한 상태·입력에 500 반환 | GET on a registry mid-CREATING -> 500 ContactAdminForAssistance instead of 409/425 (a racing client-visible state, not a true not-found). req-90138294..., live 실측-07-16. Workaround: 500 retry ladder 15s x 10 until ACTIVE. |
 | `PUT /v1/tagses/{tags_id}/check-vulnerability`<br>(checktagsvulnerability) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
 | `POST /v1/container-registries`<br>(createregistry) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
-| `POST /v1/container-registries`<br>(createregistry) | YELLOW | 유량 제한 시 JSON 에러 규격이 아닌 HTML 차단 페이지(417) 반환 | 단시간 다수 요청(약 60초 내 80건) 상황에서 the SCP edge WAF answers with 417 + an HTML 'Request Rejected' block page (Support ID 3232170405160507975, F5-style) instead of the platform's JSON error envelope — breaks the 'errors are always JSON' contract an AI/programmatic con |
 | `POST /v1/repositories`<br>(createrepository) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name, registry_id |
 | `GET /v1/tagses/{tags_id}/download/manifest`<br>(downloadmanifest) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/container-registries/connectable-resources`<br>(listconnectableresources) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `POST /v1/images/{image_id}/lifecycle-policy/preview`<br>(runimagelifecyclepolicypreview) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `PUT /v1/images/{image_id}/description`<br>(updateimagedescription) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
 | `PUT /v1/images/{image_id}/description`<br>(updateimagedescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
@@ -670,7 +637,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/repositories/{repository_id}/scan-policy`<br>(updaterepositoryscanpolicy) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
 | `PUT /v1/tagses/{tags_id}/lock-policy`<br>(updatetagslockpolicy) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
 
-#### container/ske — 15건
+#### container/ske — 12건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -678,21 +645,18 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/clusters`<br>(createcluster) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kubernetes_version, name, subnet_id, volume_id, vpc_id |
 | `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | create-verb name but not POST (GET /v1/clusters/{cluster_id}/kubeconfig) |
 | `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/nodepools`<br>(createnodepool) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cluster_id, image_os, image_os_version, keypair_name, kubernetes_version, name, server_type_id, volume_type_name |
-| `GET /v1/kubernetes-versions`<br>(listkubernetesversions) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 7) |
-| `GET /v1/clusters/{cluster_id}/nodepools`<br>(listnodepools) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/clusters/{cluster_id}/public-access-control`<br>(setclusterpublicaccesscontrol) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: public_endpoint_access_control_ip |
 | `PUT /v1/clusters/{cluster_id}/upgrade`<br>(setclusterupgrade) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kubernetes_version |
 | `PUT /v1/nodepools/{nodepool_id}/preferred-ips`<br>(setnodepoolpreferredips) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: preferred_ips |
 | `PUT /v1/nodepools/{nodepool_id}/upgrade`<br>(setnodepoolupgrade) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: os_version |
-| `GET /v1/clusters/{cluster_id}`<br>(showcluster) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/clusters/{cluster_id}/user-kubeconfig`<br>(showclusteruserkubeconfig) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/clusters/{cluster_id}/user-kubeconfig`<br>(showclusteruserkubeconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/clusters/{cluster_id}/user-kubeconfig`<br>(showclusteruserkubeconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 ### data-analytics
 
-#### data-analytics/data-flow — 9건
+#### data-analytics/data-flow — 8건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -700,13 +664,12 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/data-flows`<br>(createdataflow) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cluster_id, data_flow_name, domain, image_id, storage_class_name |
 | `POST /v1/data-flow-services`<br>(createdataflowserviceconsole) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `POST /v1/data-flow-services`<br>(createdataflowserviceconsole) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: data_flow_id, data_flow_service_name, domain, storage_class_name |
-| `GET /v1/data-flows/{data_flow_id}`<br>(getdataflow) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/data-flow-services/{data_flow_service_id}`<br>(getdataflowserviceconsole) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/data-flow-services/data-flows/{data_flow_id}/sub-versions`<br>(getdataflowservicesubversions) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-flows/{data_flow_id}`<br>(getdataflow) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-flow-services/{data_flow_service_id}`<br>(getdataflowserviceconsole) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-flow-services/data-flows/{data_flow_id}/sub-versions`<br>(getdataflowservicesubversions) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/data-flows/clusters/{cluster_id}/ingress-controllers`<br>(ingresscluster) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/data-flows/clusters/{cluster_id}/ingress-controllers`<br>(ingresscluster) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
-#### data-analytics/data-ops — 14건
+#### data-analytics/data-ops — 13건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -717,13 +680,12 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/data-ops`<br>(createdataops) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cluster_id, data_ops_name, domain, image_id, storage_class_name |
 | `POST /v1/data-ops-services`<br>(createdataopsservice) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `POST /v1/data-ops-services`<br>(createdataopsservice) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: data_ops_id, data_ops_service_name, domain, storage_class_name, worker_type |
-| `GET /v1/data-ops/{data_ops_id}`<br>(getdataopsdetail) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/data-ops-services/{data_ops_service_id}`<br>(getdataopsservice) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-ops/{data_ops_id}`<br>(getdataopsdetail) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-ops-services/{data_ops_service_id}`<br>(getdataopsservice) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources`<br>(getdataopsservicevalidateresourcescreation) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources) |
 | `POST /v1/data-ops-services/{data_ops_service_id}/validate-resources`<br>(getdataopsservicevalidateresourcesupdate) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/data-ops-services/{data_ops_service_id}/validate-resources) |
-| `GET /v1/data-ops-services/data-ops/{data_ops_id}/sub-versions`<br>(getdataopssubversion) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-ops-services/data-ops/{data_ops_id}/sub-versions`<br>(getdataopssubversion) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/data-ops/clusters/{cluster_id}/ingress-controllers`<br>(getingresscontrollerlistv1) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/data-ops/clusters/{cluster_id}/ingress-controllers`<br>(getingresscontrollerlistv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### data-analytics/eventstreams — 6건
 
@@ -734,7 +696,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/patch`<br>(eventstreamspatchminorversion) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: dbaas_engine, software_version |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(eventstreamssetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(eventstreamssetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(eventstreamsshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(eventstreamsshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### data-analytics/quick-query — 5건
 
@@ -757,7 +719,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/clusters/{cluster_id}/backups`<br>(searchenginesetbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: retention_period_day, starting_time_hour |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(searchenginesetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(searchenginesetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(searchengineshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(searchengineshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### data-analytics/vertica — 7건
 
@@ -769,7 +731,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/clusters/{cluster_id}/backups`<br>(verticasetbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: retention_period_day, starting_time_hour |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(verticasetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(verticasetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(verticashowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(verticashowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 ### database
 
@@ -784,7 +746,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/clusters/{cluster_id}/backups`<br>(cachestoresetbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: retention_period_day, starting_time_hour |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(cachestoresetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(cachestoresetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(cachestoreshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(cachestoreshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/clusters/{cluster_id}/switchover`<br>(cachestoreswitchovercluster) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: switch_host_name |
 
 #### database/epas — 12건
@@ -802,7 +764,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(epassetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(epassetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(epassetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(epasshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(epasshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### database/mariadb — 13건
 
@@ -819,7 +781,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(mariadbsetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(mariadbsetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(mariadbsetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(mariadbshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(mariadbshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/clusters/{cluster_id}/major-version-upgrade`<br>(mariadbupgrademajorversion) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: dbaas_engine, software_version |
 
 #### database/mysql — 13건
@@ -837,7 +799,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(mysqlsetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(mysqlsetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(mysqlsetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(mysqlshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(mysqlshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/clusters/{cluster_id}/major-version-upgrade`<br>(mysqlupgrademajorversion) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: dbaas_engine, software_version |
 
 #### database/postgresql — 13건
@@ -856,7 +818,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(postgresqlsetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(postgresqlsetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(postgresqlsetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(postgresqlshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(postgresqlshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### database/sqlserver — 12건
 
@@ -873,7 +835,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(sqlserversetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(sqlserversetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(sqlserversetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(sqlservershowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(sqlservershowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 ### devops-tools
 
@@ -885,17 +847,13 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 ### financial-management
 
-#### financial-management/billingplan — 8건
+#### financial-management/billingplan — 4건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/planned-computes`<br>(createplannedcomputes) | RED | errors[].detail에 파이썬 리스트의 repr 문자열을 그대로 직렬화해 반환 — 플랫폼 표준(JSON 배열, 당일 131개 API 실측)과 달리 필드 단위 파싱 불가. 즉시 수정 대상 | errors[].detail is a stringified Python list — observed "['Field required', 'Field required', 'Field required', 'Field required']" (empty-body 400, global_request_id req-b6280fd2-7848-…, 2026-08-20). Platform-standard detail is a JSON array (131 endpoints meas |
 | `POST /v1/planned-computes/cancellation-fee`<br>(showcancellationfee) | RED | errors[].detail에 파이썬 리스트의 repr 문자열을 그대로 직렬화해 반환 — 플랫폼 표준(JSON 배열, 당일 131개 API 실측)과 달리 필드 단위 파싱 불가. 즉시 수정 대상 | errors[].detail is a stringified Python list — observed "['Field required']" (empty-body 400, global_request_id req-210f6bdc-3f2a-4932-9585-5e8c8167773e, 2026-08-20). Same repr-leak shape as createplannedcomputes. Immediate-fix per owner triage. |
 | `POST /v1/planned-computes`<br>(createplannedcomputes) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type, service_id |
-| `GET /v1/planned-computes/contract-types`<br>(listcontracttypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
-| `GET /v1/planned-computes/os-types`<br>(listostypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
-| `GET /v1/planned-computes/server-types`<br>(listplannedcomputeservertypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 387) |
-| `GET /v1/planned-computes/service-types`<br>(listplannedcomputeservicetypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 13) |
 | `POST /v1/planned-computes/cancellation-fee`<br>(showcancellationfee) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/planned-computes/cancellation-fee) |
 
 #### financial-management/budget — 3건
@@ -903,7 +861,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/budgets/account`<br>(createaccountbudget) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, start_month, unit |
-| `GET /v1/budgets/account`<br>(listaccountbudgets) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
+| `GET /v1/budgets/account`<br>(listaccountbudgets) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
 | `PUT /v1/budgets/account/{budget_id}`<br>(setaccountbudget) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, start_month, unit |
 
 #### financial-management/costexplorer — 4건
@@ -911,20 +869,13 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `GET /v1/bills`<br>(listbills) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): usage_amt |
-| `GET /v1/bills`<br>(listbills) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
+| `GET /v1/bills`<br>(listbills) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
 | `GET /v1/usages`<br>(listusages) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): end_time,metrics,start_time,used_time |
-| `GET /v1/usages`<br>(listusages) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
-
-#### financial-management/pricing — 2건
-
-| API | 심각도 | 문제 | 근거 |
-|---|---|---|---|
-| `GET /v1/reports/billing-item-ids`<br>(listbillingitemids) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 276) |
-| `GET /v1/reports/offerings`<br>(listoffering) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
+| `GET /v1/usages`<br>(listusages) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
 
 ### management
 
-#### management/cloudcontrol — 7건
+#### management/cloudcontrol — 5건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -932,8 +883,6 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/accounts`<br>(createaccountfactoryaccount) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: landing_zone_id, name, parent_unit_id |
 | `POST /v1/landing-zones`<br>(createlandingzone) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: additional_ou_name, audit_account_name, audit_login_id, basic_ou_name, log_archive_account_name, log_archive_login_id |
 | `PUT /v1/landing-zones/{landing_zone_id}`<br>(setlandingzone) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: detective_guardrail_status |
-| `GET /v1/guardrails/{guardrail_id}`<br>(showguardrail) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/landing-zones/{landing_zone_id}`<br>(showlandingzone) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `PUT /v1/baseline-assignments/{assignment_id}`<br>(updatebaselineassignment) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: landing_zone_id |
 
 #### management/cloudmonitoring — 9건
@@ -942,15 +891,15 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/cloudmonitorings/product/v2/metric-data`<br>(getmetricperfdatalist) | RED | 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음 | 400 names neither field nor rule |
 | `POST /v1/cloudmonitorings/event/v2/event-policies`<br>(puteventpolicy) | RED | 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음 | 400 names neither field nor rule |
-| `GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members`<br>(getadressbookmemberlist) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}`<br>(geteventpolicydetail) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories`<br>(geteventpolicyhistories) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications`<br>(geteventpolicynotification) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members`<br>(getadressbookmemberlist) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}`<br>(geteventpolicydetail) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories`<br>(geteventpolicyhistories) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications`<br>(geteventpolicynotification) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/cloudmonitorings/product/v2/metric-data`<br>(getmetricperfdatalist) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/cloudmonitorings/product/v2/metric-data) |
 | `POST /v1/cloudmonitorings/product/v2/metric-data`<br>(getmetricperfdatalist) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: queryEndDt |
 | `POST /v1/cloudmonitorings/event/v2/event-policies`<br>(puteventpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: productResourceId |
 
-#### management/iam — 21건
+#### management/iam — 18건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -962,18 +911,15 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/policies`<br>(createpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: policy_name |
 | `POST /v1/roles`<br>(createrole) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/saml-providers`<br>(createsamlprovider) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: federation_type, saml_provider_name |
-| `GET /v1/endpoints`<br>(listendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 180) |
-| `GET /v1/groups`<br>(listgroup) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
-| `GET /v1/accounts/{account_id}/users`<br>(listiamuser) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/policies`<br>(listpolicy) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
-| `GET /v1/roles`<br>(listrole) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
-| `GET /v1/saml-providers`<br>(listsamlprovider) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/service-accounts`<br>(listserviceaccount) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 9) |
+| `GET /v1/groups`<br>(listgroup) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
+| `GET /v1/policies`<br>(listpolicy) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
+| `GET /v1/roles`<br>(listrole) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
+| `GET /v1/saml-providers`<br>(listsamlprovider) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/users/{user_id}/policy-bindings`<br>(listuserpolicybindings) | YELLOW | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | sub-resource list of a non-existent parent -> 200 (empty), not 404 |
 | `PUT /v1/groups/{group_id}`<br>(setgroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name |
 | `PUT /v1/resource-policies/{srn}/statements/{sid}`<br>(setpermission) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: Effect |
 | `PUT /v1/policies/{policy_id}/bindings`<br>(setpolicygroupbinding) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: identity_type |
-| `GET /v1/resource-policies/{srn}`<br>(showresourcepolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/resource-policies/{srn}`<br>(showresourcepolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/accounts/{account_id}/users/{user_id}/password`<br>(updateiamuserpassword) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: password |
 
 #### management/iam-identity-center — 21건
@@ -989,18 +935,18 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/permission-sets`<br>(createpermissionset) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id, name |
 | `POST /v1/users`<br>(createuser) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id, name, user_id |
 | `DELETE /v1/users/{user_uuid}`<br>(deleteuser) | YELLOW | 경로 파라미터 명명이 표준과 다름 | {user_uuid} vs {*_id} in /v1/users/{user_uuid} |
-| `GET /v1/groups/{group_id}/users`<br>(listgroupusers) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/instances`<br>(listinstances) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/permission-sets/{permission_set_id}/policies`<br>(listpermissionsetpolicies) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/groups/{group_id}/users`<br>(listgroupusers) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/instances`<br>(listinstances) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/permission-sets/{permission_set_id}/policies`<br>(listpermissionsetpolicies) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PATCH /v1/groups/{group_id}`<br>(setgroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
 | `PATCH /v1/permission-sets/{permission_set_id}`<br>(setpermissionset) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
 | `PUT /v1/permission-sets/{permission_set_id}/policies`<br>(setpermissionsetpolicies) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
 | `PATCH /v1/users/{user_uuid}`<br>(setuser) | YELLOW | 경로 파라미터 명명이 표준과 다름 | {user_uuid} vs {*_id} in /v1/users/{user_uuid} |
 | `PATCH /v1/users/{user_uuid}`<br>(setuser) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
-| `GET /v1/groups/{group_id}`<br>(showgroup) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/permission-sets/{permission_set_id}`<br>(showpermissionset) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/groups/{group_id}`<br>(showgroup) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/permission-sets/{permission_set_id}`<br>(showpermissionset) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/users/{user_uuid}`<br>(showuser) | YELLOW | 경로 파라미터 명명이 표준과 다름 | {user_uuid} vs {*_id} in /v1/users/{user_uuid} |
-| `GET /v1/users/{user_uuid}`<br>(showuser) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/users/{user_uuid}`<br>(showuser) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### management/loggingaudit — 2건
 
@@ -1015,7 +961,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/network-logging/storages`<br>(createnetworkloggingstorage) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: bucket_name |
 
-#### management/organization — 11건
+#### management/organization — 7건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -1023,31 +969,25 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/organizations`<br>(createorganization) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/organization-units`<br>(createorganizationunit) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/service-control-policies`<br>(createservicecontrolpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name, organization_id |
-| `GET /v1/organizations`<br>(listorganizations) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/organization-units/{unit_id}/parents`<br>(listparents) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/organizations`<br>(listorganizations) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/organization-accounts/parent`<br>(moveaccount) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: parent_unit_id |
 | `PUT /v1/service-control-policies/{policy_id}`<br>(setservicecontrolpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: organization_id |
-| `GET /v1/organization-accounts/{account_id}`<br>(showaccount) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/organizations/{organization_id}`<br>(showorganization) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
-| `GET /v1/service-control-policies/{policy_id}`<br>(showservicecontrolpolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 
 #### management/quota — 2건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/account-quotas`<br>(listaccountquota) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/quota-requests`<br>(listquotarequests) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/account-quotas`<br>(listaccountquota) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/quota-requests`<br>(listquotarequests) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 
-#### management/resourcemanager — 8건
+#### management/resourcemanager — 6건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/resource-groups`<br>(createresourcegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name |
-| `GET /v1/tags/{srn}`<br>(listresourcetags) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/tags/keys`<br>(listtagkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
-| `GET /v1/tags/values`<br>(listtagvalues) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 87) |
+| `GET /v1/tags/{srn}`<br>(listresourcetags) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/resource-groups/{resource_group_id}`<br>(setresourcegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
-| `GET /v1/resources/{srn}`<br>(showresource) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/resources/{srn}`<br>(showresource) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}`<br>(updatecomponentstagvalue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: value |
 | `PUT /v1/tags/{srn}/{key}`<br>(updateresourcetagvalue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: value |
 
@@ -1068,9 +1008,9 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/log-groups/{log_group_id}/log-streams`<br>(createloggrouplogstream) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/metrics/data/download/image`<br>(downloadmetricdataimage) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `GET /v1/alerts/{id}/notifications`<br>(listalertnotifications) | YELLOW | 경로 파라미터 명명이 표준과 다름 | bare {id} in /v1/alerts/{id}/notifications |
-| `GET /v1/alerts`<br>(listalerts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/alerts`<br>(listalerts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/dashboards`<br>(listdashboards) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): namespace_code,service_code |
-| `GET /v1/log-groups`<br>(listloggroups) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/log-groups`<br>(listloggroups) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `POST /v1/metrics/data`<br>(listmetricdata) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/metrics/data) |
 | `POST /v1/metrics`<br>(listmetricinfos) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/metrics) |
 | `PATCH /v1/alerts/{id}`<br>(setalert) | YELLOW | 경로 파라미터 명명이 표준과 다름 | bare {id} in /v1/alerts/{id} |
@@ -1106,7 +1046,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/direct-connects`<br>(createdirectconnect) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, vpc_id |
 | `POST /v1/direct-connects/{direct_connect_id}/routing-rules`<br>(createroutingrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: destination_cidr |
-| `GET /v1/direct-connects`<br>(listdirectconnects) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/direct-connects`<br>(listdirectconnects) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/direct-connects/{direct_connect_id}`<br>(setdirectconnect) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 
 #### networking/dns — 7건
@@ -1118,7 +1058,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/hosted-zones/{hosted_zone_id}/records`<br>(createhostedzonerecord) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, type |
 | `POST /v1/private-dns`<br>(createprivatedns) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/public-domain-names`<br>(createpublicdomainname) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: address_type, domestic_first_address_en, domestic_first_address_ko, domestic_second_address_en, domestic_second_address_ko, name, overseas_first_address, overseas_second_address |
-| `GET /v1/private-dns`<br>(listprivatedns) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/private-dns`<br>(listprivatedns) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/public-domain-names/{public_domain_id}/information`<br>(setpublicdomainnamewhoisinfo) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: address_type, domestic_first_address_en, domestic_first_address_ko, domestic_second_address_en, domestic_second_address_ko, overseas_first_address, overseas_second_address, overseas_third_address |
 
 #### networking/firewall — 3건
@@ -1127,15 +1067,15 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/firewalls/rules`<br>(createfirewallrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: firewall_id |
 | `POST /v1/firewalls/rules`<br>(createfirewallrule) | YELLOW | 버전에 따라 응답 시맨틱이 다른데(1.1=202+빈 바디) 문서는 1.0 동작만 기술 | Endpoint-pinned version 'firewall 1.1' -> 202 + an EMPTY body {} (no rule id capturable from the response); the doc page only describes the 1.0/201-with-full-body semantics. A caller pinned (or defaulted) to 1.1 who doesn't know to poll listfirewallrules inste |
-| `GET /v1/firewalls`<br>(listfirewalls) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/firewalls`<br>(listfirewalls) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 
 #### networking/gslb — 5건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/gslbs`<br>(creategslb) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
-| `GET /v1/gslbs`<br>(listgslbs) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
-| `GET /v1/gslbs/routing-control`<br>(listgslbsregionalroutingcontrol) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
+| `GET /v1/gslbs`<br>(listgslbs) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
+| `GET /v1/gslbs/routing-control`<br>(listgslbsregionalroutingcontrol) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
 | `PUT /v1/gslbs/{gslb_id}/health-check`<br>(setgslbhealthcheck) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: protocol |
 | `PUT /v1/gslbs/{gslb_id}/routing-control`<br>(setgslbregionalroutingcontrol) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: region |
 
@@ -1183,17 +1123,17 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/vpc-peerings/{vpc_peering_id}/routing-rules`<br>(createvpcpeeringrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: destination_cidr |
 | `DELETE /v1/privatelink-services/{privatelink_service_id}`<br>(deleteprivatelinkservice) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | DELETE while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 20 |
 | `DELETE /v1/vpc-endpoints/{vpc_endpoint_id}`<br>(deletevpcendpoint) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | DELETE while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 20 |
-| `GET /v1/internet-gateways`<br>(listinternetgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/nat-gateways`<br>(listnatgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/privatelink-endpoints`<br>(listprivatelinkendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/privatelink-services`<br>(listprivatelinkservices) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/private-nats`<br>(listprivatenats) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/publicips`<br>(listpublicip) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/subnets`<br>(listsubnets) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/transit-gateways`<br>(listtransitgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/vpc-endpoints`<br>(listvpcendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/vpc-peerings`<br>(listvpcpeerings) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/vpcs`<br>(listvpcs) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/internet-gateways`<br>(listinternetgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/nat-gateways`<br>(listnatgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/privatelink-endpoints`<br>(listprivatelinkendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/privatelink-services`<br>(listprivatelinkservices) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/private-nats`<br>(listprivatenats) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/publicips`<br>(listpublicip) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/subnets`<br>(listsubnets) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/transit-gateways`<br>(listtransitgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpc-endpoints`<br>(listvpcendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpc-peerings`<br>(listvpcpeerings) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpcs`<br>(listvpcs) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/privatelink-services/{privatelink_service_id}`<br>(setprivatelinkservice) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | PUT (set) while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 |
 | `PUT /v1/publicips/{publicip_id}`<br>(setpublicip) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 | `PUT /v1/subnets/{subnet_id}/vips/{vip_id}`<br>(setsubnetvip) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
@@ -1205,8 +1145,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/vpn-gateways`<br>(createvpngateway) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: ip_address, ip_id, ip_type, name, vpc_id |
 | `POST /v1/vpn-tunnels`<br>(createvpntunnel) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, vpn_gateway_id |
-| `GET /v1/vpn-gateways`<br>(listvpngateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/vpn-tunnels`<br>(listvpntunnels) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpn-gateways`<br>(listvpngateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpn-tunnels`<br>(listvpntunnels) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/vpn-gateways/{vpn_gateway_id}`<br>(setvpngateway) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | PUT (set) while the resource is still EDITING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측/ |
 | `PUT /v1/vpn-tunnels/{vpn_tunnel_id}`<br>(setvpntunnel) | YELLOW | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | PUT (set) while the resource is still EDITING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측/ |
 
@@ -1216,8 +1156,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/product-categories`<br>(listproductcategories) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 14) |
-| `GET /v1/products`<br>(listproducts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
+| `GET /v1/product-categories`<br>(listproductcategories) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 14) |
+| `GET /v1/products`<br>(listproducts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
 
 #### platform/sts — 3건
 
@@ -1257,8 +1197,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/kms/openapi/encrypt/{key_id}`<br>(encryptdata) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: plaintext |
 | `POST /v1/kms/openapi/hmac/{key_id}`<br>(hmac) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: input |
 | `PUT /v1/kms/transit/{key_id}/acl-cidr`<br>(kmssetaclcidr) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: acl_cidr |
-| `GET /v1/kms/transit`<br>(listkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/managed-kms/transit`<br>(listmanagedkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/kms/transit`<br>(listkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/managed-kms/transit`<br>(listmanagedkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `POST /v1/kms/openapi/rewrap/{key_id}`<br>(rewrapdata) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: ciphertext |
 | `POST /v1/kms/openapi/sign/{key_id}`<br>(signdata) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: input |
 | `PUT /v1/kms/transit/{key_id}/description`<br>(updatedescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
@@ -1270,19 +1210,18 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/secrets`<br>(createsecretsmanager) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kms_id, name |
-| `GET /v1/secrets`<br>(listsecretsmanager) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/secrets`<br>(listsecretsmanager) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/secrets/{secret_id}/kmsid`<br>(setkmsid) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kms_id |
 | `PUT /v1/secrets/{secret_id}/description`<br>(setsecretdescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 | `PUT /v1/secrets/{secret_id}/label`<br>(setsecretsmanagerlabel) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
 | `POST /v1/secrets/{secret_id}/values`<br>(showsecretsmanagersecretvalue) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/secrets/{secret_id}/values) |
 
-#### security/secretvault — 3건
+#### security/secretvault — 2건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/secretvault`<br>(createsecretvault) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key_id, acl_cidr, name |
-| `GET /v1/temporarykey/{secret_vault_id}`<br>(gettemporarykey) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/secretvault`<br>(listsecretvault) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/temporarykey/{secret_vault_id}`<br>(gettemporarykey) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 ### storage
 
@@ -1299,15 +1238,14 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/archiving-policies/{archiving_policy_id}`<br>(setarchivingpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: object_lifecycle |
 | `PUT /v1/archiving-policies/{archiving_policy_id}/state`<br>(setarchivingpolicystate) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: state |
 
-#### storage/backup — 7건
+#### storage/backup — 6건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/backups`<br>(createbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, server_uuid |
 | `POST /v1/backup-agents`<br>(createbackupagent) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_uuid |
-| `GET /v1/backups/region-relationship`<br>(listbackupregionrelationship) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/backups/{backup_id}/restore/restorable-subnets`<br>(listbackuprestoresubnets) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
-| `GET /v1/backups/{backup_id}/filesystem-path`<br>(listfilesystempath) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/backups/{backup_id}/restore/restorable-subnets`<br>(listbackuprestoresubnets) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/backups/{backup_id}/filesystem-path`<br>(listfilesystempath) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/backups/{backup_id}/restore-agent-backup`<br>(restoreagentbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: restore_server_uuid, restore_target_id |
 | `POST /v1/backups/{backup_id}/restore`<br>(restorebackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: restore_server_name, restore_target_id, server_type_id |
 
@@ -1333,7 +1271,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `GET /v1/replications/regions`<br>(listvolumereplicationregion) | YELLOW | 문서에 명시된 API 버전을 서버가 406으로 거절 | docs-derived pin 'filestorage /v1/replications/regions 1.1' -> 406 NoSuchVersion against the product pin; served via the no-pin fallback. Confirmed 실측 2026-07-16. |
 | `PUT /v1/volumes/{volume_id}/access-rules`<br>(setaccessrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: object_id, object_type, action |
 | `PUT /v1/replications/{replication_id}`<br>(setvolumereplication) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: replication_update_type |
-| `GET /v1/replications/{replication_id}`<br>(showvolumereplication) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/replications/{replication_id}`<br>(showvolumereplication) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 199개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### storage/parallel-filestorage — 4건
 
@@ -1343,3 +1281,54 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/volumes`<br>(createvolume) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, zone |
 | `PUT /v1/snapshots/{snapshot_id}/restore`<br>(restoresnapshot) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
 | `PUT /v1/volumes/{volume_id}/capacity`<br>(setvolumecapacity) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
+
+
+## 7. 부록 — 검토 필요 (논란 여지가 있어 본문에서 분리)
+
+결함으로 단정하기엔 대안 해석이 있는 항목들입니다. 판단 근거와 함께 전달하니 각 팀에서 의도 여부를 확인해 주십시오.
+
+### 7.1 부재 리소스에 403 반환 — 29건
+존재 여부 은닉(anti-enumeration) 설계라면 정당할 수 있으나, 같은 자격증명으로 199개 API는 404를 반환하므로 플랫폼 정책으로 보기 어렵습니다. 은닉이 의도라면 문서화+일관화가 필요합니다.
+
+| API | 근거 |
+|---|---|
+| `GET /v1/apis/{api_id}/access-controls`<br>(application-service/apigateway/listaccesscontrols) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/deployments`<br>(application-service/apigateway/listapideployments) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/auths`<br>(application-service/apigateway/listauths) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/connected-endpoints`<br>(application-service/apigateway/listconnectedprivatelinkendpoints) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/reports`<br>(application-service/apigateway/listreports) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/resources`<br>(application-service/apigateway/listresources) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/stages`<br>(application-service/apigateway/liststages) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/usage-plans`<br>(application-service/apigateway/listusageplans) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}`<br>(application-service/apigateway/showapi) | non-existent id -> 403 (not 404) |
+| `GET /v1/privatelink-endpoints/{privatelink_endpoint_id}`<br>(application-service/apigateway/showprivatelinkendpoint) | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/resource-policies`<br>(application-service/apigateway/showresourcepolicy) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/environment-variables`<br>(compute/scf/listenvironmentvariables) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints`<br>(compute/scf/listprivatelinkendpoint) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}`<br>(compute/scf/showcloudfunction) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/codes`<br>(compute/scf/showcloudfunctioncode) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations`<br>(compute/scf/showcloudfunctionconfiguration) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/logs`<br>(compute/scf/showcloudfunctionlogs) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/metrics`<br>(compute/scf/showcloudfunctionmetrics) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/config`<br>(compute/scf/showgeneralconfig) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services`<br>(compute/scf/showprivatelinkservice) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/resource-policies`<br>(compute/scf/showresourcepolicy) | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/url`<br>(compute/scf/showurlconfig) | non-existent id -> 403 (not 404) |
+| `GET /v1/guardrails/{guardrail_id}`<br>(management/cloudcontrol/showguardrail) | non-existent id -> 403 (not 404) |
+| `GET /v1/landing-zones/{landing_zone_id}`<br>(management/cloudcontrol/showlandingzone) | non-existent id -> 403 (not 404) |
+| `GET /v1/accounts/{account_id}/users`<br>(management/iam/listiamuser) | non-existent id -> 403 (not 404) |
+| `GET /v1/organization-units/{unit_id}/parents`<br>(management/organization/listparents) | non-existent id -> 403 (not 404) |
+| `GET /v1/organization-accounts/{account_id}`<br>(management/organization/showaccount) | non-existent id -> 403 (not 404) |
+| `GET /v1/organizations/{organization_id}`<br>(management/organization/showorganization) | non-existent id -> 403 (not 404) |
+| `GET /v1/service-control-policies/{policy_id}`<br>(management/organization/showservicecontrolpolicy) | non-existent id -> 403 (not 404) |
+
+### 7.2 유량 차단 시 HTML 응답 (엣지 WAF — 특정 API 아님)
+단시간 다수 요청 시 앞단 WAF가 417 + HTML "Request Rejected" 반환. 차단 시에도 JSON 엔벨로프가 바람직하나 WAF 관행상 논쟁적이며, 관측 트리거도 클라이언트측 버스트였습니다.
+
+### 7.3 플랫폼 공통 — 검토 항목
+| 결함 | 범위 | 내용 | 논점 |
+|---|---|---|---|
+| `no-cors` | 58 서비스 | OPTIONS→403, Allow/CORS 헤더 없음 | CORS는 브라우저 개념 — 서버간 전용 API라면 무결함일 수 있음 |
+| `accept-language-ignored` | 124 EP | 에러 메시지 영어 고정 | 문서가 다국어 지원을 약속한 바 없음 — 개선 요망 사항에 가까움 |
+
+참고: 부재-id에 401을 반환하는 6건(archivestorage 등)은 서비스 미청약 계정 상태로 판단되어 결함 목록에서 제외했습니다.

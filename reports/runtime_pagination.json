@@ -1,9 +1,10 @@
 {
   "summary": {
     "checked": 141,
-    "ignores_size": 57,
+    "ignores_size": 39,
     "no_paging_meta": 19,
-    "non_200": 38
+    "non_200": 38,
+    "undocumented_paging_full_return": 18
   },
   "results": [
     {
@@ -11,21 +12,24 @@
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": ""
+      "paging_meta": "",
+      "documented_paging": true
     },
     {
       "endpoint": "application-service/apigateway/listapis",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "application-service/apigateway/listprivatelinkendpoints",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "application-service/queueservice/listqueue",
@@ -39,22 +43,25 @@
       "endpoint": "compute/baremetal/listbaremetalproducts",
       "status": 200,
       "returned_items_at_size1": 16,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "compute/baremetal/listbaremetals",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/multinodegpucluster/listclusterfabrics",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/multinodegpucluster/listgpunodeimages",
@@ -64,15 +71,17 @@
       "endpoint": "compute/multinodegpucluster/listgpunodeproducts",
       "status": 200,
       "returned_items_at_size1": 2,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "compute/multinodegpucluster/listgpunodes",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/multinodegpucluster/listnodepools",
@@ -83,7 +92,8 @@
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/scf/listcloudfunctiontriggers",
@@ -93,120 +103,137 @@
       "endpoint": "compute/scf/listruntimes",
       "status": 200,
       "returned_items_at_size1": 9,
-      "respects_size": false,
-      "paging_meta": "count"
+      "respects_size": true,
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "compute/scf/listsamplecodes",
       "status": 200,
       "returned_items_at_size1": 39,
-      "respects_size": false,
-      "paging_meta": "count"
+      "respects_size": true,
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "compute/virtualserver/listautoscalinggroups",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/virtualserver/listdefaultconfigs",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "compute/virtualserver/listimages",
       "status": 200,
       "returned_items_at_size1": 20,
       "respects_size": false,
-      "paging_meta": ""
+      "paging_meta": "",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/virtualserver/listkeypairs",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": ""
+      "paging_meta": "",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/virtualserver/listlaunchconfigurations",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/virtualserver/listpendingimages",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": ""
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "compute/virtualserver/listservergroups",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": ""
+      "paging_meta": "",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/virtualserver/listservertypes",
       "status": 200,
       "returned_items_at_size1": 121,
       "respects_size": false,
-      "paging_meta": ""
+      "paging_meta": "",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/virtualserver/listsnapshot",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/virtualserver/listvolumes",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "compute/virtualserver/listvolumetransfer",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": ""
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "compute/virtualserver/listvolumetypes",
       "status": 200,
       "returned_items_at_size1": 4,
       "respects_size": false,
-      "paging_meta": ""
+      "paging_meta": "",
+      "documented_paging": true
     },
     {
       "endpoint": "container/scr/listconnectableresources",
       "status": 200,
       "returned_items_at_size1": 2,
-      "respects_size": false,
-      "paging_meta": "count"
+      "respects_size": true,
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "container/scr/listregistries",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "container/ske/listclusters",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "container/ske/listimages",
@@ -216,29 +243,33 @@
       "endpoint": "container/ske/listkubernetesversions",
       "status": 200,
       "returned_items_at_size1": 7,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "devops-tools/devopsservice/listdevopsservices",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "financial-management/billingplan/listcontracttypes",
       "status": 200,
       "returned_items_at_size1": 4,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "financial-management/billingplan/listostypes",
       "status": 200,
       "returned_items_at_size1": 4,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "financial-management/billingplan/listplannedcomputeinstances",
@@ -249,63 +280,72 @@
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "total_count,total_pages"
+      "paging_meta": "total_count,total_pages",
+      "documented_paging": true
     },
     {
       "endpoint": "financial-management/billingplan/listplannedcomputeservertypes",
       "status": 200,
       "returned_items_at_size1": 387,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "financial-management/billingplan/listplannedcomputeservicetypes",
       "status": 200,
       "returned_items_at_size1": 13,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "financial-management/budget/listaccountbudgets",
       "status": 200,
       "returned_items_at_size1": 4,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "financial-management/costexplorer/listbills",
       "status": 200,
       "returned_items_at_size1": 20,
       "respects_size": false,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "financial-management/costexplorer/listusages",
       "status": 200,
       "returned_items_at_size1": 20,
       "respects_size": false,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "financial-management/pricing/listbillingitemids",
       "status": 200,
       "returned_items_at_size1": 276,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "financial-management/pricing/listoffering",
       "status": 200,
       "returned_items_at_size1": 4,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "financial-management/pricing/listreportprice",
       "status": 200,
       "returned_items_at_size1": 1,
       "respects_size": true,
-      "paging_meta": "count,page,size,total_pages"
+      "paging_meta": "count,page,size,total_pages",
+      "documented_paging": true
     },
     {
       "endpoint": "management/cloudcontrol/listbaselineassignments",
@@ -336,7 +376,8 @@
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/iam-identity-center/listpermissionsets",
@@ -350,43 +391,49 @@
       "endpoint": "management/iam/listendpoints",
       "status": 200,
       "returned_items_at_size1": 180,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "management/iam/listgroup",
       "status": 200,
       "returned_items_at_size1": 3,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/iam/listpolicy",
       "status": 200,
       "returned_items_at_size1": 3,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/iam/listrole",
       "status": 200,
       "returned_items_at_size1": 3,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/iam/listsamlprovider",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/iam/listserviceaccount",
       "status": 200,
       "returned_items_at_size1": 9,
-      "respects_size": false,
-      "paging_meta": ""
+      "respects_size": true,
+      "paging_meta": "",
+      "documented_paging": false
     },
     {
       "endpoint": "management/loggingaudit/listlogs",
@@ -397,7 +444,8 @@
       "status": 200,
       "returned_items_at_size1": 1,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/network-logging/listnetworkloggingconfigurations",
@@ -412,7 +460,8 @@
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "management/organization/listaccounts",
@@ -427,7 +476,8 @@
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/organization/listorganizationunits",
@@ -450,98 +500,112 @@
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/quota/listquotarequests",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/resourcemanager/listresourcegroups",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/resourcemanager/listresources",
       "status": 200,
       "returned_items_at_size1": 1,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/resourcemanager/listtagkeys",
       "status": 200,
       "returned_items_at_size1": 4,
-      "respects_size": false,
-      "paging_meta": "count"
+      "respects_size": true,
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "management/resourcemanager/listtags",
       "status": 200,
       "returned_items_at_size1": 1,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/resourcemanager/listtagvalues",
       "status": 200,
       "returned_items_at_size1": 87,
-      "respects_size": false,
-      "paging_meta": "count"
+      "respects_size": true,
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "management/servicewatch/listdashboards",
       "status": 200,
       "returned_items_at_size1": 1,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/servicewatch/listloggroups",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/cdn/listcdnservice",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/direct-connect/listdirectconnects",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/dns/listhostedzone",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/dns/listprivatedns",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/dns/listpublicdomainnames",
       "status": 200,
       "returned_items_at_size1": 1,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/firewall/listfirewallrules",
@@ -552,56 +616,64 @@
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/gslb/listgslbs",
       "status": 200,
       "returned_items_at_size1": 3,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/gslb/listgslbsregionalroutingcontrol",
       "status": 200,
       "returned_items_at_size1": 3,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/loadbalancer/listlbhealthchecks",
       "status": 200,
       "returned_items_at_size1": 1,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/loadbalancer/listlblisteners",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/loadbalancer/listlbservergroups",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/loadbalancer/listloadbalancercertificates",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "networking/loadbalancer/listloadbalancers",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/security-group/listsecuritygrouprules",
@@ -612,70 +684,80 @@
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listinternetgateways",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listnatgateways",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listports",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listprivatelinkendpoints",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listprivatelinkservices",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listprivatenats",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listpublicip",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listsubnets",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listtransitgateways",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listvpcendpointconnectableresources",
@@ -686,84 +768,96 @@
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listvpcpeerings",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpc/listvpcs",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpn/listvpngateways",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "networking/vpn/listvpntunnels",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "platform/product/listproductcategories",
       "status": 200,
       "returned_items_at_size1": 14,
       "respects_size": false,
-      "paging_meta": "count,total_count,total_pages"
+      "paging_meta": "count,total_count,total_pages",
+      "documented_paging": true
     },
     {
       "endpoint": "platform/product/listproducts",
       "status": 200,
       "returned_items_at_size1": 20,
       "respects_size": false,
-      "paging_meta": "count,total_count,total_pages"
+      "paging_meta": "count,total_count,total_pages",
+      "documented_paging": true
     },
     {
       "endpoint": "security/certificatemanager/listcertificates",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "security/kms/listkeys",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "security/kms/listmanagedkeys",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "security/secretsmanager/listsecretsmanager",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "security/secretvault/listsecretvault",
       "status": 200,
       "returned_items_at_size1": 2,
-      "respects_size": false,
-      "paging_meta": "count,page,size"
+      "respects_size": true,
+      "paging_meta": "count,page,size",
+      "documented_paging": false
     },
     {
       "endpoint": "storage/archivestorage/listarchivinghistories",
@@ -786,7 +880,8 @@
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "storage/backup/listbackupagenttargets",
@@ -796,29 +891,33 @@
       "endpoint": "storage/backup/listbackupregionrelationship",
       "status": 200,
       "returned_items_at_size1": 2,
-      "respects_size": false,
-      "paging_meta": "count"
+      "respects_size": true,
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "storage/backup/listbackups",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "storage/baremetal-blockstorage/listvolumegroups",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "total_count"
+      "paging_meta": "total_count",
+      "documented_paging": true
     },
     {
       "endpoint": "storage/baremetal-blockstorage/listvolumes",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "total_count"
+      "paging_meta": "total_count",
+      "documented_paging": true
     },
     {
       "endpoint": "storage/filestorage/listsnapshots",
@@ -841,7 +940,8 @@
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "storage/parallel-filestorage/listsnapshots",
@@ -852,28 +952,32 @@
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "management/servicewatch/listalerts",
       "status": 200,
       "returned_items_at_size1": 2,
       "respects_size": false,
-      "paging_meta": "count,page,size"
+      "paging_meta": "count,page,size",
+      "documented_paging": true
     },
     {
       "endpoint": "management/servicewatch/listnamespacebyalerts",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": false
     },
     {
       "endpoint": "networking/security-group/listaddressgroups",
       "status": 200,
       "returned_items_at_size1": 0,
       "respects_size": true,
-      "paging_meta": "count"
+      "paging_meta": "count",
+      "documented_paging": true
     },
     {
       "endpoint": "storage/filestorage/listvolumereplicationzones",
