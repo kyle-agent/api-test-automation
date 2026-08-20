@@ -7,10 +7,10 @@
 | 판정 | 엔드포인트 수 | 비율 |
 |---|---:|---:|
 | 결함 없음 | 914 | 64.5% |
-| 개선 필요 (YELLOW) | 473 | 33.4% |
-| 심각 (RED) | 29 | 2.0% |
+| 개선 필요 (YELLOW) | 471 | 33.3% |
+| 심각 (RED) | 31 | 2.2% |
 
-개별 결함 총 **561건**. 아래 §2의 플랫폼 공통 결함 6종은 별도 집계(개별 판정에 중복 계상하지 않음).
+개별 결함 총 **563건**. 아래 §2의 플랫폼 공통 결함 6종은 별도 집계(개별 판정에 중복 계상하지 않음).
 
 ### 2026-08-20 동적 재검증 diff (6월 첫 측정 대비)
 
@@ -28,7 +28,7 @@
 | 메서드 | 전체 API | 결함 | RED | 결함/100API |
 |---|---:|---:|---:|---:|
 | GET | 546 | 165 | 6 | 30.2 |
-| POST | 393 | 273 | 20 | 69.5 |
+| POST | 393 | 275 | 22 | 70.0 |
 | PUT | 257 | 108 | 2 | 42.0 |
 | DELETE | 211 | 6 | 1 | 2.8 |
 | PATCH | 9 | 9 | 0 | 100.0 |
@@ -37,7 +37,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 
 ### 결함 구분
 
-**계약 위반** 193건 · **문서 결손** 366건 · **동작버그(기능 결함 — 버그 트래커 전달 권장)** 2건. 각 결함 행에 구분 표기, CSV에 cls 컬럼.
+**계약 위반** 195건 · **문서 결손** 366건 · **동작버그(기능 결함 — 버그 트래커 전달 권장)** 2건. 각 결함 행에 구분 표기, CSV에 cls 컬럼.
 
 ### 상품군별 통계
 
@@ -49,10 +49,10 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | networking | 216 | 2 | 74 | 81 |
 | compute | 181 | 2 | 73 | 88 |
 | container | 64 | 2 | 30 | 39 |
+| financial-management | 21 | 2 | 11 | 17 |
 | application-service | 67 | 1 | 26 | 30 |
 | storage | 131 | 0 | 33 | 33 |
 | security | 57 | 0 | 30 | 30 |
-| financial-management | 21 | 0 | 13 | 15 |
 | ai-ml | 21 | 0 | 8 | 10 |
 | platform | 7 | 0 | 5 | 5 |
 | devops-tools | 6 | 0 | 1 | 1 |
@@ -70,6 +70,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | database/mysql | 48 | 2 | 9 | 13 |
 | database/epas | 49 | 2 | 8 | 12 |
 | management/cloudmonitoring | 18 | 2 | 4 | 9 |
+| financial-management/billingplan | 10 | 2 | 4 | 8 |
 | application-service/apigateway | 55 | 1 | 22 | 26 |
 | container/scr | 39 | 1 | 20 | 24 |
 | container/ske | 25 | 1 | 10 | 15 |
@@ -86,39 +87,38 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | management/organization | 37 | 0 | 11 | 11 |
 | networking/cdn | 9 | 0 | 8 | 11 |
 | data-analytics/data-flow | 17 | 0 | 6 | 9 |
-| ai-ml/aimlops-platform | 12 | 0 | 6 | 8 |
-| storage/filestorage | 22 | 0 | 8 | 8 |
-| management/resourcemanager | 27 | 0 | 8 | 8 |
 | storage/archivestorage | 26 | 0 | 8 | 8 |
-| management/cloudcontrol | 15 | 0 | 7 | 7 |
+| ai-ml/aimlops-platform | 12 | 0 | 6 | 8 |
+| management/resourcemanager | 27 | 0 | 8 | 8 |
+| storage/filestorage | 22 | 0 | 8 | 8 |
 | storage/backup | 31 | 0 | 7 | 7 |
 | networking/dns | 22 | 0 | 7 | 7 |
+| management/cloudcontrol | 15 | 0 | 7 | 7 |
 | storage/baremetal-blockstorage | 41 | 0 | 6 | 6 |
 | networking/vpn | 10 | 0 | 6 | 6 |
-| compute/baremetal | 16 | 0 | 6 | 6 |
 | security/secretsmanager | 14 | 0 | 6 | 6 |
-| financial-management/billingplan | 10 | 0 | 6 | 6 |
-| networking/gslb | 10 | 0 | 5 | 5 |
+| compute/baremetal | 16 | 0 | 6 | 6 |
 | networking/security-group | 17 | 0 | 5 | 5 |
+| networking/gslb | 10 | 0 | 5 | 5 |
 | storage/parallel-filestorage | 11 | 0 | 4 | 4 |
-| application-service/queueservice | 12 | 0 | 4 | 4 |
 | networking/direct-connect | 8 | 0 | 4 | 4 |
+| application-service/queueservice | 12 | 0 | 4 | 4 |
 | compute/multinodegpucluster | 16 | 0 | 4 | 4 |
 | financial-management/costexplorer | 3 | 0 | 2 | 4 |
 | security/certificatemanager | 7 | 0 | 4 | 4 |
 | financial-management/budget | 5 | 0 | 3 | 3 |
-| platform/sts | 3 | 0 | 3 | 3 |
 | networking/firewall | 8 | 0 | 2 | 3 |
+| platform/sts | 3 | 0 | 3 | 3 |
 | security/secretvault | 5 | 0 | 3 | 3 |
-| management/quota | 4 | 0 | 2 | 2 |
-| security/configinspection | 8 | 0 | 2 | 2 |
-| ai-ml/cloud-ml | 9 | 0 | 2 | 2 |
 | management/loggingaudit | 10 | 0 | 2 | 2 |
-| platform/product | 4 | 0 | 2 | 2 |
+| ai-ml/cloud-ml | 9 | 0 | 2 | 2 |
+| management/quota | 4 | 0 | 2 | 2 |
 | financial-management/pricing | 3 | 0 | 2 | 2 |
+| platform/product | 4 | 0 | 2 | 2 |
+| security/configinspection | 8 | 0 | 2 | 2 |
 | networking/loadbalancer | 37 | 0 | 1 | 1 |
-| devops-tools/devopsservice | 6 | 0 | 1 | 1 |
 | management/network-logging | 4 | 0 | 1 | 1 |
+| devops-tools/devopsservice | 6 | 0 | 1 | 1 |
 
 ## 2. 플랫폼 공통 결함 (전 서비스급 영향)
 
@@ -148,6 +148,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | `deprecated` | 4 | DEPRECATED 표기만 있고 대체 API 안내 없음 | 대체 엔드포인트와 제거 일정 명시 |
 | `versioning.doc-version-not-supported` | 3 | 문서에 명시된 API 버전을 서버가 406으로 거절 | 문서-서버 버전 정합 |
 | `notfound-200-list` | 2 | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | 부모 부재 시 404 |
+| `errors.detail-python-repr` | 2 | errors[].detail에 파이썬 리스트의 repr 문자열을 그대로 직렬화해 반환 — 플랫폼 표준(JSON 배열, 당일 131개 API 실측)과 달리 필드 단위 파싱 불가. 즉시 수정 대상 | detail을 JSON 배열로 반환 |
 | `notfound-200` | 2 | 존재하지 않는 리소스 조회가 200 반환 | 부재 리소스는 404 |
 | `networking.subnet-read-plane-version-drift` | 2 | 생성(v1.3)은 되는 PRIVATE 타입 서브넷이 조회 계열(v1.2 enum)에서 보이지 않음 — API로 존재를 확인할 수 없는 리소스 발생 | 조회 계열 enum을 생성 계열과 동일 버전으로 정합 |
 | `status.wrong_code_403` | 1 | 입력 검증 오류에 403 반환 (권한 문제로 오인 유발) | 입력 오류는 400 |
@@ -160,7 +161,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | `docs.version-semantics-undocumented` | 1 | 버전에 따라 응답 시맨틱이 다른데(1.1=202+빈 바디) 문서는 1.0 동작만 기술 | 버전별 응답 차이 문서화 |
 | `runtime.empty-collection-404` | 1 | 빈 컬렉션 조회가 404 반환 | 빈 컬렉션은 200 + 빈 배열 |
 
-## 4. 심각(RED) 29개 API — 개별 상세
+## 4. 심각(RED) 31개 API — 개별 상세
 
 ### application-service/apigateway — `PUT /v1/privatelink-endpoints/{privatelink_endpoint_id}/approval` (approveprivatelinkendpoint)
 - **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
@@ -321,6 +322,22 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
+### financial-management/billingplan — `POST /v1/planned-computes` (createplannedcomputes)
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+  - 근거: required fields with no documented constraint: server_type, service_id
+  - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
+- **[계약] 문제**: errors[].detail에 파이썬 리스트의 repr 문자열을 그대로 직렬화해 반환 — 플랫폼 표준(JSON 배열, 당일 131개 API 실측)과 달리 필드 단위 파싱 불가. 즉시 수정 대상
+  - 근거: errors[].detail is a stringified Python list — observed "['Field required', 'Field required', 'Field required', 'Field required']" (empty-body 400, global_request_id req-b6280fd2-7848-…, 2026-08-20). Platform-standard detail is a JSON array (131 endpoints measured same day); a repr string cannot be parsed field-wise. Immediate-fix per owner triage.
+  - 기대 동작: detail을 JSON 배열로 반환
+
+### financial-management/billingplan — `POST /v1/planned-computes/cancellation-fee` (showcancellationfee)
+- **[계약] 문제**: 엔드포인트 이름의 동사와 HTTP 메서드 불일치
+  - 근거: read-verb name but not GET (POST /v1/planned-computes/cancellation-fee)
+  - 기대 동작: 동사-메서드 정합(조회=GET, 생성=POST 등)
+- **[계약] 문제**: errors[].detail에 파이썬 리스트의 repr 문자열을 그대로 직렬화해 반환 — 플랫폼 표준(JSON 배열, 당일 131개 API 실측)과 달리 필드 단위 파싱 불가. 즉시 수정 대상
+  - 근거: errors[].detail is a stringified Python list — observed "['Field required']" (empty-body 400, global_request_id req-210f6bdc-3f2a-4932-9585-5e8c8167773e, 2026-08-20). Same repr-leak shape as createplannedcomputes. Immediate-fix per owner triage.
+  - 기대 동작: detail을 JSON 배열로 반환
+
 ### management/cloudmonitoring — `POST /v1/cloudmonitorings/product/v2/metric-data` (getmetricperfdatalist)
 - **[계약] 문제**: 엔드포인트 이름의 동사와 HTTP 메서드 불일치
   - 근거: read-verb name but not GET (POST /v1/cloudmonitorings/product/v2/metric-data)
@@ -413,6 +430,38 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 {"errors":[{"code":"ContactAdminForAssistance","detail":"There was a problem processing your request.\nContact us through Support Center > Contact Us.","global_request_id":"req-07496a45-a460-42de-bb75-bc37b9eb2cae","links":[],"related_resources":[],"request_id":"req-dc07979c-f024-4eb9-b147-35eb61e6d7f8","response":null,"status":500,"title":"ContactAdminForAssistance"}]}
 
 ```
+
+## 5.5 에러 엔벨로프 실태 (실응답 원문)
+
+한 클라이언트가 SCP 에러를 처리하려면 현재 최소 3가지 형태를 알아야 합니다. 전부 2026-08-20 실측 원문입니다.
+
+### ① 미인증 경로 — 프레임워크(Spring) 기본 엔벨로프, 58개 서비스 전원 (예외 0)
+무서명 요청에 표준 errors[]가 아닌 프레임워크 기본 바디 + 401이 아닌 404:
+
+```
+{"timestamp":"2026-08-20T10:11:36.800+00:00","path":"/v1/queues","status":404,"error":"Not Found","requestId":"1d493ca5-2809043"}
+```
+대상: ai-ml/aimlops-platform, ai-ml/cloud-ml, application-service/apigateway, application-service/queueservice, compute/baremetal, compute/multinodegpucluster, compute/scf, compute/virtualserver, container/scr, container/ske, data-analytics/data-flow, data-analytics/data-ops, data-analytics/eventstreams, data-analytics/quick-query, data-analytics/searchengine, data-analytics/vertica, database/cachestore, database/epas, database/mariadb, database/mysql, database/postgresql, database/sqlserver, devops-tools/devopsservice, financial-management/billingplan, financial-management/budget, financial-management/costexplorer, financial-management/pricing, management/cloudcontrol, management/cloudmonitoring, management/iam, management/iam-identity-center, management/loggingaudit, management/network-logging, management/organization, management/quota, management/resourcemanager, management/servicewatch, management/support, networking/cdn, networking/direct-connect, networking/dns, networking/firewall, networking/gslb, networking/loadbalancer, networking/security-group, networking/vpc, networking/vpn, platform/product, security/certificatemanager, security/configinspection, security/kms, security/secretsmanager, security/secretvault, storage/archivestorage, storage/backup, storage/baremetal-blockstorage, storage/filestorage, storage/parallel-filestorage
+
+### ② 정상 인증 4xx — 표준 errors[] 엔벨로프 (이 형태가 정답이나, 문서에 스키마 없음)
+```
+{"errors":[{"code":"ValidationError","detail":["Field required"],"global_request_id":"req-fb079650-e947-4ca0-84ee-8c1b5591bf76","links":[],"related_resources":[
+```
+필드: code / detail / global_request_id / links / related_resources / request_id / status / title — **이 스키마를 API Reference에 공식 문서화하는 것이 개선의 출발점.**
+
+### ③ 같은 표준 엔벨로프 안에서도 detail 타입 혼재
+- JSON 배열(표준): **131건** — `"detail":["Field required"]`
+- 문자열: **4건** — `financial-management/billingplan/createplannedcomputes`, `financial-management/billingplan/showcancellationfee`, `financial-management/budget/createaccountbudget`, `management/iam/accesskeysendtemporaryotp`
+
+**즉시 수정 대상 — billingplan 2건은 파이썬 리스트의 repr을 문자열로 직렬화해 반환** (서버 내부 표현 누출, 필드 단위 파싱 불가):
+
+```
+{"errors":[{"code":"ValidationError","detail":"['Field required', 'Field required', 'Field required', 'Field required']","global_request_id":"req-b6280fd2-7848-
+```
+→ RED `errors.detail-python-repr` 로 등재: createplannedcomputes, showcancellationfee. (budget/iam의 문자열 detail 2건은 자연어 문장이라 타입 혼재 항목으로만 분류)
+
+### ④ 엣지(WAF) 유량 차단 — HTML 페이지 (특정 API 아님, 부록성)
+단시간 다수 요청 시 플랫폼 앞단 WAF가 417 + HTML "Request Rejected"(F5 계열) 반환 — 관측 지점은 SCR 생성이었으나 엣지 공통 동작. 차단 시에도 JSON 엔벨로프 유지가 바람직하나 WAF 관행상 논쟁적.
 
 ## 6. 전체 결함 목록 (YELLOW 포함, 상품군→상품별)
 
@@ -836,10 +885,12 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 ### financial-management
 
-#### financial-management/billingplan — 6건
+#### financial-management/billingplan — 8건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
+| `POST /v1/planned-computes`<br>(createplannedcomputes) | RED | errors[].detail에 파이썬 리스트의 repr 문자열을 그대로 직렬화해 반환 — 플랫폼 표준(JSON 배열, 당일 131개 API 실측)과 달리 필드 단위 파싱 불가. 즉시 수정 대상 | errors[].detail is a stringified Python list — observed "['Field required', 'Field required', 'Field required', 'Field required']" (empty-body 400, global_request_id req-b6280fd2-7848-…, 2026-08-20). Platform-standard detail is a JSON array (131 endpoints meas |
+| `POST /v1/planned-computes/cancellation-fee`<br>(showcancellationfee) | RED | errors[].detail에 파이썬 리스트의 repr 문자열을 그대로 직렬화해 반환 — 플랫폼 표준(JSON 배열, 당일 131개 API 실측)과 달리 필드 단위 파싱 불가. 즉시 수정 대상 | errors[].detail is a stringified Python list — observed "['Field required']" (empty-body 400, global_request_id req-210f6bdc-3f2a-4932-9585-5e8c8167773e, 2026-08-20). Same repr-leak shape as createplannedcomputes. Immediate-fix per owner triage. |
 | `POST /v1/planned-computes`<br>(createplannedcomputes) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type, service_id |
 | `GET /v1/planned-computes/contract-types`<br>(listcontracttypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
 | `GET /v1/planned-computes/os-types`<br>(listostypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |

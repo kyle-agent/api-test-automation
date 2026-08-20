@@ -385,6 +385,35 @@ ALL: list[LiveFinding] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Class 10 — errors[].detail carries a SERIALIZED PYTHON LIST (repr leak) —
+# probe run 39bb (2026-08-20), 빈-바디 400 실측. detail 필드 타입이 전 플랫폼
+# 표준으론 배열(131건 실측)인데 billingplan 은 파이썬 리스트의 repr 문자열을
+# 그대로 직렬화해 보낸다 — 클라이언트 파싱 불가 계약 위반, 오너 지정
+# "즉시 고쳐야 할 대상". budget/iam 의 문자열-detail 은 자연어 문장이라
+# 타입 혼재(엔벨로프 계열 systemic)로만 남기고 여기엔 안 넣는다.
+# ---------------------------------------------------------------------------
+_DETAIL_REPR = [
+    LiveFinding(
+        "financial-management/billingplan/createplannedcomputes",
+        "errors.detail-python-repr", RED,
+        "errors[].detail is a stringified Python list — observed "
+        "\"['Field required', 'Field required', 'Field required', 'Field "
+        "required']\" (empty-body 400, global_request_id req-b6280fd2-7848-…, "
+        "2026-08-20). Platform-standard detail is a JSON array (131 endpoints "
+        "measured same day); a repr string cannot be parsed field-wise. "
+        "Immediate-fix per owner triage."),
+    LiveFinding(
+        "financial-management/billingplan/showcancellationfee",
+        "errors.detail-python-repr", RED,
+        "errors[].detail is a stringified Python list — observed "
+        "\"['Field required']\" (empty-body 400, global_request_id "
+        "req-210f6bdc-3f2a-4932-9585-5e8c8167773e, 2026-08-20). Same repr-leak "
+        "shape as createplannedcomputes. Immediate-fix per owner triage."),
+]
+ALL = ALL + _DETAIL_REPR
+
+
 def entries() -> list[dict]:
     """Plain-dict view of :data:`ALL`, shaped for ``conformance.static.build``'s
     ``add(key, sev, typ, src, detail, issue)`` helper."""
