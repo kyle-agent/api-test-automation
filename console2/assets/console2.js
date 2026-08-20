@@ -3458,6 +3458,7 @@ function reportR4() {
       <div class="run-ctl">
         <button class="minibtn red" id="btn-cleanup" title="우리(owner)가 만든 자원을 강제 삭제 (reconciler, TTL 무시).">🧹 강제 클린업</button>
         <button class="minibtn" id="btn-verify" title="삭제 없이 남은 우리 자원 수 확인 (read-only).">🔍 클린업 확인</button>
+        <button class="minibtn" id="btn-conformance" title="AXIS 2 동적 검증 — read-only 런타임 프로브 8종 + 정적 폴드 (자원 생성 없음, 15~30분).">📐 컨포먼스 프로브</button>
         <button class="minibtn" id="btn-reflog">↻ 로그 새로고침</button>
       </div>
       <pre class="runlog" id="r4-log" data-logkey="${esc(key)}">로그 로딩…</pre>`;
@@ -3471,6 +3472,13 @@ function reportR4() {
       });
     $("btn-verify").onclick = () => {
       fetch("/api/verify", { method: "POST" }).then(r => r.json()).then(j => {
+        if (j.error) { alert(j.error); return; }
+        runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
+        drawReport(); startR4Poll();
+      }).catch(() => alert("서버 연결 실패"));
+    };
+    $("btn-conformance").onclick = () => {
+      fetch("/api/conformance", { method: "POST" }).then(r => r.json()).then(j => {
         if (j.error) { alert(j.error); return; }
         runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
         drawReport(); startR4Poll();

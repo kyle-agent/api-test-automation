@@ -2549,6 +2549,37 @@ def _verify_worker(rec: dict) -> None:
             rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
 
 
+def _conformance_worker(rec: dict) -> None:
+    """AXIS 2 동적 검증 — read-only 런타임 프로브 8종(--probe all; 과금
+    schema-live 는 별도 이중 게이트라 미포함) 후 conformance.static 으로
+    data/conformance.json 에 폴드. 화면 버튼 경로 (오너 2026-08-20 "화면에서는
+    conformance 어떻게 돌리지?" — 종전에는 로컬 실행 경로가 없어서 세션/CI
+    전용이었다). 자원 생성 없음 → VPC admission 불요."""
+    logp = Path(rec["log"])
+    env = {**os.environ, "PYTHONPATH": str(ROOT), "SCP_PROBE_RUNTIME": "true",
+           "SCP_ALLOW_MUTATIONS": "false", "SCP_ALLOW_DESTRUCTIVE": "false"}
+    try:
+        with open(logp, "w", encoding="utf-8") as f:
+            f.write(f"# console2 CONFORMANCE probes {rec['id']} "
+                    "(read-only runtime probes + static fold)\n\n"
+                    "=== conformance.runtime --probe all (no resource creation) ===\n")
+            f.flush()
+            rc = subprocess.run(
+                [sys.executable, "-m", "conformance.runtime", "--probe", "all"],
+                cwd=str(ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+            f.write(f"\n=== conformance.static (fold into data/conformance.json; "
+                    f"probe rc={rc}) ===\n")
+            f.flush()
+            rc2 = subprocess.run(
+                [sys.executable, "-m", "conformance.static"],
+                cwd=str(ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+        with _LOCK:
+            rec["status"], rec["rc"], rec["ended"] = "done", (rc or rc2), time.time()
+    except Exception as exc:  # noqa: BLE001
+        with _LOCK:
+            rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
+
+
 def _known_stuck_entries() -> list[dict]:
     """data/baselines/known_issues.json ``stuck_resources`` — documented residues
     that CANNOT be deleted via API. Same source /testing/resources folds (신규8)."""
@@ -3068,6 +3099,16 @@ class Handler(BaseHTTPRequestHandler):
                 else self._json(404, {"error": "no such command"})
         if p == "/api/verify":
             return self._json(202, _rec_view(_start("verify", _verify_worker)))
+        if p == "/api/conformance":
+            # read-only 런타임 프로브 — 자원 생성 없음. LIVE 런과 동시 실행은
+            # 프로브 관측(레이트·상태)을 오염시킬 수 있어 클린업과 같은 가드.
+            with _ADMIT:
+                busy = bool(_RESERVED or _QUEUE)
+            if busy:
+                return self._json(409, {"error":
+                    "진행 중(또는 대기 중) 실행이 있습니다 — 프로브 관측이 "
+                    "오염되지 않게 모든 실행이 끝난 뒤 다시 시도하세요."})
+            return self._json(202, _rec_view(_start("conformance", _conformance_worker)))
         if p == "/api/owned":
             # read-only owned-resource inventory (LIST calls only) -> list + total
             return self._json(202, _rec_view(_start("owned", _owned_worker)))
