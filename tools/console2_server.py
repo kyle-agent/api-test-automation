@@ -2575,6 +2575,28 @@ def _conformance_worker(rec: dict) -> None:
             rc2 = subprocess.run(
                 [sys.executable, "-m", "conformance.static"],
                 cwd=str(ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+        # 결과를 op 버킷에 미러 (오너 2026-08-20 "그 결과는 oplog에는 없는거야?")
+        # — 원격 세션이 git 푸시 없이 직접 소비. best-effort: 업로드 실패가
+        # 프로브 런을 실패로 만들지 않는다.
+        try:
+            from core import oplog as _oplog
+            with open(logp, "a", encoding="utf-8") as f:
+                f.write("\n=== upload results to op bucket ===\n")
+                n = 0
+                for fp in sorted((ROOT / "reports").glob("runtime_*.json")):
+                    if _oplog.put_text(f"runs/{rec['id']}/artifact/{fp.name}",
+                                       fp.read_text(encoding="utf-8"),
+                                       "application/json"):
+                        n += 1
+                conf = ROOT / "data" / "conformance.json"
+                if conf.exists() and _oplog.put_text(
+                        f"runs/{rec['id']}/artifact/conformance.json",
+                        conf.read_text(encoding="utf-8"), "application/json"):
+                    n += 1
+                f.write(f"uploaded {n} file(s) -> runs/{rec['id']}/artifact/\n")
+        except Exception as _exc:  # noqa: BLE001
+            with open(logp, "a", encoding="utf-8") as f:
+                f.write(f"(upload skipped: {_exc})\n")
         with _LOCK:
             rec["status"], rec["rc"], rec["ended"] = "done", (rc or rc2), time.time()
     except Exception as exc:  # noqa: BLE001
