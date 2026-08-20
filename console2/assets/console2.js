@@ -1680,6 +1680,8 @@ function drawLeftover() {
         <button class="minibtn" id="lo-scan">🔍 확인</button>
         <button class="minibtn red" id="lo-cleanup" ${busy ? "disabled" : ""}
           title="${busy ? "진행 중 실행이 있어 비활성화" : "owner=apitest 자원을 TTL 무시하고 삭제"}">🧹 클린업</button>
+        <button class="minibtn" id="lo-conformance" ${busy ? "disabled" : ""}
+          title="${busy ? "진행 중 실행이 있어 비활성화" : "AXIS 2 동적 검증 — read-only 런타임 프로브 8종 + 정적 폴드 (자원 생성 없음, 15~30분)"}">📐 컨포먼스</button>
         ${s && s.owned_total != null ? '<button class="minibtn" id="lo-recheck" title="다시 확인">↻</button>' : ""}
       </span>
     </div>
@@ -1688,6 +1690,14 @@ function drawLeftover() {
   </div>`;
   $("lo-scan").onclick = scanOwned;
   if ($("lo-recheck")) $("lo-recheck").onclick = scanOwned;
+  $("lo-conformance").onclick = () => {
+    if (busy) return;
+    fetch("/api/conformance", { method: "POST" }).then(r => r.json()).then(j => {
+      if (j.error) { alert(j.error); return; }
+      runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
+      drawReport(); startR4Poll();
+    }).catch(() => alert("서버 연결 실패"));
+  };
   $("lo-cleanup").onclick = () => {
     if (busy) return;
     const errEl = $("lo-err"); if (errEl) errEl.style.display = "none";
