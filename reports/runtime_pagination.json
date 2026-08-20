@@ -1,8 +1,8 @@
 {
   "summary": {
-    "checked": 137,
-    "ignores_size": 54,
-    "no_paging_meta": 18,
+    "checked": 141,
+    "ignores_size": 57,
+    "no_paging_meta": 19,
     "non_200": 38
   },
   "results": [
@@ -38,7 +38,7 @@
     {
       "endpoint": "compute/baremetal/listbaremetalproducts",
       "status": 200,
-      "returned_items_at_size1": 31,
+      "returned_items_at_size1": 16,
       "respects_size": false,
       "paging_meta": ""
     },
@@ -92,14 +92,14 @@
     {
       "endpoint": "compute/scf/listruntimes",
       "status": 200,
-      "returned_items_at_size1": 15,
+      "returned_items_at_size1": 9,
       "respects_size": false,
       "paging_meta": "count"
     },
     {
       "endpoint": "compute/scf/listsamplecodes",
       "status": 200,
-      "returned_items_at_size1": 64,
+      "returned_items_at_size1": 39,
       "respects_size": false,
       "paging_meta": "count"
     },
@@ -127,8 +127,8 @@
     {
       "endpoint": "compute/virtualserver/listkeypairs",
       "status": 200,
-      "returned_items_at_size1": 3,
-      "respects_size": false,
+      "returned_items_at_size1": 0,
+      "respects_size": true,
       "paging_meta": ""
     },
     {
@@ -190,8 +190,8 @@
     {
       "endpoint": "container/scr/listconnectableresources",
       "status": 200,
-      "returned_items_at_size1": 1,
-      "respects_size": true,
+      "returned_items_at_size1": 2,
+      "respects_size": false,
       "paging_meta": "count"
     },
     {
@@ -215,7 +215,7 @@
     {
       "endpoint": "container/ske/listkubernetesversions",
       "status": 200,
-      "returned_items_at_size1": 6,
+      "returned_items_at_size1": 7,
       "respects_size": false,
       "paging_meta": ""
     },
@@ -253,12 +253,15 @@
     },
     {
       "endpoint": "financial-management/billingplan/listplannedcomputeservertypes",
-      "status": 500
+      "status": 200,
+      "returned_items_at_size1": 387,
+      "respects_size": false,
+      "paging_meta": ""
     },
     {
       "endpoint": "financial-management/billingplan/listplannedcomputeservicetypes",
       "status": 200,
-      "returned_items_at_size1": 12,
+      "returned_items_at_size1": 13,
       "respects_size": false,
       "paging_meta": ""
     },
@@ -272,7 +275,7 @@
     {
       "endpoint": "financial-management/costexplorer/listbills",
       "status": 200,
-      "returned_items_at_size1": 2,
+      "returned_items_at_size1": 20,
       "respects_size": false,
       "paging_meta": "count"
     },
@@ -286,14 +289,14 @@
     {
       "endpoint": "financial-management/pricing/listbillingitemids",
       "status": 200,
-      "returned_items_at_size1": 232,
+      "returned_items_at_size1": 276,
       "respects_size": false,
       "paging_meta": ""
     },
     {
       "endpoint": "financial-management/pricing/listoffering",
       "status": 200,
-      "returned_items_at_size1": 3,
+      "returned_items_at_size1": 4,
       "respects_size": false,
       "paging_meta": ""
     },
@@ -346,7 +349,7 @@
     {
       "endpoint": "management/iam/listendpoints",
       "status": 200,
-      "returned_items_at_size1": 169,
+      "returned_items_at_size1": 180,
       "respects_size": false,
       "paging_meta": ""
     },
@@ -381,7 +384,7 @@
     {
       "endpoint": "management/iam/listserviceaccount",
       "status": 200,
-      "returned_items_at_size1": 8,
+      "returned_items_at_size1": 9,
       "respects_size": false,
       "paging_meta": ""
     },
@@ -473,8 +476,8 @@
     {
       "endpoint": "management/resourcemanager/listtagkeys",
       "status": 200,
-      "returned_items_at_size1": 1,
-      "respects_size": true,
+      "returned_items_at_size1": 4,
+      "respects_size": false,
       "paging_meta": "count"
     },
     {
@@ -487,8 +490,8 @@
     {
       "endpoint": "management/resourcemanager/listtagvalues",
       "status": 200,
-      "returned_items_at_size1": 1,
-      "respects_size": true,
+      "returned_items_at_size1": 87,
+      "respects_size": false,
       "paging_meta": "count"
     },
     {
@@ -607,7 +610,7 @@
     {
       "endpoint": "networking/security-group/listsecuritygroups",
       "status": 200,
-      "returned_items_at_size1": 1,
+      "returned_items_at_size1": 0,
       "respects_size": true,
       "paging_meta": "count"
     },
@@ -836,8 +839,8 @@
     {
       "endpoint": "storage/filestorage/listvolumes",
       "status": 200,
-      "returned_items_at_size1": 4,
-      "respects_size": false,
+      "returned_items_at_size1": 0,
+      "respects_size": true,
       "paging_meta": "count"
     },
     {
@@ -850,6 +853,31 @@
       "returned_items_at_size1": 0,
       "respects_size": true,
       "paging_meta": "count"
+    },
+    {
+      "endpoint": "management/servicewatch/listalerts",
+      "status": 200,
+      "returned_items_at_size1": 2,
+      "respects_size": false,
+      "paging_meta": "count,page,size"
+    },
+    {
+      "endpoint": "management/servicewatch/listnamespacebyalerts",
+      "status": 200,
+      "returned_items_at_size1": 0,
+      "respects_size": true,
+      "paging_meta": "count"
+    },
+    {
+      "endpoint": "networking/security-group/listaddressgroups",
+      "status": 200,
+      "returned_items_at_size1": 0,
+      "respects_size": true,
+      "paging_meta": "count"
+    },
+    {
+      "endpoint": "storage/filestorage/listvolumereplicationzones",
+      "status": 400
     }
   ]
 }

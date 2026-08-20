@@ -4050,3 +4050,15 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   라운드1 327s(나열 77s/51컬렉션, genuine 22 — 3주 잔존+이번 실패 잔재),
   라운드2 23s, 라운드3 22s 수렴, stuck 1. "스윕이 어디서 느린가"가 이제
   원격에서 보인다.
+
+## 동적 프로브 2026-08-20 전면 재실시 — 6월 대비 diff (콘솔2 📐 버튼 첫 유효 런 39bb)
+
+- **해소 2건 (플랫폼 수정 확인)**: baremetal-blockstorage createvolume /
+  createvolumegroup — 6월 빈바디 500 → 현재 400 + 누락 필드명 나열(모범).
+- **구조 잔존**: 404 비일관 88건(해소 0, 신규 2 — aimlops), size 무시 52건
+  잔존(해소 2, 신규 5), l10n 미지역화 131(전량), OPTIONS/CORS 58서비스 전량.
+- **status/l10n 프로브는 빈-바디 POST 측정이라 클라이언트 뮤테이션 가드를
+  열어야 한다** (SCP_ALLOW_MUTATIONS=true; 실생성 불가 바디, 6월 CI 동일) —
+  false면 MutationBlocked로 checked=0 전멸 (run 4bcd 실측).
+- 리포트 결함 구분 축 신설(오너): 계약/문서/**동작버그**(이미지 공유 고아화
+  2건 — 버그 트래커行) — conformance와 결이 다른 기능 결함을 분리 표기.

@@ -1,7 +1,7 @@
 {
   "summary": {
-    "checked": 225,
-    "with_undocumented_fields": 1,
+    "checked": 231,
+    "with_undocumented_fields": 5,
     "with_missing_required": 1,
     "non_200": 67
   },
@@ -12,7 +12,7 @@
       "model": "serverlistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "servershowresponse",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -246,7 +246,7 @@
       "model": "keypairlistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "keypair",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -306,7 +306,7 @@
       "model": "volumelistresponsev1dot2",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "volumeshowresponsev1dot2",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -388,7 +388,7 @@
       "model": "containerregistrylistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "",
+      "item_model": "containerregistryforlist",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -398,7 +398,7 @@
       "model": "clusterlistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "clustersummary",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -930,9 +930,13 @@
     },
     {
       "endpoint": "financial-management/billingplan/listplannedcomputeservertypes",
-      "status": 500,
+      "status": 200,
       "model": "servertypelistresponse",
-      "note": "non-200 or non-object body"
+      "undocumented_fields": "",
+      "missing_required_fields": "",
+      "item_model": "servertypedto",
+      "item_undocumented_fields": "",
+      "item_missing_required": ""
     },
     {
       "endpoint": "financial-management/billingplan/listplannedcomputeservicetypes",
@@ -960,8 +964,8 @@
       "model": "billlistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "",
-      "item_undocumented_fields": "",
+      "item_model": "billresponse",
+      "item_undocumented_fields": "usage_amt",
       "item_missing_required": ""
     },
     {
@@ -971,7 +975,7 @@
       "undocumented_fields": "",
       "missing_required_fields": "",
       "item_model": "usageresponse",
-      "item_undocumented_fields": "",
+      "item_undocumented_fields": "end_time,metrics,start_time,used_time",
       "item_missing_required": ""
     },
     {
@@ -1373,7 +1377,7 @@
       "undocumented_fields": "",
       "missing_required_fields": "",
       "item_model": "dashboarddto",
-      "item_undocumented_fields": "",
+      "item_undocumented_fields": "namespace_code,service_code",
       "item_missing_required": ""
     },
     {
@@ -1478,7 +1482,7 @@
       "model": "firewalllistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "firewall",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1564,7 +1568,7 @@
       "model": "securitygrouplistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "securitygroup",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1574,7 +1578,7 @@
       "model": "internetgatewaylistresponsev1dot2",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "internetgateway",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1594,7 +1598,7 @@
       "model": "portlistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "portlist",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1634,7 +1638,7 @@
       "model": "publiciplistresponsev1dot2",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "publicip",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1644,7 +1648,7 @@
       "model": "subnetlistresponsev1dot2",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "subnet",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1690,7 +1694,7 @@
       "model": "vpclistresponsev1dot2",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "vpcv1dot2",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1782,7 +1786,7 @@
       "model": "keypageresponsev1dot2",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "keyv1dot2",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1802,7 +1806,7 @@
       "model": "secretsmanagerlistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "secretsmanager",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1968,7 +1972,7 @@
       "model": "volumelistresponse",
       "undocumented_fields": "",
       "missing_required_fields": "",
-      "item_model": "volume",
+      "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
     },
@@ -1987,6 +1991,62 @@
       "item_model": "",
       "item_undocumented_fields": "",
       "item_missing_required": ""
+    },
+    {
+      "endpoint": "management/servicewatch/listalerts",
+      "status": 200,
+      "model": "alertslistresponse",
+      "undocumented_fields": "",
+      "missing_required_fields": "",
+      "item_model": "",
+      "item_undocumented_fields": "",
+      "item_missing_required": ""
+    },
+    {
+      "endpoint": "management/servicewatch/listnamespacebyalerts",
+      "status": 200,
+      "model": "namespacelistbyalertsresponse",
+      "undocumented_fields": "",
+      "missing_required_fields": "",
+      "item_model": "",
+      "item_undocumented_fields": "",
+      "item_missing_required": ""
+    },
+    {
+      "endpoint": "management/servicewatch/showalertlevelcountsbyservice",
+      "status": 200,
+      "model": "alertlevelcountsbyserviceresponsev1dot4",
+      "undocumented_fields": "",
+      "missing_required_fields": "",
+      "item_model": "alertlevelcountsbyservicedtov1dot4",
+      "item_undocumented_fields": "namespace_code",
+      "item_missing_required": ""
+    },
+    {
+      "endpoint": "networking/security-group/listaddressgroups",
+      "status": 200,
+      "model": "addressgrouplistresponse",
+      "undocumented_fields": "",
+      "missing_required_fields": "",
+      "item_model": "",
+      "item_undocumented_fields": "",
+      "item_missing_required": ""
+    },
+    {
+      "endpoint": "security/configinspection/getchecklistversion",
+      "status": 200,
+      "model": "checklistversionresponse",
+      "undocumented_fields": "",
+      "missing_required_fields": "",
+      "item_model": "checklistversions",
+      "item_undocumented_fields": "",
+      "item_missing_required": ""
+    },
+    {
+      "endpoint": "storage/filestorage/listvolumereplicationzones",
+      "status": 400,
+      "model": "replicationzoneslistresponse",
+      "note": "non-200 or non-object body"
     }
   ]
 }

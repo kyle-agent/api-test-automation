@@ -1,32 +1,59 @@
 # SCP API 품질 결함 리포트 (서비스 개발팀 전달용) — 2026-08-20
 
-**검증 방법**: 공식 API Reference(docs.e.samsungsdscloud.com/apireference) 전 엔드포인트 **1,416개** 정적 분석 + 실제 API 호출 검증(2026-06~08, kr-west1). 실측 결함은 응답의 `global_request_id`를 함께 기재하므로 서버 로그에서 해당 호출을 직접 추적할 수 있습니다. 별첨 CSV(`API-품질-결함목록-2026-08-20.csv`)에 결함 554건 전체가 로데이터와 함께 있습니다.
+**검증 방법**: 공식 API Reference(docs.e.samsungsdscloud.com/apireference) 전 엔드포인트 **1,416개** 정적 분석 + 실제 API 호출 검증(동적 프로브 8종 2026-08-20 전면 재실시, kr-west1). 실측 결함은 응답의 `global_request_id`를 함께 기재하므로 서버 로그에서 해당 호출을 직접 추적할 수 있습니다. 별첨 CSV(`API-품질-결함목록-2026-08-20.csv`)에 결함 전체가 로데이터와 함께 있습니다.
 
 ## 1. 요약
 
 | 판정 | 엔드포인트 수 | 비율 |
 |---|---:|---:|
-| 결함 없음 | 919 | 64.9% |
-| 개선 필요 (YELLOW) | 466 | 32.9% |
-| 심각 (RED) | 31 | 2.2% |
+| 결함 없음 | 914 | 64.5% |
+| 개선 필요 (YELLOW) | 473 | 33.4% |
+| 심각 (RED) | 29 | 2.0% |
 
-개별 결함 총 **554건**. 아래 §2의 플랫폼 공통 결함 6종은 별도 집계(개별 판정에 중복 계상하지 않음).
+개별 결함 총 **561건**. 아래 §2의 플랫폼 공통 결함 6종은 별도 집계(개별 판정에 중복 계상하지 않음).
+
+### 2026-08-20 동적 재검증 diff (6월 첫 측정 대비)
+
+| 항목 | 해소 | 신규 | 잔존 |
+|---|---:|---:|---:|
+| 잘못된 입력에 500 (5xx-on-bad-input) | **2** | 0 | 0 |
+| 부재 리소스 404 비일관 | 0 | 2 | 88 |
+| size 무시(pagination) | 2 | 5 | 52 |
+
+- **해소 확인**: baremetal-blockstorage createvolume/createvolumegroup — 6월 500 → 현재 400 + 누락 필드명 나열(모범 응답). 플랫폼 수정 확인.
+- 신규 non-404: `ai-ml/aimlops-platform/getaimlopsplatformnodelistv1`, `ai-ml/aimlops-platform/getaimlopsplatformstorageclasseslistv1` · 신규 size무시: `container/scr/listconnectableresources`, `financial-management/billingplan/listplannedcomputeservertypes`, `management/resourcemanager/listtagkeys`, `management/resourcemanager/listtagvalues`, `management/servicewatch/listalerts`
+
+### 메서드별 분포
+
+| 메서드 | 전체 API | 결함 | RED | 결함/100API |
+|---|---:|---:|---:|---:|
+| GET | 546 | 165 | 6 | 30.2 |
+| POST | 393 | 273 | 20 | 69.5 |
+| PUT | 257 | 108 | 2 | 42.0 |
+| DELETE | 211 | 6 | 1 | 2.8 |
+| PATCH | 9 | 9 | 0 | 100.0 |
+
+GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagination) — 문서 기준으론 깨끗해 보여도 자동화 클라이언트에는 실장애물. DELETE가 가장 깨끗(2.8/100).
+
+### 결함 구분
+
+**계약 위반** 193건 · **문서 결손** 366건 · **동작버그(기능 결함 — 버그 트래커 전달 권장)** 2건. 각 결함 행에 구분 표기, CSV에 cls 컬럼.
 
 ### 상품군별 통계
 
 | 상품군 | API 수 | RED | YELLOW | 결함 건수 |
 |---|---:|---:|---:|---:|
 | database | 272 | 11 | 51 | 72 |
-| management | 250 | 6 | 89 | 103 |
+| management | 250 | 6 | 94 | 108 |
 | data-analytics | 123 | 5 | 35 | 49 |
-| compute | 181 | 2 | 74 | 89 |
 | networking | 216 | 2 | 74 | 81 |
-| storage | 131 | 2 | 32 | 36 |
-| container | 64 | 2 | 29 | 38 |
+| compute | 181 | 2 | 73 | 88 |
+| container | 64 | 2 | 30 | 39 |
 | application-service | 67 | 1 | 26 | 30 |
+| storage | 131 | 0 | 33 | 33 |
 | security | 57 | 0 | 30 | 30 |
-| financial-management | 21 | 0 | 12 | 12 |
-| ai-ml | 21 | 0 | 8 | 8 |
+| financial-management | 21 | 0 | 13 | 15 |
+| ai-ml | 21 | 0 | 8 | 10 |
 | platform | 7 | 0 | 5 | 5 |
 | devops-tools | 6 | 0 | 1 | 1 |
 
@@ -35,17 +62,16 @@
 | 상품 | API 수 | RED | YELLOW | 결함 건수 |
 |---|---:|---:|---:|---:|
 | database/postgresql | 49 | 3 | 8 | 13 |
-| compute/virtualserver | 113 | 2 | 44 | 58 |
+| compute/virtualserver | 113 | 2 | 43 | 57 |
 | networking/vpc | 95 | 2 | 36 | 39 |
-| management/servicewatch | 37 | 2 | 20 | 23 |
+| management/servicewatch | 37 | 2 | 23 | 26 |
 | management/iam-identity-center | 32 | 2 | 15 | 21 |
 | database/mariadb | 49 | 2 | 9 | 13 |
 | database/mysql | 48 | 2 | 9 | 13 |
 | database/epas | 49 | 2 | 8 | 12 |
 | management/cloudmonitoring | 18 | 2 | 4 | 9 |
-| storage/baremetal-blockstorage | 41 | 2 | 4 | 8 |
 | application-service/apigateway | 55 | 1 | 22 | 26 |
-| container/scr | 39 | 1 | 19 | 23 |
+| container/scr | 39 | 1 | 20 | 24 |
 | container/ske | 25 | 1 | 10 | 15 |
 | data-analytics/data-ops | 17 | 1 | 10 | 14 |
 | database/sqlserver | 44 | 1 | 10 | 12 |
@@ -54,44 +80,45 @@
 | data-analytics/vertica | 24 | 1 | 5 | 7 |
 | data-analytics/eventstreams | 25 | 1 | 4 | 6 |
 | data-analytics/quick-query | 12 | 1 | 4 | 5 |
-| management/iam | 62 | 0 | 21 | 21 |
 | compute/scf | 36 | 0 | 20 | 21 |
+| management/iam | 62 | 0 | 21 | 21 |
 | security/kms | 23 | 0 | 15 | 15 |
 | management/organization | 37 | 0 | 11 | 11 |
 | networking/cdn | 9 | 0 | 8 | 11 |
 | data-analytics/data-flow | 17 | 0 | 6 | 9 |
-| storage/filestorage | 22 | 0 | 9 | 9 |
+| ai-ml/aimlops-platform | 12 | 0 | 6 | 8 |
+| storage/filestorage | 22 | 0 | 8 | 8 |
+| management/resourcemanager | 27 | 0 | 8 | 8 |
 | storage/archivestorage | 26 | 0 | 8 | 8 |
-| networking/dns | 22 | 0 | 7 | 7 |
-| storage/backup | 31 | 0 | 7 | 7 |
 | management/cloudcontrol | 15 | 0 | 7 | 7 |
-| security/secretsmanager | 14 | 0 | 6 | 6 |
-| compute/baremetal | 16 | 0 | 6 | 6 |
-| ai-ml/aimlops-platform | 12 | 0 | 6 | 6 |
-| management/resourcemanager | 27 | 0 | 6 | 6 |
+| storage/backup | 31 | 0 | 7 | 7 |
+| networking/dns | 22 | 0 | 7 | 7 |
+| storage/baremetal-blockstorage | 41 | 0 | 6 | 6 |
 | networking/vpn | 10 | 0 | 6 | 6 |
+| compute/baremetal | 16 | 0 | 6 | 6 |
+| security/secretsmanager | 14 | 0 | 6 | 6 |
+| financial-management/billingplan | 10 | 0 | 6 | 6 |
 | networking/gslb | 10 | 0 | 5 | 5 |
-| financial-management/billingplan | 10 | 0 | 5 | 5 |
 | networking/security-group | 17 | 0 | 5 | 5 |
-| networking/direct-connect | 8 | 0 | 4 | 4 |
 | storage/parallel-filestorage | 11 | 0 | 4 | 4 |
 | application-service/queueservice | 12 | 0 | 4 | 4 |
+| networking/direct-connect | 8 | 0 | 4 | 4 |
 | compute/multinodegpucluster | 16 | 0 | 4 | 4 |
+| financial-management/costexplorer | 3 | 0 | 2 | 4 |
 | security/certificatemanager | 7 | 0 | 4 | 4 |
-| security/secretvault | 5 | 0 | 3 | 3 |
-| networking/firewall | 8 | 0 | 2 | 3 |
 | financial-management/budget | 5 | 0 | 3 | 3 |
 | platform/sts | 3 | 0 | 3 | 3 |
-| ai-ml/cloud-ml | 9 | 0 | 2 | 2 |
-| financial-management/costexplorer | 3 | 0 | 2 | 2 |
+| networking/firewall | 8 | 0 | 2 | 3 |
+| security/secretvault | 5 | 0 | 3 | 3 |
+| management/quota | 4 | 0 | 2 | 2 |
 | security/configinspection | 8 | 0 | 2 | 2 |
+| ai-ml/cloud-ml | 9 | 0 | 2 | 2 |
 | management/loggingaudit | 10 | 0 | 2 | 2 |
 | platform/product | 4 | 0 | 2 | 2 |
-| management/quota | 4 | 0 | 2 | 2 |
 | financial-management/pricing | 3 | 0 | 2 | 2 |
-| management/network-logging | 4 | 0 | 1 | 1 |
 | networking/loadbalancer | 37 | 0 | 1 | 1 |
 | devops-tools/devopsservice | 6 | 0 | 1 | 1 |
+| management/network-logging | 4 | 0 | 1 | 1 |
 
 ## 2. 플랫폼 공통 결함 (전 서비스급 영향)
 
@@ -109,21 +136,20 @@
 | 유형 | 건수 | 무엇이 문제인가 | 기대 동작 |
 |---|---:|---|---|
 | `undiscoverable-params` | 291 | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시 |
-| `notfound-inconsistent` | 73 | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | 부재 리소스는 404로 통일 |
+| `notfound-inconsistent` | 75 | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | 부재 리소스는 404로 통일 |
+| `pagination` | 57 | 페이지네이션 파라미터(size/page) 미준수 | size/page 계약 준수 |
 | `no-success-schema` | 55 | 성공(2xx) 응답 스키마가 문서에 없음 | 2xx 응답 바디 스키마 문서화 |
-| `pagination` | 54 | 페이지네이션 파라미터(size/page) 미준수 | size/page 계약 준수 |
 | `param-naming` | 16 | 경로 파라미터 명명이 표준과 다름 | 리소스명을 포함한 파라미터명 사용(예: {alert_id}) |
 | `opaque-validation` | 13 | 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음 | 에러 응답에 필드명과 위반 내용을 포함 |
 | `runtime.500-on-client-state` | 9 | 클라이언트가 유발한 상태·입력에 500 반환 | 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만) |
 | `method-verb` | 9 | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | 동사-메서드 정합(조회=GET, 생성=POST 등) |
+| `schema-undocumented-field` | 8 | 실제 응답에 문서에 없는 필드 존재 | 응답 스키마 문서 갱신 |
 | `docs.async-settle-undocumented` | 6 | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | "ACTIVE 도달 후 변경 가능"을 문서에 명시하거나 서버측 큐잉 |
 | `deprecated` | 4 | DEPRECATED 표기만 있고 대체 API 안내 없음 | 대체 엔드포인트와 제거 일정 명시 |
-| `schema-undocumented-field` | 4 | 실제 응답에 문서에 없는 필드 존재 | 응답 스키마 문서 갱신 |
 | `versioning.doc-version-not-supported` | 3 | 문서에 명시된 API 버전을 서버가 406으로 거절 | 문서-서버 버전 정합 |
 | `notfound-200-list` | 2 | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | 부모 부재 시 404 |
 | `notfound-200` | 2 | 존재하지 않는 리소스 조회가 200 반환 | 부재 리소스는 404 |
 | `networking.subnet-read-plane-version-drift` | 2 | 생성(v1.3)은 되는 PRIVATE 타입 서브넷이 조회 계열(v1.2 enum)에서 보이지 않음 — API로 존재를 확인할 수 없는 리소스 발생 | 조회 계열 enum을 생성 계열과 동일 버전으로 정합 |
-| `5xx-on-bad-input` | 2 | 잘못된 입력에 500 반환 | 입력 오류는 400 + 원인 명시 |
 | `status.wrong_code_403` | 1 | 입력 검증 오류에 403 반환 (권한 문제로 오인 유발) | 입력 오류는 400 |
 | `compute.image-sharing-202-empty-body` | 1 | 공유 시작 202 응답 바디가 비어 있어 진행 추적 수단(공유 ID)이 없음 | 202 응답에 추적 가능한 식별자 반환 |
 | `compute.image-sharing-orphan-volume-no-cleanup` | 1 | 공유 과정에서 생성된 임시 볼륨이 공유 중단 시 삭제 불가능(400 반복) 상태로 잔존 | 공유 레코드 소멸 시 파생 임시 볼륨 정리 경로 제공 |
@@ -134,240 +160,224 @@
 | `docs.version-semantics-undocumented` | 1 | 버전에 따라 응답 시맨틱이 다른데(1.1=202+빈 바디) 문서는 1.0 동작만 기술 | 버전별 응답 차이 문서화 |
 | `runtime.empty-collection-404` | 1 | 빈 컬렉션 조회가 404 반환 | 빈 컬렉션은 200 + 빈 배열 |
 
-## 4. 심각(RED) 31개 API — 개별 상세
+## 4. 심각(RED) 29개 API — 개별 상세
 
 ### application-service/apigateway — `PUT /v1/privatelink-endpoints/{privatelink_endpoint_id}/approval` (approveprivatelinkendpoint)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: api_id
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: PUT approve on a PrivateLink Endpoint whose request/cancel already AUTO-approved it (state already APPROVED, so REQUESTED/REJECTED are never reached) -> 500 ContactAdminForAssistance instead of 400 invalid-state. req-e619b286..., 실측 2026-07-16.
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### compute/virtualserver — `POST /v1/images/{image_id}/share` (createsharingimage)
-- **문제**: 성공(2xx) 응답 스키마가 문서에 없음
+- **[문서] 문제**: 성공(2xx) 응답 스키마가 문서에 없음
   - 근거: POST 2xx documents no schema
   - 기대 동작: 2xx 응답 바디 스키마 문서화
-- **문제**: 공유 시작 202 응답 바디가 비어 있어 진행 추적 수단(공유 ID)이 없음
+- **[계약] 문제**: 공유 시작 202 응답 바디가 비어 있어 진행 추적 수단(공유 ID)이 없음
   - 근거: POST /v1/images/{id}/share -> 202 with an EMPTY body {} — no tracking handle (share/task id) is returned, so a caller can't correlate the async op with its outcome except by polling the target account's pending-images or watching temp-volume side effects. 실측 타임라인: 18:03:36Z createimage 202 -> 18:03:37Z createsharingimage 202 (req_body {"account_id": ...}) -> 18:04:35Z platform spawns a hex-named untagged 104GB temp volume in the recipient account -> 18:05:53Z deleteimage(original) 204 ACCEPTED while the share is still in flight -> the share record vanishes from BOTH accounts' API-visible state (pending-images count 0 either side) but the temp volume's VolumeForSharingImageDelete flag persists, permanently rejecting DELETE ("try again later") with no API-visible owner left to reconcile against.
   - 기대 동작: 202 응답에 추적 가능한 식별자 반환
-- **문제**: 공유 과정에서 생성된 임시 볼륨이 공유 중단 시 삭제 불가능(400 반복) 상태로 잔존
+- **[동작버그] 문제**: 공유 과정에서 생성된 임시 볼륨이 공유 중단 시 삭제 불가능(400 반복) 상태로 잔존
   - 근거: The hex-named 104GB temp volume createsharingimage spawns in the recipient account has no API-reachable cleanup path once its share record vanishes (source deleted mid-transfer, or recipient never acts): DELETE permanently 400s (VolumeForSharingImageDelete, "try again later") with no owning share left in either account's API state to reconcile against — an unrecoverable billable orphan via the API plane, confirmed via cross-account API diff 2026-07-16 (old vs new account both 0 pending-images / 0 private images, volume still stuck). 실측 타임라인: 18:03:36Z createimage 202 -> 18:03:37Z createsharingimage 202 (req_body {"account_id": ...}) -> 18:04:35Z platform spawns a hex-named untagged 104GB temp volume in the recipient account -> 18:05:53Z deleteimage(original) 204 ACCEPTED while the share is still in flight -> the share record vanishes from BOTH accounts' API-visible state (pending-images count 0 either side) but the temp volume's VolumeForSharingImageDelete flag persists, permanently rejecting DELETE ("try again later") with no API-visible owner left to reconcile against.
   - 기대 동작: 공유 레코드 소멸 시 파생 임시 볼륨 정리 경로 제공
-- **문제**: 공유의 수락/거절/취소가 별도 엔드포인트(updateimagemember)에 있음이 해당 문서에 없음
+- **[문서] 문제**: 공유의 수락/거절/취소가 별도 엔드포인트(updateimagemember)에 있음이 해당 문서에 없음
   - 근거: createsharingimage's own doc page never mentions that the accept/reject/cancel counterpart lives on a DIFFERENT endpoint family — PUT /v1/images/{image_id}/members/{member_id} (updateimagemember, body {"status": pending|accepted|rejected}) — not a sibling of the share endpoint itself. An AI/agent reading only the share endpoint's docs has no discoverable path to cancel or unwind a share. (Corrected 2026-07-16 after an earlier read mistakenly concluded no accept/reject/cancel API existed at all — it does, just undocumented as a counterpart of share.)
   - 기대 동작: 공유 문서에 상대 엔드포인트 상호 참조
 
 ### compute/virtualserver — `DELETE /v1/images/{image_id}` (deleteimage)
-- **문제**: 공유 전송 중인 원본 이미지 삭제가 차단 없이 성공(204) → 파생 임시 볼륨 영구 고아화
+- **[동작버그] 문제**: 공유 전송 중인 원본 이미지 삭제가 차단 없이 성공(204) → 파생 임시 볼륨 영구 고아화
   - 근거: DELETE on the source image of an in-flight createsharingimage share succeeds (204) with no guard rejecting it — deleting the source ~2m16s into a still-pending share orphans the derived temp volume permanently (see compute.image-sharing-orphan-volume-no-cleanup). 실측 타임라인: 18:03:36Z createimage 202 -> 18:03:37Z createsharingimage 202 (req_body {"account_id": ...}) -> 18:04:35Z platform spawns a hex-named untagged 104GB temp volume in the recipient account -> 18:05:53Z deleteimage(original) 204 ACCEPTED while the share is still in flight -> the share record vanishes from BOTH accounts' API-visible state (pending-images count 0 either side) but the temp volume's VolumeForSharingImageDelete flag persists, permanently rejecting DELETE ("try again later") with no API-visible owner left to reconcile against.
   - 기대 동작: 전송 중 원본 삭제를 409로 차단하거나 파생 자원 연쇄 정리
 
 ### container/scr — `GET /v1/container-registries/{registry_id}` (showregistry)
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: GET on a registry mid-CREATING -> 500 ContactAdminForAssistance instead of 409/425 (a racing client-visible state, not a true not-found). req-90138294..., live 실측-07-16. Workaround: 500 retry ladder 15s x 10 until ACTIVE.
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### container/ske — `POST /v1/nodepools` (createnodepool)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: cluster_id, image_os, image_os_version, keypair_name, kubernetes_version, name, server_type_id, volume_type_name
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: POST /v1/nodepools -> 500 ContactAdminForAssistance (16.7s) when `zone` is omitted on a single-AZ account (nodepoolcreaterequestv1dot5 added an optional `zone`; unmatched default-zone placement 500s server-side instead of 400 asking for zone). Cluster itself reaches RUNNING fine; failure isolated to nodepool create. req-87752221..., single-service live rerun 2026-07-16.
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### data-analytics/data-ops — `GET /v1/data-ops/image-versions` (getdataopsimageversionv1)
-- **문제**: 문서상 필수 응답 필드가 실제 응답에 없음
+- **[계약] 문제**: 문서상 필수 응답 필드가 실제 응답에 없음
   - 근거: response omits documented required field(s): image_attr
   - 기대 동작: 문서-실응답 정합
 
 ### data-analytics/eventstreams — `POST /v1/clusters` (eventstreamscreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### data-analytics/quick-query — `POST /v1/quick-query/validate-resources` (validatequickqueryresources)
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: POST /v1/quick-query/validate-resources -> 500 ContactAdminForAssistance when the account has no Quick Query instance (service itself is reachable — image-versions 200 same run) instead of 400/404. Reconfirmed 실측 2026-07-16; already masked as a <자원명>-axis known_issue (data/baselines/known_issues.json) but not previously reflected as an AXIS-2 design finding.
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### data-analytics/searchengine — `POST /v1/clusters` (searchenginecreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### data-analytics/vertica — `POST /v1/clusters` (verticacreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### database/cachestore — `POST /v1/clusters` (cachestorecreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### database/epas — `POST /v1/clusters` (epascreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### database/epas — `POST /v1/clusters/{cluster_id}/log-export-configs` (epasregisterlogexportconfig)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: access_key, bucket_name, log_type, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: Same access_key="" -> 500 ContactAdminForAssistance class as database/postgresql/postgresqlregisterlogexportconfig (실측).
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### database/mariadb — `POST /v1/clusters` (mariadbcreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### database/mariadb — `POST /v1/clusters/{cluster_id}/log-export-configs` (mariadbregisterlogexportconfig)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: access_key, bucket_name, log_type, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: Same access_key="" -> 500 ContactAdminForAssistance class as database/postgresql/postgresqlregisterlogexportconfig (실측).
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### database/mysql — `POST /v1/clusters` (mysqlcreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### database/mysql — `POST /v1/clusters/{cluster_id}/log-export-configs` (mysqlregisterlogexportconfig)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: access_key, bucket_name, log_type, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: Same access_key="" -> 500 ContactAdminForAssistance class as database/postgresql/postgresqlregisterlogexportconfig (실측).
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### database/postgresql — `POST /v1/clusters` (postgresqlcreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### database/postgresql — `POST /v1/clusters/{cluster_id}/log-export-configs` (postgresqlregisterlogexportconfig)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: access_key, bucket_name, log_type, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: POST log-export-config with access_key="" -> 500 ContactAdminForAssistance instead of 400 (an empty required credential should fail input validation, not the backend). Same class reproduced across the mariadb/mysql/epas siblings (see sibling findings on this rule_id). Heavy n6 DBaaS runs; already a <자원명>-axis known_issue but not previously an AXIS-2 finding. Reconfirmed 실측 2026-07-16.
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### database/postgresql — `PUT /v1/clusters/{cluster_id}/parameters` (postgresqlsetparametervalues)
-- **문제**: 클라이언트가 유발한 상태·입력에 500 반환
+- **[계약] 문제**: 클라이언트가 유발한 상태·입력에 500 반환
   - 근거: PUT parameters no-op echo (re-submitting the current applied_value for a template-string parameter, e.g. "{1/8 of server total memory}") -> 500 ContactAdminForAssistance instead of 200/400. req-ef12a36a..., 실측 campaign A (2026-07-16). Workaround: scenario only echoes literal-valued params (e.g. max_connections).
   - 기대 동작: 4xx + 원인/해소 방법 안내 (500은 서버 결함 신호로만)
 
 ### database/sqlserver — `POST /v1/clusters` (sqlservercreatecluster)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### management/cloudmonitoring — `POST /v1/cloudmonitorings/product/v2/metric-data` (getmetricperfdatalist)
-- **문제**: 엔드포인트 이름의 동사와 HTTP 메서드 불일치
+- **[계약] 문제**: 엔드포인트 이름의 동사와 HTTP 메서드 불일치
   - 근거: read-verb name but not GET (POST /v1/cloudmonitorings/product/v2/metric-data)
   - 기대 동작: 동사-메서드 정합(조회=GET, 생성=POST 등)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: queryEndDt
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### management/cloudmonitoring — `POST /v1/cloudmonitorings/event/v2/event-policies` (puteventpolicy)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: productResourceId
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### management/iam-identity-center — `POST /v1/groups` (creategroup)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: instance_id, name
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### management/iam-identity-center — `POST /v1/permission-sets` (createpermissionset)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
+- **[문서] 문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
   - 근거: required fields with no documented constraint: instance_id, name
   - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
+- **[계약] 문제**: 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음
   - 근거: 400 names neither field nor rule
   - 기대 동작: 에러 응답에 필드명과 위반 내용을 포함
 
 ### management/servicewatch — `GET /v1/event-rules/{event_rule_id}` (showeventrule)
-- **문제**: 존재하지 않는 리소스 조회가 200 반환
+- **[계약] 문제**: 존재하지 않는 리소스 조회가 200 반환
   - 근거: non-existent id -> 200 (should be 404)
   - 기대 동작: 부재 리소스는 404
 
 ### management/servicewatch — `GET /v1/log-groups/{log_group_id}` (showloggroup)
-- **문제**: 존재하지 않는 리소스 조회가 200 반환
+- **[계약] 문제**: 존재하지 않는 리소스 조회가 200 반환
   - 근거: non-existent id -> 200 (should be 404)
   - 기대 동작: 부재 리소스는 404
 
 ### networking/vpc — `GET /v1/subnets` (listsubnets)
-- **문제**: 페이지네이션 파라미터(size/page) 미준수
+- **[계약] 문제**: 페이지네이션 파라미터(size/page) 미준수
   - 근거: ignores size=1 (returned 2)
   - 기대 동작: size/page 계약 준수
-- **문제**: 생성(v1.3)은 되는 PRIVATE 타입 서브넷이 조회 계열(v1.2 enum)에서 보이지 않음 — API로 존재를 확인할 수 없는 리소스 발생
+- **[계약] 문제**: 생성(v1.3)은 되는 PRIVATE 타입 서브넷이 조회 계열(v1.2 enum)에서 보이지 않음 — API로 존재를 확인할 수 없는 리소스 발생
   - 근거: GET listsubnets?type=PRIVATE -> 400 "Input should be 'GENERAL', 'LOCAL' or 'VPC_ENDPOINT'" (PRIVATE rejected as a filter value) even though createsubnet documents and accepts PRIVATE. PRIVATE subnet enum was added in createsubnet v1.3 (PUBLIC/PRIVATE/LOCAL/VPC_ENDPOINT) and create/delete accept it (202), but the READ plane (show/list) still validates against the old v1.2 enum (GENERAL/LOCAL/VPC_ENDPOINT) -> a PRIVATE-typed subnet is a live, billable resource with no GET path (create/delete plane version != read plane version). Live-probed req-65a36c09..., 실측 2026-07-16; scenario workaround is a 30s blind settle instead of show-poll.
   - 기대 동작: 조회 계열 enum을 생성 계열과 동일 버전으로 정합
 
 ### networking/vpc — `GET /v1/subnets/{subnet_id}` (showsubnet)
-- **문제**: 생성(v1.3)은 되는 PRIVATE 타입 서브넷이 조회 계열(v1.2 enum)에서 보이지 않음 — API로 존재를 확인할 수 없는 리소스 발생
+- **[계약] 문제**: 생성(v1.3)은 되는 PRIVATE 타입 서브넷이 조회 계열(v1.2 enum)에서 보이지 않음 — API로 존재를 확인할 수 없는 리소스 발생
   - 근거: GET showsubnet on a PRIVATE-typed subnet -> 404 "Not found with ID With Invalid Type" even though the subnet exists and DELETE on the same id succeeds (202). PRIVATE subnet enum was added in createsubnet v1.3 (PUBLIC/PRIVATE/LOCAL/VPC_ENDPOINT) and create/delete accept it (202), but the READ plane (show/list) still validates against the old v1.2 enum (GENERAL/LOCAL/VPC_ENDPOINT) -> a PRIVATE-typed subnet is a live, billable resource with no GET path (create/delete plane version != read plane version). Live-probed req-65a36c09..., 실측 2026-07-16; scenario workaround is a 30s blind settle instead of show-poll.
   - 기대 동작: 조회 계열 enum을 생성 계열과 동일 버전으로 정합
-
-### storage/baremetal-blockstorage — `POST /v1/volumes` (createvolume)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
-  - 근거: required fields with no documented constraint: name, zone
-  - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 500 반환
-  - 근거: empty body -> 500 (should be 400)
-  - 기대 동작: 입력 오류는 400 + 원인 명시
-
-### storage/baremetal-blockstorage — `POST /v1/volume-groups` (createvolumegroup)
-- **문제**: 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
-  - 근거: required fields with no documented constraint: name, zone
-  - 기대 동작: 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시
-- **문제**: 잘못된 입력에 500 반환
-  - 근거: empty body -> 500 (should be 400)
-  - 기대 동작: 입력 오류는 400 + 원인 명시
 
 ## 5. 실측 로데이터 (요청/응답 원문)
 
@@ -408,13 +418,15 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 ### ai-ml
 
-#### ai-ml/aimlops-platform — 6건
+#### ai-ml/aimlops-platform — 8건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `GET /v1/aimlops-platform/clusters/{cluster_id}/check-version`<br>(checkaimlopsplatformversionv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes`<br>(getaimlopsplatformnodelistv1) | YELLOW | DEPRECATED 표기만 있고 대체 API 안내 없음 | DEPRECATED endpoint |
+| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes`<br>(getaimlopsplatformnodelistv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses`<br>(getaimlopsplatformstorageclasseslistv1) | YELLOW | DEPRECATED 표기만 있고 대체 API 안내 없음 | DEPRECATED endpoint |
+| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses`<br>(getaimlopsplatformstorageclasseslistv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/{release_id}`<br>(getaimlopsplatformv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-namespaces`<br>(validateclusternamespaceforaimlopsplatformv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-resources`<br>(validateclusterresourcesizeforaimlopsplatformv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
@@ -479,7 +491,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/baremetals/local-subnet/{baremetal_id}/attach`<br>(attachlocalsubnetbaremetal) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: local_subnet_id |
 | `POST /v1/baremetals`<br>(createbaremetals) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: region_id, image_id, os_user_id, os_user_password, vpc_id, subnet_id |
 | `PUT /v1/baremetals/local-subnet/{baremetal_id}/detach`<br>(detachlocalsubnetbaremetal) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: local_subnet_id, local_subnet_ip |
-| `GET /v1/bm_products`<br>(listbaremetalproducts) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 31) |
+| `GET /v1/bm_products`<br>(listbaremetalproducts) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 16) |
 
 #### compute/multinodegpucluster — 4건
 
@@ -499,8 +511,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/triggers/cronjob`<br>(createcloudfunctioncronjobtrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cloud_function_id, schedule, timezone |
 | `GET /v1/cloud-functions/{cloud_function_id}/configurations/environment-variables`<br>(listenvironmentvariables) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
 | `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints`<br>(listprivatelinkendpoint) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/runtimes`<br>(listruntimes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 15) |
-| `GET /v1/cloud-functions/sample-codes`<br>(listsamplecodes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 64) |
+| `GET /v1/cloud-functions/runtimes`<br>(listruntimes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 9) |
+| `GET /v1/cloud-functions/sample-codes`<br>(listsamplecodes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 39) |
 | `PUT /v1/cloud-functions/{cloud_function_id}/codes/file`<br>(setcloudfunctioncodefile) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: class_name, method_name |
 | `GET /v1/cloud-functions/{cloud_function_id}`<br>(showcloudfunction) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
 | `GET /v1/cloud-functions/{cloud_function_id}/codes`<br>(showcloudfunctioncode) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
@@ -516,7 +528,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/cloud-functions/{cloud_function_id}/codes`<br>(updatecloudfunctioncode) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: content |
 | `PUT /v1/triggers/cronjob/{trigger_id}`<br>(updatecloudfunctioncronjobtrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cloud_function_id, schedule, timezone |
 
-#### compute/virtualserver — 58건
+#### compute/virtualserver — 57건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -554,7 +566,6 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/images/{image_id}/import`<br>(importimage) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `GET /v1/auto-scaling-groups/{auto_scaling_group_id}/notifications`<br>(listautoscalinggroupnotifications) | YELLOW | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | sub-resource list of a non-existent parent -> 200 (empty), not 404 |
 | `GET /v1/images`<br>(listimages) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 20) |
-| `GET /v1/keypairs`<br>(listkeypairs) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
 | `GET /v1/servers/{server_id}/ips`<br>(listserverips) | YELLOW | 문서에 명시된 API 버전을 서버가 406으로 거절 | docs-derived pin 'virtualserver /v1/servers/{id}/ips 1.3' -> 406 NoSuchVersion against the product pin; served via the no-pin fallback. Confirmed 실측 2026-07-16. |
 | `GET /v1/server-types`<br>(listservertypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 121) |
 | `GET /v1/volume-types`<br>(listvolumetypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
@@ -581,7 +592,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 ### container
 
-#### container/scr — 23건
+#### container/scr — 24건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -591,6 +602,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/container-registries`<br>(createregistry) | YELLOW | 유량 제한 시 JSON 에러 규격이 아닌 HTML 차단 페이지(417) 반환 | 단시간 다수 요청(약 60초 내 80건) 상황에서 the SCP edge WAF answers with 417 + an HTML 'Request Rejected' block page (Support ID 3232170405160507975, F5-style) instead of the platform's JSON error envelope — breaks the 'errors are always JSON' contract an AI/programmatic con |
 | `POST /v1/repositories`<br>(createrepository) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name, registry_id |
 | `GET /v1/tagses/{tags_id}/download/manifest`<br>(downloadmanifest) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
+| `GET /v1/container-registries/connectable-resources`<br>(listconnectableresources) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
 | `POST /v1/images/{image_id}/lifecycle-policy/preview`<br>(runimagelifecyclepolicypreview) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `PUT /v1/images/{image_id}/description`<br>(updateimagedescription) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
 | `PUT /v1/images/{image_id}/description`<br>(updateimagedescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
@@ -619,7 +631,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
 | `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `POST /v1/nodepools`<br>(createnodepool) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cluster_id, image_os, image_os_version, keypair_name, kubernetes_version, name, server_type_id, volume_type_name |
-| `GET /v1/kubernetes-versions`<br>(listkubernetesversions) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 6) |
+| `GET /v1/kubernetes-versions`<br>(listkubernetesversions) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 7) |
 | `GET /v1/clusters/{cluster_id}/nodepools`<br>(listnodepools) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `PUT /v1/clusters/{cluster_id}/public-access-control`<br>(setclusterpublicaccesscontrol) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: public_endpoint_access_control_ip |
 | `PUT /v1/clusters/{cluster_id}/upgrade`<br>(setclusterupgrade) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kubernetes_version |
@@ -824,14 +836,15 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 ### financial-management
 
-#### financial-management/billingplan — 5건
+#### financial-management/billingplan — 6건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/planned-computes`<br>(createplannedcomputes) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type, service_id |
 | `GET /v1/planned-computes/contract-types`<br>(listcontracttypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
 | `GET /v1/planned-computes/os-types`<br>(listostypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
-| `GET /v1/planned-computes/service-types`<br>(listplannedcomputeservicetypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 12) |
+| `GET /v1/planned-computes/server-types`<br>(listplannedcomputeservertypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 387) |
+| `GET /v1/planned-computes/service-types`<br>(listplannedcomputeservicetypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 13) |
 | `POST /v1/planned-computes/cancellation-fee`<br>(showcancellationfee) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/planned-computes/cancellation-fee) |
 
 #### financial-management/budget — 3건
@@ -842,19 +855,21 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `GET /v1/budgets/account`<br>(listaccountbudgets) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
 | `PUT /v1/budgets/account/{budget_id}`<br>(setaccountbudget) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, start_month, unit |
 
-#### financial-management/costexplorer — 2건
+#### financial-management/costexplorer — 4건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/bills`<br>(listbills) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/bills`<br>(listbills) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): usage_amt |
+| `GET /v1/bills`<br>(listbills) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 20) |
+| `GET /v1/usages`<br>(listusages) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): end_time,metrics,start_time,used_time |
 | `GET /v1/usages`<br>(listusages) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 20) |
 
 #### financial-management/pricing — 2건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/reports/billing-item-ids`<br>(listbillingitemids) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 232) |
-| `GET /v1/reports/offerings`<br>(listoffering) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
+| `GET /v1/reports/billing-item-ids`<br>(listbillingitemids) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 276) |
+| `GET /v1/reports/offerings`<br>(listoffering) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
 
 ### management
 
@@ -896,13 +911,13 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/policies`<br>(createpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: policy_name |
 | `POST /v1/roles`<br>(createrole) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/saml-providers`<br>(createsamlprovider) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: federation_type, saml_provider_name |
-| `GET /v1/endpoints`<br>(listendpoints) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 169) |
+| `GET /v1/endpoints`<br>(listendpoints) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 180) |
 | `GET /v1/groups`<br>(listgroup) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
 | `GET /v1/accounts/{account_id}/users`<br>(listiamuser) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
 | `GET /v1/policies`<br>(listpolicy) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
 | `GET /v1/roles`<br>(listrole) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
 | `GET /v1/saml-providers`<br>(listsamlprovider) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/service-accounts`<br>(listserviceaccount) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 8) |
+| `GET /v1/service-accounts`<br>(listserviceaccount) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 9) |
 | `GET /v1/users/{user_id}/policy-bindings`<br>(listuserpolicybindings) | YELLOW | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | sub-resource list of a non-existent parent -> 200 (empty), not 404 |
 | `PUT /v1/groups/{group_id}`<br>(setgroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name |
 | `PUT /v1/resource-policies/{srn}/statements/{sid}`<br>(setpermission) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: Effect |
@@ -972,18 +987,20 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `GET /v1/account-quotas`<br>(listaccountquota) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
 | `GET /v1/quota-requests`<br>(listquotarequests) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
 
-#### management/resourcemanager — 6건
+#### management/resourcemanager — 8건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/resource-groups`<br>(createresourcegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name |
 | `GET /v1/tags/{srn}`<br>(listresourcetags) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/tags/keys`<br>(listtagkeys) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
+| `GET /v1/tags/values`<br>(listtagvalues) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 87) |
 | `PUT /v1/resource-groups/{resource_group_id}`<br>(setresourcegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 | `GET /v1/resources/{srn}`<br>(showresource) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `PUT /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}`<br>(updatecomponentstagvalue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: value |
 | `PUT /v1/tags/{srn}/{key}`<br>(updateresourcetagvalue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: value |
 
-#### management/servicewatch — 23건
+#### management/servicewatch — 26건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -1000,6 +1017,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/log-groups/{log_group_id}/log-streams`<br>(createloggrouplogstream) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/metrics/data/download/image`<br>(downloadmetricdataimage) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `GET /v1/alerts/{id}/notifications`<br>(listalertnotifications) | YELLOW | 경로 파라미터 명명이 표준과 다름 | bare {id} in /v1/alerts/{id}/notifications |
+| `GET /v1/alerts`<br>(listalerts) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/dashboards`<br>(listdashboards) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): namespace_code,service_code |
 | `GET /v1/log-groups`<br>(listloggroups) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
 | `POST /v1/metrics/data`<br>(listmetricdata) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/metrics/data) |
 | `POST /v1/metrics`<br>(listmetricinfos) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/metrics) |
@@ -1010,6 +1029,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/alerts/{id}/notifications`<br>(setalertnotifications) | YELLOW | 경로 파라미터 명명이 표준과 다름 | bare {id} in /v1/alerts/{id}/notifications |
 | `PATCH /v1/event-rules/{event_rule_id}`<br>(seteventrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: service_id |
 | `GET /v1/alerts/{id}`<br>(showalert) | YELLOW | 경로 파라미터 명명이 표준과 다름 | bare {id} in /v1/alerts/{id} |
+| `GET /v1/alerts/level-counts-by-service`<br>(showalertlevelcountsbyservice) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): namespace_code |
 
 ### networking
 
@@ -1240,12 +1260,10 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/backups/{backup_id}/restore-agent-backup`<br>(restoreagentbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: restore_server_uuid, restore_target_id |
 | `POST /v1/backups/{backup_id}/restore`<br>(restorebackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: restore_server_name, restore_target_id, server_type_id |
 
-#### storage/baremetal-blockstorage — 8건
+#### storage/baremetal-blockstorage — 6건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `POST /v1/volumes`<br>(createvolume) | RED | 잘못된 입력에 500 반환 | empty body -> 500 (should be 400) |
-| `POST /v1/volume-groups`<br>(createvolumegroup) | RED | 잘못된 입력에 500 반환 | empty body -> 500 (should be 400) |
 | `POST /v1/volumes`<br>(createvolume) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, zone |
 | `POST /v1/volume-groups`<br>(createvolumegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, zone |
 | `POST /v1/volume-groups/{volume_group_id}/recoveries`<br>(createvolumegrouprecovery) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: block_storage_name_prefix, snapshot_id |
@@ -1253,7 +1271,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/volumes/{volume_id}/recoveries`<br>(createvolumerecovery) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, snapshot_id |
 | `POST /v1/volumes/{volume_id}/replications`<br>(createvolumereplication) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, region, zone |
 
-#### storage/filestorage — 9건
+#### storage/filestorage — 8건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
@@ -1262,7 +1280,6 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/volumes`<br>(createvolume) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, protocol, type_name, zone |
 | `POST /v1/replications`<br>(createvolumereplication) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, replication_frequency, zone, volume_id, replication_type |
 | `GET /v1/replications/regions`<br>(listvolumereplicationregion) | YELLOW | 문서에 명시된 API 버전을 서버가 406으로 거절 | docs-derived pin 'filestorage /v1/replications/regions 1.1' -> 406 NoSuchVersion against the product pin; served via the no-pin fallback. Confirmed 실측 2026-07-16. |
-| `GET /v1/volumes`<br>(listvolumes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
 | `PUT /v1/volumes/{volume_id}/access-rules`<br>(setaccessrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: object_id, object_type, action |
 | `PUT /v1/replications/{replication_id}`<br>(setvolumereplication) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: replication_update_type |
 | `GET /v1/replications/{replication_id}`<br>(showvolumereplication) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |

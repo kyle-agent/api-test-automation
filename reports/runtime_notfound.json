@@ -1,8 +1,8 @@
 {
   "summary": {
-    "checked": 278,
-    "ok_404": 190,
-    "non_404": 88,
+    "checked": 282,
+    "ok_404": 192,
+    "non_404": 90,
     "server_5xx": 0
   },
   "results": [
@@ -17,15 +17,15 @@
       "endpoint": "ai-ml/aimlops-platform/getaimlopsplatformnodelistv1",
       "path": "/v1/aimlops-platform/internal/clusters/{cluster_id}/nodes",
       "param": "cluster_id",
-      "status_nonexistent_id": 404,
-      "status_malformed_id": 404
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
     },
     {
       "endpoint": "ai-ml/aimlops-platform/getaimlopsplatformstorageclasseslistv1",
       "path": "/v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses",
       "param": "cluster_id",
-      "status_nonexistent_id": 404,
-      "status_malformed_id": 404
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
     },
     {
       "endpoint": "ai-ml/aimlops-platform/getaimlopsplatformv1",
@@ -1949,6 +1949,34 @@
       "endpoint": "storage/parallel-filestorage/showvolume",
       "path": "/v1/volumes/{volume_id}",
       "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/sqlserver/sqlserverlistdrsecondaries",
+      "path": "/v1/clusters/{cluster_id}/dr-secondaries",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/servicewatch/listalertnotifications",
+      "path": "/v1/alerts/{id}/notifications",
+      "param": "id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/security-group/listaddressgroupcidrs",
+      "path": "/v1/address-groups/{address_group_id}/addresses",
+      "param": "address_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/security-group/showaddressgroup",
+      "path": "/v1/address-groups/{address_group_id}",
+      "param": "address_group_id",
       "status_nonexistent_id": 404,
       "status_malformed_id": 404
     }
