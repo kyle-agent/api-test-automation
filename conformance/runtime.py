@@ -580,11 +580,21 @@ def main() -> int:
     # `all` runs the safe (non-mutating-by-default) probes; the gated probes
     # (validation, schema-live) self-skip inside their runners unless opted in.
     todo = probes if args.probe == "all" else {args.probe: probes[args.probe]}
-    for name, fn in todo.items():
+    _t0 = time.monotonic()
+    for i, (name, fn) in enumerate(todo.items(), 1):
+        # 진행 가시성 (오너 2026-08-20 "뭐가 돌고 있는지 알 수가 없군"): 각
+        # 프로브는 수백 대상 × sleep 으로 수 분씩 걸리는데 종전에는 종료
+        # 요약만 찍어 화면 로그가 내내 침묵했다. 시작 배너 + 경과를 즉시
+        # flush 해 콘솔 런 로그가 단계 단위로 살아 움직이게 한다.
+        print(f"▶ [{i}/{len(todo)}] probe {name} 시작 "
+              f"(+{time.monotonic() - _t0:.0f}s)", flush=True)
+        _p0 = time.monotonic()
         try:
             fn(client, docs, args.limit, args.category)
         except Exception as exc:
-            print(f"::error::probe {name} failed: {exc}")
+            print(f"::error::probe {name} failed: {exc}", flush=True)
+        print(f"■ [{i}/{len(todo)}] probe {name} 종료 "
+              f"({time.monotonic() - _p0:.0f}s)", flush=True)
     return 0
 
 
