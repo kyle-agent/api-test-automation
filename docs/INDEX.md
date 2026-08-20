@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 81 docs · 30 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 82 docs · 31 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -21,6 +21,7 @@
 ## Working — current state
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
+| [`working/CONFORMANCE-QUALITY-REPORT-2026-08-20.md`](working/CONFORMANCE-QUALITY-REPORT-2026-08-20.md) | all | SCP API 품질 컨포먼스 리포트 — 2026-08-20 | 🟢 active |
 | [`working/CONTEXT.md`](working/CONTEXT.md) | orchestrator | Shared Context (CONTEXT.md) | 🟢 active |
 | [`working/DOCS-MCP-FEASIBILITY.md`](working/DOCS-MCP-FEASIBILITY.md) | all | SCP Docs MCP Server — 도입 타당성 조사 (2026-07-15) | 🟢 active |
 | [`working/NEWAPI-DBAAS-INSTANCE-OPS.md`](working/NEWAPI-DBAAS-INSTANCE-OPS.md) | coverage-service (database/*, data-analytics/*) · coverage-validator · orchestrator | NEWAPI — DBaaS instance-ops 설계 메모 (2026-07-15) | 🟢 active |
