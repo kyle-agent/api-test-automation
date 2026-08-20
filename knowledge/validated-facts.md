@@ -4073,3 +4073,14 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - **반론 2 (403 authz-first)**: anti-enumeration 설계로는 정당하나 같은
   자격증명에 192개 API가 404를 주므로 플랫폼 정책이 아니라 비일관 — 결함
   정의를 "은닉 정책이라면 전체 일관+문서화" 조건부로 보강.
+
+## 미인증 Spring 엔벨로프의 주체 = 공통 게이트웨이 (2026-08-20 확정)
+
+- 무서명 요청의 404+Spring 기본 바디는 58개 서비스 **전원 동일 형태**이고,
+  **requestId 프리픽스가 서비스 간 재사용**된다 (1d493ca5-: apigateway·
+  queueservice / a395fa31-: scr·data-ops / b9440fac-: ske·data-flow) —
+  서로 다른 서비스 호스트에 보낸 요청이 같은 프리픽스를 받으므로 응답
+  생성 주체는 개별 서비스가 아니라 **공통 API 게이트웨이(Spring Cloud
+  Gateway 계열, 오너 확인)의 기본 에러 핸들러**다. 프리픽스=GW 인스턴스,
+  뒷숫자=카운터 추정. → systemic unauth-404/엔벨로프 ①의 수정 주체는
+  게이트웨이 1곳 (58개 서비스팀 아님) — 리포트에 명시.

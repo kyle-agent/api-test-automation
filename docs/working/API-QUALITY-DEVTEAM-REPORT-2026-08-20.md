@@ -436,7 +436,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 한 클라이언트가 SCP 에러를 처리하려면 현재 최소 3가지 형태를 알아야 합니다. 전부 2026-08-20 실측 원문입니다.
 
 ### ① 미인증 경로 — 프레임워크(Spring) 기본 엔벨로프, 58개 서비스 전원 (예외 0)
-무서명 요청에 표준 errors[]가 아닌 프레임워크 기본 바디 + 401이 아닌 404:
+무서명 요청에 표준 errors[]가 아닌 프레임워크 기본 바디 + 401이 아닌 404. **58개 서비스 전원이 동일 형태이고, requestId 프리픽스가 서비스 간 재사용됨**(예: 1d493ca5-가 apigateway·queueservice에서, a395fa31-이 scr·data-ops에서 동일) — 개별 서비스가 아니라 **공통 API 게이트웨이(Spring Cloud Gateway 계열)의 기본 에러 핸들러**가 내는 응답으로 판단됩니다. 수정 주체 = 게이트웨이 1곳: 인증 실패를 401 + 표준 errors[] 엔벨로프로 변환.
 
 ```
 {"timestamp":"2026-08-20T10:11:36.800+00:00","path":"/v1/queues","status":404,"error":"Not Found","requestId":"1d493ca5-2809043"}
