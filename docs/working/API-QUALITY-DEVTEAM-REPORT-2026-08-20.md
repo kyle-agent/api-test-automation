@@ -124,8 +124,8 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 
 | 결함 | 범위 | 무엇이 문제인가 | 기대 동작 |
 |---|---|---|---|
-| `error-schema-undocumented` | 1414 EP | 4xx/5xx 에러 응답 스키마가 문서에 없고, 실제 에러 엔벨로프가 3종 이상 혼재(표준 errors[] · Spring 기본 · HTML 차단 페이지) | 에러 스키마 문서화 + 엔벨로프 단일화 |
-| `unauth-404` | 58 서비스 | 미인증 요청에 401이 아닌 404 + 프레임워크 기본 엔벨로프 | 401 + 표준 에러 스키마 |
+| `error-schema-undocumented` | 1414 EP | 4xx/5xx 에러 응답 스키마가 문서에 없고, 실제 에러 엔벨로프가 3종 혼재 — 표준 errors[](서비스) · Spring 기본(공통 게이트웨이의 인증 실패 경로) · HTML(엣지 WAF). §5.5 실응답 원문 참조 | 표준 errors[] 스키마 문서화 + 게이트웨이/엣지 포함 엔벨로프 단일화 |
+| `unauth-404` | 58 서비스 | 공통 API 게이트웨이(Spring Cloud Gateway)가 인증 실패를 게이트웨이 기본 포맷으로 반환 — 404 + Spring 기본 엔벨로프({timestamp,path,status,error,requestId}). 58개 서비스 전원 동일 + requestId 프리픽스 서비스 간 재사용으로 게이트웨이 소행 확정. 개별 서비스가 아닌 게이트웨이 수정 대상 | 게이트웨이 에러 핸들러에서 401 + 표준 errors[] 엔벨로프로 변환 |
 | `no-cors` | 58 서비스 | OPTIONS 요청 403, Allow/CORS 헤더 없음 | OPTIONS/CORS 표준 응답 |
 | `accept-language-ignored` | 124 EP | Accept-Language 헤더 무시 — 에러 메시지 영어 고정 | 요청 언어 반영 |
 | `path-collisions` | 78 경로 | 서로 다른 서비스가 동일 method+path 재사용 (네임스페이스 없음) | 경로 네임스페이스 분리 |
