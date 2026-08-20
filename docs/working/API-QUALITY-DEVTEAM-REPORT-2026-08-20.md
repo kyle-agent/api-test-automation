@@ -136,7 +136,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 | 유형 | 건수 | 무엇이 문제인가 | 기대 동작 |
 |---|---:|---|---|
 | `undiscoverable-params` | 291 | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시 |
-| `notfound-inconsistent` | 75 | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | 부재 리소스는 404로 통일 |
+| `notfound-inconsistent` | 75 | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | 부재 리소스는 404로 통일 (또는 은닉 정책이라면 플랫폼 전체 일관 + 문서화) |
 | `pagination` | 57 | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | size개만 반환 + count/page/size 메타 제공. 의도적 전량 반환 API라면 size/page 파라미터를 문서에서 제거 |
 | `no-success-schema` | 55 | 성공(2xx) 응답 스키마가 문서에 없음 | 2xx 응답 바디 스키마 문서화 |
 | `param-naming` | 16 | 경로 파라미터 명명이 표준과 다름 | 리소스명을 포함한 파라미터명 사용(예: {alert_id}) |
@@ -422,14 +422,14 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/aimlops-platform/clusters/{cluster_id}/check-version`<br>(checkaimlopsplatformversionv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/clusters/{cluster_id}/check-version`<br>(checkaimlopsplatformversionv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes`<br>(getaimlopsplatformnodelistv1) | YELLOW | DEPRECATED 표기만 있고 대체 API 안내 없음 | DEPRECATED endpoint |
-| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes`<br>(getaimlopsplatformnodelistv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes`<br>(getaimlopsplatformnodelistv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses`<br>(getaimlopsplatformstorageclasseslistv1) | YELLOW | DEPRECATED 표기만 있고 대체 API 안내 없음 | DEPRECATED endpoint |
-| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses`<br>(getaimlopsplatformstorageclasseslistv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/aimlops-platform/{release_id}`<br>(getaimlopsplatformv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-namespaces`<br>(validateclusternamespaceforaimlopsplatformv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-resources`<br>(validateclusterresourcesizeforaimlopsplatformv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses`<br>(getaimlopsplatformstorageclasseslistv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/{release_id}`<br>(getaimlopsplatformv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-namespaces`<br>(validateclusternamespaceforaimlopsplatformv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/aimlops-platform/clusters/{cluster_id}/validate-resources`<br>(validateclusterresourcesizeforaimlopsplatformv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### ai-ml/cloud-ml — 2건
 
@@ -456,28 +456,28 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/apis/{api_id}/resources/{parent_id}`<br>(createresource) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: path_part |
 | `POST /v1/apis/{api_id}/stages`<br>(createstage) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: deployment_id, stage_name |
 | `POST /v1/apis/{api_id}/usage-plans`<br>(createusageplan) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
-| `GET /v1/apis/{api_id}/access-controls`<br>(listaccesscontrols) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/deployments`<br>(listapideployments) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/access-controls`<br>(listaccesscontrols) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/deployments`<br>(listapideployments) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `GET /v1/apis`<br>(listapis) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): endpoint_type |
-| `GET /v1/apis/{api_id}/auths`<br>(listauths) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/connected-endpoints`<br>(listconnectedprivatelinkendpoints) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/reports`<br>(listreports) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/resources`<br>(listresources) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/stages`<br>(liststages) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/usage-plans`<br>(listusageplans) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/auths`<br>(listauths) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/connected-endpoints`<br>(listconnectedprivatelinkendpoints) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/reports`<br>(listreports) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/resources`<br>(listresources) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/stages`<br>(liststages) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/usage-plans`<br>(listusageplans) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `PUT /v1/apis/{api_id}/stages/{stage_name}/deployment`<br>(setstageactivedeployment) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: deployment_id |
-| `GET /v1/apis/{api_id}`<br>(showapi) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}`<br>(showapi) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `GET /v1/apis/{api_id}`<br>(showapi) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): endpoint_type,privatelink_service_id |
-| `GET /v1/privatelink-endpoints/{privatelink_endpoint_id}`<br>(showprivatelinkendpoint) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/apis/{api_id}/resource-policies`<br>(showresourcepolicy) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/privatelink-endpoints/{privatelink_endpoint_id}`<br>(showprivatelinkendpoint) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/apis/{api_id}/resource-policies`<br>(showresourcepolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 
 #### application-service/queueservice — 4건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/queues`<br>(createqueue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
-| `GET /v1/queues/{queue_id}/attributes`<br>(getqueueattributes) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/queues/{queue_id}`<br>(showqueue) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/queues/{queue_id}/attributes`<br>(getqueueattributes) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/queues/{queue_id}`<br>(showqueue) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/queues/{queue_id}/description`<br>(updatequeuedescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 
 ### compute
@@ -509,22 +509,22 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/cloud-functions`<br>(createcloudfunction) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: content, name, runtime |
 | `POST /v1/triggers/apigateway`<br>(createcloudfunctionapigatewaytrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: apigateway_api_id, apigateway_stage_name, cloud_function_id |
 | `POST /v1/triggers/cronjob`<br>(createcloudfunctioncronjobtrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cloud_function_id, schedule, timezone |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/environment-variables`<br>(listenvironmentvariables) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints`<br>(listprivatelinkendpoint) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/environment-variables`<br>(listenvironmentvariables) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints`<br>(listprivatelinkendpoint) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `GET /v1/cloud-functions/runtimes`<br>(listruntimes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 9) |
 | `GET /v1/cloud-functions/sample-codes`<br>(listsamplecodes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 39) |
 | `PUT /v1/cloud-functions/{cloud_function_id}/codes/file`<br>(setcloudfunctioncodefile) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: class_name, method_name |
-| `GET /v1/cloud-functions/{cloud_function_id}`<br>(showcloudfunction) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/codes`<br>(showcloudfunctioncode) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations`<br>(showcloudfunctionconfiguration) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/logs`<br>(showcloudfunctionlogs) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/metrics`<br>(showcloudfunctionmetrics) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}`<br>(showcloudfunction) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/codes`<br>(showcloudfunctioncode) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations`<br>(showcloudfunctionconfiguration) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/logs`<br>(showcloudfunctionlogs) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/metrics`<br>(showcloudfunctionmetrics) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `GET /v1/cloud-functions/{cloud_function_id}/metrics`<br>(showcloudfunctionmetrics) | YELLOW | 문서에 명시된 API 버전을 서버가 406으로 거절 | docs-derived pin 'scf metrics 1.3' -> 406 NoSuchVersion against the product pin (1.4); served via the no-pin fallback (latest current). Confirmed 실측 2026-07-16. |
-| `GET /v1/triggers/{trigger_id}`<br>(showcloudfunctiontrigger) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/config`<br>(showgeneralconfig) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services`<br>(showprivatelinkservice) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/resource-policies`<br>(showresourcepolicy) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/{cloud_function_id}/configurations/url`<br>(showurlconfig) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/triggers/{trigger_id}`<br>(showcloudfunctiontrigger) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/config`<br>(showgeneralconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services`<br>(showprivatelinkservice) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/resource-policies`<br>(showresourcepolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/cloud-functions/{cloud_function_id}/configurations/url`<br>(showurlconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `PUT /v1/cloud-functions/{cloud_function_id}/codes`<br>(updatecloudfunctioncode) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: content |
 | `PUT /v1/triggers/cronjob/{trigger_id}`<br>(updatecloudfunctioncronjobtrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cloud_function_id, schedule, timezone |
 
@@ -629,17 +629,17 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/clusters`<br>(createcluster) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kubernetes_version, name, subnet_id, volume_id, vpc_id |
 | `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | create-verb name but not POST (GET /v1/clusters/{cluster_id}/kubeconfig) |
 | `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/nodepools`<br>(createnodepool) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cluster_id, image_os, image_os_version, keypair_name, kubernetes_version, name, server_type_id, volume_type_name |
 | `GET /v1/kubernetes-versions`<br>(listkubernetesversions) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 7) |
-| `GET /v1/clusters/{cluster_id}/nodepools`<br>(listnodepools) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/clusters/{cluster_id}/nodepools`<br>(listnodepools) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/clusters/{cluster_id}/public-access-control`<br>(setclusterpublicaccesscontrol) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: public_endpoint_access_control_ip |
 | `PUT /v1/clusters/{cluster_id}/upgrade`<br>(setclusterupgrade) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kubernetes_version |
 | `PUT /v1/nodepools/{nodepool_id}/preferred-ips`<br>(setnodepoolpreferredips) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: preferred_ips |
 | `PUT /v1/nodepools/{nodepool_id}/upgrade`<br>(setnodepoolupgrade) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: os_version |
-| `GET /v1/clusters/{cluster_id}`<br>(showcluster) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/clusters/{cluster_id}`<br>(showcluster) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/clusters/{cluster_id}/user-kubeconfig`<br>(showclusteruserkubeconfig) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/clusters/{cluster_id}/user-kubeconfig`<br>(showclusteruserkubeconfig) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/clusters/{cluster_id}/user-kubeconfig`<br>(showclusteruserkubeconfig) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 ### data-analytics
 
@@ -651,11 +651,11 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/data-flows`<br>(createdataflow) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cluster_id, data_flow_name, domain, image_id, storage_class_name |
 | `POST /v1/data-flow-services`<br>(createdataflowserviceconsole) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `POST /v1/data-flow-services`<br>(createdataflowserviceconsole) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: data_flow_id, data_flow_service_name, domain, storage_class_name |
-| `GET /v1/data-flows/{data_flow_id}`<br>(getdataflow) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/data-flow-services/{data_flow_service_id}`<br>(getdataflowserviceconsole) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/data-flow-services/data-flows/{data_flow_id}/sub-versions`<br>(getdataflowservicesubversions) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-flows/{data_flow_id}`<br>(getdataflow) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-flow-services/{data_flow_service_id}`<br>(getdataflowserviceconsole) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-flow-services/data-flows/{data_flow_id}/sub-versions`<br>(getdataflowservicesubversions) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/data-flows/clusters/{cluster_id}/ingress-controllers`<br>(ingresscluster) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/data-flows/clusters/{cluster_id}/ingress-controllers`<br>(ingresscluster) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-flows/clusters/{cluster_id}/ingress-controllers`<br>(ingresscluster) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### data-analytics/data-ops — 14건
 
@@ -668,13 +668,13 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/data-ops`<br>(createdataops) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cluster_id, data_ops_name, domain, image_id, storage_class_name |
 | `POST /v1/data-ops-services`<br>(createdataopsservice) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `POST /v1/data-ops-services`<br>(createdataopsservice) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: data_ops_id, data_ops_service_name, domain, storage_class_name, worker_type |
-| `GET /v1/data-ops/{data_ops_id}`<br>(getdataopsdetail) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/data-ops-services/{data_ops_service_id}`<br>(getdataopsservice) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-ops/{data_ops_id}`<br>(getdataopsdetail) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-ops-services/{data_ops_service_id}`<br>(getdataopsservice) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources`<br>(getdataopsservicevalidateresourcescreation) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources) |
 | `POST /v1/data-ops-services/{data_ops_service_id}/validate-resources`<br>(getdataopsservicevalidateresourcesupdate) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/data-ops-services/{data_ops_service_id}/validate-resources) |
-| `GET /v1/data-ops-services/data-ops/{data_ops_id}/sub-versions`<br>(getdataopssubversion) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-ops-services/data-ops/{data_ops_id}/sub-versions`<br>(getdataopssubversion) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/data-ops/clusters/{cluster_id}/ingress-controllers`<br>(getingresscontrollerlistv1) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/data-ops/clusters/{cluster_id}/ingress-controllers`<br>(getingresscontrollerlistv1) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/data-ops/clusters/{cluster_id}/ingress-controllers`<br>(getingresscontrollerlistv1) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### data-analytics/eventstreams — 6건
 
@@ -685,7 +685,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/patch`<br>(eventstreamspatchminorversion) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: dbaas_engine, software_version |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(eventstreamssetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(eventstreamssetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(eventstreamsshowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(eventstreamsshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### data-analytics/quick-query — 5건
 
@@ -708,7 +708,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/clusters/{cluster_id}/backups`<br>(searchenginesetbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: retention_period_day, starting_time_hour |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(searchenginesetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(searchenginesetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(searchengineshowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(searchengineshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### data-analytics/vertica — 7건
 
@@ -720,7 +720,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/clusters/{cluster_id}/backups`<br>(verticasetbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: retention_period_day, starting_time_hour |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(verticasetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(verticasetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(verticashowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(verticashowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 ### database
 
@@ -735,7 +735,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/clusters/{cluster_id}/backups`<br>(cachestoresetbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: retention_period_day, starting_time_hour |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(cachestoresetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(cachestoresetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(cachestoreshowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(cachestoreshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/clusters/{cluster_id}/switchover`<br>(cachestoreswitchovercluster) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: switch_host_name |
 
 #### database/epas — 12건
@@ -753,7 +753,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(epassetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(epassetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(epassetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(epasshowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(epasshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### database/mariadb — 13건
 
@@ -770,7 +770,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(mariadbsetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(mariadbsetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(mariadbsetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(mariadbshowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(mariadbshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/clusters/{cluster_id}/major-version-upgrade`<br>(mariadbupgrademajorversion) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: dbaas_engine, software_version |
 
 #### database/mysql — 13건
@@ -788,7 +788,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(mysqlsetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(mysqlsetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(mysqlsetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(mysqlshowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(mysqlshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/clusters/{cluster_id}/major-version-upgrade`<br>(mysqlupgrademajorversion) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: dbaas_engine, software_version |
 
 #### database/postgresql — 13건
@@ -807,7 +807,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(postgresqlsetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(postgresqlsetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(postgresqlsetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(postgresqlshowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(postgresqlshowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### database/sqlserver — 12건
 
@@ -824,7 +824,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/clusters/{cluster_id}/log-export-configs/{log_type}`<br>(sqlserversetlogexportconfig) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key |
 | `POST /v1/clusters/{cluster_id}/maintenance`<br>(sqlserversetmaintenance) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: start_time, term_hour |
 | `POST /v1/instance-groups/{instance_group_id}/resize`<br>(sqlserversetservertype) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type_name |
-| `GET /v1/requests/{request_id}`<br>(sqlservershowrequest) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/requests/{request_id}`<br>(sqlservershowrequest) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 ### devops-tools
 
@@ -881,8 +881,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/accounts`<br>(createaccountfactoryaccount) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: landing_zone_id, name, parent_unit_id |
 | `POST /v1/landing-zones`<br>(createlandingzone) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: additional_ou_name, audit_account_name, audit_login_id, basic_ou_name, log_archive_account_name, log_archive_login_id |
 | `PUT /v1/landing-zones/{landing_zone_id}`<br>(setlandingzone) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: detective_guardrail_status |
-| `GET /v1/guardrails/{guardrail_id}`<br>(showguardrail) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/landing-zones/{landing_zone_id}`<br>(showlandingzone) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/guardrails/{guardrail_id}`<br>(showguardrail) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/landing-zones/{landing_zone_id}`<br>(showlandingzone) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `PUT /v1/baseline-assignments/{assignment_id}`<br>(updatebaselineassignment) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: landing_zone_id |
 
 #### management/cloudmonitoring — 9건
@@ -891,10 +891,10 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/cloudmonitorings/product/v2/metric-data`<br>(getmetricperfdatalist) | RED | 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음 | 400 names neither field nor rule |
 | `POST /v1/cloudmonitorings/event/v2/event-policies`<br>(puteventpolicy) | RED | 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음 | 400 names neither field nor rule |
-| `GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members`<br>(getadressbookmemberlist) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}`<br>(geteventpolicydetail) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories`<br>(geteventpolicyhistories) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications`<br>(geteventpolicynotification) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members`<br>(getadressbookmemberlist) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}`<br>(geteventpolicydetail) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories`<br>(geteventpolicyhistories) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications`<br>(geteventpolicynotification) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/cloudmonitorings/product/v2/metric-data`<br>(getmetricperfdatalist) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/cloudmonitorings/product/v2/metric-data) |
 | `POST /v1/cloudmonitorings/product/v2/metric-data`<br>(getmetricperfdatalist) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: queryEndDt |
 | `POST /v1/cloudmonitorings/event/v2/event-policies`<br>(puteventpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: productResourceId |
@@ -913,7 +913,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/saml-providers`<br>(createsamlprovider) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: federation_type, saml_provider_name |
 | `GET /v1/endpoints`<br>(listendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 180) |
 | `GET /v1/groups`<br>(listgroup) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
-| `GET /v1/accounts/{account_id}/users`<br>(listiamuser) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/accounts/{account_id}/users`<br>(listiamuser) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `GET /v1/policies`<br>(listpolicy) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
 | `GET /v1/roles`<br>(listrole) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
 | `GET /v1/saml-providers`<br>(listsamlprovider) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
@@ -922,7 +922,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/groups/{group_id}`<br>(setgroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name |
 | `PUT /v1/resource-policies/{srn}/statements/{sid}`<br>(setpermission) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: Effect |
 | `PUT /v1/policies/{policy_id}/bindings`<br>(setpolicygroupbinding) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: identity_type |
-| `GET /v1/resource-policies/{srn}`<br>(showresourcepolicy) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/resource-policies/{srn}`<br>(showresourcepolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/accounts/{account_id}/users/{user_id}/password`<br>(updateiamuserpassword) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: password |
 
 #### management/iam-identity-center — 21건
@@ -938,18 +938,18 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/permission-sets`<br>(createpermissionset) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id, name |
 | `POST /v1/users`<br>(createuser) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id, name, user_id |
 | `DELETE /v1/users/{user_uuid}`<br>(deleteuser) | YELLOW | 경로 파라미터 명명이 표준과 다름 | {user_uuid} vs {*_id} in /v1/users/{user_uuid} |
-| `GET /v1/groups/{group_id}/users`<br>(listgroupusers) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/groups/{group_id}/users`<br>(listgroupusers) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/instances`<br>(listinstances) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/permission-sets/{permission_set_id}/policies`<br>(listpermissionsetpolicies) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/permission-sets/{permission_set_id}/policies`<br>(listpermissionsetpolicies) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PATCH /v1/groups/{group_id}`<br>(setgroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
 | `PATCH /v1/permission-sets/{permission_set_id}`<br>(setpermissionset) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
 | `PUT /v1/permission-sets/{permission_set_id}/policies`<br>(setpermissionsetpolicies) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
 | `PATCH /v1/users/{user_uuid}`<br>(setuser) | YELLOW | 경로 파라미터 명명이 표준과 다름 | {user_uuid} vs {*_id} in /v1/users/{user_uuid} |
 | `PATCH /v1/users/{user_uuid}`<br>(setuser) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
-| `GET /v1/groups/{group_id}`<br>(showgroup) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/permission-sets/{permission_set_id}`<br>(showpermissionset) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/groups/{group_id}`<br>(showgroup) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/permission-sets/{permission_set_id}`<br>(showpermissionset) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/users/{user_uuid}`<br>(showuser) | YELLOW | 경로 파라미터 명명이 표준과 다름 | {user_uuid} vs {*_id} in /v1/users/{user_uuid} |
-| `GET /v1/users/{user_uuid}`<br>(showuser) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/users/{user_uuid}`<br>(showuser) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### management/loggingaudit — 2건
 
@@ -973,12 +973,12 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/organization-units`<br>(createorganizationunit) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/service-control-policies`<br>(createservicecontrolpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name, organization_id |
 | `GET /v1/organizations`<br>(listorganizations) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/organization-units/{unit_id}/parents`<br>(listparents) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/organization-units/{unit_id}/parents`<br>(listparents) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 | `PUT /v1/organization-accounts/parent`<br>(moveaccount) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: parent_unit_id |
 | `PUT /v1/service-control-policies/{policy_id}`<br>(setservicecontrolpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: organization_id |
-| `GET /v1/organization-accounts/{account_id}`<br>(showaccount) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/organizations/{organization_id}`<br>(showorganization) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/service-control-policies/{policy_id}`<br>(showservicecontrolpolicy) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
+| `GET /v1/organization-accounts/{account_id}`<br>(showaccount) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/organizations/{organization_id}`<br>(showorganization) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
+| `GET /v1/service-control-policies/{policy_id}`<br>(showservicecontrolpolicy) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 403 (not 404) |
 
 #### management/quota — 2건
 
@@ -992,11 +992,11 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/resource-groups`<br>(createresourcegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name |
-| `GET /v1/tags/{srn}`<br>(listresourcetags) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/tags/{srn}`<br>(listresourcetags) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/tags/keys`<br>(listtagkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
 | `GET /v1/tags/values`<br>(listtagvalues) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 87) |
 | `PUT /v1/resource-groups/{resource_group_id}`<br>(setresourcegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
-| `GET /v1/resources/{srn}`<br>(showresource) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/resources/{srn}`<br>(showresource) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `PUT /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}`<br>(updatecomponentstagvalue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: value |
 | `PUT /v1/tags/{srn}/{key}`<br>(updateresourcetagvalue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: value |
 
@@ -1230,7 +1230,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/secretvault`<br>(createsecretvault) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key_id, acl_cidr, name |
-| `GET /v1/temporarykey/{secret_vault_id}`<br>(gettemporarykey) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/temporarykey/{secret_vault_id}`<br>(gettemporarykey) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `GET /v1/secretvault`<br>(listsecretvault) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 
 ### storage
@@ -1255,8 +1255,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/backups`<br>(createbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, server_uuid |
 | `POST /v1/backup-agents`<br>(createbackupagent) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_uuid |
 | `GET /v1/backups/region-relationship`<br>(listbackupregionrelationship) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
-| `GET /v1/backups/{backup_id}/restore/restorable-subnets`<br>(listbackuprestoresubnets) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/backups/{backup_id}/filesystem-path`<br>(listfilesystempath) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/backups/{backup_id}/restore/restorable-subnets`<br>(listbackuprestoresubnets) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
+| `GET /v1/backups/{backup_id}/filesystem-path`<br>(listfilesystempath) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 | `POST /v1/backups/{backup_id}/restore-agent-backup`<br>(restoreagentbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: restore_server_uuid, restore_target_id |
 | `POST /v1/backups/{backup_id}/restore`<br>(restorebackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: restore_server_name, restore_target_id, server_type_id |
 
@@ -1282,7 +1282,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `GET /v1/replications/regions`<br>(listvolumereplicationregion) | YELLOW | 문서에 명시된 API 버전을 서버가 406으로 거절 | docs-derived pin 'filestorage /v1/replications/regions 1.1' -> 406 NoSuchVersion against the product pin; served via the no-pin fallback. Confirmed 실측 2026-07-16. |
 | `PUT /v1/volumes/{volume_id}/access-rules`<br>(setaccessrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: object_id, object_type, action |
 | `PUT /v1/replications/{replication_id}`<br>(setvolumereplication) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: replication_update_type |
-| `GET /v1/replications/{replication_id}`<br>(showvolumereplication) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
+| `GET /v1/replications/{replication_id}`<br>(showvolumereplication) | YELLOW | 형식이 유효한 존재하지-않는 id 조회에 404가 아닌 400/403 반환 — 클라이언트가 "형식 오류/권한 문제/부재"를 구분할 수 없음. 참고: 같은 플랫폼에서 192개 API는 404를 반환하므로 (존재여부 은닉 등) 의도된 정책이 아니라 비일관 | non-existent id -> 400 (not 404) |
 
 #### storage/parallel-filestorage — 4건
 

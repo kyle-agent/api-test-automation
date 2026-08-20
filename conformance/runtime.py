@@ -49,6 +49,11 @@ CSVDIR = OUTDIR / "csv"
 VALIDATION_OUT = OUTDIR / "validation_probe.json"
 
 NONEXISTENT_ID = "00000000-0000-4000-8000-000000000000"
+# SCP id 포맷은 서비스별 혼재: 대시 없는 32-hex(대부분) vs 대시 UUID(ports 등).
+# 한 포맷만 보내면 다른 체계 서비스에서 "형식 오류 400"이 정당하게 나와
+# 부재-404 판정을 오염시킨다 (오너 지적 2026-08-20). 두 포맷 모두 보내고
+# 하나라도 404면 합격으로 판정한다.
+NONEXISTENT_ID_HEX = "00000000000040008000000000000000"
 MALFORMED_ID = "not-a-valid-id"
 
 
@@ -204,12 +209,20 @@ def probe_notfound(client, docs, limit, category):
         def call(idval):
             p = path.replace("{" + params[0] + "}", idval)
             try:
-                return client.request("GET", p, service=e["service"]).status
+                r = client.request("GET", p, service=e["service"])
+                return r.status, (r.raw_text or "").replace("\n", " ")[:140]
             except Exception as exc:
-                return f"ERR:{str(exc)[:40]}"
+                return f"ERR:{str(exc)[:40]}", ""
 
-        s_missing = call(NONEXISTENT_ID)
-        s_malformed = call(MALFORMED_ID)
+        s_missing, x_missing = call(NONEXISTENT_ID)
+        s_hex, x_hex = call(NONEXISTENT_ID_HEX)
+        s_malformed, _ = call(MALFORMED_ID)
+        # 두 포맷 중 404가 있으면 그 판정을 채택 (형식-400 오염 제거);
+        # 둘 다 non-404면 더 관대한(200>403>400 아님, 그냥 hex 우선) 쪽 기록.
+        if 404 in (s_missing, s_hex):
+            s_missing, x_missing = 404, ""
+        elif s_hex not in (None,) and not str(s_hex).startswith("ERR"):
+            s_missing, x_missing = s_hex, x_hex
         summ["checked"] += 1
         if s_missing == 404:
             summ["ok_404"] += 1
@@ -219,7 +232,10 @@ def probe_notfound(client, docs, limit, category):
            isinstance(s_malformed, int) and 500 <= s_malformed < 600:
             summ["server_5xx"] += 1
         rows.append({"endpoint": k, "path": path, "param": params[0],
-                     "status_nonexistent_id": s_missing, "status_malformed_id": s_malformed})
+                     "status_nonexistent_id": s_missing,
+                     "status_nonexistent_hex": s_hex,
+                     "status_malformed_id": s_malformed,
+                     "excerpt": x_missing})
         # unified findings (mirror static aggregation semantics)
         name = k.rsplit("/", 1)[-1]
         is_dup = ("checkduplication" in name or "check-duplication" in path
@@ -234,13 +250,16 @@ def probe_notfound(client, docs, limit, category):
                           "non-existent id -> 200 (should be 404)")
             elif s_missing in (400, 403):
                 _emit(k, "notfound-inconsistent", "yellow",
-                      f"non-existent id -> {s_missing} (not 404)")
+                      f"non-existent id -> {s_missing} (not 404; dashed-UUID and "
+                      f"32-hex id formats BOTH tried — not a format-validation "
+                      f"artifact) · resp: {x_missing[:110]}")
         time.sleep(0.15)
         n += 1
         if limit and n >= limit:
             break
     _write("notfound", summ, rows,
-           ["endpoint", "path", "param", "status_nonexistent_id", "status_malformed_id"])
+           ["endpoint", "path", "param", "status_nonexistent_id",
+            "status_nonexistent_hex", "status_malformed_id", "excerpt"])
 
 
 # ------------------------------------------------ errors/auth (unauth) [GET]
