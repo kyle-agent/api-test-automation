@@ -2274,12 +2274,6 @@
       "server_group_id": "",
       "service_port": "",
       "session_duration_time": "",
-      "sni_certificate": [
-        {
-          "domain_name": "",
-          "sni_cert_id": ""
-        }
-      ],
       "ssl_certificate": {
         "client_cert_id": "",
         "client_cert_level": "",
@@ -2287,7 +2281,13 @@
       },
       "support_http2": false,
       "tags": [],
-      "url_handler": "",
+      "url_handler": [
+        {
+          "seq": "",
+          "server_group_id": "",
+          "url_pattern": ""
+        }
+      ],
       "url_redirection": "",
       "x_forwarded_for": "",
       "x_forwarded_port": "",
@@ -2369,7 +2369,6 @@
       "sni_certificate": [
         {
           "domain_name": "",
-          "not_after_dt": "",
           "sni_cert_id": ""
         }
       ],
@@ -2428,7 +2427,13 @@
         "response_code": ""
       },
       "server_group_id": "",
-      "url_handler": "",
+      "url_handler": [
+        {
+          "seq": "",
+          "server_group_id": "",
+          "url_pattern": ""
+        }
+      ],
       "url_redirection": ""
     }
   },
@@ -2437,6 +2442,18 @@
       "description": "this is an lb server group",
       "lb_health_check_id": "46c681018e33453085ca7c8db54e0076",
       "lb_method": "ROUND_ROBIN"
+    }
+  },
+  "networking/loadbalancer/setlbservergroupmember": {
+    "member": {
+      "member_port": 80,
+      "member_state": "ENABLE",
+      "member_weight": 100
+    }
+  },
+  "networking/loadbalancer/setloadbalancer": {
+    "loadbalancer": {
+      "description": ""
     }
   },
   "networking/security-group/addaddressgroupcidrs": {
@@ -2674,6 +2691,9 @@
   },
   "security/kms/encryptdata": {
     "plaintext": "dGhlIHF1aWNrIGJyb3duIGZveAo="
+  },
+  "security/kms/exportpublickey": {
+    "key_version": 1
   },
   "security/kms/hmac": {
     "input": "dGVzdCBpbnB1dA=="

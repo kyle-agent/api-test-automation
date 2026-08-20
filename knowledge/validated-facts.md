@@ -4002,3 +4002,18 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   백엔드 지연 자체라 (VM-ERROR 2026-07-13 재발 방지 게이트 유지 필수)
   안전히 줄일 여지가 사실상 없다. nvs 내부 직렬성은 same-VPC subnet 전환
   직렬화(백엔드) 때문이라 오버랩 불가 — 병렬화 제안 기각.
+
+## 스펙 diff 2026-08-20 (fresh 재수집 vs 2026-07-18 카탈로그)
+
+- **+1 엔드포인트**: `security/kms/exportpublickey` — POST
+  /v1/kms/openapi/export/public-key/{key_id} (asymmetric 전용, 바디
+  {"key_version": 1}). 삭제/시그니처 변경 0, 1416 불변. →
+  security-kms-transit-crypto의 rsa-2048 {key_id}에 스텝 편입 (라이브 미검증).
+- **LB 리스너 바디 스키마 드리프트 3건** (spec.diff 비가시 — 모델 페이지
+  diff로 검출): createlblistener/setlblistenerrule의 `listener.url_handler`
+  가 평문 문자열 → `[{seq, server_group_id, url_pattern}]` 배열로,
+  setlblistener 예시에서 sni_certificate.not_after_dt 제거. 기존
+  gen-heavy-lb-members 페이로드는 두 필드 미사용이라 무영향.
+- `data/spec_diff_latest.json` 마커 생성 (dashboard NEW/UPD 배지 소비용).
+- 문서 호스트(docs.e.samsungsdscloud.com)는 API-플레인 프록시 502와 무관하게
+  정상 — 스펙 수집은 프록시 장애 중에도 가능.
