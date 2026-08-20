@@ -333,6 +333,13 @@ def probe_pagination(client, docs, limit, category):
             continue
         if category and category not in e["category"]:
             continue
+        # size/page 를 문서화한 엔드포인트만 "무시" 판정 대상 (오탐 제거,
+        # 오너 2026-08-20): 문서에 없는 쿼리 파라미터를 서버가 무시하는 것은
+        # 정상 동작이다. 미문서 엔드포인트는 측정만 기록하고 결함은 안 낸다.
+        doc_paging = any(p.get("in") == "query"
+                         and p.get("name") in ("page", "size", "page_size",
+                                               "limit", "offset")
+                         for p in e.get("parameters", []))
         try:
             resp = client.request("GET", e["path"], params={"page": 1, "size": 1},
                                   service=e["service"])
@@ -348,18 +355,22 @@ def probe_pagination(client, docs, limit, category):
         meta = sorted(set(resp.body.keys()) & PAGING)
         arr = [v for v in resp.body.values() if isinstance(v, list)]
         biggest = max((len(a) for a in arr), default=0)
-        ignores = biggest > 1                      # asked size=1 but got >1
+        ignores = doc_paging and biggest > 1       # 문서화된 size=1 요청에 >1
         if ignores:
             summ["ignores_size"] += 1
+        if not doc_paging and biggest > 1:
+            summ["undocumented_paging_full_return"] = \
+                summ.get("undocumented_paging_full_return", 0) + 1
         if not meta:
             summ["no_paging_meta"] += 1
         rows.append({"endpoint": k, "status": 200, "returned_items_at_size1": biggest,
-                     "respects_size": not ignores, "paging_meta": ",".join(meta)})
+                     "respects_size": not ignores, "paging_meta": ",".join(meta),
+                     "documented_paging": doc_paging})
         # unified findings
         if ignores:
             _emit(k, "pagination-ignores-size", "yellow",
                   f"requested size=1 but response returned {biggest} items")
-        if not meta:
+        if not meta and doc_paging:
             _emit(k, "pagination-no-meta", "yellow",
                   "list response carries no pagination metadata (page/size/total/next/...)")
         time.sleep(0.1)
@@ -367,7 +378,8 @@ def probe_pagination(client, docs, limit, category):
         if limit and n >= limit:
             break
     _write("pagination", summ, rows,
-           ["endpoint", "status", "returned_items_at_size1", "respects_size", "paging_meta", "note"])
+           ["endpoint", "status", "returned_items_at_size1", "respects_size",
+            "paging_meta", "documented_paging", "note"])
 
 
 # ---------------------------------------------------------------- OPTIONS/CORS

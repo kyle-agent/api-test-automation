@@ -395,7 +395,8 @@ def build(*, emit_findings: bool = True) -> dict:
                 add(r["endpoint"], "yellow", "schema-undocumented-field", "runtime",
                     f"response has undocumented field(s): {extra}", 37)
     for r in _load(R / "runtime_pagination.json", {}).get("results", []):
-        if r.get("status") == 200 and r.get("respects_size") is False:
+        if r.get("status") == 200 and r.get("respects_size") is False \
+                and r.get("documented_paging", True):
             add(r["endpoint"], "yellow", "pagination", "runtime",
                 f"ignores size=1 (returned {r.get('returned_items_at_size1')})", 38)
     for r in _load(R / "validation_probe.json", {}).get("results", []):
