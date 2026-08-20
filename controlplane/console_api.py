@@ -423,6 +423,19 @@ def api_verify() -> JSONResponse:
     return _json(c2._rec_view(c2._start("verify", c2._verify_worker)), 202)
 
 
+@router.post("/api/conformance")
+def api_conformance() -> JSONResponse:
+    """AXIS 2 동적 검증 (read-only 프로브 8종 + 정적 폴드) — 화면 버튼 경로.
+    LIVE 런 진행 중엔 거부 (프로브 관측 오염 방지 — cleanup 과 같은 가드)."""
+    with c2._ADMIT:
+        busy = bool(c2._RESERVED or c2._QUEUE)
+    if busy:
+        return _json({"error":
+            "진행 중(또는 대기 중) 실행이 있습니다 — 프로브 관측이 오염되지 "
+            "않게 모든 실행이 끝난 뒤 다시 시도하세요."}, 409)
+    return _json(c2._rec_view(c2._start("conformance", c2._conformance_worker)), 202)
+
+
 @router.post("/api/owned")
 def api_owned() -> JSONResponse:
     return _json(c2._rec_view(c2._start("owned", c2._owned_worker)), 202)
