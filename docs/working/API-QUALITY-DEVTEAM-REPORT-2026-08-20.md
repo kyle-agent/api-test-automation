@@ -137,7 +137,7 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
 |---|---:|---|---|
 | `undiscoverable-params` | 291 | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | 필수 필드별 타입·제약·유효값(또는 값을 얻는 조회 API)을 문서에 명시 |
 | `notfound-inconsistent` | 75 | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | 부재 리소스는 404로 통일 |
-| `pagination` | 57 | 페이지네이션 파라미터(size/page) 미준수 | size/page 계약 준수 |
+| `pagination` | 57 | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | size개만 반환 + count/page/size 메타 제공. 의도적 전량 반환 API라면 size/page 파라미터를 문서에서 제거 |
 | `no-success-schema` | 55 | 성공(2xx) 응답 스키마가 문서에 없음 | 2xx 응답 바디 스키마 문서화 |
 | `param-naming` | 16 | 경로 파라미터 명명이 표준과 다름 | 리소스명을 포함한 파라미터명 사용(예: {alert_id}) |
 | `opaque-validation` | 13 | 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음 | 에러 응답에 필드명과 위반 내용을 포함 |
@@ -367,9 +367,9 @@ GET 결함의 81%는 실호출에서만 드러나는 계열(404 비일관·pagin
   - 기대 동작: 부재 리소스는 404
 
 ### networking/vpc — `GET /v1/subnets` (listsubnets)
-- **[계약] 문제**: 페이지네이션 파라미터(size/page) 미준수
+- **[계약] 문제**: 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음
   - 근거: ignores size=1 (returned 2)
-  - 기대 동작: size/page 계약 준수
+  - 기대 동작: size개만 반환 + count/page/size 메타 제공. 의도적 전량 반환 API라면 size/page 파라미터를 문서에서 제거
 - **[계약] 문제**: 생성(v1.3)은 되는 PRIVATE 타입 서브넷이 조회 계열(v1.2 enum)에서 보이지 않음 — API로 존재를 확인할 수 없는 리소스 발생
   - 근거: GET listsubnets?type=PRIVATE -> 400 "Input should be 'GENERAL', 'LOCAL' or 'VPC_ENDPOINT'" (PRIVATE rejected as a filter value) even though createsubnet documents and accepts PRIVATE. PRIVATE subnet enum was added in createsubnet v1.3 (PUBLIC/PRIVATE/LOCAL/VPC_ENDPOINT) and create/delete accept it (202), but the READ plane (show/list) still validates against the old v1.2 enum (GENERAL/LOCAL/VPC_ENDPOINT) -> a PRIVATE-typed subnet is a live, billable resource with no GET path (create/delete plane version != read plane version). Live-probed req-65a36c09..., 실측 2026-07-16; scenario workaround is a 30s blind settle instead of show-poll.
   - 기대 동작: 조회 계열 enum을 생성 계열과 동일 버전으로 정합
@@ -491,7 +491,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/baremetals/local-subnet/{baremetal_id}/attach`<br>(attachlocalsubnetbaremetal) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: local_subnet_id |
 | `POST /v1/baremetals`<br>(createbaremetals) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: region_id, image_id, os_user_id, os_user_password, vpc_id, subnet_id |
 | `PUT /v1/baremetals/local-subnet/{baremetal_id}/detach`<br>(detachlocalsubnetbaremetal) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: local_subnet_id, local_subnet_ip |
-| `GET /v1/bm_products`<br>(listbaremetalproducts) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 16) |
+| `GET /v1/bm_products`<br>(listbaremetalproducts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 16) |
 
 #### compute/multinodegpucluster — 4건
 
@@ -499,7 +499,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/gpu-nodes/{gpu_node_id}/public-nat-ip`<br>(assigngpunodepublicnatip) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: public_ip_address_id |
 | `POST /v1/gpu-nodes`<br>(creategpunodes) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: region_id, image_id, os_user_id, os_user_password, vpc_id, subnet_id |
-| `GET /v1/gpu-nodes/products`<br>(listgpunodeproducts) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/gpu-nodes/products`<br>(listgpunodeproducts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `POST /v1/cluster-fabrics/modify-members`<br>(modifyclusterfabricmembers) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: after_cluster_fabric_id, before_cluster_fabric_id |
 
 #### compute/scf — 21건
@@ -511,8 +511,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/triggers/cronjob`<br>(createcloudfunctioncronjobtrigger) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cloud_function_id, schedule, timezone |
 | `GET /v1/cloud-functions/{cloud_function_id}/configurations/environment-variables`<br>(listenvironmentvariables) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
 | `GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints`<br>(listprivatelinkendpoint) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/cloud-functions/runtimes`<br>(listruntimes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 9) |
-| `GET /v1/cloud-functions/sample-codes`<br>(listsamplecodes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 39) |
+| `GET /v1/cloud-functions/runtimes`<br>(listruntimes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 9) |
+| `GET /v1/cloud-functions/sample-codes`<br>(listsamplecodes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 39) |
 | `PUT /v1/cloud-functions/{cloud_function_id}/codes/file`<br>(setcloudfunctioncodefile) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: class_name, method_name |
 | `GET /v1/cloud-functions/{cloud_function_id}`<br>(showcloudfunction) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
 | `GET /v1/cloud-functions/{cloud_function_id}/codes`<br>(showcloudfunctioncode) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
@@ -565,10 +565,10 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `DELETE /v1/servers/{server_id}/security-groups/{security_group_id}`<br>(detachvirtualserversecuritygroup) | YELLOW | DEPRECATED 표기만 있고 대체 API 안내 없음 | DEPRECATED endpoint |
 | `POST /v1/images/{image_id}/import`<br>(importimage) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `GET /v1/auto-scaling-groups/{auto_scaling_group_id}/notifications`<br>(listautoscalinggroupnotifications) | YELLOW | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | sub-resource list of a non-existent parent -> 200 (empty), not 404 |
-| `GET /v1/images`<br>(listimages) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 20) |
+| `GET /v1/images`<br>(listimages) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
 | `GET /v1/servers/{server_id}/ips`<br>(listserverips) | YELLOW | 문서에 명시된 API 버전을 서버가 406으로 거절 | docs-derived pin 'virtualserver /v1/servers/{id}/ips 1.3' -> 406 NoSuchVersion against the product pin; served via the no-pin fallback. Confirmed 실측 2026-07-16. |
-| `GET /v1/server-types`<br>(listservertypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 121) |
-| `GET /v1/volume-types`<br>(listvolumetypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
+| `GET /v1/server-types`<br>(listservertypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 121) |
+| `GET /v1/volume-types`<br>(listvolumetypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
 | `POST /v1/servers/{server_id}/lock`<br>(lockvirtualserver) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `POST /v1/servers/{server_id}/reboot`<br>(rebootvirtualserver) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `POST /v1/servers/{server_id}/rebuild`<br>(rebuildvirtualserver) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
@@ -602,7 +602,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/container-registries`<br>(createregistry) | YELLOW | 유량 제한 시 JSON 에러 규격이 아닌 HTML 차단 페이지(417) 반환 | 단시간 다수 요청(약 60초 내 80건) 상황에서 the SCP edge WAF answers with 417 + an HTML 'Request Rejected' block page (Support ID 3232170405160507975, F5-style) instead of the platform's JSON error envelope — breaks the 'errors are always JSON' contract an AI/programmatic con |
 | `POST /v1/repositories`<br>(createrepository) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name, registry_id |
 | `GET /v1/tagses/{tags_id}/download/manifest`<br>(downloadmanifest) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
-| `GET /v1/container-registries/connectable-resources`<br>(listconnectableresources) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/container-registries/connectable-resources`<br>(listconnectableresources) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `POST /v1/images/{image_id}/lifecycle-policy/preview`<br>(runimagelifecyclepolicypreview) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `PUT /v1/images/{image_id}/description`<br>(updateimagedescription) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
 | `PUT /v1/images/{image_id}/description`<br>(updateimagedescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
@@ -631,7 +631,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | GET 2xx documents no schema |
 | `GET /v1/clusters/{cluster_id}/kubeconfig`<br>(createclusterkubeconfig) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `POST /v1/nodepools`<br>(createnodepool) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: cluster_id, image_os, image_os_version, keypair_name, kubernetes_version, name, server_type_id, volume_type_name |
-| `GET /v1/kubernetes-versions`<br>(listkubernetesversions) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 7) |
+| `GET /v1/kubernetes-versions`<br>(listkubernetesversions) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 7) |
 | `GET /v1/clusters/{cluster_id}/nodepools`<br>(listnodepools) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `PUT /v1/clusters/{cluster_id}/public-access-control`<br>(setclusterpublicaccesscontrol) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: public_endpoint_access_control_ip |
 | `PUT /v1/clusters/{cluster_id}/upgrade`<br>(setclusterupgrade) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kubernetes_version |
@@ -841,10 +841,10 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/planned-computes`<br>(createplannedcomputes) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_type, service_id |
-| `GET /v1/planned-computes/contract-types`<br>(listcontracttypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
-| `GET /v1/planned-computes/os-types`<br>(listostypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
-| `GET /v1/planned-computes/server-types`<br>(listplannedcomputeservertypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 387) |
-| `GET /v1/planned-computes/service-types`<br>(listplannedcomputeservicetypes) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 13) |
+| `GET /v1/planned-computes/contract-types`<br>(listcontracttypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
+| `GET /v1/planned-computes/os-types`<br>(listostypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
+| `GET /v1/planned-computes/server-types`<br>(listplannedcomputeservertypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 387) |
+| `GET /v1/planned-computes/service-types`<br>(listplannedcomputeservicetypes) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 13) |
 | `POST /v1/planned-computes/cancellation-fee`<br>(showcancellationfee) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/planned-computes/cancellation-fee) |
 
 #### financial-management/budget — 3건
@@ -852,7 +852,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/budgets/account`<br>(createaccountbudget) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, start_month, unit |
-| `GET /v1/budgets/account`<br>(listaccountbudgets) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
+| `GET /v1/budgets/account`<br>(listaccountbudgets) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
 | `PUT /v1/budgets/account/{budget_id}`<br>(setaccountbudget) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, start_month, unit |
 
 #### financial-management/costexplorer — 4건
@@ -860,16 +860,16 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `GET /v1/bills`<br>(listbills) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): usage_amt |
-| `GET /v1/bills`<br>(listbills) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 20) |
+| `GET /v1/bills`<br>(listbills) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
 | `GET /v1/usages`<br>(listusages) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): end_time,metrics,start_time,used_time |
-| `GET /v1/usages`<br>(listusages) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 20) |
+| `GET /v1/usages`<br>(listusages) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
 
 #### financial-management/pricing — 2건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/reports/billing-item-ids`<br>(listbillingitemids) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 276) |
-| `GET /v1/reports/offerings`<br>(listoffering) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
+| `GET /v1/reports/billing-item-ids`<br>(listbillingitemids) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 276) |
+| `GET /v1/reports/offerings`<br>(listoffering) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
 
 ### management
 
@@ -911,13 +911,13 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/policies`<br>(createpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: policy_name |
 | `POST /v1/roles`<br>(createrole) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/saml-providers`<br>(createsamlprovider) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: federation_type, saml_provider_name |
-| `GET /v1/endpoints`<br>(listendpoints) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 180) |
-| `GET /v1/groups`<br>(listgroup) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
+| `GET /v1/endpoints`<br>(listendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 180) |
+| `GET /v1/groups`<br>(listgroup) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
 | `GET /v1/accounts/{account_id}/users`<br>(listiamuser) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
-| `GET /v1/policies`<br>(listpolicy) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
-| `GET /v1/roles`<br>(listrole) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
-| `GET /v1/saml-providers`<br>(listsamlprovider) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/service-accounts`<br>(listserviceaccount) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 9) |
+| `GET /v1/policies`<br>(listpolicy) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
+| `GET /v1/roles`<br>(listrole) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
+| `GET /v1/saml-providers`<br>(listsamlprovider) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/service-accounts`<br>(listserviceaccount) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 9) |
 | `GET /v1/users/{user_id}/policy-bindings`<br>(listuserpolicybindings) | YELLOW | 존재하지 않는 부모의 하위 목록 조회가 200(빈 목록) 반환 | sub-resource list of a non-existent parent -> 200 (empty), not 404 |
 | `PUT /v1/groups/{group_id}`<br>(setgroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name |
 | `PUT /v1/resource-policies/{srn}/statements/{sid}`<br>(setpermission) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: Effect |
@@ -939,7 +939,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/users`<br>(createuser) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id, name, user_id |
 | `DELETE /v1/users/{user_uuid}`<br>(deleteuser) | YELLOW | 경로 파라미터 명명이 표준과 다름 | {user_uuid} vs {*_id} in /v1/users/{user_uuid} |
 | `GET /v1/groups/{group_id}/users`<br>(listgroupusers) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/instances`<br>(listinstances) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/instances`<br>(listinstances) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/permission-sets/{permission_set_id}/policies`<br>(listpermissionsetpolicies) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `PATCH /v1/groups/{group_id}`<br>(setgroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
 | `PATCH /v1/permission-sets/{permission_set_id}`<br>(setpermissionset) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: instance_id |
@@ -972,7 +972,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/organizations`<br>(createorganization) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/organization-units`<br>(createorganizationunit) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/service-control-policies`<br>(createservicecontrolpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name, organization_id |
-| `GET /v1/organizations`<br>(listorganizations) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/organizations`<br>(listorganizations) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/organization-units/{unit_id}/parents`<br>(listparents) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 403 (not 404) |
 | `PUT /v1/organization-accounts/parent`<br>(moveaccount) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: parent_unit_id |
 | `PUT /v1/service-control-policies/{policy_id}`<br>(setservicecontrolpolicy) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: organization_id |
@@ -984,8 +984,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/account-quotas`<br>(listaccountquota) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/quota-requests`<br>(listquotarequests) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/account-quotas`<br>(listaccountquota) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/quota-requests`<br>(listquotarequests) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 
 #### management/resourcemanager — 8건
 
@@ -993,8 +993,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/resource-groups`<br>(createresourcegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description, name |
 | `GET /v1/tags/{srn}`<br>(listresourcetags) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/tags/keys`<br>(listtagkeys) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 4) |
-| `GET /v1/tags/values`<br>(listtagvalues) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 87) |
+| `GET /v1/tags/keys`<br>(listtagkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 4) |
+| `GET /v1/tags/values`<br>(listtagvalues) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 87) |
 | `PUT /v1/resource-groups/{resource_group_id}`<br>(setresourcegroup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 | `GET /v1/resources/{srn}`<br>(showresource) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `PUT /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}`<br>(updatecomponentstagvalue) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: value |
@@ -1017,9 +1017,9 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/log-groups/{log_group_id}/log-streams`<br>(createloggrouplogstream) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/metrics/data/download/image`<br>(downloadmetricdataimage) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | POST 2xx documents no schema |
 | `GET /v1/alerts/{id}/notifications`<br>(listalertnotifications) | YELLOW | 경로 파라미터 명명이 표준과 다름 | bare {id} in /v1/alerts/{id}/notifications |
-| `GET /v1/alerts`<br>(listalerts) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/alerts`<br>(listalerts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/dashboards`<br>(listdashboards) | YELLOW | 실제 응답에 문서에 없는 필드 존재 | response has undocumented field(s): namespace_code,service_code |
-| `GET /v1/log-groups`<br>(listloggroups) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/log-groups`<br>(listloggroups) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `POST /v1/metrics/data`<br>(listmetricdata) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/metrics/data) |
 | `POST /v1/metrics`<br>(listmetricinfos) | YELLOW | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | read-verb name but not GET (POST /v1/metrics) |
 | `PATCH /v1/alerts/{id}`<br>(setalert) | YELLOW | 경로 파라미터 명명이 표준과 다름 | bare {id} in /v1/alerts/{id} |
@@ -1055,7 +1055,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/direct-connects`<br>(createdirectconnect) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, vpc_id |
 | `POST /v1/direct-connects/{direct_connect_id}/routing-rules`<br>(createroutingrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: destination_cidr |
-| `GET /v1/direct-connects`<br>(listdirectconnects) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/direct-connects`<br>(listdirectconnects) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/direct-connects/{direct_connect_id}`<br>(setdirectconnect) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 
 #### networking/dns — 7건
@@ -1067,7 +1067,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/hosted-zones/{hosted_zone_id}/records`<br>(createhostedzonerecord) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, type |
 | `POST /v1/private-dns`<br>(createprivatedns) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
 | `POST /v1/public-domain-names`<br>(createpublicdomainname) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: address_type, domestic_first_address_en, domestic_first_address_ko, domestic_second_address_en, domestic_second_address_ko, name, overseas_first_address, overseas_second_address |
-| `GET /v1/private-dns`<br>(listprivatedns) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/private-dns`<br>(listprivatedns) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/public-domain-names/{public_domain_id}/information`<br>(setpublicdomainnamewhoisinfo) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: address_type, domestic_first_address_en, domestic_first_address_ko, domestic_second_address_en, domestic_second_address_ko, overseas_first_address, overseas_second_address, overseas_third_address |
 
 #### networking/firewall — 3건
@@ -1076,15 +1076,15 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/firewalls/rules`<br>(createfirewallrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: firewall_id |
 | `POST /v1/firewalls/rules`<br>(createfirewallrule) | YELLOW | 버전에 따라 응답 시맨틱이 다른데(1.1=202+빈 바디) 문서는 1.0 동작만 기술 | Endpoint-pinned version 'firewall 1.1' -> 202 + an EMPTY body {} (no rule id capturable from the response); the doc page only describes the 1.0/201-with-full-body semantics. A caller pinned (or defaulted) to 1.1 who doesn't know to poll listfirewallrules inste |
-| `GET /v1/firewalls`<br>(listfirewalls) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/firewalls`<br>(listfirewalls) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 
 #### networking/gslb — 5건
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/gslbs`<br>(creategslb) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name |
-| `GET /v1/gslbs`<br>(listgslbs) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
-| `GET /v1/gslbs/routing-control`<br>(listgslbsregionalroutingcontrol) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 3) |
+| `GET /v1/gslbs`<br>(listgslbs) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
+| `GET /v1/gslbs/routing-control`<br>(listgslbsregionalroutingcontrol) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 3) |
 | `PUT /v1/gslbs/{gslb_id}/health-check`<br>(setgslbhealthcheck) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: protocol |
 | `PUT /v1/gslbs/{gslb_id}/routing-control`<br>(setgslbregionalroutingcontrol) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: region |
 
@@ -1132,17 +1132,17 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/vpc-peerings/{vpc_peering_id}/routing-rules`<br>(createvpcpeeringrule) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: destination_cidr |
 | `DELETE /v1/privatelink-services/{privatelink_service_id}`<br>(deleteprivatelinkservice) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | DELETE while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 20 |
 | `DELETE /v1/vpc-endpoints/{vpc_endpoint_id}`<br>(deletevpcendpoint) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | DELETE while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 20 |
-| `GET /v1/internet-gateways`<br>(listinternetgateways) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/nat-gateways`<br>(listnatgateways) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/privatelink-endpoints`<br>(listprivatelinkendpoints) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/privatelink-services`<br>(listprivatelinkservices) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/private-nats`<br>(listprivatenats) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/publicips`<br>(listpublicip) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/subnets`<br>(listsubnets) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/transit-gateways`<br>(listtransitgateways) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/vpc-endpoints`<br>(listvpcendpoints) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/vpc-peerings`<br>(listvpcpeerings) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/vpcs`<br>(listvpcs) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/internet-gateways`<br>(listinternetgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/nat-gateways`<br>(listnatgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/privatelink-endpoints`<br>(listprivatelinkendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/privatelink-services`<br>(listprivatelinkservices) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/private-nats`<br>(listprivatenats) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/publicips`<br>(listpublicip) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/subnets`<br>(listsubnets) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/transit-gateways`<br>(listtransitgateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpc-endpoints`<br>(listvpcendpoints) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpc-peerings`<br>(listvpcpeerings) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpcs`<br>(listvpcs) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/privatelink-services/{privatelink_service_id}`<br>(setprivatelinkservice) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | PUT (set) while the resource is still CREATING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측 |
 | `PUT /v1/publicips/{publicip_id}`<br>(setpublicip) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 | `PUT /v1/subnets/{subnet_id}/vips/{vip_id}`<br>(setsubnetvip) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
@@ -1154,8 +1154,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/vpn-gateways`<br>(createvpngateway) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: ip_address, ip_id, ip_type, name, vpc_id |
 | `POST /v1/vpn-tunnels`<br>(createvpntunnel) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, vpn_gateway_id |
-| `GET /v1/vpn-gateways`<br>(listvpngateways) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/vpn-tunnels`<br>(listvpntunnels) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/vpn-gateways`<br>(listvpngateways) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/vpn-tunnels`<br>(listvpntunnels) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/vpn-gateways/{vpn_gateway_id}`<br>(setvpngateway) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | PUT (set) while the resource is still EDITING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측/ |
 | `PUT /v1/vpn-tunnels/{vpn_tunnel_id}`<br>(setvpntunnel) | YELLOW | 생성/변경 202 후 상태가 안정될 때까지 후속 변경이 400으로 거절되는데, 대기 필요가 문서에 없음 | PUT (set) while the resource is still EDITING (async 202 from the preceding create/set) -> 400 invalid-state; the doc page never states that a caller must poll to ACTIVE before mutating — 자동화 클라이언트 following only the endpoint doc hits an undocumented race. 실측/ |
 
@@ -1165,8 +1165,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
-| `GET /v1/product-categories`<br>(listproductcategories) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 14) |
-| `GET /v1/products`<br>(listproducts) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 20) |
+| `GET /v1/product-categories`<br>(listproductcategories) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 14) |
+| `GET /v1/products`<br>(listproducts) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 20) |
 
 #### platform/sts — 3건
 
@@ -1206,8 +1206,8 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `POST /v1/kms/openapi/encrypt/{key_id}`<br>(encryptdata) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: plaintext |
 | `POST /v1/kms/openapi/hmac/{key_id}`<br>(hmac) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: input |
 | `PUT /v1/kms/transit/{key_id}/acl-cidr`<br>(kmssetaclcidr) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: acl_cidr |
-| `GET /v1/kms/transit`<br>(listkeys) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
-| `GET /v1/managed-kms/transit`<br>(listmanagedkeys) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/kms/transit`<br>(listkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
+| `GET /v1/managed-kms/transit`<br>(listmanagedkeys) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `POST /v1/kms/openapi/rewrap/{key_id}`<br>(rewrapdata) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: ciphertext |
 | `POST /v1/kms/openapi/sign/{key_id}`<br>(signdata) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: input |
 | `PUT /v1/kms/transit/{key_id}/description`<br>(updatedescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
@@ -1219,7 +1219,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | API | 심각도 | 문제 | 근거 |
 |---|---|---|---|
 | `POST /v1/secrets`<br>(createsecretsmanager) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kms_id, name |
-| `GET /v1/secrets`<br>(listsecretsmanager) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/secrets`<br>(listsecretsmanager) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `PUT /v1/secrets/{secret_id}/kmsid`<br>(setkmsid) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: kms_id |
 | `PUT /v1/secrets/{secret_id}/description`<br>(setsecretdescription) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: description |
 | `PUT /v1/secrets/{secret_id}/label`<br>(setsecretsmanagerlabel) | YELLOW | 성공(2xx) 응답 스키마가 문서에 없음 | PUT 2xx documents no schema |
@@ -1231,7 +1231,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/secretvault`<br>(createsecretvault) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: access_key_id, acl_cidr, name |
 | `GET /v1/temporarykey/{secret_vault_id}`<br>(gettemporarykey) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
-| `GET /v1/secretvault`<br>(listsecretvault) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/secretvault`<br>(listsecretvault) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 
 ### storage
 
@@ -1254,7 +1254,7 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 |---|---|---|---|
 | `POST /v1/backups`<br>(createbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: name, server_uuid |
 | `POST /v1/backup-agents`<br>(createbackupagent) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: server_uuid |
-| `GET /v1/backups/region-relationship`<br>(listbackupregionrelationship) | YELLOW | 페이지네이션 파라미터(size/page) 미준수 | ignores size=1 (returned 2) |
+| `GET /v1/backups/region-relationship`<br>(listbackupregionrelationship) | YELLOW | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, listbillingitemids 276개), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | ignores size=1 (returned 2) |
 | `GET /v1/backups/{backup_id}/restore/restorable-subnets`<br>(listbackuprestoresubnets) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `GET /v1/backups/{backup_id}/filesystem-path`<br>(listfilesystempath) | YELLOW | 존재하지 않는 리소스 조회에 404가 아닌 코드 반환 | non-existent id -> 400 (not 404) |
 | `POST /v1/backups/{backup_id}/restore-agent-backup`<br>(restoreagentbackup) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: restore_server_uuid, restore_target_id |
