@@ -6,11 +6,11 @@
 
 | 판정 | 엔드포인트 수 | 비율 |
 |---|---:|---:|
-| 이상 없음 | 937 | 66.2% |
+| 이상 없음 | 936 | 66.1% |
 | 개선 필요 (YELLOW) | 448 | 31.6% |
-| 우선 개선 (RED) | 31 | 2.2% |
+| 우선 개선 (RED) | 32 | 2.3% |
 
-개선 항목 총 538건 = 본문 508건 + 부록(검토 필요) 30건 — 부록은 환경·정책에 따라 해석이 달라질 수 있는 항목입니다. 플랫폼 공통 항목은 §2(4종)·§7(2종).
+개선 항목 총 540건 = 본문 510건 + 부록(검토 필요) 30건 — 부록은 환경·정책에 따라 해석이 달라질 수 있는 항목입니다. 플랫폼 공통 항목은 §2(4종)·§7(2종).
 
 > 확인 방법: 존재하지 않는 id는 플랫폼의 두 id 형식(32-hex·대시 UUID)을 모두 사용해 확인했으며, size/page를 문서화하지 않은 API의 전량 반환은 항목에서 제외했습니다.
 
@@ -19,14 +19,14 @@
 | 메서드 | 전체 API | 항목 | RED | 항목/100API |
 |---|---:|---:|---:|---:|
 | GET | 546 | 140 | 6 | 25.6 |
-| POST | 393 | 275 | 22 | 70.0 |
+| POST | 393 | 277 | 24 | 70.5 |
 | PUT | 257 | 108 | 2 | 42.0 |
 | DELETE | 211 | 6 | 1 | 2.8 |
 | PATCH | 9 | 9 | 0 | 100.0 |
 
 ### 항목 구분
 
-규격 관련 176건 · 문서 관련 360건 · 기능 동작 관련 2건 (기능 항목은 별도 검토 권장). 각 행과 CSV의 cls 컬럼에 구분 표기.
+규격 관련 178건 · 문서 관련 360건 · 기능 동작 관련 2건 (기능 항목은 별도 검토 권장). 각 행과 CSV의 cls 컬럼에 구분 표기.
 
 ### 상품군별 통계
 
@@ -35,7 +35,7 @@
 | database | 272 | 11 | 51 | 72 |
 | management | 250 | 6 | 90 | 104 |
 | data-analytics | 123 | 5 | 35 | 47 |
-| networking | 216 | 2 | 74 | 81 |
+| networking | 216 | 3 | 74 | 83 |
 | compute | 181 | 2 | 69 | 84 |
 | container | 64 | 2 | 26 | 35 |
 | financial-management | 21 | 2 | 5 | 11 |
@@ -70,22 +70,23 @@
 | data-analytics/vertica | 24 | 1 | 5 | 7 |
 | data-analytics/eventstreams | 25 | 1 | 4 | 6 |
 | data-analytics/quick-query | 12 | 1 | 4 | 5 |
-| management/iam | 62 | 0 | 19 | 19 |
+| networking/loadbalancer | 37 | 1 | 1 | 3 |
 | compute/scf | 36 | 0 | 18 | 19 |
+| management/iam | 62 | 0 | 19 | 19 |
 | security/kms | 23 | 0 | 15 | 15 |
-| management/organization | 37 | 0 | 11 | 11 |
 | networking/cdn | 9 | 0 | 8 | 11 |
+| management/organization | 37 | 0 | 11 | 11 |
 | data-analytics/data-flow | 17 | 0 | 6 | 8 |
 | storage/archivestorage | 26 | 0 | 8 | 8 |
 | storage/filestorage | 22 | 0 | 8 | 8 |
-| networking/dns | 22 | 0 | 7 | 7 |
 | management/cloudcontrol | 15 | 0 | 7 | 7 |
+| networking/dns | 22 | 0 | 7 | 7 |
+| security/secretsmanager | 14 | 0 | 6 | 6 |
 | management/resourcemanager | 27 | 0 | 6 | 6 |
+| networking/vpn | 10 | 0 | 6 | 6 |
 | storage/backup | 31 | 0 | 6 | 6 |
 | ai-ml/aimlops-platform | 12 | 0 | 4 | 6 |
-| networking/vpn | 10 | 0 | 6 | 6 |
 | storage/baremetal-blockstorage | 41 | 0 | 6 | 6 |
-| security/secretsmanager | 14 | 0 | 6 | 6 |
 | networking/security-group | 17 | 0 | 5 | 5 |
 | compute/baremetal | 16 | 0 | 5 | 5 |
 | networking/gslb | 10 | 0 | 5 | 5 |
@@ -94,17 +95,16 @@
 | security/certificatemanager | 7 | 0 | 4 | 4 |
 | financial-management/costexplorer | 3 | 0 | 2 | 4 |
 | application-service/queueservice | 12 | 0 | 3 | 3 |
-| financial-management/budget | 5 | 0 | 3 | 3 |
 | compute/multinodegpucluster | 16 | 0 | 3 | 3 |
 | networking/firewall | 8 | 0 | 2 | 3 |
+| financial-management/budget | 5 | 0 | 3 | 3 |
 | platform/sts | 3 | 0 | 3 | 3 |
-| ai-ml/cloud-ml | 9 | 0 | 2 | 2 |
-| security/configinspection | 8 | 0 | 2 | 2 |
-| management/quota | 4 | 0 | 2 | 2 |
 | platform/product | 4 | 0 | 2 | 2 |
+| security/configinspection | 8 | 0 | 2 | 2 |
+| ai-ml/cloud-ml | 9 | 0 | 2 | 2 |
 | management/loggingaudit | 10 | 0 | 2 | 2 |
 | security/secretvault | 5 | 0 | 2 | 2 |
-| networking/loadbalancer | 37 | 0 | 1 | 1 |
+| management/quota | 4 | 0 | 2 | 2 |
 | devops-tools/devopsservice | 6 | 0 | 1 | 1 |
 | management/network-logging | 4 | 0 | 1 | 1 |
 
@@ -127,7 +127,7 @@
 | `pagination` | 39 | 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음 | size개만 반환 + count/page/size 메타 제공. 의도적 전량 반환 API라면 size/page 파라미터를 문서에서 제거 |
 | `param-naming` | 16 | 경로 파라미터 명명이 표준과 다름 | 리소스명을 포함한 파라미터명 사용(예: {alert_id}) |
 | `opaque-validation` | 13 | 잘못된 입력에 대한 400 응답이 원인 필드와 위반 규칙을 특정하지 않음 | 에러 응답에 필드명과 위반 내용을 포함 |
-| `runtime.500-on-client-state` | 9 | 클라이언트가 유발한 상태·입력에 500 반환 | 4xx + 원인/해소 방법 안내 (500은 서버 내부 오류 신호로만) |
+| `runtime.500-on-client-state` | 10 | 클라이언트가 유발한 상태·입력에 500 반환 | 4xx + 원인/해소 방법 안내 (500은 서버 내부 오류 신호로만) |
 | `method-verb` | 9 | 엔드포인트 이름의 동사와 HTTP 메서드 불일치 | 동사-메서드 정합(조회=GET, 생성=POST 등) |
 | `schema-undocumented-field` | 8 | 실제 응답에 문서에 없는 필드 존재 | 응답 스키마 문서 갱신 |
 | `docs.async-settle-undocumented` | 6 | 생성/변경 202 후 상태가 안정(ACTIVE)되기 전의 set/delete를 400으로 거절 — 400은 "요청 자체가 잘못됨" 신호라 클라이언트가 "기다렸다 재시도" 판단을 할 수 없음. 같은 상태-충돌에 플랫폼 내 다른 서비스는 이미 409를 반환(SCR creating-cannot-delete 409, VIP connected-ports 409 — 실측 원문 §5.5 인접) | 일시-상태 거절은 409로 통일(플랫폼 자체 선례 준용). 보조로 "202=접수, ACTIVE 후 변경 가능" 문서화 |
@@ -144,9 +144,10 @@
 | `compute.image-sharing-delete-during-transfer-unguarded` | 1 | 공유 전송 중인 원본 이미지 삭제가 차단 없이 성공(204) → 파생 임시 볼륨 영구 고아화 | 전송 중 원본 삭제를 409로 차단하거나 파생 자원 연쇄 정리 |
 | `schema-missing-field` | 1 | 문서상 필수 응답 필드가 실제 응답에 없음 | 문서-실응답 정합 |
 | `docs.version-semantics-undocumented` | 1 | 버전에 따라 응답 시맨틱이 다른데(1.1=202+빈 바디) 문서는 1.0 동작만 기술 | 버전별 응답 차이 문서화 |
+| `loadbalancer.accept-then-hang` | 1 | 전제조건(subnet 전이 완료) 미충족 상태의 생성 요청을 202로 수락한 뒤 영구 Creating 상태로 유지 — 거부·수렴·실패 전이 중 어느 것도 없어 클라이언트는 타임아웃 외 판단 불가, 잔존 리소스는 LB 삭제로도 정리되지 않음 | 전제조건 미충족 시 409로 거절하거나, 수렴/실패 상태로 전이 |
 | `runtime.empty-collection-404` | 1 | 빈 컬렉션 조회가 404 반환 | 빈 컬렉션은 200 + 빈 배열 |
 
-## 4. 우선 조치 대상 (RED) — 31개 API
+## 4. 우선 조치 대상 (RED) — 32개 API
 
 ### application-service/apigateway — `PUT /v1/privatelink-endpoints/{privatelink_endpoint_id}/approval` (approveprivatelinkendpoint)
 - **[문서]** 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음
@@ -367,6 +368,14 @@
 - **[규격]** 존재하지 않는 리소스 조회가 200 반환
   - 근거: non-existent id -> 200 (should be 404)
   - 조치 방안: 부재 리소스는 404
+
+### networking/loadbalancer — `POST /v1/lb-health-checks` (createlbhealthcheck)
+- **[규격]** 전제조건(subnet 전이 완료) 미충족 상태의 생성 요청을 202로 수락한 뒤 영구 Creating 상태로 유지 — 거부·수렴·실패 전이 중 어느 것도 없어 클라이언트는 타임아웃 외 판단 불가, 잔존 리소스는 LB 삭제로도 정리되지 않음
+  - 근거: Health-check create issued while the target subnet is re-transitioning (a preceding LB create/PUT or subnet-VIP op) is ACCEPTED (202) but then sits in Creating forever — no rejection, no convergence, no failure transition. The caller can only give up by timeout, and the zombie health-check remains (it does not cascade-delete with the LB). Observed 2026-07-30 (kr-west1). Expected: reject the call (409) when the precondition is not met, or converge/fail-transition.
+  - 조치 방안: 전제조건 미충족 시 409로 거절하거나, 수렴/실패 상태로 전이
+- **[규격]** 클라이언트가 유발한 상태·입력에 500 반환
+  - 근거: Same precondition gap, second shape: subnet ACTIVE on the VPC plane but LB-service partition metadata not yet propagated -> 500 scp-loadbalancer.common.search-partition-error (req-8571a7db, 2026-07-31). A client-timing condition surfaced as a server error with no retry hint. Expected: 4xx with a retryable indication.
+  - 조치 방안: 4xx + 원인/해소 방법 안내 (500은 서버 내부 오류 신호로만)
 
 ### networking/vpc — `GET /v1/subnets` (listsubnets)
 - **[규격]** 목록 조회에 ?size=1을 보내도 전량 반환(size 무시 — 실측: listservertypes 121개, costexplorer listbills/listusages 각 20개 — 모두 size/page를 문서화한 API), 또는 페이징 메타(count/total) 부재로 클라이언트가 순회 종료 시점을 알 수 없음
@@ -1066,10 +1075,12 @@ PUT /v1/privatelink-endpoints/{ple_id}/approval
 | `PUT /v1/gslbs/{gslb_id}/health-check`<br>(setgslbhealthcheck) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: protocol |
 | `PUT /v1/gslbs/{gslb_id}/routing-control`<br>(setgslbregionalroutingcontrol) | YELLOW | 필수 파라미터의 값 형식·제약·출처가 API Reference에 없음 | required fields with no documented constraint: region |
 
-#### networking/loadbalancer — 1건
+#### networking/loadbalancer — 3건
 
 | API | 심각도 | 확인된 사항 | 근거 |
 |---|---|---|---|
+| `POST /v1/lb-health-checks`<br>(createlbhealthcheck) | RED | 전제조건(subnet 전이 완료) 미충족 상태의 생성 요청을 202로 수락한 뒤 영구 Creating 상태로 유지 — 거부·수렴·실패 전이 중 어느 것도 없어 클라이언트는 타임아웃 외 판단 불가, 잔존 리소스는 LB 삭제로도 정리되지 않음 | Health-check create issued while the target subnet is re-transitioning (a preceding LB create/PUT or subnet-VIP op) is ACCEPTED (202) but then sits in Creating forever — no rejection, no convergence, no failure transition. The caller can only give up by timeou |
+| `POST /v1/lb-health-checks`<br>(createlbhealthcheck) | RED | 클라이언트가 유발한 상태·입력에 500 반환 | Same precondition gap, second shape: subnet ACTIVE on the VPC plane but LB-service partition metadata not yet propagated -> 500 scp-loadbalancer.common.search-partition-error (req-8571a7db, 2026-07-31). A client-timing condition surfaced as a server error with |
 | `GET /v1/loadbalancers/{loadbalancer_id}/static-nats`<br>(showloadbalancerpublicnatip) | YELLOW | 빈 컬렉션 조회가 404 반환 | GET .../{loadbalancer_id}/static-nats on a load balancer with zero NAT IPs attached -> 404 instead of 200 [] (empty collection represented as not-found rather than an empty successful list). 실측 2026-07-16. |
 
 #### networking/security-group — 5건

@@ -411,7 +411,32 @@ _DETAIL_REPR = [
         "req-210f6bdc-3f2a-4932-9585-5e8c8167773e, 2026-08-20). Same repr-leak "
         "shape as createplannedcomputes. Immediate-fix per owner triage."),
 ]
-ALL = ALL + _DETAIL_REPR
+# ---------------------------------------------------------------------------
+# Class 11 — PF-52: lb-health-check create in the subnet-propagation window
+# (tracker PRODUCT-FINDINGS PF-52; owner-observed 2026-07-30 + run 5e3f
+# req-8571a7db). Two manifestations of the same cross-service propagation gap.
+# ---------------------------------------------------------------------------
+_PF52 = [
+    LiveFinding(
+        "networking/loadbalancer/createlbhealthcheck",
+        "loadbalancer.accept-then-hang", RED,
+        "Health-check create issued while the target subnet is re-transitioning "
+        "(a preceding LB create/PUT or subnet-VIP op) is ACCEPTED (202) but then "
+        "sits in Creating forever — no rejection, no convergence, no failure "
+        "transition. The caller can only give up by timeout, and the zombie "
+        "health-check remains (it does not cascade-delete with the LB). "
+        "Observed 2026-07-30 (kr-west1). Expected: reject the call (409) when "
+        "the precondition is not met, or converge/fail-transition."),
+    LiveFinding(
+        "networking/loadbalancer/createlbhealthcheck",
+        "runtime.500-on-client-state", RED,
+        "Same precondition gap, second shape: subnet ACTIVE on the VPC plane "
+        "but LB-service partition metadata not yet propagated -> 500 "
+        "scp-loadbalancer.common.search-partition-error (req-8571a7db, "
+        "2026-07-31). A client-timing condition surfaced as a server error "
+        "with no retry hint. Expected: 4xx with a retryable indication."),
+]
+ALL = ALL + _DETAIL_REPR + _PF52
 
 
 def entries() -> list[dict]:
