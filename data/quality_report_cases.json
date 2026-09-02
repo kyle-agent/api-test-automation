@@ -1,0 +1,35 @@
+{
+ "_note": "quality_report §5 실측 예시 — conformance.quality_report가 로드. 재검증 시 최신 실측으로 교체; 파일이 없으면 §5는 생략된다.",
+ "cases": [
+  {
+   "key": "scf",
+   "title": "compute/scf — 유효 런타임 셋과 문서·에러 메시지 불일치",
+   "desc": "문서 예시와 동일한 runtime 값(\"Node.js:20\")을 400으로 거절하면서, 에러 메시지에는 그 값을 유효 예시로 인용. 유효 런타임 변경이 문서와 에러 메시지에 반영되지 않음.",
+   "method": "POST",
+   "path": "/v1/cloud-functions",
+   "req": "{\"name\": \"regrscf99c369a3\", \"runtime\": \"Node.js:20\", \"content\": \"exports.handler = async () => ({ statusCode: 200, body: 'regr' });\"}",
+   "status": 400,
+   "resp": "{\"errors\":[{\"code\":\"scp-cloud-function.invalid-runtime\",\"detail\":\"Invalid runtime. Runtime should be in the format '{runtime}:{version}', such as 'Node.js:20'.\",\"global_request_id\":\"req-7331d2ba-1698-49a0-9761-fd73cecfc196\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-c1f3d8f6-0a4e-4d4c-8e3c-9646d7ed1e2b\",\"response\":null,\"status\":400,\"title\":\"InvalidRuntimeError\"}]}\n"
+  },
+  {
+   "key": "kms",
+   "title": "security/kms — 정상 요청에 500",
+   "desc": "문서 스펙대로의 키 생성 요청에 500 \"Vault error\". 클라이언트가 조치할 방법이 없는 응답.",
+   "method": "POST",
+   "path": "/v1/kms/transit",
+   "req": "{\"auto_rotate\": \"Y\", \"description\": \"API regression suite (crypto)\", \"key_type\": \"advanced\", \"name\": \"regrkmsc99c59c33\", \"purpose\": \"rsa-2048\", \"rotate_cycle\": 7}",
+   "status": 500,
+   "resp": "{\"errors\":[{\"code\":\"scp-security.kms.vault-error\",\"detail\":\"Vault error\",\"global_request_id\":\"req-2d747a7b-549e-4635-860d-bc6f861b5b95\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-ccad9686-5efc-461a-93c5-20930475624a\",\"response\":null,\"status\":500,\"title\":\"KmsVaultError\"}]}\n"
+  },
+  {
+   "key": "ple",
+   "title": "application-service/apigateway — 승인 처리에 500",
+   "desc": "PrivateLink Endpoint 승인 PUT이 500 ContactAdminForAssistance. 동일 계열(클라이언트 상태에 500)이 9개 API에서 재현됨.",
+   "method": "PUT",
+   "path": "/v1/privatelink-endpoints/{ple_id}/approval",
+   "req": "{\"api_id\": \"e7b61e90255b4ee9a4362c71\", \"type\": \"APPROVE\"}",
+   "status": 500,
+   "resp": "{\"errors\":[{\"code\":\"ContactAdminForAssistance\",\"detail\":\"There was a problem processing your request.\\nContact us through Support Center > Contact Us.\",\"global_request_id\":\"req-07496a45-a460-42de-bb75-bc37b9eb2cae\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-dc07979c-f024-4eb9-b147-35eb61e6d7f8\",\"response\":null,\"status\":500,\"title\":\"ContactAdminForAssistance\"}]}\n"
+  }
+ ]
+}

@@ -4092,3 +4092,22 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   미문서 전량반환 18건 결함 제외. 폴드: **green 937 / yellow 448 / red 31**.
 - 최종 전달본 구조: 확정 508건(본문) + 검토 30건(부록 — 403 은닉설계
   가능성·WAF 417·CORS·Accept-Language), tier 컬럼 CSV 동봉.
+
+## 품질점검 리포트 기능화 — `conformance.quality_report` (2026-09-02, 오너 "기능으로 구현해줘")
+
+- 8/20 핸드오프를 만들던 스크래치 스크립트 2개(gen + build) 를 `conformance/quality_report.py` 한 모듈로 이식.
+  같은 입력(data/conformance.json @ f739bcaa) 으로 재생성 시 항목 540건 · 본문 510 · 부록 30 · 요약 936/448/32 로
+  커밋본과 일치 (핸드오프 MD 대비 diff 는 하드코딩 숫자 3곳뿐 — 404-반환 API 수·detail 배열 건수·Spring 서비스 수를
+  데이터에서 다시 계산하도록 바꿈).
+- 판정 입력을 파일에서 직접 도출: 부재-id 403/401 → 부록은 `reports/runtime_notfound.json` 의
+  `status_nonexistent_id`; §5.5 엔벨로프 현황은 `runtime_errors.json`(envelope_keys 에 timestamp = Spring) +
+  `runtime_status.json`(`"detail":[` vs `"detail":"`, `"detail":"[` = 파이썬 repr). §5 요청/응답 원문은
+  `data/quality_report_cases.json` (없으면 §5 생략 — 검증계 재검증 때 교체).
+- 헤더의 분석 대상 수는 conformance.json `summary.total`(1,416) 을 쓴다 — 카탈로그 method 카운트는 1,417 로
+  method 없는 항목이 1개 섞여 있어 다르다.
+- 환경 표기: `--env-label` 또는 `SCP_ENV_LABEL` → 헤더 "(검증계 · <날짜> 실측 기준, <SCP_REGION>)" + 파일명·출력
+  디렉터리(`reports/quality/<날짜>-<라벨>/`). 콘솔2 📐 버튼은 폴드 뒤 `reports/quality/<run-id>/` 에 생성 +
+  버킷 `runs/<run-id>/artifact/` 에 3종 업로드. 절차 전체는 `docs/QUALITY-REPORT.md`.
+- 어투 회귀 방지: `BANNED_WORDS`(결함/확정/소행/오탐/재실시) 를 오프라인 테스트가 MD/HTML 전문에서 검사
+  (`tests/offline/test_quality_report.py`) — RULE_KR/SYS_KR 에 없는 유형이 conformance.json 에 생기면 실패하므로
+  새 규칙 추가 시 한국어 문구도 같이 추가.

@@ -2581,24 +2581,46 @@ def _conformance_worker(rec: dict) -> None:
             rc2 = subprocess.run(
                 [sys.executable, "-m", "conformance.static"],
                 cwd=str(ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+        # 폴드 결과로 개발팀 전달용 품질점검 리포트(MD/HTML/CSV)까지 바로 생성
+        # (오너 2026-09-02 "report 생성하는 부분을 기능으로") — 환경 표기는
+        # SCP_ENV_LABEL. 실패해도 프로브 런 자체는 done.
+        report_files: list = []
+        try:
+            from conformance import quality_report as _qr
+            res = _qr.generate(ROOT, ROOT / "reports" / "quality" / rec["id"],
+                               os.environ.get("SCP_ENV_LABEL", ""))
+            report_files = [res["md"], res["html"], res["csv"]]
+            with open(logp, "a", encoding="utf-8") as f:
+                s = res["summary"]
+                f.write(f"\n=== quality report (conformance.quality_report) ===\n"
+                        f"green {s['green']} / yellow {s['yellow']} / red {s['red']} "
+                        f"(총 {s['total']}) · 항목 {res['rows']}건 = 본문 {res['main']} + "
+                        f"부록 {res['appendix']}\n")
+                for fp in report_files:
+                    f.write(f"  {fp.relative_to(ROOT)}\n")
+        except Exception as _exc:  # noqa: BLE001
+            with open(logp, "a", encoding="utf-8") as f:
+                f.write(f"\n(quality report skipped: {_exc})\n")
         # 결과를 op 버킷에 미러 (오너 2026-08-20 "그 결과는 oplog에는 없는거야?")
         # — 원격 세션이 git 푸시 없이 직접 소비. best-effort: 업로드 실패가
         # 프로브 런을 실패로 만들지 않는다.
         try:
             from core import oplog as _oplog
+            _ct = {".json": "application/json", ".md": "text/markdown; charset=utf-8",
+                   ".html": "text/html; charset=utf-8", ".csv": "text/csv; charset=utf-8"}
             with open(logp, "a", encoding="utf-8") as f:
                 f.write("\n=== upload results to op bucket ===\n")
                 n = 0
-                for fp in sorted((ROOT / "reports").glob("runtime_*.json")):
+                ups = sorted((ROOT / "reports").glob("runtime_*.json"))
+                conf = ROOT / "data" / "conformance.json"
+                if conf.exists():
+                    ups.append(conf)
+                ups.extend(report_files)
+                for fp in ups:
                     if _oplog.put_text(f"runs/{rec['id']}/artifact/{fp.name}",
                                        fp.read_text(encoding="utf-8"),
-                                       "application/json"):
+                                       _ct.get(fp.suffix, "text/plain; charset=utf-8")):
                         n += 1
-                conf = ROOT / "data" / "conformance.json"
-                if conf.exists() and _oplog.put_text(
-                        f"runs/{rec['id']}/artifact/conformance.json",
-                        conf.read_text(encoding="utf-8"), "application/json"):
-                    n += 1
                 f.write(f"uploaded {n} file(s) -> runs/{rec['id']}/artifact/\n")
         except Exception as _exc:  # noqa: BLE001
             with open(logp, "a", encoding="utf-8") as f:

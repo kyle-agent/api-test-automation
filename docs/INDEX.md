@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 82 docs · 31 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 84 docs · 33 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -13,6 +13,7 @@
 | [`HANDOVER-2026-07-29.md`](HANDOVER-2026-07-29.md) | all | 인수인계 — SCP API 회귀 테스트 플랫폼 (2026-07-29 기준) | 🟢 active |
 | [`OPS-DASHBOARD.md`](OPS-DASHBOARD.md) | human-ops | Ops dashboard — 영구 oplog 버킷(apitest-oplog-permanent) + 정적 뷰어 | 🟢 active |
 | [`PLATFORM-PLAN.md`](PLATFORM-PLAN.md) | all | SCP API Regression Test Platform — 업그레이드 계획 | 🟢 active |
+| [`QUALITY-REPORT.md`](QUALITY-REPORT.md) | human-ops | SCP API 품질점검 결과 리포트 — 생성·재검증 런북 (`conformance.quality_report`) | 🟢 active |
 | [`RESOURCE-MODEL-PLAN.md`](RESOURCE-MODEL-PLAN.md) | all | 자원 모델 기반 시나리오 합성 (Resource Task Model) — 설계 | 🟢 active |
 | [`agent-team.md`](agent-team.md) | all | The Agent Team — design & operating model | 🟢 active |
 | [`lessons.md`](lessons.md) | all | Lessons | 🟢 active |
@@ -21,6 +22,7 @@
 ## Working — current state
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
+| [`working/API-QUALITY-DEVTEAM-REPORT-2026-08-20.md`](working/API-QUALITY-DEVTEAM-REPORT-2026-08-20.md) | all | SCP API 품질점검 결과 — 2026-08-20 | 🟢 active |
 | [`working/CONFORMANCE-QUALITY-REPORT-2026-08-20.md`](working/CONFORMANCE-QUALITY-REPORT-2026-08-20.md) | all | SCP API 품질 컨포먼스 리포트 — 2026-08-20 | 🟢 active |
 | [`working/CONTEXT.md`](working/CONTEXT.md) | orchestrator | Shared Context (CONTEXT.md) | 🟢 active |
 | [`working/DOCS-MCP-FEASIBILITY.md`](working/DOCS-MCP-FEASIBILITY.md) | all | SCP Docs MCP Server — 도입 타당성 조사 (2026-07-15) | 🟢 active |
