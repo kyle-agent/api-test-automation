@@ -45,3 +45,31 @@ def test_no_literal_zone_hardcodes_left():
             if "kr-west1-b" in line or '"{region}-a"' in line or '"{region}-b"' in line:
                 bad.append(f"{p.name}:{i}")
     assert not bad, f"존 리터럴/준-리터럴 하드코딩 잔존 (값 위치): {bad}"
+
+
+def test_ske_nodepool_os_version_is_captured_not_hardcoded():
+    """2026-09-17 run 915f: k8s 버전 목록이 밀려 [1]=v1.35.5가 되자 하드코딩
+    ubuntu 22.04(v1.34.3 이하에만 존재)가 create-nodepool을 죽였다. OS 버전은
+    list-images 응답에서 {kube_ver}/{kube_ver_next}에 맞춰 캡처한다."""
+    import json
+    root = pathlib.Path(engine.__file__).resolve().parent
+    d = json.loads((root / "scenarios.json").read_text(encoding="utf-8"))
+    lc = next(l for l in d["lifecycles"] if l["id"] == "container-ske-cluster-nodepool")
+    steps = {s["name"]: s for s in lc["steps"]}
+    cap = steps["list-images"]["capture"]
+    assert cap["np_os_ver"]["where_prefix"] == {"kubernetes_version": "{kube_ver}", "os": "ubuntu"}
+    assert cap["np_os_ver_next"]["where_prefix"] == {"kubernetes_version": "{kube_ver_next}", "os": "ubuntu"}
+    assert steps["create-nodepool"]["json"]["image_os_version"] == "{np_os_ver}"
+    assert steps["upgrade-nodepool"]["json"]["os_version"] == "{np_os_ver_next}"
+    names = [s["name"] for s in lc["steps"]]
+    assert names.index("list-images") < names.index("create-nodepool")
+    imgs = {"nodepool_images": [
+        {"kubernetes_version": "v1.36.3", "os": "ubuntu", "os_version": "24.04"},
+        {"kubernetes_version": "v1.35.5", "os": "rhel", "os_version": "9.6"},
+        {"kubernetes_version": "v1.35.5", "os": "ubuntu", "os_version": "24.04"},
+        {"kubernetes_version": "v1.34.3", "os": "ubuntu", "os_version": "22.04"}]}
+    ctx = {"kube_ver": "v1.35.5", "kube_ver_next": "v1.36.3"}
+    assert engine._capture(imgs, cap["np_os_ver"], ctx) == "24.04"
+    ctx = {"kube_ver": "v1.34.3", "kube_ver_next": "v1.35.5"}
+    assert engine._capture(imgs, cap["np_os_ver"], ctx) == "22.04"
+    assert engine._capture(imgs, cap["np_os_ver_next"], ctx) == "24.04"

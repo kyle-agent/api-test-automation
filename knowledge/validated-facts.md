@@ -4166,3 +4166,19 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   "size_gb":56,"volume_type":"SSD"}` 추가(8의 배수 제약 준수). 후속 `add-block-storages`는 [2]로
   붙고 resize 대상 `block_storage_groups[1]`은 여전히 DATA라 인덱스 캡처 무변경. sqlserver
   (guarded, 미실측)만 OS-only 유지. 다음 런 판정: 4엔진 create 202 + add-block-storages/resize 정상.
+
+## SKE 노드 이미지 매트릭스는 k8s 버전에 종속 — OS 버전 하드코딩 금지 (2026-09-17, run 915f)
+
+- `GET /v1/kubernetes-versions` 09-17 실측: [0]=v1.36.3 · [1]=v1.35.5 · v1.34.3 · v1.33.5 · v1.32.8 ·
+  v1.31.8 · v1.30.6 · v1.29.8 (8개, 최신 먼저). 8/20(run 3e67)에는 [0]=v1.35.5·[1]=v1.34.3였다.
+- `GET /v1/images?scp_original_image_type=k8s` 09-17 실측 19종: **v1.36.3·v1.35.5는 ubuntu 24.04 ·
+  rhel 9.6뿐**, ubuntu 22.04는 v1.34.3 이하(rhel 9.4/8.10 동반), rhel 8.8은 end_of_support.
+  → 시나리오가 [1]로 생성하는 규약이라 목록이 한 칸 밀리는 순간 하드코딩 `image_os_version:
+  22.04`가 create-nodepool 400 `scp-kubernetes.nodepool.invalid-os-image`가 된다(3e67은 [1]=v1.34.3
+  이라 22.04로 통과, 915f는 [1]=v1.35.5라 실패). 문서(createnodepool 1.5/1.6) 예시는 여전히
+  `22.04 + v1.29.8` — 예시가 아니라 listimages 응답이 정본.
+- 수리: `list-images`에서 `{kube_ver}`/`{kube_ver_next}`에 맞는 ubuntu `os_version`을 캡처
+  (`np_os_ver`/`np_os_ver_next`, where_prefix 토큰 치환) → create-nodepool `image_os_version`,
+  upgrade-nodepool `os_version`에 주입. 같은 OS끼리(24.04→24.04) 노드풀 업그레이드는 미실측.
+- 잔여 하드코딩: gen-heavy-aimlops(create-ske-nodepool v1.33.5+22.04 핀, 아직 유효 쌍) ·
+  gen-quick-query(v1.33.5+22.04, 어차피 500 ContactAdmin 클래스) — v1.33.5가 목록에서 빠지면 동일 수리.

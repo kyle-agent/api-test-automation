@@ -3112,6 +3112,25 @@
           "expect_status": [
             200
           ],
+          "capture": {
+            "np_os_ver": {
+              "list": "$.nodepool_images",
+              "where_prefix": {
+                "kubernetes_version": "{kube_ver}",
+                "os": "ubuntu"
+              },
+              "get": "os_version"
+            },
+            "np_os_ver_next": {
+              "list": "$.nodepool_images",
+              "where_prefix": {
+                "kubernetes_version": "{kube_ver_next}",
+                "os": "ubuntu"
+              },
+              "get": "os_version"
+            }
+          },
+          "_comment": "REPAIR 2026-09-17 (run 915f): 노드 이미지 매트릭스가 k8s 버전마다 다르다 — 실측 v1.36.3/v1.35.5는 ubuntu 24.04·rhel 9.6뿐, ubuntu 22.04는 v1.34.3 이하. 버전 목록이 밀리면(09-17: [0]=v1.36.3, [1]=v1.35.5) 하드코딩 22.04가 create-nodepool 400 invalid-os-image를 만든다. 이제 {kube_ver}/{kube_ver_next}에 맞는 ubuntu os_version을 이 응답에서 캡처해 create-nodepool(image_os_version)과 upgrade-nodepool(os_version)에 주입. 문서(createnodepool 1.5/1.6) 예시는 여전히 22.04+v1.29.8 — 예시가 아니라 listimages가 정본.",
           "_note": "scp_original_image_type is a REQUIRED query (missing -> 400 'Field required', runs 27483895557/27491816948) — this step silently logged a 400 EVERY run behind [200,400]+optional until 2026-07-08. Param proven 200 live 2026-06-20 (15 nodepool_images); hard [200] per ct-ske-image model."
         },
         {
@@ -3147,7 +3166,7 @@
             "max_node_count": "2",
             "server_type_id": "{vs_server_type}",
             "image_os": "ubuntu",
-            "image_os_version": "22.04",
+            "image_os_version": "{np_os_ver}",
             "keypair_name": "regrkey{unique}",
             "volume_size": "104",
             "volume_type_name": "SSD",
@@ -3340,7 +3359,7 @@
           "method": "PUT",
           "path": "/v1/nodepools/{nodepool_id}/upgrade",
           "json": {
-            "os_version": "24.04"
+            "os_version": "{np_os_ver_next}"
           },
           "expect_status": [
             200,
