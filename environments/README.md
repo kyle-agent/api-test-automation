@@ -68,7 +68,11 @@ Key fields (see `core/profiles.py` for the full schema):
 4. **가용영역/서버타입이 다르면 env 토큰으로 핀**:
    - `SCP_ZONE=<존>` — 존 규칙이 다른 리전 (기본: kr-west1→`-b`, 그 외→`-a`
      — 실측 기반 자동). 2026-08-01부터 시나리오의 `{region}-b` 준-리터럴도
-     전부 `{zone}` 토큰이라 이 env가 모든 존 값을 지배한다.
+     전부 `{zone}` 토큰이라 이 env가 모든 존 값을 지배한다 — **단 file
+     storage는 예외**: filestorage 볼륨은 kr-west1에서 `kr-west1-b`에만
+     존재해(오너 실측 2026-09-17, `SCP_ZONE=kr-west1-a` 핀에서 create 400)
+     `{zone_fs}` 토큰이 SCP_ZONE을 따라가지 않고 `-b`를 고정한다. 다른
+     값이 필요하면 `SCP_ZONE_FS=<존>`으로 별도 핀.
    - 서버타입 세대가 다른 오퍼링 (2026-07-29 west1 실측: s1 풀 고갈로 전
      DB 클러스터 FAILED, "신규 VM은 s2로"; 노드명은 패밀리별 —
      VM `s2v{cpu}m{mem}` · DB `db2v…` · eventstreams `ess2v…`):

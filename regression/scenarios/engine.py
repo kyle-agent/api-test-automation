@@ -526,6 +526,23 @@ def _default_zone(region: str) -> str:
     return f"{region}-b" if region == "kr-west1" else f"{region}-a"
 
 
+def _fs_zone(region: str) -> str:
+    """{zone_fs} — File Storage(filestorage) 볼륨 create 전용 가용영역.
+    filestorage는 kr-west1에서 **kr-west1-b에만** 존재한다 (오너 실측
+    2026-09-17: 오퍼링 캠페인의 SCP_ZONE=kr-west1-a 핀이 {zone}을 통째로
+    -a로 끌고 가자 filestorage create 9곳이 400 invalid-zone; 2026-07-15
+    LIVE도 kr-west1-b만 2xx, 복제쌍 kr-west1-b↔kr-east1-a). 그래서 SCP_ZONE
+    핀을 따라가지 않는 분리 토큰이다. 우선순위: SCP_ZONE_FS env → kr-west1이면
+    'kr-west1-b' 고정 → 그 외 리전은 _default_zone(region) (SCP_ZONE 포함).
+    parallel-filestorage는 실측 없음 — 그대로 {zone}."""
+    z = os.environ.get("SCP_ZONE_FS", "").strip()
+    if z:
+        return z
+    if region == "kr-west1":
+        return "kr-west1-b"
+    return _default_zone(region)
+
+
 def _alt_zone(zone: str) -> str:
     """{zone_alt} — {zone}의 반대편 가용영역 (…-a↔…-b 플립). SCP_ZONE_ALT
     env가 최우선. run 3e67 (2026-08-20) direct-connect 400 required-zone이
@@ -1202,6 +1219,9 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # 하드코딩이 교차-리전 400 InvalidAvailabilityZone을 만든 게 계기).
         "zone": _default_zone(cfg.region),
         "zone_alt": _alt_zone(_default_zone(cfg.region)),
+        # {zone_fs} — filestorage 전용 존 (2026-09-17: SCP_ZONE=-a 핀에도
+        # filestorage는 kr-west1-b뿐이라 {zone}과 분리).
+        "zone_fs": _fs_zone(cfg.region),
         # 서버타입 세대 핀 (2026-07-29 — 오퍼링 자원부족 대응; capture 필터의
         # where_prefix 값에서 {token}으로 소비된다).
         "vs_server_type_prefix": _vs_server_type_prefix(),

@@ -4111,3 +4111,19 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - 어투 회귀 방지: `BANNED_WORDS`(결함/확정/소행/오탐/재실시) 를 오프라인 테스트가 MD/HTML 전문에서 검사
   (`tests/offline/test_quality_report.py`) — RULE_KR/SYS_KR 에 없는 유형이 conformance.json 에 생기면 실패하므로
   새 규칙 추가 시 한국어 문구도 같이 추가.
+
+## filestorage는 kr-west1-b 전용 — SCP_ZONE 핀과 분리된 `{zone_fs}` 토큰 (2026-09-17, 오너 실측)
+
+- **filestorage 볼륨(POST /v1/volumes)은 kr-west1에서 `kr-west1-b`에만 생성된다.**
+  오퍼링 캠페인(존 `-a`)에서 `SCP_ZONE=kr-west1-a`를 핀하자 `{zone}` 토큰을 쓰던
+  filestorage create 9곳(filestorage-volume · filestorage-replication-schedule ·
+  container-ske-cluster-nodepool/create-vol · gen-wave2-fs · gen-cloudml-chain ·
+  gen-heavy-aimlops · gen-heavy-vs-netops · gen-vpc-endpoint · gen-wave5-vpce)이
+  일제히 invalid-zone으로 실패 — 2026-07-15 LIVE(kr-west1-b만 2xx, kr-west1-a는
+  `GET /v1/replications/zones` 대상 zones:[])와 일치.
+- **수리**: 엔진 `_fs_zone(region)` + `{zone_fs}` 토큰 신설. 우선순위
+  `SCP_ZONE_FS` env → kr-west1이면 `kr-west1-b` 고정 → 그 외 리전은
+  `_default_zone` (SCP_ZONE 포함). filestorage create 9곳 전부 `{zone_fs}`로 전환,
+  가드 테스트 `test_filestorage_volume_creates_use_zone_fs_token`이 `{zone}` 회귀를
+  막는다. parallel-filestorage는 실측이 없어 `{zone}` 유지 — 같은 증상이 나면
+  동일 방식으로 분리.

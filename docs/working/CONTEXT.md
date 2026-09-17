@@ -114,6 +114,11 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **2026-09-17 (branch `claude/amazing-davinci-z2klhq`):** 오너 런 오류 ① filestorage
+  create가 `SCP_ZONE=kr-west1-a` 핀에 끌려 400 — filestorage는 kr-west1-b뿐.
+  `{zone_fs}` 토큰(`_fs_zone`: SCP_ZONE_FS → west1 `-b` 고정 → 그 외 `_default_zone`)
+  신설, create 9곳 전환 + 가드 테스트. 나머지 오류 점검(oplog 버킷 로그)은 오너가
+  별도 세션에서 진행 예정.
 - **CURRENT (2026-08-01 — s2 오퍼링 업그레이드 전/후 캠페인, 오너 콘솔 반복 런):**
   오퍼링(west1, 존 `-a`, 서버타입 s2/db2/ess2 세대) 부분런 반복 중 — env 레시피
   정본은 `environments/README.md` 전환 체크리스트 (oplog 3종 · PIN=false ·

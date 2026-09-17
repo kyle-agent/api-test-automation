@@ -45,3 +45,53 @@ def test_no_literal_zone_hardcodes_left():
             if "kr-west1-b" in line or '"{region}-a"' in line or '"{region}-b"' in line:
                 bad.append(f"{p.name}:{i}")
     assert not bad, f"존 리터럴/준-리터럴 하드코딩 잔존 (값 위치): {bad}"
+
+
+# ── {zone_fs} — filestorage 전용 존 (2026-09-17) ──────────────────────────────
+# 오퍼링 캠페인의 SCP_ZONE=kr-west1-a 핀이 {zone}을 통째로 -a로 끌고 가자
+# filestorage create 9곳이 400 — filestorage는 kr-west1-b에만 있다 (오너 실측).
+
+
+def test_fs_zone_west_is_b_even_when_scp_zone_pins_a(monkeypatch):
+    monkeypatch.delenv("SCP_ZONE_FS", raising=False)
+    monkeypatch.setenv("SCP_ZONE", "kr-west1-a")
+    assert engine._default_zone("kr-west1") == "kr-west1-a"
+    assert engine._fs_zone("kr-west1") == "kr-west1-b"
+
+
+def test_fs_zone_other_regions_follow_default(monkeypatch):
+    monkeypatch.delenv("SCP_ZONE_FS", raising=False)
+    monkeypatch.delenv("SCP_ZONE", raising=False)
+    assert engine._fs_zone("kr-east1") == "kr-east1-a"
+    monkeypatch.setenv("SCP_ZONE", "kr-east1-z")
+    assert engine._fs_zone("kr-east1") == "kr-east1-z"
+
+
+def test_scp_zone_fs_env_wins(monkeypatch):
+    monkeypatch.setenv("SCP_ZONE_FS", "kr-west1-c")
+    monkeypatch.setenv("SCP_ZONE", "kr-west1-a")
+    assert engine._fs_zone("kr-west1") == "kr-west1-c"
+
+
+def test_filestorage_volume_creates_use_zone_fs_token():
+    """filestorage POST /v1/volumes 스텝이 {zone}을 쓰면 SCP_ZONE 핀에
+    다시 끌려간다 — 반드시 {zone_fs}. (parallel-filestorage는 실측 없어 제외.)"""
+    import json
+    root = pathlib.Path(engine.__file__).resolve().parent
+    files = list((root / "lifecycles").glob("*.json")) + [root / "scenarios.json"]
+    bad, seen = [], 0
+    for p in files:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        lcs = d["lifecycles"] if isinstance(d, dict) and "lifecycles" in d else d
+        for lc in lcs:
+            for st in lc.get("steps", []):
+                svc = st.get("service") or lc.get("service", "")
+                body = st.get("json")
+                if ("filestorage" in svc and "parallel" not in svc
+                        and st.get("path") == "/v1/volumes"
+                        and isinstance(body, dict) and "zone" in body):
+                    seen += 1
+                    if body["zone"] != "{zone_fs}":
+                        bad.append(f"{p.name}:{lc['id']}/{st.get('name')}={body['zone']}")
+    assert seen >= 9, f"filestorage create 스텝 탐지 실패 (seen={seen})"
+    assert not bad, f"filestorage create의 zone은 {{zone_fs}}여야 한다: {bad}"
