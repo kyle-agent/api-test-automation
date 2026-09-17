@@ -120,7 +120,16 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   /v1/replications/zones` 실측 `[]`, `-b`는 `['kr-east1-a']`). 조치: `.env` 핀 제거/`-b`.
   **존 가드 신설** `regression/scenarios/zone_guard.py` — read-only 프로브로 `{zone}` 검증,
   형제 존만 유효하면 차단(콘솔2 pre-flight·REAL 런 시작·`shared_infra --provision` 3곳,
-  `SCP_ZONE_CHECK=warn|false`). DBaaS 13건(존 무관, ~9s 실패)은 아티팩트 도착 후 원인 확정.
+  `SCP_ZONE_CHECK=warn|false`). 89de 최종(124 lifecycle, 91 pass / 33 fail) 아티팩트 판정:
+  존 클래스 14(서버 `InvalidServerType.Zone`·볼륨 `InvalidAvailabilityZone`/`Invalid.zone`·
+  publicip `ip.invalid-zone`·ASG `ZonesSubnetMismatch`) + **DC 2건 회귀**: 8/20 수리가 넣은
+  uplink_active/standby_zone을 단일존 VPC가 `active-standby-zone-not-allowed`로 거부 — 존 수에
+  따라 조건부 송신 필요(미수리). **DBaaS 13건 = 신규 계약**: `Dbaas.ValidationError.
+  InvalidBlockStorageDataDiskCount` "ACTIVE instance group must have 1 or more DATA block
+  storage (current: 0)" — mysql/postgresql/mariadb/epas create 바디에 DATA 블록스토리지 필수화
+  (미수리, SPEC-DIFF §2.3 DBaaS 공통 웨이브와 연관 추정). 기타: secretsmanager create 400
+  `check-namespace-error` ×2(신규) · scr quota 403(기지) · gen-vpc-endpoint 409 직렬화(기지) ·
+  lb-members static-nats 404. 개선 36 / 회귀 55 vs 3e67 (`tools.triage_run --diff`).
   스펙: 문서 사이트 리디자인으로 `spec.extract_catalog --fresh` **금지**(카탈로그 1개로
   덮어씀) — changelog 기반 부분 diff `docs/working/SPEC-DIFF-20260917.md` (cssdlan 폐기,
   messagehub 29 EP 신설, 25 서비스 버전업). 다음: 89de 아티팩트 판정 · discovery 재설계
