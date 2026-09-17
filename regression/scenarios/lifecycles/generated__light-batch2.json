@@ -532,10 +532,17 @@
             "firewall_enabled": false,
             "firewall_loggable": false,
             "tags": [],
-            "vpc_id": "{vpc_id}",
-            "uplink_active_zone": "{zone}",
-            "uplink_standby_zone": "{zone_alt}"
+            "vpc_id": "{vpc_id}"
           },
+          "fallback_on_error_code": [
+            {
+              "codes": ["scp-network.direct-connect.required-zone"],
+              "merge": {
+                "uplink_active_zone": "{zone}",
+                "uplink_standby_zone": "{zone_alt}"
+              }
+            }
+          ],
           "expect_status": [
             200,
             201,
@@ -870,10 +877,17 @@
             "firewall_enabled": false,
             "firewall_loggable": false,
             "tags": [],
-            "vpc_id": "{vpc_id}",
-            "uplink_active_zone": "{zone}",
-            "uplink_standby_zone": "{zone_alt}"
+            "vpc_id": "{vpc_id}"
           },
+          "fallback_on_error_code": [
+            {
+              "codes": ["scp-network.direct-connect.required-zone"],
+              "merge": {
+                "uplink_active_zone": "{zone}",
+                "uplink_standby_zone": "{zone_alt}"
+              }
+            }
+          ],
           "expect_status": [
             200,
             201,

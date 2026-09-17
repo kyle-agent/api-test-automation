@@ -814,6 +814,38 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         time.sleep(5)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
+    # fallback_on_error_code: 바디 에러 코드가 일치하면 **바디를 바꿔** 1회
+    # 재전송하는 조건부 변형 (2026-09-17 run 89de 계기). 서버가 같은 create를
+    # VPC 존 구성에 따라 반대로 요구하는 클래스 — direct-connect는 multi-zone
+    # VPC면 uplink_active/standby_zone 필수(400 required-zone, run 3e67), 단일존
+    # VPC면 그 필드가 금지(400 active-standby-zone-not-allowed, run 89de).
+    # 존 수를 read-only로 알 방법이 없어(VPC show에 zones 필드 없음) 서버의
+    # 거절 코드를 판정 신호로 쓴다. 형식:
+    #   [{"codes": [...], "merge": {...}, "drop": [...]}]  — merge 값은 ctx 토큰
+    # 치환, drop은 최상위 키 제거. 항목당 1회, 순서대로; 재전송 결과가 다시
+    # 4xx면 아래 상태/코드 사다리가 그대로 이어받는다.
+    fbs = step.get("fallback_on_error_code") or []
+    fbs = [fbs] if isinstance(fbs, dict) else list(fbs)
+    for fb in fbs:
+        if resp.status < 400:
+            break
+        codes = fb.get("codes") or fb.get("code") or []
+        codes = [codes] if isinstance(codes, str) else list(codes)
+        b = getattr(resp, "body", None)
+        errs = b.get("errors") if isinstance(b, dict) else None
+        if not any(isinstance(e, dict) and e.get("code") in codes for e in errs or []):
+            continue
+        nb = dict(body) if isinstance(body, dict) else body
+        if isinstance(nb, dict):
+            for k in fb.get("drop") or []:
+                nb.pop(k, None)
+            nb.update(_fill_obj(fb.get("merge") or {}, ctx))
+        print(f"  step '{step.get('name')}': error code {codes} on HTTP {resp.status} "
+              f"— re-sending with body variant (merge={list((fb.get('merge') or {}).keys())}, "
+              f"drop={fb.get('drop') or []})")
+        body = nb
+        resp = client.request(step["method"], path, json=body, service=service, params=params,
+                              headers=step.get("headers"))
     # 429 레이트리밋 재시도는 http_client.RETRY_STATUS(+Retry-After 존중)가
     # 전 요청 공통으로 처리한다 (run-c373 수리, 2026-07-13 — 병렬 세션이
     # 클라이언트 레벨로 먼저 반영) — 엔진 레벨 중복 백오프는 두지 않는다.

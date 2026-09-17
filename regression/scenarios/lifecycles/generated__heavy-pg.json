@@ -243,6 +243,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -267,7 +272,8 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
-          }
+          },
+          "_note": "REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-postgresql-cluster",
@@ -816,6 +822,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -840,7 +851,8 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
-          }
+          },
+          "_note": "REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-postgresql-cluster",
@@ -1248,6 +1260,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -1272,7 +1289,8 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
-          }
+          },
+          "_note": "REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-postgresql-cluster",

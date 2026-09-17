@@ -181,6 +181,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -215,7 +220,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "mysql"
           },
-          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived."
+          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived. || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-cluster",
@@ -1517,6 +1522,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -1554,7 +1564,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "mysql"
           },
-          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived."
+          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived. || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-cluster",
@@ -2635,6 +2645,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -2672,7 +2687,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "mysql"
           },
-          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived."
+          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived. || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-cluster",
@@ -3332,6 +3347,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -3365,7 +3385,7 @@
           "capture_soft": {
             "request_id": "$.request_id"
           },
-          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this). || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "epas-wait",
@@ -5327,6 +5347,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -5363,7 +5388,7 @@
           "capture_soft": {
             "request_id": "$.request_id"
           },
-          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this). || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "epas-wait",
@@ -7034,6 +7059,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -7070,7 +7100,7 @@
           "capture_soft": {
             "request_id": "$.request_id"
           },
-          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this). || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "epas-wait",
@@ -7822,6 +7852,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -7855,7 +7890,7 @@
           "capture_soft": {
             "request_id": "$.request_id"
           },
-          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this). || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "maria-wait",
@@ -9747,6 +9782,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -9783,7 +9823,7 @@
           "capture_soft": {
             "request_id": "$.request_id"
           },
-          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this). || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "maria-wait",
@@ -11412,6 +11452,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -11448,7 +11493,7 @@
           "capture_soft": {
             "request_id": "$.request_id"
           },
-          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this)."
+          "_note": "request_id capture_soft added 2026-07-04 (HB1 repair, mirrors mysql/postgresql's create-cluster in this same file, added 2026-06-11): AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example, verbatim across all 5 DBaaS engines in this file) — feeds the showrequest probe (GET /v1/requests/{request_id}) via probe_reads' identity/name resolution, closing the showrequest gap that HB1 hit as a 400 (no request_id ever captured for mariadb/epas/cachestore, unlike mysql/postgresql which already had this). || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "maria-wait",
@@ -15790,6 +15835,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -15824,7 +15874,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
           },
-          "_note": "Copied VERBATIM from live-proven database-postgresql-cluster (scenarios.json; verified 2xx in verified_endpoints.json). RISK: pg create 500'd ContactAdminForAssistance 2026-06-19 (known_issues.json Product Bug) and failed once on 2026-06-29 — treat a create failure as flaky/transient; give_up_status settle-polls keep a failed create cheap."
+          "_note": "Copied VERBATIM from live-proven database-postgresql-cluster (scenarios.json; verified 2xx in verified_endpoints.json). RISK: pg create 500'd ContactAdminForAssistance 2026-06-19 (known_issues.json Product Bug) and failed once on 2026-06-29 — treat a create failure as flaky/transient; give_up_status settle-polls keep a failed create cheap. || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-cluster",
@@ -17777,6 +17827,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -17814,7 +17869,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
           },
-          "_note": "Copied VERBATIM from live-proven database-postgresql-cluster (scenarios.json; verified 2xx in verified_endpoints.json). RISK: pg create 500'd ContactAdminForAssistance 2026-06-19 (known_issues.json Product Bug) and failed once on 2026-06-29 — treat a create failure as flaky/transient; give_up_status settle-polls keep a failed create cheap."
+          "_note": "Copied VERBATIM from live-proven database-postgresql-cluster (scenarios.json; verified 2xx in verified_endpoints.json). RISK: pg create 500'd ContactAdminForAssistance 2026-06-19 (known_issues.json Product Bug) and failed once on 2026-06-29 — treat a create failure as flaky/transient; give_up_status settle-polls keep a failed create cheap. || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-cluster",
@@ -19504,6 +19559,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -19541,7 +19601,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
           },
-          "_note": "Copied VERBATIM from live-proven database-postgresql-cluster (scenarios.json; verified 2xx in verified_endpoints.json). RISK: pg create 500'd ContactAdminForAssistance 2026-06-19 (known_issues.json Product Bug) and failed once on 2026-06-29 — treat a create failure as flaky/transient; give_up_status settle-polls keep a failed create cheap."
+          "_note": "Copied VERBATIM from live-proven database-postgresql-cluster (scenarios.json; verified 2xx in verified_endpoints.json). RISK: pg create 500'd ContactAdminForAssistance 2026-06-19 (known_issues.json Product Bug) and failed once on 2026-06-29 — treat a create failure as flaky/transient; give_up_status settle-polls keep a failed create cheap. || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-cluster",

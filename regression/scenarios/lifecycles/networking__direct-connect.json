@@ -78,6 +78,11 @@
             "tags": [],
             "vpc_id": "{vpc_id}"
           },
+          "fallback_on_error_code": [
+            {"codes": ["scp-network.direct-connect.required-zone"],
+             "merge": {"uplink_active_zone": "{zone}", "uplink_standby_zone": "{zone_alt}"}}
+          ],
+          "_note": "2026-09-17 (run 89de↔3e67): VPC가 multi-zone이면 uplink_active/standby_zone 필수(400 required-zone), 단일존이면 금지(400 active-standby-zone-not-allowed) — 기본은 존 없이 보내고 required-zone 거절 시에만 {zone}/{zone_alt}를 붙여 1회 재전송 (engine fallback_on_error_code).",
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture_soft": {"direct_connect_id": "$.direct_connect.id"},
           "cleanup": {"method": "DELETE", "path": "/v1/direct-connects/{direct_connect_id}", "service": "direct-connect"}

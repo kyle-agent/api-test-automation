@@ -4148,3 +4148,21 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   훅: `shared_infra.provision()`(exit 2, SCP_SHARED_* 미출력) · 콘솔2 `_preflight`(`zone` 키 +
   경고, UI pfFail 차단) · 콘솔2 REAL 런 시작(`_zone_gate` 서브프로세스 → status=error).
   `SCP_ZONE_CHECK=warn|false`. 라이브 확인 09-17: 기본 `-b` → ok, `SCP_ZONE=kr-west1-a` → exit 2.
+
+## run 89de 후속 수리 2건 — DC uplink 존 조건부 · DBaaS DATA 디스크 필수 (2026-09-17)
+
+- **direct-connect create는 VPC 존 구성에 따라 요구가 반대**: multi-zone VPC → `uplink_active_zone`/
+  `uplink_standby_zone` 필수(400 `scp-network.direct-connect.required-zone`, run 3e67 08-20); 단일존
+  VPC → 같은 필드 금지(400 `scp-network.direct-connect.active-standby-zone-not-allowed` "VPC has only
+  one zone", run 89de 09-17). VPC list/show에 존 필드가 없어 read-only로 미리 알 수 없다 → 엔진
+  **`fallback_on_error_code`** 신설: `[{"codes":[...], "merge":{...}, "drop":[...]}]` — 바디 에러 코드
+  일치 시 바디를 바꿔 1회 재전송(항목당 1회, 이후 기존 상태/코드 사다리가 이어받음). DC create 3곳
+  (gen-direct-connect · gen-private-nat · networking-direct-connect-routing)은 **기본 존 없이** 보내고
+  `required-zone`일 때만 `{zone}`/`{zone_alt}`를 붙인다. 8/20의 무조건 송신은 회귀였음.
+- **DBaaS create 계약 변경**: mysql/postgresql/mariadb/epas `POST /v1/clusters`가 OS-only 인스턴스
+  그룹을 400 `Dbaas.ValidationError.InvalidBlockStorageDataDiskCount` "ACTIVE instance group must have
+  1 or more DATA block storage (current: 0)"로 거절(run 89de, 13 lifecycle 동시). cachestore(DATA 56)·
+  eventstreams(DATA 16)는 이미 OS+DATA라 202. 수리: 4엔진 create 바디 32곳에 `{"role_type":"DATA",
+  "size_gb":56,"volume_type":"SSD"}` 추가(8의 배수 제약 준수). 후속 `add-block-storages`는 [2]로
+  붙고 resize 대상 `block_storage_groups[1]`은 여전히 DATA라 인덱스 캡처 무변경. sqlserver
+  (guarded, 미실측)만 OS-only 유지. 다음 런 판정: 4엔진 create 202 + add-block-storages/resize 정상.

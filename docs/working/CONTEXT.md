@@ -123,11 +123,12 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   `SCP_ZONE_CHECK=warn|false`). 89de 최종(124 lifecycle, 91 pass / 33 fail) 아티팩트 판정:
   존 클래스 14(서버 `InvalidServerType.Zone`·볼륨 `InvalidAvailabilityZone`/`Invalid.zone`·
   publicip `ip.invalid-zone`·ASG `ZonesSubnetMismatch`) + **DC 2건 회귀**: 8/20 수리가 넣은
-  uplink_active/standby_zone을 단일존 VPC가 `active-standby-zone-not-allowed`로 거부 — 존 수에
-  따라 조건부 송신 필요(미수리). **DBaaS 13건 = 신규 계약**: `Dbaas.ValidationError.
+  uplink_active/standby_zone을 단일존 VPC가 `active-standby-zone-not-allowed`로 거부 → **수리**:
+  엔진 `fallback_on_error_code` 신설, DC create 3곳은 존 없이 보내고 required-zone일 때만 재전송.
+  **DBaaS 13건 = 신규 계약**: `Dbaas.ValidationError.
   InvalidBlockStorageDataDiskCount` "ACTIVE instance group must have 1 or more DATA block
   storage (current: 0)" — mysql/postgresql/mariadb/epas create 바디에 DATA 블록스토리지 필수화
-  (미수리, SPEC-DIFF §2.3 DBaaS 공통 웨이브와 연관 추정). 기타: secretsmanager create 400
+  → **수리**: 4엔진 create 32곳에 DATA 56 SSD 추가(다음 런 판정). 기타: secretsmanager create 400
   `check-namespace-error` ×2(신규) · scr quota 403(기지) · gen-vpc-endpoint 409 직렬화(기지) ·
   lb-members static-nats 404. 개선 36 / 회귀 55 vs 3e67 (`tools.triage_run --diff`).
   스펙: 문서 사이트 리디자인으로 `spec.extract_catalog --fresh` **금지**(카탈로그 1개로
