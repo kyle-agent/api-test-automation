@@ -69,6 +69,14 @@ Key fields (see `core/profiles.py` for the full schema):
    - `SCP_ZONE=<존>` — 존 규칙이 다른 리전 (기본: kr-west1→`-b`, 그 외→`-a`
      — 실측 기반 자동). 2026-08-01부터 시나리오의 `{region}-b` 준-리터럴도
      전부 `{zone}` 토큰이라 이 env가 모든 존 값을 지배한다.
+     **핀은 오퍼링 캠페인이 끝나면 지워라** — 2026-09-17 run 89de: 8/1
+     캠페인의 `SCP_ZONE=kr-west1-a`가 `.env`에 남아 zone을 싣는 lifecycle
+     20여 개가 첫 create에서 전멸. 이후 **존 가드**가 실행 전에 잡는다:
+     `python -m regression.scenarios.zone_guard`(read-only 프로브 `GET
+     filestorage /v1/replications/zones` — 핀 존이 비고 형제 존만 유효하면
+     invalid). 콘솔2 pre-flight·REAL 런 시작·`shared_infra --provision`
+     세 곳에서 돌며 invalid면 **차단**(exit 2). `SCP_ZONE_CHECK=warn`
+     (경고만) · `false`(생략).
    - 서버타입 세대가 다른 오퍼링 (2026-07-29 west1 실측: s1 풀 고갈로 전
      DB 클러스터 FAILED, "신규 VM은 s2로"; 노드명은 패밀리별 —
      VM `s2v{cpu}m{mem}` · DB `db2v…` · eventstreams `ess2v…`):

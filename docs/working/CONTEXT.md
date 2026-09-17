@@ -114,7 +114,18 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-08-01 — s2 오퍼링 업그레이드 전/후 캠페인, 오너 콘솔 반복 런):**
+- **CURRENT (2026-09-17 — run 89de 존 핀 stale + 존 가드, 스펙 사이트 리디자인):**
+  오늘 런 `20260917-085140-89de`(85 pass / 33 fail, 진행 중) 실패의 대부분이 오너 `.env`의
+  stale `SCP_ZONE=kr-west1-a`(8/1 캠페인 잔재) — 계정에서 `-a` 무효(`GET filestorage
+  /v1/replications/zones` 실측 `[]`, `-b`는 `['kr-east1-a']`). 조치: `.env` 핀 제거/`-b`.
+  **존 가드 신설** `regression/scenarios/zone_guard.py` — read-only 프로브로 `{zone}` 검증,
+  형제 존만 유효하면 차단(콘솔2 pre-flight·REAL 런 시작·`shared_infra --provision` 3곳,
+  `SCP_ZONE_CHECK=warn|false`). DBaaS 13건(존 무관, ~9s 실패)은 아티팩트 도착 후 원인 확정.
+  스펙: 문서 사이트 리디자인으로 `spec.extract_catalog --fresh` **금지**(카탈로그 1개로
+  덮어씀) — changelog 기반 부분 diff `docs/working/SPEC-DIFF-20260917.md` (cssdlan 폐기,
+  messagehub 29 EP 신설, 25 서비스 버전업). 다음: 89de 아티팩트 판정 · discovery 재설계
+  (search-index.json) · messagehub 커버리지.
+- **PRIOR (2026-08-01 — s2 오퍼링 업그레이드 전/후 캠페인, 오너 콘솔 반복 런):**
   오퍼링(west1, 존 `-a`, 서버타입 s2/db2/ess2 세대) 부분런 반복 중 — env 레시피
   정본은 `environments/README.md` 전환 체크리스트 (oplog 3종 · PIN=false ·
   SCP_ZONE · SCP_VS_SERVER_TYPE_PREFIX=s2 · DB 이름 핀). 금일 main 반영 2건:

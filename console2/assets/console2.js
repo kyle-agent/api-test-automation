@@ -1824,6 +1824,12 @@ function preflightRun(sel, opts) {
       pfFail(plan.error || capacity.error || "capacity 응답이 불완전합니다 (headroom 없음)", sel, opts);
       return;
     }
+    // 존 가드 (2026-09-17 run 89de): stale SCP_ZONE 핀이 확정(invalid)이면 실행 차단 —
+    // 서버 REAL 런 경로에도 같은 가드가 있어 우회 없음. unknown 은 경고 줄로만.
+    if (pf && !pf.error && pf.zone && pf.zone.verdict === "invalid") {
+      pfFail("존 검증 실패 — " + (pf.zone.detail || "SCP_ZONE 핀이 이 계정에서 유효하지 않습니다"), sel, opts);
+      return;
+    }
     opts.pf = pf && !pf.error ? pf : null;
     pfRender(plan, capacity, sel, opts);
   }).catch(e => pfFail(e.message, sel, opts));
@@ -1927,9 +1933,15 @@ function pfRender(plan, capacity, sel, opts) {
   const heavyConfirm = heavy
     ? '<label class="pf-confirm"><input type="checkbox" id="pf-heavy-ok"> <b>⚠️ 과금 실행임을 확인했습니다</b></label>'
     : "";
+  // 존 줄 (zone guard): ok=조용히 한 줄, unknown=경고색. invalid 는 preflightRun 에서 이미 차단.
+  const z = opts.pf && opts.pf.zone;
+  const zoneLine = z
+    ? '<p class="muted small">존 <code>' + esc(z.zone || "?") + "</code> (" + esc(z.source || "") + ") — " +
+      (z.verdict === "ok" ? "✓ 유효" : '<span style="color:var(--amber)">⚠ ' + esc(z.detail || z.verdict || "") + "</span>") + "</p>"
+    : "";
   $("pf-body").innerHTML =
     '<p class="muted small">실제 클라우드 자원을 만들고 삭제합니다 — 게이트는 선택(의존 폐쇄집합)에서 파생됩니다.</p>' +
-    gates + summary + queueNote + skipped + dropped + tableDetails + heavyDetails + heavyConfirm;
+    zoneLine + gates + summary + queueNote + skipped + dropped + tableDetails + heavyDetails + heavyConfirm;
   $("pf-foot").innerHTML =
     '<span class="muted small">취소해도 선택은 유지됩니다.</span>' +
     '<button class="btn ghost" id="pf-cancel">취소</button>' +

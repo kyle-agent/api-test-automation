@@ -1060,9 +1060,53 @@ def _preflight(sel: dict) -> dict:
         warnings.append("일부 lifecycle은 예상 시간이 기본값입니다")
     if plan.get("skipped_disabled"):
         warnings.append(f"비활성 lifecycle {len(plan['skipped_disabled'])}개 제외")
+    # 존 가드 (2026-09-17 run 89de): stale SCP_ZONE 핀은 confirm 전에 잡는다.
+    # read-only 런은 zone을 싣는 create가 없으므로 프로브 생략. invalid면 UI가
+    # 실행을 차단(pfFail)하고, unknown은 경고 한 줄로만 보인다.
+    zone = None if sel.get("read_only") else _zone_preflight()
+    if zone and zone.get("verdict") == "invalid":
+        warnings.insert(0, f"존 검증 실패 — {zone['detail']}")
+    elif zone and zone.get("verdict") == "unknown":
+        warnings.append(f"존 검증 불가 — {zone['detail']}")
 
     return {"lifecycles": runnable, "resources": resources, "peak_quota": peak_quota,
-            "billable_count": billable_count, "est": est, "warnings": warnings}
+            "billable_count": billable_count, "est": est, "warnings": warnings,
+            "zone": zone}
+
+
+def _zone_preflight() -> dict | None:
+    """regression.scenarios.zone_guard.check() — read-only 프로브 1~2회. 실패는
+    confirm을 막지 않는다(None → UI는 존 줄을 생략). 테스트는 이 함수를 대체."""
+    try:
+        from regression.scenarios import zone_guard
+        return zone_guard.check()
+    except Exception as exc:  # noqa: BLE001 — 가드 자체의 실패는 견적을 막지 않는다
+        return {"verdict": "unknown", "detail": f"zone_guard 실패: {exc}"[:160]}
+
+
+def _zone_gate(env: dict, f) -> str | None:
+    """REAL 런 최종 방어선 — pre-flight 이후 env가 바뀐 경우까지 커버. 런 env
+    그대로 `python -m regression.scenarios.zone_guard`를 돌려(exit 2 = invalid
+    & enforce) 차단 사유를 돌려준다; 그 외(0/타임아웃/예외)는 None(진행)."""
+    f.write("\n=== zone guard (실행 전 존 검증, read-only 프로브) ===\n")
+    f.flush()
+    try:
+        p = subprocess.run([sys.executable, "-m", "regression.scenarios.zone_guard"],
+                           cwd=str(ROOT), env=env, capture_output=True, text=True,
+                           timeout=90)
+    except Exception as exc:  # noqa: BLE001 — 가드 실패는 런을 막지 않는다
+        f.write(f"  zone guard 실행 실패(무시, 진행): {exc}\n")
+        f.flush()
+        return None
+    for line in (p.stderr or "").splitlines():
+        f.write(f"  {line}\n")
+    f.flush()
+    if p.returncode != 2:
+        return None
+    try:
+        return json.loads((p.stdout or "").strip().splitlines()[-1]).get("detail") or "invalid zone"
+    except Exception:  # noqa: BLE001
+        return "invalid zone (zone_guard exit 2)"
 
 
 # --------------------------------------------------------------------------- #
@@ -2250,6 +2294,15 @@ def _run_worker(rec: dict) -> None:
             # read-only(smoke) 런: 자원을 만들지 않으므로 공유 VPC provision도
             # 불필요 — 통째로 스킵 (아래 pytest 타깃도 tests/smoke로 전환).
             _read_only = bool(rec.get("read_only"))
+            # 존 가드 최종 방어선 (2026-09-17 run 89de): pre-flight가 이미 막지만
+            # confirm 이후 .env가 바뀐 경우까지 런 env 그대로 재검증. invalid면
+            # 자원을 하나도 만들기 전에 error 로 종료(아래 except → status=error).
+            if not _read_only:
+                _zone_block = _zone_gate(env, f)
+                if _zone_block:
+                    f.write(f"\n=== 존 가드 차단 — 실행하지 않음 ===\n  {_zone_block}\n")
+                    f.flush()
+                    raise RuntimeError(f"존 가드 차단(SCP_ZONE 확인): {_zone_block}")
             # adopt:vpc 선택은 non-heavy여도 공유 VPC가 필요하다 (2026-07-10
             # run-adfd: heavy-게이트 탓에 private-nat/apigw-privatelink IB-049 스킵)
             shared = ({} if _read_only else

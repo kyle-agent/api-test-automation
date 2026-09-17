@@ -1158,3 +1158,45 @@ def test_abort_all_empties_queue_first_and_skips_non_abortable(monkeypatch):
     js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
     assert 'id="cap-abort-all"' in js and "function abortAllConfirm" in js
     assert '"/api/abort-all"' in js and "대기열을 먼저 비웁니다" in js
+
+
+# ---- zone guard in pre-flight (2026-09-17 run 89de: stale SCP_ZONE=kr-west1-a) ----
+def test_preflight_carries_zone_verdict_and_blocks_on_invalid(monkeypatch):
+    bad = {"zone": "kr-west1-a", "zone_alt": "kr-west1-b", "source": "env SCP_ZONE",
+           "verdict": "invalid", "detail": "존 핀 'kr-west1-a'은 유효하지 않음"}
+    monkeypatch.setattr(C2, "_zone_preflight", lambda: bad)
+    pf = C2._preflight({"lifecycle_ids": ["iam-role-full"]})
+    assert pf["zone"]["verdict"] == "invalid"
+    assert pf["warnings"][0].startswith("존 검증 실패")
+    # read-only 런은 zone 을 싣는 create 가 없으므로 프로브를 생략한다
+    pf_ro = C2._preflight({"lifecycle_ids": ["iam-role-full"], "read_only": True})
+    assert pf_ro["zone"] is None and not any("존" in w for w in pf_ro["warnings"])
+    # unknown 은 경고 줄만 (차단 아님)
+    monkeypatch.setattr(C2, "_zone_preflight",
+                        lambda: {**bad, "verdict": "unknown", "detail": "프로브 실패"})
+    pf_u = C2._preflight({"lifecycle_ids": ["iam-role-full"]})
+    assert pf_u["zone"]["verdict"] == "unknown" and any(w.startswith("존 검증 불가") for w in pf_u["warnings"])
+    # 프론트 계약: invalid 면 pfFail 로 실행 차단, 모달에 존 줄 표시
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    assert 'pf.zone.verdict === "invalid"' in js and "zoneLine" in js
+
+
+def test_zone_gate_blocks_only_on_exit_2(monkeypatch, tmp_path):
+    import io
+    import subprocess as _sp
+
+    class P:
+        def __init__(self, rc, out="", err=""):
+            self.returncode, self.stdout, self.stderr = rc, out, err
+
+    log = io.StringIO()
+    monkeypatch.setattr(C2.subprocess, "run", lambda *a, **k: P(0, '{"verdict":"ok"}', "[zone-guard] OK"))
+    assert C2._zone_gate({}, log) is None
+    monkeypatch.setattr(C2.subprocess, "run",
+                        lambda *a, **k: P(2, '{"verdict":"invalid","detail":"핀 틀림"}', "[zone-guard] BLOCK"))
+    assert C2._zone_gate({}, log) == "핀 틀림"
+    def _boom(*a, **k):
+        raise _sp.TimeoutExpired("x", 90)
+    monkeypatch.setattr(C2.subprocess, "run", _boom)
+    assert C2._zone_gate({}, log) is None          # 가드 실패는 런을 막지 않는다
+    assert "[zone-guard] BLOCK" in log.getvalue()
