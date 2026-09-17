@@ -4123,5 +4123,28 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   (`[신규]/[변경]/[삭제]`, `<code>METHOD /path</code>`). 63개 서비스 교차검증 결과는
   `docs/working/SPEC-DIFF-20260917.md` — cssdlan 서비스 폐기(= 기존 unresolved 1건), messagehub 신설
   29 EP(카탈로그 미포함), 25개 서비스 버전업(19개 method+path 상세, 6개 changelog 부재).
-- 재설계 후보: `https://docs.e.samsungsdscloud.com/search-index.json`(86MB minisearch, 35,779 문서)에서
-  엔드포인트 URL 목록 복원.
+- **재설계 경로 확정(같은 날 후속, SPEC-DIFF-20260917 §7)**: `https://docs.e.samsungsdscloud.com/
+  search-index.json`(86MB minisearch v2, 35,779 문서)의 `storedFields[*].ref/body`에서 ko
+  `/apireference/<cat>/<svc>/apis/<name>/<version>/` 리프 5,285행 추출 — body 첫 줄 `method path`가
+  카탈로그 1,390행과 0 불일치. 커버리지 1,390/1,417(미매치 27은 archivestorage 1.2 구페이지가
+  인덱스에서만 빠진 것, 라이브 200). 버전 드리프트 881 EP/25 서비스, 신규 이름 75 EP/11 서비스
+  (messagehub 29 · resourceoptimizer 24 — "스텁" 판정 정정, 실제 문서 있음). 콜드 8.8초.
+  주의: 인덱스의 구버전 보존이 서비스마다 달라 "인덱스에 없음 = 폐기"로 읽지 말 것; 카탈로그
+  쓰기는 기존 대비 ≥90% 바닥 게이트 필수(--fresh 1개 사고 재발 방지).
+
+## 존 핀 stale 클래스 + 실행 전 존 가드 (2026-09-17, run 20260917-085140-89de)
+
+- **원인**: 8/1 s2 오퍼링 캠페인 레시피의 `SCP_ZONE=kr-west1-a`가 오너 `.env`에 남아 있었고,
+  계정 존 구성이 바뀌어(8/20 run 3e67에서는 `-a` create가 202/201로 성공) `-a`가 무효가 되자
+  zone을 싣는 lifecycle 20여 개(볼륨·서버·publicip·ASG·복제·VPN·백업)가 첫 create에서
+  3~30초 만에 전멸(생성 자원 0). 엔진 기본값(kr-west1→`-b`)·시나리오 토큰화는 정상 — 코드가
+  아니라 **env 핀이 stale**한 클래스.
+- **읽기 전용 존 판정 신호**: `GET filestorage /v1/replications/zones?type_name=HDD&source_zone=
+  <zone>&replication_type=replication` — 유효 존이면 복제 대상 목록(`kr-west1-b` → `['kr-east1-a']`),
+  무효 존이면 `[]`(07-15·09-17 두 차례 동일). 카탈로그에 존을 열거하는 다른 GET은 없음
+  (VPC list/show도 09-17 현재 `zones` 필드 없음; backup region-relationship은 빈 목록).
+- **가드** `regression/scenarios/zone_guard.py`: `{zone}` 프로브가 비고 **형제 존(`{zone_alt}`)만
+  차 있을 때만** invalid(차단) — 둘 다 비거나 프로브 실패는 unknown(경고만, 런 사망 금지).
+  훅: `shared_infra.provision()`(exit 2, SCP_SHARED_* 미출력) · 콘솔2 `_preflight`(`zone` 키 +
+  경고, UI pfFail 차단) · 콘솔2 REAL 런 시작(`_zone_gate` 서브프로세스 → status=error).
+  `SCP_ZONE_CHECK=warn|false`. 라이브 확인 09-17: 기본 `-b` → ok, `SCP_ZONE=kr-west1-a` → exit 2.
