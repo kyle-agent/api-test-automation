@@ -4111,3 +4111,17 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
 - 어투 회귀 방지: `BANNED_WORDS`(결함/확정/소행/오탐/재실시) 를 오프라인 테스트가 MD/HTML 전문에서 검사
   (`tests/offline/test_quality_report.py`) — RULE_KR/SYS_KR 에 없는 유형이 conformance.json 에 생기면 실패하므로
   새 규칙 추가 시 한국어 문구도 같이 추가.
+
+## 문서 사이트 리디자인 — `spec.extract_catalog --fresh` 금지 (2026-09-17 실측)
+
+- `docs.e.samsungsdscloud.com/apireference/` index가 5MB(전체 nav 임베드) → 31KB(카테고리 링크만)로
+  재구성됨. `python -m spec.extract_catalog --fresh`를 돌리면 **discovered 1개로 카탈로그가 통째로
+  덮어써진다**(1,417 → 1). 기본(resumable) 모드는 cache-hit no-op이라 변경 감지도 못 함. discovery
+  재설계 전까지 `--fresh` 금지 — 백업 후 원복 완료, `data/`는 커밋 상태 그대로.
+- 구식 per-endpoint 페이지(카탈로그 `doc_url`)는 아직 200 — 카탈로그 자체는 유효.
+- 대체 신호: 서비스 overview 페이지의 `Version` 표 + "API Version History" changelog
+  (`[신규]/[변경]/[삭제]`, `<code>METHOD /path</code>`). 63개 서비스 교차검증 결과는
+  `docs/working/SPEC-DIFF-20260917.md` — cssdlan 서비스 폐기(= 기존 unresolved 1건), messagehub 신설
+  29 EP(카탈로그 미포함), 25개 서비스 버전업(19개 method+path 상세, 6개 changelog 부재).
+- 재설계 후보: `https://docs.e.samsungsdscloud.com/search-index.json`(86MB minisearch, 35,779 문서)에서
+  엔드포인트 URL 목록 복원.
