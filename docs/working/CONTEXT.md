@@ -128,8 +128,8 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   **DBaaS 13건 = 신규 계약**: `Dbaas.ValidationError.
   InvalidBlockStorageDataDiskCount` "ACTIVE instance group must have 1 or more DATA block
   storage (current: 0)" — mysql/postgresql/mariadb/epas create 바디에 DATA 블록스토리지 필수화
-  → **수리**: 4엔진 create 32곳에 DATA 56 SSD 추가. **재런 915f(08:12Z~)**: 중간 106 pass / 4 fail —
-  존·DBaaS(클러스터 19 생성)·DC(4 생성) 수리 실측 확인. ske 실패 = k8s 목록이 밀려([1]=v1.35.5)
+  → **수리**: 4엔진 create 32곳에 DATA 56 SSD 추가. **재런 915f 최종: 120 pass / 4 fail** (89de 91/33) —
+  존 에러 0 · DBaaS create 14/14 202 + add/resize 정상 · DC 기본 바디 202(fallback 미발동, 단일존). ske 실패 = k8s 목록이 밀려([1]=v1.35.5)
   하드코딩 ubuntu 22.04가 무효(오너 지적) → list-images에서 OS 버전 캡처로 수리. 기타: secretsmanager create 400
   `check-namespace-error` ×2(신규) · scr quota 403(기지) · gen-vpc-endpoint 409 직렬화(기지) ·
   lb-members static-nats 404. 개선 36 / 회귀 55 vs 3e67 (`tools.triage_run --diff`).

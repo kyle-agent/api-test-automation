@@ -4182,3 +4182,21 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   upgrade-nodepool `os_version`에 주입. 같은 OS끼리(24.04→24.04) 노드풀 업그레이드는 미실측.
 - 잔여 하드코딩: gen-heavy-aimlops(create-ske-nodepool v1.33.5+22.04 핀, 아직 유효 쌍) ·
   gen-quick-query(v1.33.5+22.04, 어차피 500 ContactAdmin 클래스) — v1.33.5가 목록에서 빠지면 동일 수리.
+
+## run 915f 최종 판정 — 9/17 수리 3건 라이브 확정 (2026-09-17, 20260917-171126-915f)
+
+- **결과**: 124 lifecycle · **120 pass / 4 fail** (89de 91/33 → 개선 53 EP / 회귀 2 EP, `tools.triage_run --diff`).
+- **존**: 요청 바디의 존 문자열 전부 `kr-west1-b`(34), 존 클래스 에러 0 — `.env` 핀 제거 + 존 가드 경로 정상.
+- **DBaaS DATA 디스크**: mysql 4 · postgresql 4 · mariadb 3 · epas 3 create 전부 202; 후속 `add-block-storages`
+  202 ×5, `block_storage_groups[1]`(DATA) resize 202 ×6 — 인덱스 캡처 무변경 판단 적중. (cachestore-version-
+  upgrade의 resize-block-storage 400 InvalidBlockStorageRoleType은 [0]=OS를 겨냥하는 기존 soft 스텝, 별건.)
+- **DC**: 3 lifecycle create 전부 **기본 바디(존 없음)로 202** — 이 계정(단일존)에서는 fallback 재전송이
+  발동하지 않았다. `required-zone` 경로는 오프라인 테스트로만 검증됨 — multi-zone 계정 런에서 첫 실측.
+- **ske**: `create-nodepool 400 scp-kubernetes.nodepool.invalid-os-image "No image matches request:
+  os_distro=ubuntu, os_version=22.04, k8s_version=v1.35.5, gpu_driver=None, server_type_id=s2v1m2"` —
+  진단 그대로. 수리(list-images 캡처)는 다음 런 판정.
+- **secretsmanager `check-namespace-error` (신규 클래스, PF 후보)**: `POST /v1/secrets` 완전한 바디(kms_id
+  실존·name 규격·acl_cidr)에 400 `scp-security.secretsmanager.check-namespace-error` "Secrets Manager Check
+  Namespace Error" — 89de·915f 두 런 연속, 두 lifecycle(gen-wave2-sec·security-secretsmanager-writes) 동일.
+  같은 lifecycle의 random-password 200. 서버측 네임스페이스 점검 장애로 추정 — 바디 결함 근거 없음.
+- **회귀 2**: resourcemanager `GET/PUT /v1/tags/{rg_srn}/bulk` 200→404 — 계정 픽스처 클래스(이전 403·404 왕복).
