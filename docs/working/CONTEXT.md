@@ -120,8 +120,13 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   organization 3 · budget 2 · cnapp 2 · baremetal 1 · vpc 1; 버전업 881; cssdlan 폐기). 바디
   `--from-index` 재추출 477/477, `spec.refresh_versions` 신설로 버전 핀 29개 상향(다음 런에서 406
   여부 판정 — 뒤지면 PIN=false). http_client 버전 매칭 구체성 규칙 수리. api_docs.json 재스크레이프
-  + coverage-service agent 3개(messagehub · resourceoptimizer · 기타 신규 15)로 lifecycle 작성 중.
-  다음: 신규 lifecycle 검증 런 · 갭 153→? 재측정 · 버전 핀 실효 판정.
+  완료(1,492 EP · 2,815 모델, 에러 0) + enrich(자기 id 1,070: 생산자 1,050 · waiver 20 · null 0).
+  신규 lifecycle 3파일(generated__messagehub · generated__resourceoptimizer · generated__newapi-202609,
+  16 lifecycle, 74 신규 EP 전부 정적 도달; resourceoptimizer·costnavigator 글로벌 호스트 확정, cnapp은
+  양쪽 호스트 무라우팅 → blocked-owner). **정적 도달 1,337→1,402 / 1,490 (94.1%), 갭 153→88**
+  (잔여 = baremetal-blockstorage 35 · archivestorage 20 · cloudmonitoring 10 · cdn 8 등 waiver 클래스
+  + cnapp 2 + ske preferred-ips 1). 오프라인 764 passed. **다음 런 판정**: 신규 lifecycle 실제 실행
+  (messagehub 3종 create, resourceoptimizer 설정 CRUD/opt — 오너 결정), 버전 핀 29개 상향의 406 여부.
 - **CURRENT (2026-09-17 — run 89de 존 핀 stale + 존 가드, 스펙 사이트 리디자인):**
   오늘 런 `20260917-085140-89de`(85 pass / 33 fail, 진행 중) 실패의 대부분이 오너 `.env`의
   stale `SCP_ZONE=kr-west1-a`(8/1 캠페인 잔재) — 계정에서 `-a` 무효(`GET filestorage

@@ -96,9 +96,10 @@ def test_real_run_has_sane_documented_distribution():
     self-param totals (960 produced / 19 waivers / 0 null) must hold."""
     rows_by_service, _skipped = rr.analyze()
     rows = [r for rows in rows_by_service.values() for r in rows]
-    # 315 since the 2026-07-18 45-endpoint catalog scrape (e8fe8b3d) grew the
-    # id-bound GET universe by 13; was 302. Re-pin deliberately on spec bumps.
-    assert len(rows) == 315, "id-bound GET universe changed unexpectedly"
+    # 317 since the 2026-09-18 search-index catalog rebuild (1,417 -> 1,490 endpoints;
+    # +2 id-bound GETs: ske listnamespacedpods, vpc privatelink-scp-services family);
+    # was 315 (2026-07-18), 302 before. Re-pin deliberately on spec bumps.
+    assert len(rows) == 317, "id-bound GET universe changed unexpectedly"
     totals = {v: sum(1 for r in rows if r["verdict"] == v) for v in rr._VERDICTS}
     assert sum(totals.values()) == len(rows)
     # every verdict is a recognised bucket
@@ -124,4 +125,6 @@ def test_sidecar_self_params_match_design_invariants():
                 waiver += 1
             else:
                 null_no_waiver += 1
-    assert (self_total, produced, waiver, null_no_waiver) == (979, 960, 19, 0)
+    # 2026-09-18 spec bump: 979/960/19 -> 1070/1050/20 (DBaaS <engine>showinstance
+    # instance_name = detail-read of showcluster; ske namespace_name = waiver).
+    assert (self_total, produced, waiver, null_no_waiver) == (1070, 1050, 20, 0)
