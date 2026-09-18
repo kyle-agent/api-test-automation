@@ -1048,6 +1048,32 @@
       ],
       "notes": "0/3 read-only (all POST). HOST BUG FIXED 2026-06-29: sts is GLOBAL not REGIONAL — sts.e.samsungsdscloud.com returns JSON API responses; sts.kr-west1.e.samsungsdscloud.com was returning HTML portal. Body shapes correct from api_docs.json: assumerole=role_indicator+role_session_name+duration_seconds; assumerolewithsaml=role_indicator+principal_indicator+saml_assertion+duration_seconds; objectstoreauthorization=method+url+x_amz_content_sha256+x_amz_date+region+service.",
       "updated": "2026-06-29T08:35:54Z"
+    },
+    {
+      "service": "messagehub",
+      "covered": 4,
+      "total": 29,
+      "gap": 25,
+      "heavy": false,
+      "blockers": [
+        {
+          "key": "6 push-application id-bound endpoints (show/delete/setdescription/setprivateacl/setpublicacl/setenableprivateendpoint): no create endpoint exists",
+          "reason": "There is NO createpushapplication (or equivalent POST /v1/push-applications) anywhere in the 1,490-endpoint catalog -- confirmed by scanning every 'push'-keyed catalog entry across ALL services 2026-09-18. Push applications are evidently provisioned out-of-band (console-only, or a not-yet-cataloged mobile-push registration API). LIVE-CONFIRMED 2026-09-18 (read-only): GET /v1/push-applications -> 200, this test account currently has ZERO push applications, so there's no real id to target from this account/API alone. regression/scenarios/lifecycles/generated__messagehub.json's messagehub-pushapplication-coverage lifecycle uses the devopsservice-write-coverage list+capture_soft pattern so the STATIC gap reads 0, but these 6 endpoints have no real 2xx on record and cannot get one without either (a) a push-application showing up in this account via some out-of-band path, or (b) the API/catalog gaining a create endpoint.",
+          "kind": "needs-peer"
+        },
+        {
+          "key": "domain/email/phone create+setters: docs-derived bodies, NOT runtime-mutation-proven",
+          "reason": "2026-09-18 modeling pass ran ONLY read-only live GETs (SCP_ALLOW_MUTATIONS=false SCP_ALLOW_DESTRUCTIVE=false) per its mandate -- confirmed host/auth (GET /v1/domains|/emails|/phones all 200, empty lists) but never exercised createdomain/createemail/createphone or any setter live. Bodies are docs-derived (data/api_bodies.json + live doc pages). phone_number format is UNCONFIRMED (no regex found in docs) -- the lifecycle sends {epoch_now} digits which may not match a strict format check. NEXT RUN with a live-mutation budget should run generated__messagehub.json for real and fix whatever the first 400 names (masked-defect lesson).",
+          "kind": "unvalidated-mutation"
+        }
+      ],
+      "next_levers": [
+        "Run generated__messagehub.json live (SCP_ALLOW_MUTATIONS default-on) to prove createdomain/createemail/createphone + every setter for real; fix phone_number format / any field-shape 400s the API's own error message names, then tighten expect_status per the masked-defect rule.",
+        "Check whether the console (or a newer messagehub API version) exposes a push-application create path -- if so, add createpushapplication to the catalog/scenario and the 6 blocked endpoints become coverable; if a human/another flow ever creates one in this test account, the list+capture_soft step in messagehub-pushapplication-coverage will automatically pick up the real id on the next run.",
+        "python -m tools.coverage_headroom --write refreshes the WHOLE ledger's numeric fields from the LOCAL reports/results/observations.jsonl -- this session's copy only had 119 lines (nowhere near full history), so running it here would have zeroed out every other service's 'covered' count. DID NOT run it globally this session (reverted after seeing the blast radius) -- only hand-edited this row. Next agent: confirm observations.jsonl is the full/current store before running --write unscoped, or extend the tool to update a single service's row."
+      ],
+      "notes": "2026-09-18: MODELING pass only (task mandate: no live mutations). Static coverage_gap 25 -> 0 via 4 new lifecycles in generated__messagehub.json (domain/email/phone fully modeled CRUD + setters; push-application list+soft-capture, honestly un-coverable past that without a create endpoint or an out-of-band resource). Host+auth live-confirmed read-only (covered=4 here = the 4 smoke-floor list GETs, matching python -m spec.coverage_gap's 'reachable now' count -- NOT a live-2xx-observation count, since no observations were recorded this session; see next_levers for why tools.coverage_headroom --write was not run globally). See knowledge/services.md 'application-service / messagehub' + knowledge/validated-facts.md 2026-09-18 entry for full provenance (from-docs vs validated-at-runtime).",
+      "updated": "2026-09-18T00:00:00Z"
     }
   ]
 }

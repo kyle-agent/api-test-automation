@@ -1640,6 +1640,42 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - stage pattern `^[a-z][a-z0-9-]{1,48}[a-z0-9]$`, addressed by name. `createaccesscontrols` -> `$.id`. `createusageplan` -> `$.usage_plan.id`. `createapikey` -> `$.api_key.id`.
 - API delete is async; poll `GET /v1/apis/{id}` until 404.
 
+## application-service / messagehub
+
+**NEW product (2026-09-18 catalog rebuild), 29 endpoints, static gap 25 -> 0 via
+`regression/scenarios/lifecycles/generated__messagehub.json`** (modeling pass —
+docs-derived, mutations NOT yet runtime-proven; see `knowledge/validated-facts.md`
+2026-09-18 entry for the full write-up and provenance markers). Light, VPC-free.
+
+**Key facts:**
+- Host: standard regional template `https://messagehub.<region>.<env>.samsungsdscloud.com`
+  — **VALIDATED AT RUNTIME 2026-09-18**: `GET /v1/domains|/emails|/phones|/push-applications`
+  all 200 (empty lists) against `https://messagehub.kr-west1.e.samsungsdscloud.com`. No
+  `SCP_SERVICE_HOSTS` override needed.
+- 4 resource families, each roughly create/list/show/delete + `PUT .../description`
+  (sync 200) + (email/phone/push-application only) `private-acl`/`public-acl`/
+  `private-endpoint` setters (async 202): **domain** (5 endpoints, no ACL/endpoint
+  setters — just description), **email** (8), **phone** (9, adds `use-caller`),
+  **push-application** (7).
+- **Every create/delete + every ACL/endpoint/use-caller setter is `202 Accepted`
+  `AsyncResponse {account_id, global_request_id, resource_id}`** — `resource_id` IS
+  the resource id. Only the `description` setters are synchronous `200` (full
+  Show-shape response). From docs, not yet runtime-proven.
+- **push-application has NO create endpoint anywhere in the catalog** (confirmed
+  by scanning all `push`-keyed entries across the full 1,490-endpoint catalog) —
+  push applications are provisioned out-of-band (console or an uncatalogued flow).
+  The 6 id-bound push-application endpoints (show/delete/4 setters) are recorded
+  as a **blocker** in `data/coverage_ledger.json` (`messagehub`): they cannot be
+  truly covered from this API alone until either a real push-application exists
+  in the test account or a create endpoint is added to the catalog. The generated
+  lifecycle still statically "reaches" them (list-first + soft-capture pattern,
+  same as `devopsservice-write-coverage`) so the static gap reads 0, but no real
+  2xx is on record for them yet.
+- `phone_number` format is undocumented (no regex found on the live doc page or
+  in the search-index text beyond the example `"01012341234"`) — treat any fix
+  attempt as exploratory; the lifecycle currently sends `{epoch_now}` (digits
+  only, cross-run-unique) which may not match a strict format check.
+
 ## compute / scf (Serverless Cloud Function)
 
 **Coverage: 17/36 as of 2026-06-24.** VPC-free control-plane for cloud functions.

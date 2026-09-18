@@ -4222,3 +4222,77 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   messagehub 25 · resourceoptimizer 24 · ske 6 · servicewatch 5 · budget 2 · costnavigator 2 ·
   organization 2 · cnapp 2 · kms 2 · baremetal 1 · vpc 1 (+ 기존 baremetal-blockstorage 35 ·
   archivestorage 20 · cloudmonitoring 10 · cdn 8 등 waiver 클래스).
+
+## application-service/messagehub — modeling pass, 0 -> 0 GAP (2026-09-18)
+
+New product from the 2026-09-18 catalog rebuild (29 endpoints, 0 prior coverage).
+This was a **read-only-live / docs-modeling** pass (mandate: no live mutations —
+`SCP_ALLOW_MUTATIONS=false SCP_ALLOW_DESTRUCTIVE=false` for every live call made).
+New file: `regression/scenarios/lifecycles/generated__messagehub.json` (4
+lifecycles: domain / email / phone / push-application). Static gap
+25 -> 0 (`python -m spec.coverage_gap --service messagehub`), `validate` 0
+errors/0 warnings. **Bodies/response-shape facts below are FROM DOCS** (docs
+search-index text via `spec.extract_catalog.index_body_texts` + the live doc
+pages, `data/api_bodies.json`) and are **NOT runtime-mutation-proven** — only
+the host/auth facts marked VALIDATED AT RUNTIME below were actually exercised
+live this session.
+
+- **VALIDATED AT RUNTIME (2026-09-18, kr-west1/e, read-only GET)**: host
+  resolves via the standard per-service regional template —
+  `https://messagehub.<region>.<env>.samsungsdscloud.com` (no
+  `SCP_SERVICE_HOSTS` override needed) — and HMAC auth works: `GET /v1/domains`,
+  `/v1/emails`, `/v1/phones`, `/v1/push-applications` all returned `200` with an
+  **empty** resource list (`{"count":0,"domains":[],...}` etc.) — this test
+  account currently owns zero messagehub resources of any kind.
+- **From docs — resource model**: 4 resource families — domain (5 endpoints),
+  email (8), phone (9), push-application (7). Every family has
+  create(POST)/list(GET)/show(GET id)/delete(DELETE id) + `PUT .../description`
+  (sync, 200, returns the full Show-shape response) EXCEPT push-application,
+  which has **no create endpoint at all** — confirmed by grepping
+  `core.catalog.endpoints()` for every `push`-keyed entry across **all**
+  services in the full 1,490-endpoint catalog: only list/show/delete/
+  set{description,private-acl,public-acl,private-endpoint} exist (7
+  endpoints, no POST /v1/push-applications). Push applications are evidently
+  provisioned out-of-band (console-only, or an uncatalogued mobile-push
+  registration flow) — **this is a genuine product/catalog gap**, not
+  something a coverage agent can work around from this API alone. Recorded as
+  a blocker in `data/coverage_ledger.json` (service `messagehub`).
+- **From docs — async envelope**: every create/delete AND every
+  `private-acl`/`public-acl`/`private-endpoint`/`use-caller` setter returns
+  `202 Accepted` with `AsyncResponse {account_id, global_request_id,
+  resource_id}` — `resource_id` IS the new resource's id (same field name the
+  show/list responses key the resource on: `id`). Only the `description`
+  setters (`setdomaindescription`/`setemaildescription`/`setphonedescription`/
+  `setpushapplicationdescription`) are **synchronous 200**, returning the full
+  Show-response envelope (`$.domain`/`$.email`/`$.phone`/`$.push_application`).
+- **From docs — bodies**: `createdomain` needs `email_domain` (+ optional
+  `description`/`tags[]`); `createemail` needs `email_address`; `createphone`
+  needs `country_code` + `phone_number` (+ optional `owner`/`description`/
+  `tags[]`); `private-acl` setters take `private_access_resources[]` (each
+  `{id, ips[], name, type}`, doc example `type: "virtual_server"`);
+  `public-acl` setters take `public_access_ip_addresses[]` (CIDR strings);
+  `private-endpoint` setters take `{private_endpoint_enabled: bool}`;
+  `setphoneusecaller` takes `{use_caller: bool}`. Exact example values live in
+  `data/api_bodies.json` under each `application-service/messagehub/<op>` key.
+- **UNCONFIRMED — `phone_number` format**: neither the search-index text nor
+  the live doc page HTML (`createphone/1.0`, fetched 2026-09-18 via the
+  agent-proxy CA bundle) exposes a regex/pattern for
+  `PhoneCreateRequest.phone_number` beyond the example `"01012341234"`
+  (11 digits, no separators, KR-mobile shape) — the docs site is a
+  client-rendered SPA and the SSR'd HTML only carries the same example text as
+  the search index, no schema-constraints section. The lifecycle uses
+  `{epoch_now}` (pure-digit builtin) directly as `phone_number` for
+  cross-run uniqueness (avoids `409 Conflict` on rerun); this does **not**
+  match the example's 11-digit shape and may 400 on a strict format check —
+  next live-mutation run should confirm and, per the masked-defect lesson, fix
+  from whatever the real error message names.
+- **UNCONFIRMED — verification lifecycle**: `domain`/`email` show responses
+  include `verification_state`/`spf_record_state` (doc example always shows
+  `CONFIRMED`, which is fake example data). Since this suite doesn't own
+  `example.com`, a real create against `regr{unique}.example.com` /
+  `regr{unique}@example.com` will likely stay `PENDING` — this should not
+  block the CRUD steps (create/show/set/delete all key off the resource id,
+  not verification state), but the `poll ... until ["ACTIVE"]` steps in the
+  new lifecycles are a best-effort guess at post-create `state` and may not
+  converge (hence `give_up_status: [400, 404]` on every poll — a non-converged
+  poll doesn't hard-fail the lifecycle).
