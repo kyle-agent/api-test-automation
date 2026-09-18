@@ -258,17 +258,23 @@ def _example(seg, anchor):
 
 # ---------------------------------------------------------------- discovery
 def discover_models() -> list[dict]:
-    h = INDEX_CACHE.read_text(errors="replace")
-    seen = {}
-    for c, s, name in re.findall(
-        r"/apireference/([a-z0-9-]+)/([a-z0-9-]+)/models/([a-zA-Z0-9_.-]+?)/", h
-    ):
-        key = f"{c}/{s}/{name}"
-        seen[key] = {
-            "key": key, "category": c, "service": s, "name": name,
-            "doc_url": f"{BASE}/apireference/{c}/{s}/models/{name}/",
-        }
-    return sorted(seen.values(), key=lambda e: e["key"])
+    """Model pages from the docs search index (2026-09-17: the index HTML no
+    longer embeds hrefs — see spec.extract_catalog)."""
+    from spec.extract_catalog import discover_models_from_index, get_search_index
+    return discover_models_from_index(get_search_index())
+
+
+def drop_marked(store: dict, marks_path: Path) -> int:
+    """Forget cached endpoint records whose catalog key is marked added/changed
+    in ``data/spec_diff_latest.json`` so the resumable loop re-scrapes them."""
+    if not marks_path.exists():
+        return 0
+    marks = json.loads(marks_path.read_text(encoding="utf-8")).get("marks", {})
+    n = 0
+    for k in list(store.get("endpoints", {})):
+        if k in marks:
+            store["endpoints"].pop(k); n += 1
+    return n
 
 
 def main() -> int:
@@ -278,12 +284,17 @@ def main() -> int:
     ap.add_argument("--only", choices=["endpoints", "models"], default=None)
     ap.add_argument("--key-substr", default="")
     ap.add_argument("--out", default=str(OUT), help="output JSON path (for sharded runs)")
+    ap.add_argument("--redo-marked", action="store_true",
+                    help="re-scrape endpoints marked added/changed in data/spec_diff_latest.json")
     args = ap.parse_args()
 
     OUT = Path(args.out)
     store = json.loads(OUT.read_text()) if OUT.exists() else {}
     store.setdefault("endpoints", {})
     store.setdefault("models", {})
+    if args.redo_marked:
+        n = drop_marked(store, ROOT / "data" / "spec_diff_latest.json")
+        print(f"--redo-marked: dropped {n} cached endpoint record(s) for re-scrape", flush=True)
 
     cat = json.loads(CATALOG.read_text())
     endpoints = [e for e in cat if e.get("doc_url") and args.key_substr in e["key"]]

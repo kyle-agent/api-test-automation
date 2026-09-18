@@ -127,9 +127,20 @@ def _endpoint_version_for(svc: str, method: str | None, path: str | None):
     if not cands:
         return None
     segs = path.split("?")[0].split("/")
-    matches = [ver for shape, ver in cands
-               if all(s == "{}" or s == seg for s, seg in zip(shape, segs))]
-    return matches[0] if len(set(matches)) == 1 else None
+    # 가장 구체적인 shape가 이긴다 (2026-09-18): 리터럴 세그먼트가 많은 매치를
+    # 우선. 종전 "매치가 2개면 모호"는 `GET /v1/replications/regions`(1.1)가
+    # `GET /v1/replications/{}`(showreplication, 1.2로 버전업)와 동시에 매치되는
+    # 순간 None → 제품 핀 1.2 → 406 클래스로 떨어뜨렸다(2026-09 버전업에서
+    # 표면화). 같은 구체성에서 버전이 갈릴 때만 모호(None).
+    scored = []
+    for shape, ver in cands:
+        if all(s == "{}" or s == seg for s, seg in zip(shape, segs)):
+            scored.append((sum(1 for s in shape if s != "{}"), ver))
+    if not scored:
+        return None
+    best = max(n for n, _ in scored)
+    top = {ver for n, ver in scored if n == best}
+    return top.pop() if len(top) == 1 else None
 
 
 def _version_overrides() -> dict:

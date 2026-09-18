@@ -28,11 +28,11 @@ Supports: `spec/` (extract+diff the spec), `dashboard/` (visualize both axes),
 
 ## The catalog at a glance (source of truth: `data/api_catalog.json`)
 
-- **1,416 endpoints** (2026-07 spec bump), 1,415 resolved / 1 unresolved.
-  13 categories present in the catalog.
-- By method: GET 546 · POST 392 · PUT 257 · DELETE 211 · PATCH 9.
-- Smoke-testability split: **231** GETs are directly testable (no path params);
-  **315** GETs need a resource id (reached via CRUD/read-chains); **869** are
+- **1,490 endpoints** (2026-09 spec bump, search-index discovery 2026-09-18), 1,490 resolved / 0 unresolved.
+  13 categories · 62 services (신규: messagehub 29 · resourceoptimizer 24 · costnavigator 3 · cnapp 2; 폐기: cssdlan).
+- By method: GET 570 · POST 408 · PUT 280 · DELETE 220 · PATCH 12.
+- Smoke-testability split: **238** GETs are directly testable (no path params);
+  **332** GETs need a resource id (reached via CRUD/read-chains); **920** are
   mutating (reached via CRUD lifecycles).
 - Re-run the live summary any time: `python -m spec.summary`.
 
@@ -114,6 +114,14 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **CURRENT (2026-09-18 — 신규 API 모수 편입, 오너 "신규 API 모수 작업 시작"):** 문서 사이트
+  리디자인 대응으로 `spec.extract_catalog`를 search-index 기반으로 교체 → 카탈로그 **1,417→1,490**
+  (신규 74: messagehub 29 · resourceoptimizer 24 · ske 5 · servicewatch 4 · costnavigator 3 ·
+  organization 3 · budget 2 · cnapp 2 · baremetal 1 · vpc 1; 버전업 881; cssdlan 폐기). 바디
+  `--from-index` 재추출 477/477, `spec.refresh_versions` 신설로 버전 핀 29개 상향(다음 런에서 406
+  여부 판정 — 뒤지면 PIN=false). http_client 버전 매칭 구체성 규칙 수리. api_docs.json 재스크레이프
+  + coverage-service agent 3개(messagehub · resourceoptimizer · 기타 신규 15)로 lifecycle 작성 중.
+  다음: 신규 lifecycle 검증 런 · 갭 153→? 재측정 · 버전 핀 실효 판정.
 - **CURRENT (2026-09-17 — run 89de 존 핀 stale + 존 가드, 스펙 사이트 리디자인):**
   오늘 런 `20260917-085140-89de`(85 pass / 33 fail, 진행 중) 실패의 대부분이 오너 `.env`의
   stale `SCP_ZONE=kr-west1-a`(8/1 캠페인 잔재) — 계정에서 `-a` 무효(`GET filestorage

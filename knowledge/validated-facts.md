@@ -4200,3 +4200,25 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   Namespace Error" — 89de·915f 두 런 연속, 두 lifecycle(gen-wave2-sec·security-secretsmanager-writes) 동일.
   같은 lifecycle의 random-password 200. 서버측 네임스페이스 점검 장애로 추정 — 바디 결함 근거 없음.
 - **회귀 2**: resourcemanager `GET/PUT /v1/tags/{rg_srn}/bulk` 200→404 — 계정 픽스처 클래스(이전 403·404 왕복).
+
+## 신규 API 모수 편입 1단계 — search-index 기반 카탈로그 재수집 (2026-09-18)
+
+- `spec.extract_catalog` discovery를 `search-index.json`(minisearch storedFields, ko 리프 페이지)로 교체:
+  **1,417 → 1,490** (added 74 · removed 1 cssdlan · version-bumped 881, method/path 변경 0), 1,490 전부
+  resolved. 바닥 게이트(기존의 90% 미만이면 미기록, `--force`) 내장. 캐시 `data/.search-index.json`
+  (86MB, gitignore) — `--fresh`가 재다운로드. `spec.diff --mark` → `data/spec_diff_latest.json`(marks 955).
+- 요청 바디는 인덱스 본문의 "Request body {…} Example HTTP response"에서 페이지 fetch 없이 추출
+  (`spec.extract_bodies --from-index --redo-marked`): 변경/신규 write 477/477 확보(97개는 `_raw`).
+  `spec.scrape_docs --redo-marked`가 api_docs.json 재스크레이프(881 변경 + 74 신규 + 신규 모델).
+- **버전 핀 재생성기 신설** `spec.refresh_versions`: `api_endpoint_versions.json`은 카탈로그 CURRENT
+  버전(1,490/63 서비스), `api_versions.json`은 docs 버전 페이지(62) + 카탈로그 최대(costexplorer 1).
+  제품 핀 29개 상향(예: ske 1.5→1.6, vpc 1.3→1.4, mysql 1.2→1.3, sts 1.1→1.3; 신규 4 = 1.0).
+  **다음 런 판정 필수**: 오퍼링이 문서보다 뒤지면 406 NoSuchVersion 폭풍 — 그 경우 `SCP_API_VERSION_PIN=false`
+  (environments/README.md 3항) 또는 `SCP_API_VERSION_OVERRIDES`로 서비스별 되돌림.
+- `core.http_client._endpoint_version_for` 결함 표면화·수리: `GET /v1/replications/regions`(1.1)이
+  `GET /v1/replications/{}`(showreplication 1.2)와 동시 매치 → 종전 "2개 매치=모호" 규칙이 None →
+  제품 핀. 이제 리터럴 세그먼트가 많은 shape 우선(같은 구체성에서 버전이 갈릴 때만 None).
+- coverage_gap(카탈로그 갱신 직후, lifecycle 미작성): reachable 1,337/1,490 (89.7%), 갭 153 —
+  messagehub 25 · resourceoptimizer 24 · ske 6 · servicewatch 5 · budget 2 · costnavigator 2 ·
+  organization 2 · cnapp 2 · kms 2 · baremetal 1 · vpc 1 (+ 기존 baremetal-blockstorage 35 ·
+  archivestorage 20 · cloudmonitoring 10 · cdn 8 등 waiver 클래스).
