@@ -3,8 +3,8 @@
   "services": [
     {
       "service": "vpc",
-      "covered": 58,
-      "total": 95,
+      "covered": 59,
+      "total": 96,
       "gap": 37,
       "heavy": true,
       "blockers": [
@@ -42,8 +42,8 @@
         "vpc-transit-gateway-children: run to cover transit gateway CRUD + children",
         "vpc-peering: run last (needs 2 VPCs, free>=3) to cover createvpcpeering/approvalvpcpeering/createvpcpeeringrule/getpeeringroutingrules/setvpcpeering/deletevpcpeeringrule/deletevpcpeering"
       ],
-      "notes": "HEAVY privatelink run 2026-06-24: +12 new VPC PL endpoints covered (all 14/14 PL endpoints now 2xx). Key findings: (1) IP-type PLS works without LB: connected_resource_type=IP + connected_resource_id/connected_resource_ip_address (same value), service_ip_address required. (2) PLS body: flat (no wrapper key). (3) State machine: AUTO PLS -> PLE ACTIVE immediately; MANUAL -> REQUESTING -> CANCELED/RE_REQUEST -> APPROVE -> ACTIVE -> DISCONNECT/RECONNECT. (4) VPC create returns 201 (not 200/202). (5) Subnet at /v1/subnets (not /v1/vpcs/{id}/subnets). Previous: 46/95 (2026-06-23).",
-      "updated": "2026-06-24T10:00:00Z"
+      "notes": "HEAVY privatelink run 2026-06-24: +12 new VPC PL endpoints covered (all 14/14 PL endpoints now 2xx). Key findings: (1) IP-type PLS works without LB: connected_resource_type=IP + connected_resource_id/connected_resource_ip_address (same value), service_ip_address required. (2) PLS body: flat (no wrapper key). (3) State machine: AUTO PLS -> PLE ACTIVE immediately; MANUAL -> REQUESTING -> CANCELED/RE_REQUEST -> APPROVE -> ACTIVE -> DISCONNECT/RECONNECT. (4) VPC create returns 201 (not 200/202). (5) Subnet at /v1/subnets (not /v1/vpcs/{id}/subnets). Previous: 46/95 (2026-06-23). | 2026-09-18 coverage-agent (2026-09 spec bump, +1 endpoint listprivatelinkscpservices): LIVE 200 confirmed (GET /v1/privatelink-services/scp-services, response {scp_services:[{id,name,type}]}). Modeled in generated__newapi-202609.json (vpc-privatelink-scp-services-newapi-202609) as a documentation anchor only — the endpoint needed zero lifecycle work (plain 0-path-param GET, auto-covered by the smoke floor).",
+      "updated": "2026-09-18T05:00:00Z"
     },
     {
       "service": "virtualserver",
@@ -158,20 +158,21 @@
     },
     {
       "service": "organization",
-      "covered": 3,
-      "total": 37,
-      "gap": 12,
+      "covered": 4,
+      "total": 40,
+      "gap": 36,
       "heavy": false,
       "blockers": [
         "entitlement-403 (신규 계정 재확정 2026-07-16): 10 read가 계정 부착 'delegation policy(organization)'에 의해 파라미터 검증 전 차단(listaccounts/listorganizationinvitations/listorganizationunits/listpoliciesfortarget/listservicecontrolpolicies/listtargetsforpolicy/showdelegationpolicy/showaccount/showservicecontrolpolicy/listparents). waiver 제안 있으나 2026-06-10 오너 결정(org reads는 C3 타깃 유지)과 충돌 — 오너 승인 대기.",
         "unsatisfiable-flow (신규 구분): showorganization/showorganizationunit은 정책 통과 후 비즈니스 로직 도달(AccountNotIncludeOrganization/UnitNotFoundError) — 권한은 있고 실 org_id/unit_id만 부재. 계정은 org MEMBER(마스터 아님), listorganizations 빈 목록."
       ],
       "next_levers": [
+        "registerdelegatedadministrator/deregisterdelegatedadministrator: re-run under SCP_ALLOW_MUTATIONS=true to classify (expect 403 entitlement on this member account, same as the rest of org's guarded writes).",
         "org 마스터 승격 or 실 org_id 확보 시 show 2종+listparents 즉시 재시도",
         "오너: 10키 waiver 승인 여부 결정"
       ],
-      "notes": "3/37 유지 (2026-07-16 svccov-org 재실측 — mutating 금지 준수, read 12키 전수 프로브). 403 뿌리가 delegation policy로 특정됨(신규 사실).",
-      "updated": "2026-07-16T16:30:00Z"
+      "notes": "3/37 유지 (2026-07-16 svccov-org 재실측 — mutating 금지 준수, read 12키 전수 프로브). 403 뿌리가 delegation policy로 특정됨(신규 사실). | 2026-09-18 coverage-agent (2026-09 spec bump, +3 delegated-administrator endpoints): listdelegatedadministrators LIVE 200 (GET /v1/delegation-accounts -> {count:0,delegation_accounts:[]}) -- a NEW EXCEPTION to the usual member-403 pattern (member accounts CAN see their own delegation-account list). registerdelegatedadministrator/deregisterdelegatedadministrator guarded+optional in org-delegated-administrators-newapi-202609 (generated__newapi-202609.json) -- same entitlement-403-expected pattern as the rest of organization; UNTESTED this session (read-only mandate, mutations off). deregisterdelegatedadministrator body uses 'account_ids' (LIST), NOT 'account_id' singular like create -- easy copy-paste trap, documented in knowledge/services.md.",
+      "updated": "2026-09-18T05:00:00Z"
     },
     {
       "service": "iam-identity-center",
@@ -241,9 +242,9 @@
     },
     {
       "service": "servicewatch",
-      "covered": 34,
-      "total": 37,
-      "gap": 3,
+      "covered": 35,
+      "total": 41,
+      "gap": 6,
       "heavy": false,
       "blockers": [
         "createcustommetrics: product-bug/undocumented — OTLP /v1/metrics/custom 라우팅 키 미공개, 등록된 namespace 일치시켜도 400 SWT_CUSTOM_NAMESPACE (가설 반증 2026-07-16). 서포트/콘솔 힌트 필요.",
@@ -251,12 +252,14 @@
         "setalertnotifications: needs-peer(IAM) — 실 IAM user id 필수(404 'Some user IDs do not exist'). iam-access-key-full이 아닌 iam-user-full로 유저 생성 후 페어링 가능. user_ids:[]는 500 ContactAdmin(PF 후보) — 보내지 말 것."
       ],
       "next_levers": [
+        "setwidgets: once a lifecycle creates+owns a real dashboard (e.g. via management__servicewatch.json's dashboard writes) under mutations, retarget setwidgets at that owned dashboard_id instead of the NO-OP literal.",
+        "deletebulkalertnotifications/setalertnotificationsactivated: need a real alert id -- create one via the existing servicewatch-alert lifecycle under mutations first, then retarget.",
         "iam-user-full과 페어링해 setalertnotifications 회수",
         "OBS 버킷 확보 시 logexport 재시도",
         "custom metrics는 서포트 문의"
       ],
-      "notes": "17->34/37 (2026-07-16 svccov-svcwatch). create/setalert는 dimension 필수(문서 optional 표기와 다름 — 400 'At least one dimension must be set'), 실측 쌍은 POST /v1/metrics 카탈로그에서 캡처. custommetricmetas는 resource_id 차원 필수 + 삭제 API 없음 -> 고정명으로 전환(매 런 영구물 적립 차단, 프리티어 10/월). downloadmetricdataimage h>=500/w>=1000. probe_reads 귀속 수리(showalert/showeventrule/listalertnotifications).",
-      "updated": "2026-07-16T16:30:00Z"
+      "notes": "17->34/37 (2026-07-16 svccov-svcwatch). create/setalert는 dimension 필수(문서 optional 표기와 다름 — 400 'At least one dimension must be set'), 실측 쌍은 POST /v1/metrics 카탈로그에서 캡처. custommetricmetas는 resource_id 차원 필수 + 삭제 API 없음 -> 고정명으로 전환(매 런 영구물 적립 차단, 프리티어 10/월). downloadmetricdataimage h>=500/w>=1000. probe_reads 귀속 수리(showalert/showeventrule/listalertnotifications). | 2026-09-18 coverage-agent (2026-09 spec bump, +4 endpoints): listloggrouplogstreamslogevents LIVE 200 via the generic read_chains 1-param auto-chain (real log_group_id from this account's 17 log groups) -- zero lifecycle work needed to reach it live; a documentation-anchor step was still added (servicewatch-newapi-202609-coverage, generated__newapi-202609.json) so the STATIC coverage-ceiling analyzer also credits it. deletebulkalertnotifications/setalertnotificationsactivated need a real alert (0 alerts exist on this account) -- NO-OP literal-id modeled, UNTESTED. setwidgets needs a real dashboard (17 exist, but pre-existing/unowned -- deliberately NOT targeted, NO-OP literal-id modeled instead per core.registry ownership discipline) -- UNTESTED.",
+      "updated": "2026-09-18T05:00:00Z"
     },
     {
       "service": "archivestorage",
@@ -347,16 +350,17 @@
     {
       "service": "ske",
       "covered": 2,
-      "total": 24,
-      "gap": 22,
+      "total": 30,
+      "gap": 28,
       "heavy": true,
       "blockers": [],
       "next_levers": [
+        "All 5 new ske ops: need a real cluster (SCP_RUN_HEAVY + SCP_ALLOW_MUTATIONS) to get past literal-id 404s to a real 2xx/4xx-with-real-id classification. Cheapest path: adopt the shared cluster from container-ske-cluster-nodepool's next successful heavy run rather than provisioning a second one (VPC/cost budget).",
         "listimages now has scp_original_image_type=k8s param — should count as covered on next smoke run",
         "Remaining 21 gaps need SCP_ALLOW_MUTATIONS + SCP_RUN_HEAVY (cluster+nodepool lifecycle)"
       ],
-      "notes": "listimages (GET /v1/images): scp_original_image_type=k8s is REQUIRED (400 without; 200 with, count:15). Fixed in container__ske.json (new list-images step) and generated__heavy-ske.json (inline params -> params dict). Confirmed 200 live 2026-06-20.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "listimages (GET /v1/images): scp_original_image_type=k8s is REQUIRED (400 without; 200 with, count:15). Fixed in container__ske.json (new list-images step) and generated__heavy-ske.json (inline params -> params dict). Confirmed 200 live 2026-06-20. | 2026-09-18 coverage-agent (2026-09 spec bump, +5 new endpoints; total corrected 24->30 to match the current 1,490-endpoint catalog, ledger total was stale): setclusterdeletionprotection/setclusterlinkedresources/setclusternfsvolume/setclustersubnets/listnamespacedpods modeled in container-ske-newapi-202609-coverage (generated__newapi-202609.json), NOT the heavy cluster-nodepool lifecycle in scenarios.json (untouched -- file ownership). Account has 0 SKE clusters live -- all 5 use the NO-OP literal-id-404 pattern, UNTESTED this session (mutations off). listnamespacedpods also needs namespace_name with NO discovery endpoint anywhere in the catalog -- seeded literal 'default' via action:set_const.",
+      "updated": "2026-09-18T05:00:00Z"
     },
     {
       "service": "iam",
@@ -487,13 +491,13 @@
     {
       "service": "baremetal",
       "covered": 3,
-      "total": 16,
-      "gap": 13,
+      "total": 17,
+      "gap": 14,
       "heavy": true,
       "blockers": [],
       "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "2026-09-18 coverage-agent (2026-09 spec bump, +1 endpoint updatebaremetalcpucores): modeled in baremetal-cpu-cores-newapi-202609 (generated__newapi-202609.json) using the same literal-id-404 NO-OP pattern as the existing baremetal-server-coverage lifecycle (compute__baremetal.json, untouched). Account has 0 bare-metal servers live -- UNTESTED this session (mutations off).",
+      "updated": "2026-09-18T05:00:00Z"
     },
     {
       "service": "cloudmonitoring",
@@ -907,13 +911,15 @@
     {
       "service": "budget",
       "covered": 5,
-      "total": 5,
-      "gap": 0,
+      "total": 7,
+      "gap": 2,
       "heavy": false,
       "blockers": [],
-      "next_levers": [],
-      "notes": "ALL 5 COVERED (100%) 2026-06-23. createaccountbudget 201 CONFIRMED LIVE (body shape BudgetCreateRequest{amount:int,name,start_month:'YYYY-MM',unit:'MONTHLY'|'OVERALL'} with optional notifications). KEY FIX: start_month must be >= current month (400 if in past; fixed from 2026-01 to 2026-06). showaccountbudget 200 via probe_reads. setaccountbudget 200. deleteaccountbudget 204. Teardown clean (0 budgets post-run). known_issues.json entry for createaccountbudget (added 2026-06-12) SHOULD BE REMOVED: 500 was a body-shape bug (wrong field names budget_amount/currency/period_type), not a product bug; corrected body yields 201.",
-      "updated": "2026-06-24T09:01:02Z"
+      "next_levers": [
+        "setaccountcostlinkage/deleteaccountcostlinkage: once budget-account-budget(-full) creates a real budget under mutations, re-run these two against the real budget_id for a live 2xx (no body needed -- path param only)."
+      ],
+      "notes": "ALL 5 COVERED (100%) 2026-06-23. createaccountbudget 201 CONFIRMED LIVE (body shape BudgetCreateRequest{amount:int,name,start_month:'YYYY-MM',unit:'MONTHLY'|'OVERALL'} with optional notifications). KEY FIX: start_month must be >= current month (400 if in past; fixed from 2026-01 to 2026-06). showaccountbudget 200 via probe_reads. setaccountbudget 200. deleteaccountbudget 204. Teardown clean (0 budgets post-run). known_issues.json entry for createaccountbudget (added 2026-06-12) SHOULD BE REMOVED: 500 was a body-shape bug (wrong field names budget_amount/currency/period_type), not a product bug; corrected body yields 201. | 2026-09-18 coverage-agent (2026-09 spec bump, +2 cost-linkage endpoints): setaccountcostlinkage/deleteaccountcostlinkage modeled in budget-cost-linkage-newapi-202609 (generated__newapi-202609.json), NOT financial-management__budget.json (untouched). CORRECTED: both take NO request body (docs-confirmed 2026-09-18 -- the pre-existing api_bodies.json '_raw' entry for setaccountcostlinkage is a stub, not a real body). Account has 0 budgets live (unchanged since 2026-06-23) -- NO-OP literal-id pattern, UNTESTED this session (mutations off).",
+      "updated": "2026-09-18T05:00:00Z"
     },
     {
       "service": "secretvault",
@@ -1111,6 +1117,45 @@
       ],
       "notes": "2026-09-18 (modeling+read-only-validation agent): NEW service catalog rebuild (0->24 endpoints). GLOBAL service confirmed live (resourceoptimizer.e.samsungsdscloud.com authenticates; regional host has no route) — core/config.py DEFAULT_GLOBAL_SERVICES updated same commit. Authored regression/scenarios/lifecycles/generated__resourceoptimizer.json (4 lifecycles, all 24 endpoints modeled, spec.coverage_gap gap 24->0). Live-validated 14/24 endpoints (8 real 2xx: getaccount, listaccountsettings, getaccountlimsettings, listorganizationsettings, getorganizationlimsettings, getdashboard, getidleresourcelist, listrecommendationsbybody; 6 reached-but-404 due to 0 data on this account: showrecommendation, getrecommendationmetrics, getaccountsettingdetail, getorganizationsettingdetail, getaccountsetting, getorganizationsetting). Key runtime quirk (docs mismatch): getaccountsettingdetail/getorganizationsettingdetail require cpu_threshold/cpu_headroom/memory_headroom even under utilization_preset=PERFORMANCE_PRIORITY, despite the doc marking them query-optional (\"any of [enum, null]\") — live 400 \"When PERFORMANCE_PRIORITY is selected, cpu_threshold is required\" without them. createaccountsetting/createorganizationsettings response envelope is $.items[0].id (list), not $.id. The 13 write endpoints (creates/updates/deletes/optin/optout/setlim) are modeled with docs-derived bodies but NOT live-executed (mandate: read-only validation only) — see blockers.",
       "updated": "2026-09-18T04:30:07Z"
+    },
+    {
+      "service": "costnavigator",
+      "covered": 1,
+      "total": 3,
+      "gap": 2,
+      "heavy": false,
+      "blockers": [
+        {
+          "key": "analyzecost/analyzecostcomparison: unverified — read-only mandate could not fire the real POST",
+          "reason": "Both are query-style POSTs (filter/group_by/time_period body, no resource created). A bare GET host-reachability probe against both paths returned 403 Forbidden ('Action definition not found') -- inconclusive (could be a real entitlement gap or just GET correctly rejected on a POST-only route). Needs a mutations-enabled re-check for a real verdict.",
+          "kind": "fixable"
+        }
+      ],
+      "next_levers": [
+        "Re-run costnavigator-reads-newapi-202609 (generated__newapi-202609.json) under SCP_ALLOW_MUTATIONS=true to fire analyzecost/analyzecostcomparison for real and classify the 403 seen on the GET probe."
+      ],
+      "notes": "NEW product (2026-09 spec bump), 3 endpoints. HOST FIX 2026-09-18: costnavigator added to DEFAULT_GLOBAL_SERVICES in core/config.py (was resolving to a dead regional host, proxy 502 no-route -- same bug class as the sts/resourceoptimizer global-host fixes). getcostdimensionoptions LIVE-CONFIRMED 200 with required start_date/end_date query params (YYYY-MM-DD, docs search-index confirmed). See knowledge/services.md 'financial-management / costnavigator'.",
+      "updated": "2026-09-18T05:00:00Z"
+    },
+    {
+      "service": "cnapp",
+      "covered": 0,
+      "total": 2,
+      "gap": 2,
+      "heavy": false,
+      "blockers": [
+        {
+          "key": "host unreachable on both regional AND global templates",
+          "reason": "cnapp.kr-west1.e.samsungsdscloud.com AND cnapp.e.samsungsdscloud.com (tried both explicitly 2026-09-18) fail identically with a proxy 502 'Tunnel connection failed' -- no route to either host, not a real gateway 4xx. Unlike costnavigator/resourceoptimizer (where the global template was simply the fix), NEITHER host works for cnapp. Hypothesis: not yet provisioned/routed for this account+environment, OR these are SaaS-vendor-inbound-only callback endpoints (per their docs descriptions) not meant for direct customer HMAC access. Needs owner input.",
+          "kind": "needs-peer"
+        }
+      ],
+      "next_levers": [
+        "Ask owner/platform: is cnapp entitled+routed for this test account? If yes, re-probe both host templates. If it's structurally a SaaS-vendor-only integration surface, waive both endpoints instead of chasing further.",
+        "Lifecycle cnapp-newapi-202609-coverage (generated__newapi-202609.json) is modeled+ready, currently enabled:false _status:blocked-owner -- flip enabled:true once the host question is resolved."
+      ],
+      "notes": "NEW product (2026-09 spec bump), 2 endpoints, both POST. Bodies confirmed verbatim from docs search-index 2026-09-18. See knowledge/services.md 'security / cnapp'.",
+      "updated": "2026-09-18T05:00:00Z"
     }
   ]
 }

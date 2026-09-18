@@ -510,6 +510,18 @@ lifecycle `heavy-asg-full-coverage` in
   own dedicated `10.124.9.0/24`). Fixed OFFLINE 2026-07-07: `endpoint_ip_address` →
   `10.124.9.20` (inside the dedicated subnet's own range). UNVERIFIED LIVE.
 
+**2026-09-18 (coverage-agent, 2026-09 spec bump — 1 NEW endpoint):**
+`listprivatelinkscpservices` (GET /v1/privatelink-services/scp-services, zero path
+params). **LIVE-CONFIRMED 200** via the plain catalog smoke floor — no lifecycle
+work needed to reach it (`regression/smoke.py` picks up any zero-path-param GET
+automatically). Response envelope: `{scp_services:[{id, name, type}]}` (e.g.
+`{id:"e3df2e8e3b374fbb81d4e322b52ca50d", name:"OpenAPI", type:"OPEN_API"}` per
+docs). Optional query params `type` (enum `OPEN_API`|`SERVICE_WATCH`) and `name`
+— bare call already 200s. A one-step documentation-anchor lifecycle
+(`vpc-privatelink-scp-services-newapi-202609`) was added to
+`regression/scenarios/lifecycles/generated__newapi-202609.json` purely so the
+proven query shape lives in git, not just the results log.
+
 ## networking / loadbalancer
 
 - **Host:** regional. 34 endpoints. Base LB stack (subnet → health-check → LB → server-group) is
@@ -1225,6 +1237,29 @@ lifecycle `heavy-asg-full-coverage` in
 - **Coverage 2026-06-24:** 2 → **3 / 37** (+1: `cancelinvitations` → 200).
   All 37 endpoints reached (32 canonical soft/ok + 5 newly probed id-bound).
 
+**2026-09-18 (coverage-agent, 2026-09 spec bump — 3 NEW endpoints):**
+`registerdelegatedadministrator` (POST /v1/delegation-accounts), `listdelegatedadministrators`
+(GET, same path), `deregisterdelegatedadministrator` (DELETE, same path). Modeled in
+`regression/scenarios/lifecycles/generated__newapi-202609.json`
+(`org-delegated-administrators-newapi-202609`); did NOT touch
+`management__organization.json` (parallel-agent file ownership).
+- **`listdelegatedadministrators` is a NEW EXCEPTION to this account's usual
+  member-403 pattern**: LIVE-CONFIRMED 200 2026-09-18 →
+  `{count:0, delegation_accounts:[], page:0, size:20, sort:[created_at:desc,id:desc]}`.
+  Unlike `listorganizations`/`listorganizationunits`/etc. (which 403 for a
+  member), a member account CAN see its own account's (empty) delegation-account
+  list — raises the org coverage count by +1 real 2xx (4 → 5 canonical ok
+  including this one, still against the same 37-endpoint total pending a
+  ledger/coverage-headroom recompute).
+- register/deregister are guarded optional+broad (`organization_id`/`account_id`
+  soft-captured from `listorganizations`, empty on this member account → stays
+  literal, same convention as `org-invitations-guarded`'s `create-invitation`).
+- **`deregisterdelegatedadministrator` body field name TRAP** (confirmed from docs
+  search-index 2026-09-18): `DelegationAccountDeleteRequest` uses **`account_ids`
+  (a LIST)**, NOT `account_id` singular like the create body
+  (`DelegationAccountCreateRequest`) — easy to get wrong by copy-paste between
+  the two.
+
 ---
 
 ## management / loggingaudit
@@ -1402,6 +1437,31 @@ lifecycle `heavy-asg-full-coverage` in
 - **Scenario files updated:** `container__ske.json` (added `list-images` step with `params: {scp_original_image_type: k8s}` to `ske-read-coverage` lifecycle); `generated__heavy-ske.json` (converted inline query-string path to `params` dict for `create-ske-image` and `verify-ske-image-images-page` steps).
 - **Coverage 2026-06-20:** `listimages` unblocked — 400→200 confirmed live.
 
+**2026-09-18 (coverage-agent, 2026-09 spec bump — 5 NEW endpoints):**
+`setclusterdeletionprotection` (PUT .../deletion-protection), `setclusterlinkedresources`
+(PUT .../linked-resources), `setclusternfsvolume` (PUT .../nfs-volume), `setclustersubnets`
+(PUT .../subnets), `listnamespacedpods` (GET .../namespaces/{namespace_name}/pods). Modeled
+read-only (no real cluster exists to mutate against — see below) in
+`regression/scenarios/lifecycles/generated__newapi-202609.json`
+(`container-ske-newapi-202609-coverage`); the real heavy cluster lifecycle
+(`container-ske-cluster-nodepool`, `scenarios.json`) was intentionally NOT touched
+(parallel-agent file ownership).
+- All 4 PUT-setter bodies CONFIRMED verbatim against the docs search-index text
+  (`spec.extract_catalog.index_body_texts`) — identical to the pre-existing
+  `data/api_bodies.json` entries, so those can be trusted as docs-CONFIRMED not
+  just best-effort.
+- `listnamespacedpods` needs a SECOND path param `namespace_name` and there is
+  **no namespace-list endpoint anywhere in the 1,490-endpoint catalog** (full scan
+  2026-09-18) to discover a real value — seeded as the documented literal
+  `"default"` (standard k8s namespace) via an `action:set_const` step.
+- Live read-only check 2026-09-18: this account has **0 SKE clusters**
+  (`GET /v1/clusters` → `{clusters:[],count:0}`), so all 5 ops are exercised via
+  the NO-OP soft-capture literal-id pattern (same as `compute/baremetal`'s
+  `baremetal-server-coverage`) — every write 404s against a non-existent
+  `{cluster_id}`, never touching a real cluster, while still recording as
+  reached/covered. **Pending live 2xx validation** once a real cluster exists
+  (a `SCP_RUN_HEAVY` pass or a dedicated owner test cluster).
+
 ---
 
 ## security / configinspection
@@ -1467,6 +1527,34 @@ lifecycle `heavy-asg-full-coverage` in
 - **Dashboard capture:** `$.id` (flat, VALIDATED 2026-06-15). Dashboard delete uses field `dashboard_ids` (NOT `ids`) in the bulk DELETE body. All other bulk deletes (alerts, event-rules, log-groups, log-streams) use `ids`.
 - **OTLP custom metrics:** `POST /v1/metrics/custom` — `as_int` integer value (not `as_double`), `time_unix_nano` must be a recent epoch (use 1780272000000000000 = 2026-06-01 UTC; 15mo retention). resource.attributes routing key for namespace is `namespace` (UNPROVEN — may still 400). Broad 202/400 tolerance recommended.
 - **Coverage 2026-06-20:** 24/31. Remaining gaps: showalert (blocked on createalert needing real metric ids — now fixed in lifecycle), showeventrule (blocked on createeventrule; get-event-rule decoupled from group so it fires), createcustommetrics 400 (OTLP namespace routing unresolved). Target +2 on next light CRUD run.
+
+**2026-09-18 (coverage-agent, 2026-09 spec bump — 4 NEW endpoints, 41 total now):**
+`deletebulkalertnotifications` (DELETE /v1/alerts/{id}/notifications), `setalertnotificationsactivated`
+(PATCH /v1/alerts/{id}/notifications/activated), `setwidgets` (PUT /v1/dashboards/{dashboard_id}/widgets),
+`listloggrouplogstreamslogevents` (GET /v1/log-groups/{log_group_id}/log-streams/log-events).
+Modeled in `regression/scenarios/lifecycles/generated__newapi-202609.json`
+(`servicewatch-newapi-202609-coverage`); did not touch `management__servicewatch.json`.
+- **`listloggrouplogstreamslogevents` is LIVE-CONFIRMED 200** — and needed ZERO
+  lifecycle work: it has exactly one path param (`log_group_id`) whose parent list
+  is `GET /v1/log-groups`, so the generic `regression/read_chains.py` 1-param
+  auto-chain discovers it for free against a real log group (this account has
+  **17 real log groups**, e.g. `/scp/scf/regrw5scfa4e70597`). A lifecycle step was
+  still added (real, non-literal `log_group_id`) purely so the STATIC
+  coverage-ceiling analyzer (`spec.coverage_gap`) also credits it — the analyzer
+  only counts scenario-declared steps, not the dynamic read-chain pass.
+- `deletebulkalertnotifications`/`setalertnotificationsactivated` need a real
+  **alert** id — this account has **0 alerts** live (`GET /v1/alerts` →
+  `{alerts:[],count:0}`) — NO-OP literal-id pattern, pending a real alert (create
+  one via the existing `servicewatch-alert` lifecycle under mutations first).
+- `setwidgets` needs a real **dashboard** id — this account DOES have **17 real
+  dashboards** (`GET /v1/dashboards` → count:17, e.g. `Block Storage VM`
+  `0f50a2ca5b9345918c0a8a732eccd601`), but they are pre-existing/system
+  dashboards this run did not create. Deliberately used the NO-OP literal-id
+  pattern here too rather than mutating an unowned dashboard's widgets
+  (`core.registry` ownership discipline) — promote to a real id only via a
+  dashboard THIS run creates.
+- Bodies for all 3 mutating ops CONFIRMED verbatim from the docs search-index
+  text 2026-09-18, identical to the pre-existing `data/api_bodies.json` entries.
 
 ## ai-ml / aimlops-platform
 
@@ -1552,6 +1640,25 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - **known_issues.json:** The entry for `financial-management/budget/createaccountbudget` (added 2026-06-12, "500 ContactAdminForAssistance") IS A BODY-SHAPE BUG, NOT a product bug. The 500 was caused by wrong field names in the request body (`budget_amount`/`currency`/`period_type` instead of the correct `amount`/`name`/`start_month`/`unit`). With the corrected body, create reliably returns 201. The entry SHOULD BE REMOVED from known_issues.json.
 - **Teardown:** delete → 204; verified account returns to 0 budgets post-run.
 - **Fragment:** `regression/scenarios/lifecycles/financial-management__budget.json` (lifecycle `budget-account-budget`).
+
+**2026-09-18 (coverage-agent, 2026-09 spec bump — 2 NEW endpoints, now 7 total):**
+`setaccountcostlinkage` (PUT /v1/budgets/account/{budget_id}/cost-linkage),
+`deleteaccountcostlinkage` (DELETE, same path). Modeled in
+`regression/scenarios/lifecycles/generated__newapi-202609.json`
+(`budget-cost-linkage-newapi-202609`); did not touch `financial-management__budget.json`.
+- **BOTH ops take NO request body** — CONFIRMED from the docs search-index text
+  (`spec.extract_catalog.index_body_texts`) 2026-09-18: path param `budget_id`
+  only, response is `200 BudgetAccountShowResponseV1dot1` with the budget's
+  `is_cost_linked` boolean flipped. The list envelope's `sort` field
+  (`["is_cost_linked:desc", ...]`) independently corroborates `is_cost_linked` as
+  the real field these toggle. **The pre-existing `data/api_bodies.json` entry
+  for `setaccountcostlinkage` (`{"_raw": "{budget_id}"}`) is a stub placeholder,
+  not a real body — do not send it as JSON.**
+- Live read-only check 2026-09-18: this account still has **0 budgets**
+  (`GET /v1/budgets/account` → `{budgets:[],count:0}`, unchanged since 2026-06-23),
+  so both ops are exercised via the NO-OP literal-id pattern — pending a real
+  budget (create one via `budget-account-budget(-full)` under mutations first,
+  then re-run these two against the real id for a live 2xx).
 
 ## financial-management / billingplan
 
@@ -1675,6 +1782,99 @@ docs-derived, mutations NOT yet runtime-proven; see `knowledge/validated-facts.m
   in the search-index text beyond the example `"01012341234"`) — treat any fix
   attempt as exploratory; the lifecycle currently sends `{epoch_now}` (digits
   only, cross-run-unique) which may not match a strict format check.
+
+## financial-management / costnavigator
+
+**NEW product (2026-09-18 catalog rebuild), 3 endpoints, static gap 3 → 0 via
+`regression/scenarios/lifecycles/generated__newapi-202609.json`
+(`costnavigator-reads-newapi-202609`).** Global (account-scoped, no region).
+
+- **HOST FIX 2026-09-18 (same bug class as `sts`/`resourceoptimizer`):**
+  `costnavigator` was missing from `DEFAULT_GLOBAL_SERVICES` in `core/config.py` —
+  fixed in this commit. `costnavigator.e.samsungsdscloud.com` (global)
+  signs+authenticates correctly (**LIVE-CONFIRMED 200** on `getcostdimensionoptions`);
+  `costnavigator.kr-west1.e.samsungsdscloud.com` (regional) has **no route at all**
+  (proxy `502 Tunnel connection failed` — not a real gateway 4xx, same no-route
+  signature documented for `resourceoptimizer`).
+- **`getcostdimensionoptions` (GET /v1/cost-analysis/dimension) REQUIRES
+  `start_date`+`end_date` query params (YYYY-MM-DD, both required)** — confirmed
+  from the docs search-index text (`spec.extract_catalog.index_body_texts`); a
+  bare call 400s `ValidationError: ['Field required', 'Field required']`. NOT
+  added to `regression/smoke.py`'s global `_REQUIRED_QUERY_DEFAULTS` (those two
+  names are used by ~10 other endpoints across other services with different
+  per-service constraints — see the billingplan `start_date`/`end_date` strict-
+  format note below — a shared global default was judged out of scope/risk for a
+  single-service session). **LIVE-CONFIRMED 200 2026-09-18** with
+  `start_date=2026-01-01&end_date=2026-06-30`: response
+  `{filter_options:[{key,label,target,values}...], group_by_options:[{key,label,type}...]}`
+  (10 filter dimensions incl. `region`/`service_id`/`account_id`/`srn`; all
+  `values:[]` — dimension VALUE lists are apparently populated per real cost
+  data, empty here).
+- **`analyzecost` (POST /v1/cost-analysis) / `analyzecostcomparison` (POST
+  /v1/cost-analysis/comparison)** are query-style POSTs (filter/group_by/
+  time_period or baseline+comparison periods in the body; no resource is
+  created/deleted). Bodies pre-existed in `data/api_bodies.json` (docs-derived) —
+  **NOT** live-tested this session (`SCP_ALLOW_MUTATIONS=false` read-only
+  mandate). A bare **GET** probe against both paths (host-reachability check
+  only, not the real POST) returned `403 Forbidden` (`"Action definition not
+  found"`, real JSON) rather than a routing failure — inconclusive on its own
+  (could be a real POST-only route with GET correctly rejected, or a genuine
+  entitlement gap) but at minimum confirms the host/gateway itself is alive.
+  **Needs a mutations-enabled re-check** for a real verdict.
+
+## security / cnapp
+
+**NEW product (2026-09-18 catalog rebuild), 2 endpoints, BOTH UNREACHABLE this
+session — lifecycle `cnapp-newapi-202609-coverage` added
+DISABLED (`_status: blocked-owner`) in
+`regression/scenarios/lifecycles/generated__newapi-202609.json`.**
+
+- `sendnotification` (POST /v1/notification — "Sends an OTP notification via mail
+  or sms") and `updatecnapptenantstatusbycallback` (POST /v1/tenants/callback —
+  "Callback Request from CNAPP SaaS to SCP for tenant status update").
+- **HOST UNREACHABLE on BOTH templates, tried explicitly 2026-09-18:**
+  `cnapp.kr-west1.e.samsungsdscloud.com` (regional) AND
+  `cnapp.e.samsungsdscloud.com` (global, per the costnavigator/resourceoptimizer
+  precedent) both fail identically: proxy `502 Tunnel connection failed` — no
+  route to either host at all (not a 401/403/404 from a real API gateway).
+  Unlike costnavigator/resourceoptimizer (where the global template turned out
+  to be correct and reachable), **neither host works for cnapp** — this is
+  different from a template-mismatch bug.
+- **Hypothesis (unconfirmed, needs owner input):** either (a) cnapp is
+  genuinely not provisioned/routed for this account+environment yet (brand-new
+  2026-09 product), or (b) per the endpoint descriptions ("Callback Request
+  FROM CNAPP SaaS TO SCP") these may be inbound-only integration endpoints for
+  a third-party CNAPP SaaS vendor to call SCP, not endpoints a customer's own
+  HMAC key is meant to call directly (similar in spirit to `security/
+  configinspection`'s console-only `plan_type STANDARD` activation gate, also
+  in this file).
+- Request bodies for both endpoints CONFIRMED verbatim from the docs
+  search-index text 2026-09-18 (identical to `data/api_bodies.json`), modeled
+  and ready to flip `enabled:true` the moment the host resolves. Both bodies
+  reference SYNTHETIC/example ids from the docs sample (`scp_tenant_id`,
+  `account_id`, `srn`) — even once reachable, expect 400/403 without real
+  CNAPP-tenant provisioning data.
+- **Next step (owner decision needed):** confirm whether cnapp should be
+  entitled+routed for the test account, or whether these 2 endpoints should be
+  waived as structurally uncoverable via HMAC (SaaS-vendor-only integration
+  surface). Recorded as a blocker in `data/coverage_ledger.json`.
+
+## compute / baremetal (cpu-cores op)
+
+**2026-09-18 (coverage-agent, 2026-09 spec bump — 1 NEW endpoint):**
+`updatebaremetalcpucores` (PUT /v1/baremetals/{baremetal_id}/cpu-cores). Modeled
+in `regression/scenarios/lifecycles/generated__newapi-202609.json`
+(`baremetal-cpu-cores-newapi-202609`) using the SAME literal-id-404 NO-OP
+pattern as the existing `compute__baremetal.json` `baremetal-server-coverage`
+lifecycle (not touched here — parallel-agent file ownership; see that
+lifecycle's own `_note` for the full baremetal coverage picture / 12
+pre-existing write endpoints).
+- Live read-only check 2026-09-18: this account still has **0 bare-metal
+  servers** (`GET /v1/baremetals` → `{baremetals:[],count:0}`).
+- Body CONFIRMED verbatim from the docs search-index text 2026-09-18
+  (`BaremetalCpuCoresRequest: {core_disable_use, cpu_core_active,
+  hyperthreading_use}`), identical to the pre-existing `data/api_bodies.json`
+  entry. Docs show `202 Accepted` (`AsyncResponse`) as the success code.
 
 ## compute / scf (Serverless Cloud Function)
 

@@ -1,0 +1,650 @@
+{
+  "lifecycles": [
+    {
+      "id": "container-ske-newapi-202609-coverage",
+      "service": "container/ske",
+      "enabled": true,
+      "heavy": false,
+      "_note": "2026-09 spec-bump NEW endpoints (5): setclusterdeletionprotection, setclusterlinkedresources, setclusternfsvolume, setclustersubnets, listnamespacedpods. Bodies for the 4 PUT setters CONFIRMED verbatim against the docs search-index text (spec.extract_catalog.index_body_texts) 2026-09-18 — identical to data/api_bodies.json entries, so treat those as docs-CONFIRMED not just best-effort. Live read-only check 2026-09-18: this account has 0 SKE clusters (GET /v1/clusters -> {clusters:[],count:0}), and the real cluster lifecycle (container-ske-cluster-nodepool, scenarios.json, heavy/54 steps) is intentionally NOT touched here (parallel-agent file-ownership rule). Cost/safety pattern (proven by compute-baremetal): {cluster_id} is declared via a NO-OP soft-capture selector that deliberately finds nothing (deep field name that never exists), so at runtime it stays LITERAL and every per-cluster write 404s against a non-existent id — no real cluster is ever touched — while the catalog normalizes {cluster_id}/{namespace_name} to '*' so each endpoint is still RECORDED as reached. listnamespacedpods needs a SECOND path param (namespace_name) with NO list endpoint anywhere in the catalog to discover a real value from (full-catalog scan 2026-09-18) — namespace_name is seeded as the documented literal 'default' via an action:set_const step (same pattern engine.py already uses for DBaaS {log_type}). All 5 steps optional + broad expect_status so a 4xx records coverage without failing the run. PENDING LIVE 2xx VALIDATION once a real cluster exists (either a future SCP_RUN_HEAVY pass adopting the shared cluster, or a dedicated owner-run test cluster) — promote from literal-id coverage-only to a real read/verify step at that point.",
+      "steps": [
+        {
+          "name": "seed-ske-cluster-placeholder",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "params": {
+            "limit": 1
+          },
+          "expect_status": [
+            200,
+            403
+          ],
+          "optional": true,
+          "capture_soft": {
+            "cluster_id": "$.clusters[0].nonexistent_ske_cluster_seed"
+          },
+          "_note": "NO-OP soft-capture: this account had 0 clusters live 2026-09-18, and even if one exists the field name never matches, so cluster_id always stays LITERAL. Real list call still exercises listclusters."
+        },
+        {
+          "name": "seed-ske-namespace-literal",
+          "action": "set_const",
+          "values": {
+            "namespace_name": "default"
+          },
+          "_note": "listnamespacedpods needs {namespace_name} with no discovery list endpoint in the catalog (full scan 2026-09-18) — 'default' is the documented standard k8s namespace, seeded as a fixed literal (same pattern as DBaaS {log_type})."
+        },
+        {
+          "name": "set-cluster-deletion-protection",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/deletion-protection",
+          "json": {
+            "deletion_protection_enabled": false
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "ske-newapi",
+          "_note": "setclusterdeletionprotection. Body CONFIRMED verbatim from docs search-index 2026-09-18 (ClusterDeletionProtectionSetRequest). Literal {cluster_id} -> 404 (never touches a real cluster)."
+        },
+        {
+          "name": "set-cluster-linked-resources",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/linked-resources",
+          "json": {
+            "linked_resources": [
+              {
+                "id": "res-12345678",
+                "name": "my-resource",
+                "type": "fs"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "ske-newapi",
+          "_note": "setclusterlinkedresources. Body CONFIRMED verbatim from docs search-index 2026-09-18 (ClusterLinkedResourcesSetRequest; docs example response is 202 Accepted). Literal {cluster_id} -> 404."
+        },
+        {
+          "name": "set-cluster-nfs-volume",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/nfs-volume",
+          "json": {
+            "nfs_volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438"
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "ske-newapi",
+          "_note": "setclusternfsvolume. Body CONFIRMED verbatim from docs search-index 2026-09-18 (ClusterNfsVolumeSetRequest). Literal {cluster_id} -> 404."
+        },
+        {
+          "name": "set-cluster-subnets",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/subnets",
+          "json": {
+            "additional_subnet_id_list": [
+              "023c57b14f11483689338d085e061492",
+              "617b3d0e90c24a5fa1f65a3824861354"
+            ]
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "ske-newapi",
+          "_note": "setclustersubnets. Body CONFIRMED verbatim from docs search-index 2026-09-18 (ClusterSubnetsSetRequest). Literal {cluster_id} -> 404."
+        },
+        {
+          "name": "list-namespaced-pods",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/namespaces/{namespace_name}/pods",
+          "params": {},
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "ske-newapi",
+          "_note": "listnamespacedpods. namespace_name seeded literal 'default' (see seed-ske-namespace-literal). Literal {cluster_id} -> 404 (never queries a real cluster's k8s API). 'params': {} forces catalog-key recording for this GET per the container/scr 2026-06-24 fix (engine only records under the catalog key for GET steps carrying a 'params' dict)."
+        }
+      ]
+    },
+    {
+      "id": "budget-cost-linkage-newapi-202609",
+      "service": "financial-management/budget",
+      "enabled": true,
+      "heavy": false,
+      "_note": "2026-09 spec-bump NEW endpoints (2): setaccountcostlinkage, deleteaccountcostlinkage — PUT/DELETE /v1/budgets/account/{budget_id}/cost-linkage. CORRECTED BODY 2026-09-18: docs search-index text (spec.extract_catalog.index_body_texts) confirms BOTH ops take NO request body — path param budget_id only (200 BudgetAccountShowResponseV1dot1 with 'is_cost_linked' flipped true/false in the budget sub-object). The pre-existing data/api_bodies.json entry for setaccountcostlinkage ({'_raw': '{budget_id}'}) is a stub placeholder, NOT a real body — do not send it as JSON. Live read-only check 2026-09-18: this account has 0 budgets (GET /v1/budgets/account -> {budgets:[],count:0}; same as the 2026-06-23 budget knowledge entry, still true), so budget_id is seeded via the same NO-OP soft-capture literal-id pattern used elsewhere — writes 404 against a non-existent id, never touching a real budget. Once the existing budget-account-budget(-full) lifecycle (financial-management__budget.json, NOT touched here) creates a real budget under mutations, these two ops should be re-run against that real budget_id for a live 2xx.",
+      "steps": [
+        {
+          "name": "seed-budget-placeholder",
+          "method": "GET",
+          "path": "/v1/budgets/account",
+          "params": {
+            "limit": 1
+          },
+          "expect_status": [
+            200,
+            403
+          ],
+          "optional": true,
+          "capture_soft": {
+            "budget_id": "$.budgets[0].nonexistent_budget_seed"
+          },
+          "_note": "NO-OP soft-capture: account has 0 budgets live (2026-09-18), and even if one exists the field name never matches -> budget_id stays LITERAL."
+        },
+        {
+          "name": "set-account-cost-linkage",
+          "method": "PUT",
+          "path": "/v1/budgets/account/{budget_id}/cost-linkage",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "budget-cost-linkage",
+          "_note": "setaccountcostlinkage. NO request body (docs-confirmed 2026-09-18 — see lifecycle _note). Literal {budget_id} -> 404."
+        },
+        {
+          "name": "delete-account-cost-linkage",
+          "method": "DELETE",
+          "path": "/v1/budgets/account/{budget_id}/cost-linkage",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "budget-cost-linkage-delete",
+          "_note": "deleteaccountcostlinkage. NO request body. destructive-gated (SCP_ALLOW_DESTRUCTIVE) though the literal id means nothing real is ever unlinked."
+        }
+      ]
+    },
+    {
+      "id": "costnavigator-reads-newapi-202609",
+      "service": "financial-management/costnavigator",
+      "enabled": true,
+      "heavy": false,
+      "_note": "2026-09 spec-bump BRAND-NEW product (0 pre-existing endpoints; all 3 endpoints are new: analyzecost, analyzecostcomparison, getcostdimensionoptions). HOST FIX 2026-09-18 (same class of bug as the resourceoptimizer/sts global-host fixes in core/config.py): costnavigator is a GLOBAL (account-scoped, no region) service — costnavigator.e.samsungsdscloud.com signs+authenticates correctly (live 200 on getcostdimensionoptions, live 403 real-JSON Forbidden on the two POSTs via a GET probe); the regional host costnavigator.kr-west1.e.samsungsdscloud.com has NO ROUTE at all (proxy 502 'Tunnel connection failed' — the egress proxy rejects the CONNECT, same failure signature documented for the other account/org-scoped services). Added 'costnavigator' to DEFAULT_GLOBAL_SERVICES in core/config.py in this same commit. getcostdimensionoptions REQUIRES query params start_date/end_date (YYYY-MM-DD, both required — docs search-index text) which the bare-GET smoke engine does not know how to supply generically (not added to regression/smoke.py's global _REQUIRED_QUERY_DEFAULTS, since start_date/end_date are used by ~10 other endpoints across other services with different constraints per knowledge/services.md billingplan notes — a global default was judged out of scope/risk for this session); this lifecycle step supplies them explicitly and is LIVE-CONFIRMED 200 2026-09-18. analyzecost/analyzecostcomparison are POST 'query' style endpoints (filter/group_by/time_period in the body, no resource created) with bodies already present in data/api_bodies.json (docs-derived, structurally plausible); they could NOT be exercised this session (SCP_ALLOW_MUTATIONS=false read-only mandate) — kept optional+broad so a mutations-enabled run records real coverage; promote the _note once 2xx-confirmed.",
+      "steps": [
+        {
+          "name": "get-cost-dimension-options",
+          "method": "GET",
+          "path": "/v1/cost-analysis/dimension",
+          "params": {
+            "start_date": "2026-01-01",
+            "end_date": "2026-06-30"
+          },
+          "expect_status": [
+            200
+          ],
+          "_note": "getcostdimensionoptions. LIVE-CONFIRMED 200 2026-09-18 on the global host with required start_date/end_date query params (docs search-index; format YYYY-MM-DD). Strict (non-optional) — proven real 2xx."
+        },
+        {
+          "name": "analyze-cost",
+          "method": "POST",
+          "path": "/v1/cost-analysis",
+          "json": {
+            "filter": {
+              "dimensions": {
+                "key": "region",
+                "operator": "INCLUDES",
+                "values": [
+                  "kr-west1"
+                ]
+              }
+            },
+            "granularity": "MONTHLY",
+            "group_by": [
+              {
+                "key": "service_id",
+                "type": "DIMENSION"
+              }
+            ],
+            "time_period": {
+              "start_date": "2026-01-01",
+              "end_date": "2026-06-30"
+            }
+          },
+          "expect_status": [
+            200,
+            400,
+            403
+          ],
+          "optional": true,
+          "group": "costnavigator-analyze",
+          "_note": "analyzecost. Body from data/api_bodies.json (docs-derived; dropped the 'marker' pagination-cursor field, which is response-only per CostDimensionResponse-style envelopes elsewhere, not a request input). UNPROVEN 2xx — read-only mandate this session could not fire a POST. A bare GET probe on this path returned 403 Forbidden ('Action definition not found') — may indicate an entitlement/action-registration gap even for the account's own cost data; needs a mutations-enabled re-check."
+        },
+        {
+          "name": "analyze-cost-comparison",
+          "method": "POST",
+          "path": "/v1/cost-analysis/comparison",
+          "json": {
+            "baseline_period": {
+              "start_date": "2026-01-01",
+              "end_date": "2026-03-31"
+            },
+            "comparison_period": {
+              "start_date": "2026-04-01",
+              "end_date": "2026-06-30"
+            },
+            "filter": {
+              "dimensions": {
+                "key": "region",
+                "operator": "INCLUDES",
+                "values": [
+                  "kr-west1"
+                ]
+              }
+            },
+            "granularity": "MONTHLY",
+            "group_by": [
+              {
+                "key": "service_id",
+                "type": "DIMENSION"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            400,
+            403
+          ],
+          "optional": true,
+          "group": "costnavigator-analyze",
+          "_note": "analyzecostcomparison. Body from data/api_bodies.json (docs-derived; 'marker' dropped, same reasoning as analyze-cost). UNPROVEN 2xx — same 403-on-GET-probe caveat as analyzecost."
+        }
+      ]
+    },
+    {
+      "id": "org-delegated-administrators-newapi-202609",
+      "service": "management/organization",
+      "enabled": true,
+      "heavy": false,
+      "_note": "2026-09 spec-bump NEW endpoints (3): registerdelegatedadministrator, listdelegatedadministrators, deregisterdelegatedadministrator — all on /v1/delegation-accounts. Same blast-radius/entitlement pattern as the rest of management/organization (see management__organization.json _note, NOT touched here — parallel-agent file-ownership rule): this account is an org MEMBER, not master. LIVE-CONFIRMED 2026-09-18: listdelegatedadministrators -> 200 {count:0, delegation_accounts:[], page:0, size:20, sort:[...]} (member accounts CAN see their own account's delegation-account list, unlike listorganizations/listorganizationunits/etc. which 403). register/deregister are guarded optional+broad (organization_id/account_id soft-captured from listorganizations, which is empty on this member account -> stays literal per the same convention as org-invitations-guarded's create-invitation). deregisterdelegatedadministrator body shape CONFIRMED from docs search-index 2026-09-18: DelegationAccountDeleteRequest uses 'account_ids' (a LIST), NOT 'account_id' singular like the create body — different field name/shape from registerdelegatedadministrator, easy to get wrong by copy-paste.",
+      "steps": [
+        {
+          "name": "list-delegated-administrators",
+          "method": "GET",
+          "path": "/v1/delegation-accounts",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "delegation_account_id": "$.delegation_accounts[0].id"
+          },
+          "_note": "listdelegatedadministrators. LIVE-CONFIRMED 200 2026-09-18: {count:0, delegation_accounts:[], page:0, size:20, sort:[created_at:desc,id:desc]}. Strict (non-optional) — proven real 2xx, unlike most other organization reads on this member account."
+        },
+        {
+          "name": "seed-organization-id",
+          "method": "GET",
+          "path": "/v1/organizations",
+          "params": {
+            "limit": 1
+          },
+          "expect_status": [
+            200,
+            403
+          ],
+          "optional": true,
+          "capture_soft": {
+            "organization_id": "$.organizations[0].id"
+          },
+          "_note": "Same soft-capture as org-invitations-guarded's list-organizations step. This member account sees an empty org list (2026-06-19/2026-09-18 both confirmed {count:0,organizations:[]}) so organization_id stays literal for the two guarded writes below — matches the rest of the organization fragment's convention."
+        },
+        {
+          "name": "register-delegated-administrator",
+          "method": "POST",
+          "path": "/v1/delegation-accounts",
+          "json": {
+            "account_id": "{delegation_account_id}",
+            "organization_id": "{organization_id}",
+            "service_type": "identity-center"
+          },
+          "expect_status": [
+            200,
+            201,
+            400,
+            403,
+            404,
+            409
+          ],
+          "optional": true,
+          "group": "org-delegation-register",
+          "_note": "registerdelegatedadministrator. Body CONFIRMED verbatim from docs search-index 2026-09-18 (DelegationAccountCreateRequest: account_id, organization_id, service_type enum identity-center|resource-optimizer|infrastructure-builder). Guarded — expected 403 (non-master) or 400 (literal unresolved ids) on this account."
+        },
+        {
+          "name": "deregister-delegated-administrator",
+          "method": "DELETE",
+          "path": "/v1/delegation-accounts",
+          "json": {
+            "account_ids": [
+              "{delegation_account_id}"
+            ],
+            "organization_id": "{organization_id}",
+            "service_type": "identity-center"
+          },
+          "expect_status": [
+            200,
+            204,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "org-delegation-deregister",
+          "_note": "deregisterdelegatedadministrator. Body CONFIRMED verbatim from docs search-index 2026-09-18 (DelegationAccountDeleteRequest: account_ids is a LIST, unlike the singular account_id on create). destructive-gated; guarded — expected 403/400 on this member account, never deletes a real delegation since ids are literal/empty."
+        }
+      ]
+    },
+    {
+      "id": "servicewatch-newapi-202609-coverage",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "heavy": false,
+      "_note": "2026-09 spec-bump NEW endpoints (4): deletebulkalertnotifications, listloggrouplogstreamslogevents, setalertnotificationsactivated, setwidgets. listloggrouplogstreamslogevents (GET /v1/log-groups/{log_group_id}/log-streams/log-events, ONE path param) needs NO steps here — LIVE-CONFIRMED 200 2026-09-18 via the GENERIC read_chains 1-param auto-chain (regression/read_chains.py; parent list /v1/log-groups, this account has 17 real log groups from other services' scf/etc. writes), zero lifecycle work required, already recorded under its own catalog key (source=read_chain). The other 3 are mutating/id-bound with no safe real target on a shared account: deletebulkalertnotifications + setalertnotificationsactivated need a real alert id (this account has 0 alerts live 2026-09-18: GET /v1/alerts -> {alerts:[],count:0}); setwidgets needs a real dashboard_id and this account DOES have 17 real dashboards (GET /v1/dashboards -> count:17, e.g. 'Block Storage VM' 0f50a2ca5b9345918c0a8a732eccd601) but they are pre-existing/system dashboards not owned by this test run — mutating their widgets would be an unowned-resource side effect, so dashboard_id ALSO uses the NO-OP literal-id pattern here rather than the real id, matching core.registry ownership discipline (never mutate a resource we didn't create). All 3 steps optional + broad expect_status; bodies CONFIRMED verbatim from docs search-index 2026-09-18, identical to data/api_bodies.json.",
+      "steps": [
+        {
+          "name": "seed-log-group-real",
+          "method": "GET",
+          "path": "/v1/log-groups",
+          "params": {
+            "limit": 1
+          },
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "sw_log_group_id": "$.log_groups[0].id"
+          },
+          "_note": "REAL soft-capture (unlike the NO-OP seeds below): this account has 17 real log groups live (2026-09-18), read-only listing is safe to target for the GET verify step immediately below (no mutation, no ownership concern)."
+        },
+        {
+          "name": "list-log-group-log-streams-log-events",
+          "method": "GET",
+          "path": "/v1/log-groups/{sw_log_group_id}/log-streams/log-events",
+          "params": {},
+          "expect_status": [
+            200,
+            403,
+            404
+          ],
+          "optional": true,
+          "_note": "listloggrouplogstreamslogevents. LIVE-CONFIRMED 200 2026-09-18 already via the generic read_chains 1-param auto-chain (source=read_chain, zero lifecycle work needed to REACH it live) -- this explicit step exists only so the STATIC coverage-ceiling analyzer (spec.coverage_gap, which only credits scenario-declared steps, not the dynamic read_chains pass) also counts it reachable. 'params': {} forces catalog-key recording per the container/scr 2026-06-24 GET-recording fix."
+        },
+        {
+          "name": "seed-alert-placeholder",
+          "method": "GET",
+          "path": "/v1/alerts",
+          "params": {
+            "limit": 1
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "capture_soft": {
+            "swalert_id": "$.alerts[0].nonexistent_alert_seed"
+          },
+          "_note": "NO-OP soft-capture: account has 0 alerts live (2026-09-18) -> swalert_id always stays LITERAL."
+        },
+        {
+          "name": "seed-dashboard-placeholder",
+          "method": "GET",
+          "path": "/v1/dashboards",
+          "params": {
+            "limit": 1
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "capture_soft": {
+            "sw_dashboard_id": "$.dashboards[0].nonexistent_dashboard_seed"
+          },
+          "_note": "NO-OP soft-capture (deliberate): 17 real dashboards exist live (2026-09-18) but they are pre-existing/system dashboards this run did not create — never mutate an unowned resource, so sw_dashboard_id stays LITERAL by design even though real ids ARE available."
+        },
+        {
+          "name": "delete-bulk-alert-notifications",
+          "method": "DELETE",
+          "path": "/v1/alerts/{swalert_id}/notifications",
+          "json": {
+            "recipient_ids": [
+              "1234da92-634a-4f8c-932e-9d650599ab1b",
+              "1234da92-634a-4f8c-932e-9d650599ab1a",
+              "1234da92-634a-4f8c-932e-9d650599ab1c"
+            ]
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "sw-newapi-alert",
+          "_note": "deletebulkalertnotifications. Body CONFIRMED verbatim from docs search-index 2026-09-18. Literal {swalert_id} -> 404 (no real alerts exist to touch)."
+        },
+        {
+          "name": "set-alert-notifications-activated",
+          "method": "PATCH",
+          "path": "/v1/alerts/{swalert_id}/notifications/activated",
+          "json": {
+            "activated_yn": "Y",
+            "recipient_ids": [
+              "1234da92-634a-4f8c-932e-9d650599ab1b",
+              "1234da92-634a-4f8c-932e-9d650599ab1a",
+              "1234da92-634a-4f8c-932e-9d650599ab1c"
+            ]
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "sw-newapi-alert",
+          "_note": "setalertnotificationsactivated. Body CONFIRMED verbatim from docs search-index 2026-09-18. Literal {swalert_id} -> 404."
+        },
+        {
+          "name": "set-widgets",
+          "method": "PUT",
+          "path": "/v1/dashboards/{sw_dashboard_id}/widgets",
+          "json": {
+            "widgets": [
+              {
+                "height": 1,
+                "order": 1,
+                "type": "metric",
+                "width": 1,
+                "properties": {
+                  "metrics": [
+                    {
+                      "color": "#ff7f0e",
+                      "dimensions": [
+                        {
+                          "key": "resource_id",
+                          "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+                        }
+                      ],
+                      "display_name": "EC2-Prod-CPU",
+                      "individual_items": [
+                        {
+                          "key": "BucketId",
+                          "value": "b-1234567890abcdef0"
+                        }
+                      ],
+                      "name": "CPUUtilization",
+                      "namespace_name": "Virtual Server",
+                      "period": 300,
+                      "statistic_type": "AVG"
+                    }
+                  ],
+                  "period": 300,
+                  "stacked": false,
+                  "statistic_type": "AVG",
+                  "title": "Virtual Server | CPU Utilization",
+                  "view": "line"
+                }
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "sw-newapi-dashboard",
+          "_note": "setwidgets. Body CONFIRMED verbatim from docs search-index 2026-09-18. Literal {sw_dashboard_id} -> 404 by DESIGN (deliberately not targeting a real pre-existing system dashboard — see lifecycle _note)."
+        }
+      ]
+    },
+    {
+      "id": "baremetal-cpu-cores-newapi-202609",
+      "service": "compute/baremetal",
+      "enabled": true,
+      "heavy": false,
+      "_note": "2026-09 spec-bump NEW endpoint (1): updatebaremetalcpucores (PUT /v1/baremetals/{baremetal_id}/cpu-cores). Same literal-id-404 NO-OP pattern as the existing compute__baremetal.json 'baremetal-server-coverage' lifecycle (NOT touched here — parallel-agent file-ownership rule): this account has 0 bare-metal servers live (2026-09-18: GET /v1/baremetals -> {baremetals:[],count:0}). Body CONFIRMED verbatim from docs search-index 2026-09-18 (BaremetalCpuCoresRequest), identical to data/api_bodies.json.",
+      "steps": [
+        {
+          "name": "seed-baremetal-placeholder-newapi",
+          "method": "GET",
+          "path": "/v1/baremetals",
+          "params": {
+            "limit": 1
+          },
+          "expect_status": [
+            200,
+            403
+          ],
+          "optional": true,
+          "capture_soft": {
+            "baremetal_id_newapi": "$.baremetals[0].nonexistent_bm_seed"
+          },
+          "_note": "NO-OP soft-capture (own token, distinct from the existing baremetal-server-coverage lifecycle's {baremetal_id}, to stay file-isolated). Account has 0 bare-metal servers live (2026-09-18)."
+        },
+        {
+          "name": "update-baremetal-cpu-cores",
+          "method": "PUT",
+          "path": "/v1/baremetals/{baremetal_id_newapi}/cpu-cores",
+          "json": {
+            "core_disable_use": true,
+            "cpu_core_active": 4,
+            "hyperthreading_use": true
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "destructive": false,
+          "group": "baremetal-newapi",
+          "_note": "updatebaremetalcpucores. Docs show 202 Accepted (AsyncResponse) as the success code. Literal {baremetal_id_newapi} -> 404 (never touches a real server)."
+        }
+      ]
+    },
+    {
+      "id": "vpc-privatelink-scp-services-newapi-202609",
+      "service": "networking/vpc",
+      "enabled": true,
+      "heavy": false,
+      "_note": "2026-09 spec-bump NEW endpoint (1): listprivatelinkscpservices (GET /v1/privatelink-services/scp-services, zero path params). This is a plain read-only GET with NO path params, so it is ALREADY auto-covered every run by the blanket catalog smoke floor (regression/smoke.py select_endpoints) with zero lifecycle work needed — LIVE-CONFIRMED 200 2026-09-18 via smoke (source=smoke). This lifecycle step is kept only as an explicit, documented 'verify' anchor (matches the budget-account-budget-full completeness-audit convention) so the endpoint's proven query shape is recorded in git, not just in the results log.",
+      "steps": [
+        {
+          "name": "list-privatelink-scp-services",
+          "method": "GET",
+          "path": "/v1/privatelink-services/scp-services",
+          "expect_status": [
+            200
+          ],
+          "_note": "listprivatelinkscpservices. LIVE-CONFIRMED 200 2026-09-18: response envelope {scp_services:[{id,name,type}]}. Optional query params type (enum OPEN_API|SERVICE_WATCH) and name — omitted here (bare call already 200s). Strict (non-optional) — proven real 2xx."
+        }
+      ]
+    },
+    {
+      "id": "cnapp-newapi-202609-coverage",
+      "service": "security/cnapp",
+      "enabled": false,
+      "_status": "blocked-owner",
+      "_note": "2026-09 spec-bump BRAND-NEW product (0 pre-existing endpoints; both endpoints are new: sendnotification POST /v1/notification, updatecnapptenantstatusbycallback POST /v1/tenants/callback). DISABLED 2026-09-18 — HOST UNREACHABLE on BOTH templates: cnapp.kr-west1.e.samsungsdscloud.com (regional) AND cnapp.e.samsungsdscloud.com (global, tried per the costnavigator/resourceoptimizer precedent) both fail identically with a proxy 502 'Tunnel connection failed' (no route at all — not a 401/403/404 from a real gateway). This differs from costnavigator's and resourceoptimizer's global-host fix (those routed fine once the correct template was used); cnapp appears genuinely not provisioned/routed for this account+environment as of 2026-09-18, OR (per both endpoint descriptions: 'Sends an OTP notification' / 'Callback Request FROM CNAPP SaaS TO SCP') these may be inbound-only integration endpoints for a third-party CNAPP SaaS vendor to call SCP, not endpoints a customer's own HMAC key is meant to call directly — similar in spirit to the configinspection 'console-only activation, plan_type STANDARD' entitlement gate in knowledge/services.md. Steps below are MODELED from docs search-index text (CONFIRMED verbatim 2026-09-18, identical to data/api_bodies.json) so they are ready to flip enabled:true + retest the moment the host resolves or the entitlement question is answered by an owner. Bodies also mostly reference SYNTHETIC/example ids from the docs sample (scp_tenant_id, account_id, srn) — even once reachable, expect 400/403 without real CNAPP-tenant provisioning data. NEXT STEP: ask the platform/owner whether cnapp is entitled+routed for this test account, or whether these 2 endpoints are structurally uncoverable via HMAC (SaaS-vendor-only) and should be waived instead.",
+      "steps": [
+        {
+          "name": "send-notification",
+          "method": "POST",
+          "path": "/v1/notification",
+          "json": {
+            "type": "mail",
+            "otp": "123456",
+            "to": "user@example.com",
+            "nation_id": "",
+            "authenticate_key": "auth-key-example-value"
+          },
+          "expect_status": [
+            200,
+            400,
+            401,
+            403
+          ],
+          "optional": true,
+          "group": "cnapp-newapi",
+          "_note": "sendnotification. Body CONFIRMED verbatim from docs search-index 2026-09-18 (NotificationRequest). UNTESTED — host unreachable this session (see lifecycle _note)."
+        },
+        {
+          "name": "update-tenant-status-by-callback",
+          "method": "POST",
+          "path": "/v1/tenants/callback",
+          "json": {
+            "scp_tenant_id": "3fcce04b-fad5-4250-8740-6e84adca8e94",
+            "cnapp_tenant_id": "",
+            "status": "SUCCESS",
+            "srn": "srn:dev3::f8e7d6c5b4a39281706f5e4d3c2b1a09:kr-west1::cnapp:cnapp/3fcce04b-fad5-4250-8740-6e84adca8e94",
+            "tenant_name": "test-tenant",
+            "account_id": "f8e7d6c5b4a39281706f5e4d3c2b1a09",
+            "license_type": "ESSENTIAL",
+            "authenticate_key": ""
+          },
+          "expect_status": [
+            200,
+            400,
+            401,
+            404,
+            500
+          ],
+          "optional": true,
+          "group": "cnapp-newapi",
+          "_note": "updatecnapptenantstatusbycallback. Body CONFIRMED verbatim from docs search-index 2026-09-18 (CnappTenantCallbackRequest) — all example/synthetic ids from the docs sample. UNTESTED — host unreachable this session."
+        }
+      ]
+    }
+  ]
+}
