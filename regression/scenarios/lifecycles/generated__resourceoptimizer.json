@@ -1,0 +1,513 @@
+{
+  "_comment": "management/resourceoptimizer — NEW product (catalog rebuild 2026-09-18, 24 endpoints, 0 prior coverage). Modeled by the resourceoptimizer coverage agent from live docs (data/api_bodies.json + spec.extract_catalog search-index text; api_docs.json was only partially re-scraped for this service while this lifecycle was authored) + LIVE read-only probing (GET/query-POST calls only; every create/update/delete/optin/optout/setlim step below is docs-derived and UNPROVEN live — the agent's mandate was modeling + read-only validation, not mutation execution). GLOBAL service: confirmed live 2026-09-18 that resourceoptimizer.e.samsungsdscloud.com (no region segment) signs+authenticates correctly while resourceoptimizer.<region>.e.samsungsdscloud.com has no route at all (egress-proxy CONNECT rejected — same failure signature as the other account/org-scoped global services). core/config.py DEFAULT_GLOBAL_SERVICES updated to include resourceoptimizer in the SAME commit as this file — without that change every step below 502s (wrong host) instead of reaching the API. account_id/organization_id are soft-captured at runtime (iam access-keys -> account_id; resourceoptimizer's own getaccount response -> organization_id) — no hardcoded ids. Domain: SCP's resource-rightsizing/idle-detection advisor (account + organization scoped settings, dashboard, idle-resource list, recommendations). Covers all 24: 11 id-bound GETs + 13 writes, split across 4 lifecycles by blast radius.",
+  "lifecycles": [
+    {
+      "id": "resourceoptimizer-readonly",
+      "service": "management/resourceoptimizer",
+      "enabled": true,
+      "_note": "LIGHT, read-only-in-effect (getdashboard/getidleresourcelist/listrecommendationsbybody are POST verbs but are query/search reads per their doc description — 'POST 방식으로 검색어를 body로 전달한다' — not creates; confirmed by their own response envelopes carrying only computed/aggregated summaries, never an id you'd need to delete). LIVE-CONFIRMED 2026-09-18 against this account (81eccb26aeb34b52a120d5d58a8b65b0, org o-6d249f756f0c475fa1730fa9a40e3e78, account_type MEMBER, analysis_status PENDING i.e. not yet analyzed): getaccount 200, listaccountsettings 200 ({count:0,items:[]}), getaccountlimsettings 200 ({lim_settings:[]}), listorganizationsettings 200 ({count:0,items:[]}), getorganizationlimsettings 200 ({lim_settings:[]}), getdashboard 200 (all-zero category_summary — no analyzed resources yet), getidleresourcelist 200 ({count:0,items:[]}), listrecommendationsbybody 200 ({items:[],pagination:{total:0}}). showrecommendation/getrecommendationmetrics tested live with a synthetic id -> 404 ResourceNotFound (correct shape; this account has 0 recommendations so no real id exists to probe with today — see capture_soft below, which will resolve a real id automatically once analysis completes and idle-resources/recommendations returns non-empty). Interesting finding: getaccount's own response ($.organization_id) is a self-contained org-id source — no cross-service organization-list call needed (that list is EMPTY for MEMBER accounts per management__organization.json, so it would have been a dead end).",
+      "steps": [
+        {
+          "name": "capture-account-id",
+          "service": "iam",
+          "method": "GET",
+          "path": "/v1/access-keys",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "ro-read",
+          "capture_soft": {
+            "account_id": "$.access_keys[0].account_id"
+          },
+          "_note": "Cross-service pre-step (iam host, read-only) — same pattern as management__iam.json / management__loggingaudit.json. LIVE-CONFIRMED 2026-09-18: 200, account_id=81eccb26aeb34b52a120d5d58a8b65b0."
+        },
+        {
+          "name": "get-account",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}",
+          "expect_status": [200],
+          "group": "ro-read",
+          "capture_soft": {
+            "organization_id": "$.organization_id"
+          },
+          "_note": "LIVE-CONFIRMED 2026-09-18: 200 {account_id, account_name, account_type:MEMBER, analysis_status:PENDING, organization_id:o-6d249f756f0c475fa1730fa9a40e3e78, status:ACTIVE}. Strict [200] — real 2xx proven. organization_id captured here feeds every org-scoped GET below and the org-settings lifecycle."
+        },
+        {
+          "name": "list-account-settings",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}/settings",
+          "expect_status": [200],
+          "group": "ro-read",
+          "capture_soft": {
+            "existing_account_setting_id": "$.items[0].id"
+          },
+          "_note": "LIVE-CONFIRMED 2026-09-18: 200 {count:0, items:[]} (no rightsizing settings configured yet on this account). Strict [200]."
+        },
+        {
+          "name": "get-account-lim-settings",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}/settings/lim",
+          "expect_status": [200],
+          "group": "ro-read",
+          "_note": "LIVE-CONFIRMED 2026-09-18: 200 {lim_settings:[]} (LIM not configured). Strict [200]."
+        },
+        {
+          "name": "list-organization-settings",
+          "method": "GET",
+          "path": "/v1/organizations/{organization_id}/settings",
+          "expect_status": [200],
+          "group": "ro-read",
+          "capture_soft": {
+            "existing_org_setting_id": "$.items[0].id"
+          },
+          "_note": "LIVE-CONFIRMED 2026-09-18: 200 {count:0, items:[]} on this MEMBER account's own org (readable despite the account being a member, not the org master — unlike management/organization's listorganizations which is master-only). Strict [200]."
+        },
+        {
+          "name": "get-organization-lim-settings",
+          "method": "GET",
+          "path": "/v1/organizations/{organization_id}/settings/lim",
+          "expect_status": [200],
+          "group": "ro-read",
+          "_note": "LIVE-CONFIRMED 2026-09-18: 200 {lim_settings:[]}. Strict [200]."
+        },
+        {
+          "name": "get-dashboard",
+          "method": "POST",
+          "path": "/v1/dashboard",
+          "json": {
+            "account_id": "{account_id}",
+            "region_id": ["{region}"],
+            "tags": []
+          },
+          "expect_status": [200],
+          "group": "ro-read",
+          "_note": "getdashboard — query-style POST (DashboardRequest), no resource created. LIVE-CONFIRMED 2026-09-18: 200, category_summary all idle_count:0/total_count:0 (account not yet analyzed). Body per api_bodies.json/docs; account_id is the caller's own real id (the docs example's account_id 1bcf39b344ac41cbaf0466ff0d2bebad is a generic placeholder, NOT this account — using it live would very likely 403/404 cross-account). Strict [200]."
+        },
+        {
+          "name": "get-idle-resource-list",
+          "method": "POST",
+          "path": "/v1/idle-resources",
+          "json": {
+            "category": ["VIRTUAL_SERVER"],
+            "idle_state": ["IDLE"],
+            "page": 0,
+            "region_id": ["{region}"],
+            "size": 20,
+            "sort": "duration:desc",
+            "tags": [],
+            "target_account_id": "{account_id}"
+          },
+          "expect_status": [200],
+          "group": "ro-read",
+          "capture_soft": {
+            "recommendation_id": "$.items[0].recommendation_id"
+          },
+          "_note": "getidleresourcelist — query-style POST (IdleResourcesListRequest). LIVE-CONFIRMED 2026-09-18: 200 {count:0, items:[]}. capture_soft recommendation_id (IdleResourceItem.recommendation_id per the doc's response_example) feeds showrecommendation/getrecommendationmetrics below — currently unresolved (0 items) until this account's analysis completes. resource_name/tags omitted vs the docs example (optional filter fields; omitting widens the match instead of narrowing it to a literal 'web-server-01'/'env=prod' that doesn't exist on this account). Strict [200]."
+        },
+        {
+          "name": "list-recommendations",
+          "method": "POST",
+          "path": "/v1/recommendations",
+          "json": {
+            "category": "virtual-server",
+            "page": 0,
+            "size": 20,
+            "sort_order": "asc",
+            "tags": [],
+            "target_account_id": "{account_id}"
+          },
+          "expect_status": [200],
+          "group": "ro-read",
+          "capture_soft": {
+            "recommendation_id": "$.items[0].recommendation_id"
+          },
+          "_note": "listrecommendationsbybody — query-style POST (RecommendationListRequest). LIVE-CONFIRMED 2026-09-18: 200 {items:[], pagination:{total:0}}. Body TRIMMED from the docs example: the doc's own request_example sends empty-string '' for judge_result/keyword_resource_id/keyword_resource_name/region_id/result_reason/sort_by and an empty tags[0] {key:'',value:['']} — sending literal empty strings for enum-typed filters risks a 400 (untested whether the API tolerates '' vs omission), so this body only sends the fields with real non-empty values and omits the empty-string ones; the resulting real 200 online confirms omission is safe. capture_soft overwrites idle-resource-list's recommendation_id only if THIS list has an item (jsonpath returns None on an empty list, which capture_soft never overwrites with — see engine.py capture_soft semantics). Strict [200]."
+        },
+        {
+          "name": "show-recommendation",
+          "method": "GET",
+          "path": "/v1/recommendations/{recommendation_id}",
+          "expect_status": [200, 404],
+          "optional": true,
+          "group": "ro-read",
+          "_note": "id-bound GET (showrecommendation). LIVE-CONFIRMED 2026-09-18 with a synthetic id: 404 {code:ResourceNotFound, detail:'Recommendation not found'} — correct error shape, endpoint reachable. This account currently has 0 recommendations (analysis_status PENDING, nothing analyzed yet) so {recommendation_id} stays an unresolved literal placeholder (normalizes to the catalog '*' key) until list-recommendations/get-idle-resource-list above capture_soft a real id from a future run once analysis has produced data. Tolerant [200,404] with this note — NOT masking a bug, this is the documented not-found shape."
+        },
+        {
+          "name": "get-recommendation-metrics",
+          "method": "GET",
+          "path": "/v1/recommendations/{recommendation_id}/metrics",
+          "expect_status": [200, 404],
+          "optional": true,
+          "group": "ro-read",
+          "_note": "id-bound GET (getrecommendationmetrics). Same id-availability situation as show-recommendation above — LIVE-CONFIRMED 404 ResourceNotFound with a synthetic id (correct shape); will resolve to 200 automatically once {recommendation_id} captures a real id."
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "account_id": "{account_id}",
+            "organization_id": "{organization_id}",
+            "recommendation_id": "{recommendation_id}"
+          },
+          "_note": "ADDED per the loggingaudit/security__kms idiom: re-fires every resourceoptimizer catalog GET whose path params resolve from this lifecycle's captured ctx (account_id, organization_id, recommendation_id) and records it under its REAL catalog key (engine.py's dual-write rule only auto-credits a bare-path GET step under its catalog key when the step carries an explicit `params`; several GETs above have no query params so this step is what actually lands them in data/api_catalog.json-keyed coverage). Will ALSO re-hit getaccountsettingdetail/getorganizationsettingdetail (their path param account_id/organization_id resolves too) WITHOUT their required category/lookback_period/utilization_preset query — data/api_catalog_params.json has no sidecar entry yet for this freshly-rebuilt-catalog service, so probe_reads can't discover those required query params automatically and this fires a harmless extra 400 (ValidationError 'Field required' — the SAME 400 this agent saw before learning the params) alongside the correctly-parameterized 200/404 call the account/org-settings lifecycles make explicitly. Not a bug, just a redundant reachable-but-400 observation for those two keys from this step specifically."
+        }
+      ]
+    },
+    {
+      "id": "resourceoptimizer-account-settings",
+      "service": "management/resourceoptimizer",
+      "enabled": true,
+      "_note": "Account-scoped rightsizing-settings CRUD (createaccountsetting/getaccountsetting/getaccountsettingdetail/updateaccountsetting/setaccountlimactive/deleteaccountsettings). DOCS-DERIVED, NOT live-executed by the modeling agent (mandate: read-only validation only — mutations were left for a future full run, which runs with SCP_ALLOW_MUTATIONS default ON per docs/agent-team.md). Bodies come straight from data/api_bodies.json (already schema-shaped for this endpoint) cross-checked against the live-fetched doc pages (RightsizingSettingCreateRequest/-UpdateRequest/-DeleteRequest/LimActiveRequest, 2026-09-18) — see the createaccountsetting/updateaccountsetting/deleteaccountsettings/setaccountlimactive doc pages under https://docs.e.samsungsdscloud.com/apireference/management/resourceoptimizer/apis/. Chain: create -> capture setting id ($.items[0].id, RightsizingSettingsResponse) -> show-by-id + show-detail-by-filter (both id-bound GETs, closing the static gap) -> update (origin/new_values must exactly match the created values per doc's 'origin validation' description) -> set LIM active then revert to N (a real account-level toggle, not a deletable resource — reverted explicitly rather than left flipped) -> delete (explicit DELETE step + a cleanup backstop on the create, per validate.py's leak-warning convention). Every mutating step is optional with a broad tolerant expect_status: this account has never created a setting before, so whether it will actually succeed (this account's own settings, likely self-service-allowed) vs 403 (Forbidden, if rightsizing-settings need an entitlement this account lacks) is UNPROVEN — either outcome still records real coverage on the CALL.",
+      "steps": [
+        {
+          "name": "capture-account-id",
+          "service": "iam",
+          "method": "GET",
+          "path": "/v1/access-keys",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "as-setup",
+          "capture_soft": {
+            "account_id": "$.access_keys[0].account_id"
+          },
+          "_note": "Same iam capture as resourceoptimizer-readonly — each lifecycle captures its own ctx independently (lifecycles do not share ctx)."
+        },
+        {
+          "name": "create-account-setting",
+          "method": "POST",
+          "path": "/v1/accounts/{account_id}/settings",
+          "json": {
+            "category": "VIRTUAL_SERVER",
+            "cpu_headroom": 20,
+            "cpu_threshold": "P99.5",
+            "lookback_period": "14d",
+            "memory_headroom": 20,
+            "region_ids": ["{region}"],
+            "utilization_preset": "PERFORMANCE_PRIORITY"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409],
+          "optional": true,
+          "group": "as-setting",
+          "capture": {
+            "setting_id": "$.items[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/accounts/{account_id}/settings",
+            "json": {
+              "category": "VIRTUAL_SERVER",
+              "deletion_groups": [["{setting_id}"]]
+            }
+          },
+          "_note": "Body per data/api_bodies.json + createaccountsetting doc (RightsizingSettingCreateRequest) 2026-09-18. region_ids uses {region} (kr-west1) instead of the doc's hardcoded ['kr-west1','kr-west2'] — kr-west2 is not this account's provisioned region and could 400/404 region-scope; a single valid region is the minimal-viable create. Response envelope is $.items[0].id (RightsizingSettingsResponse — 'items' is a LIST even for a single-category create, per createaccountsetting's own response_example) — NOT $.id. UNPROVEN live: 201 vs 400 (e.g. per-region duplicate-category conflict) vs 403 (entitlement) all plausible; tolerant + optional so any of them records coverage without failing the run."
+        },
+        {
+          "name": "get-account-setting",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}/settings/{setting_id}",
+          "expect_status": [200, 404],
+          "optional": true,
+          "group": "as-setting",
+          "_note": "id-bound GET (getaccountsetting). 404 if create above didn't produce a real setting_id (placeholder stays literal, normalizes to catalog '*' key) — still a valid reachable-call observation either way."
+        },
+        {
+          "name": "get-account-setting-detail",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}/settings/detail",
+          "params": {
+            "category": "VIRTUAL_SERVER",
+            "lookback_period": "14d",
+            "utilization_preset": "PERFORMANCE_PRIORITY",
+            "cpu_threshold": "P99.5",
+            "cpu_headroom": "20",
+            "memory_headroom": "20"
+          },
+          "expect_status": [200, 404],
+          "optional": true,
+          "group": "as-setting",
+          "_note": "getaccountsettingdetail — LIVE-CONFIRMED 2026-09-18 (real params, before any setting existed): 400 'Field required'x3 -> then correctly 404 'Setting not found' once category+lookback_period+utilization_preset+cpu_threshold+cpu_headroom+memory_headroom are ALL supplied. IMPORTANT quirk (docs mismatch, validated live): the doc marks cpu_threshold/cpu_headroom/memory_headroom as query-optional ('any of [enum, null]'), but PERFORMANCE_PRIORITY actually REQUIRES cpu_threshold live (400 'When PERFORMANCE_PRIORITY is selected, cpu_threshold is required') — so all 6 query params are sent here regardless of the doc's optional/null claim. These values exactly match create-account-setting's body so, once that create succeeds, this GET's filter matches the just-created setting -> 200; if create failed/was skipped this stays a legitimate 404 (recorded in knowledge/validated-facts.md). Strict path reached either way; tolerant status because create's outcome is unproven."
+        },
+        {
+          "name": "update-account-setting",
+          "method": "PATCH",
+          "path": "/v1/accounts/{account_id}/settings/detail",
+          "json": {
+            "category": "VIRTUAL_SERVER",
+            "origin": {
+              "cpu_headroom": 20,
+              "cpu_threshold": "P99.5",
+              "lookback_period": "14d",
+              "memory_headroom": 20,
+              "utilization_preset": "PERFORMANCE_PRIORITY"
+            },
+            "new_values": {
+              "cpu_headroom": 30,
+              "cpu_threshold": "P99.5",
+              "lookback_period": "14d",
+              "memory_headroom": 30,
+              "utilization_preset": "MAX_PERFORMANCE"
+            },
+            "region_ids": ["{region}"]
+          },
+          "expect_status": [200, 400, 403, 404, 409],
+          "optional": true,
+          "group": "as-setting",
+          "_note": "updateaccountsetting (RightsizingSettingUpdateRequest) — 'origin validation': origin MUST exactly equal the setting's CURRENT stored values (per description 'Update ... with origin validation') so origin here mirrors create-account-setting's body exactly; new_values bumps headroom/preset (PERFORMANCE_PRIORITY->MAX_PERFORMANCE, per the doc's documented preset->threshold/headroom mapping table, both 20->30 and P99.5 stays P99.5 for MAX_PERFORMANCE). If create above never produced a real setting this 400/404s harmlessly (still reached)."
+        },
+        {
+          "name": "set-account-lim-active",
+          "method": "PUT",
+          "path": "/v1/accounts/{account_id}/settings/lim",
+          "json": {
+            "lim_settings": [
+              {
+                "category": "VIRTUAL_SERVER",
+                "regions": [
+                  {"lim_enabled_yn": "Y", "region_id": "{region}"}
+                ]
+              }
+            ]
+          },
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "as-lim",
+          "_note": "setaccountlimactive (LimActiveRequest). This is an account-level TOGGLE, not a deletable resource — reverted by the next step rather than a cleanup/delete. Body per docs/api_bodies.json."
+        },
+        {
+          "name": "revert-account-lim-active",
+          "method": "PUT",
+          "path": "/v1/accounts/{account_id}/settings/lim",
+          "json": {
+            "lim_settings": [
+              {
+                "category": "VIRTUAL_SERVER",
+                "regions": [
+                  {"lim_enabled_yn": "N", "region_id": "{region}"}
+                ]
+              }
+            ]
+          },
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "as-lim",
+          "_note": "Restores LIM to disabled (N) — this account's baseline before this lifecycle ran was {lim_settings:[]} i.e. inactive (LIVE-CONFIRMED 2026-09-18 via get-account-lim-settings in resourceoptimizer-readonly). Hygiene: leave the account's LIM posture as found rather than stranding it toggled on."
+        },
+        {
+          "name": "delete-account-settings",
+          "method": "DELETE",
+          "path": "/v1/accounts/{account_id}/settings",
+          "json": {
+            "category": "VIRTUAL_SERVER",
+            "deletion_groups": [["{setting_id}"]]
+          },
+          "expect_status": [200, 400, 403, 404, 409],
+          "optional": true,
+          "destructive": true,
+          "group": "as-setting",
+          "_note": "Explicit delete (not just the create step's cleanup backstop — validate.py flags a create-with-cleanup-but-no-explicit-delete as a leak risk on the happy path, since cleanup only fires on a later step FAILURE). deletion_groups is a list of GROUPS of setting_ids sharing identical values (doc: '[[setting_id1, setting_id2], [setting_id3]]') — a single-element group [[setting_id]] deletes just the one setting this lifecycle created. If {setting_id} never resolved (create failed) this normalizes to a literal-placeholder call -> harmless 400/404, still reached."
+        }
+      ]
+    },
+    {
+      "id": "resourceoptimizer-organization-settings",
+      "service": "management/resourceoptimizer",
+      "enabled": true,
+      "_note": "Organization-scoped mirror of resourceoptimizer-account-settings (createorganizationsettings/getorganizationsetting/getorganizationsettingdetail/updateorganizationsetting/setorganizationlimactive/deleteorganizationsettings). HIGHER UNCERTAINTY than the account lifecycle: this test account is org-MEMBER not org-master (management__organization.json: listorganizations returns [] for members, createorganization 409/most writes 403 on this account). resourceoptimizer's org-scoped READS were live-confirmed OPEN to a member (200 on list/lim GETs in resourceoptimizer-readonly, via organization_id captured from resourceoptimizer's own getaccount) — but whether org-scoped WRITES here follow the same member-friendly rule or the organization-service's master-only rule is UNPROVEN (not live-tested per the read-only mandate). Every write below is optional + broadly tolerant (200s AND 403 AND 400/404/409) with that uncertainty called out explicitly rather than assumed either way.",
+      "steps": [
+        {
+          "name": "capture-account-id",
+          "service": "iam",
+          "method": "GET",
+          "path": "/v1/access-keys",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "os-setup",
+          "capture_soft": {
+            "account_id": "$.access_keys[0].account_id"
+          }
+        },
+        {
+          "name": "get-account-for-org-id",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}",
+          "expect_status": [200],
+          "group": "os-setup",
+          "capture_soft": {
+            "organization_id": "$.organization_id"
+          },
+          "_note": "Self-contained org-id source (see resourceoptimizer-readonly get-account note) — this lifecycle does not depend on management/organization's (member-empty) listorganizations."
+        },
+        {
+          "name": "create-organization-settings",
+          "method": "POST",
+          "path": "/v1/organizations/{organization_id}/settings",
+          "json": {
+            "category": "VIRTUAL_SERVER",
+            "cpu_headroom": 20,
+            "cpu_threshold": "P99.5",
+            "lookback_period": "14d",
+            "memory_headroom": 20,
+            "region_ids": ["{region}"],
+            "utilization_preset": "PERFORMANCE_PRIORITY"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409],
+          "optional": true,
+          "group": "os-setting",
+          "capture": {
+            "setting_id": "$.items[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/organizations/{organization_id}/settings",
+            "json": {
+              "category": "VIRTUAL_SERVER",
+              "deletion_groups": [["{setting_id}"]]
+            }
+          },
+          "_note": "Body/response envelope shape identical to createaccountsetting (same RightsizingSettingCreateRequest/-Response schema, org-scoped path). 403 Forbidden (member-not-master) is a live-plausible, honestly-classified outcome here, not assumed to be a bug."
+        },
+        {
+          "name": "get-organization-setting",
+          "method": "GET",
+          "path": "/v1/organizations/{organization_id}/settings/{setting_id}",
+          "expect_status": [200, 404],
+          "optional": true,
+          "group": "os-setting"
+        },
+        {
+          "name": "get-organization-setting-detail",
+          "method": "GET",
+          "path": "/v1/organizations/{organization_id}/settings/detail",
+          "params": {
+            "category": "VIRTUAL_SERVER",
+            "lookback_period": "14d",
+            "utilization_preset": "PERFORMANCE_PRIORITY",
+            "cpu_threshold": "P99.5",
+            "cpu_headroom": "20",
+            "memory_headroom": "20"
+          },
+          "expect_status": [200, 404],
+          "optional": true,
+          "group": "os-setting",
+          "_note": "LIVE-CONFIRMED 2026-09-18 (same query-shape quirk as getaccountsettingdetail — cpu_threshold/headroom required live despite doc marking them optional): 404 'Setting not found' pre-create (no org setting exists yet). Same params as create-organization-settings so a successful create resolves this to 200."
+        },
+        {
+          "name": "update-organization-setting",
+          "method": "PATCH",
+          "path": "/v1/organizations/{organization_id}/settings/detail",
+          "json": {
+            "category": "VIRTUAL_SERVER",
+            "origin": {
+              "cpu_headroom": 20,
+              "cpu_threshold": "P99.5",
+              "lookback_period": "14d",
+              "memory_headroom": 20,
+              "utilization_preset": "PERFORMANCE_PRIORITY"
+            },
+            "new_values": {
+              "cpu_headroom": 30,
+              "cpu_threshold": "P99.5",
+              "lookback_period": "14d",
+              "memory_headroom": 30,
+              "utilization_preset": "MAX_PERFORMANCE"
+            },
+            "region_ids": ["{region}"]
+          },
+          "expect_status": [200, 400, 403, 404, 409],
+          "optional": true,
+          "group": "os-setting"
+        },
+        {
+          "name": "set-organization-lim-active",
+          "method": "PUT",
+          "path": "/v1/organizations/{organization_id}/settings/lim",
+          "json": {
+            "lim_settings": [
+              {
+                "category": "VIRTUAL_SERVER",
+                "regions": [
+                  {"lim_enabled_yn": "Y", "region_id": "{region}"}
+                ]
+              }
+            ]
+          },
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "os-lim"
+        },
+        {
+          "name": "revert-organization-lim-active",
+          "method": "PUT",
+          "path": "/v1/organizations/{organization_id}/settings/lim",
+          "json": {
+            "lim_settings": [
+              {
+                "category": "VIRTUAL_SERVER",
+                "regions": [
+                  {"lim_enabled_yn": "N", "region_id": "{region}"}
+                ]
+              }
+            ]
+          },
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "os-lim",
+          "_note": "Restores org LIM posture to disabled — baseline was {lim_settings:[]} (LIVE-CONFIRMED via get-organization-lim-settings in resourceoptimizer-readonly)."
+        },
+        {
+          "name": "delete-organization-settings",
+          "method": "DELETE",
+          "path": "/v1/organizations/{organization_id}/settings",
+          "json": {
+            "category": "VIRTUAL_SERVER",
+            "deletion_groups": [["{setting_id}"]]
+          },
+          "expect_status": [200, 400, 403, 404, 409],
+          "optional": true,
+          "destructive": true,
+          "group": "os-setting",
+          "_note": "Explicit delete (same reasoning as resourceoptimizer-account-settings' delete-account-settings — avoids the create-with-cleanup-only leak warning)."
+        }
+      ]
+    },
+    {
+      "id": "resourceoptimizer-opt",
+      "service": "management/resourceoptimizer",
+      "enabled": true,
+      "_note": "optin/optout — ACCOUNT-WIDE TOGGLES, not owned/deletable resources: opt-in enrolls this account into the resource-optimizer analysis pipeline (which is what produces the dashboard/idle-resource/recommendation data the other 3 lifecycles read); opt-out disables it. This account's OBSERVED baseline (getaccount, resourceoptimizer-readonly, 2026-09-18) is analysis_status:PENDING, which only makes sense if the account is ALREADY opted in — so this lifecycle deliberately orders opt-out THEN opt-in (never the reverse) so it always ends in the opted-in state regardless of which way the toggle started, instead of risking leaving a shared test account opted out of a service other lifecycles/agents depend on for data. NOT live-executed by the modeling agent (mandate: read-only validation only) — both calls are docs-derived and UNPROVEN; a future full run (mutations default ON) will exercise them for real and should re-verify analysis_status afterward.",
+      "steps": [
+        {
+          "name": "capture-account-id",
+          "service": "iam",
+          "method": "GET",
+          "path": "/v1/access-keys",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "opt",
+          "capture_soft": {
+            "account_id": "$.access_keys[0].account_id"
+          }
+        },
+        {
+          "name": "opt-out",
+          "method": "POST",
+          "path": "/v1/accounts/{account_id}/opt-out",
+          "expect_status": [200, 400, 403, 404, 409],
+          "optional": true,
+          "group": "opt",
+          "_note": "optout — no request body (doc example: empty). 404/400 is a legitimate 'not currently opted in' outcome, not a bug."
+        },
+        {
+          "name": "opt-in",
+          "method": "POST",
+          "path": "/v1/accounts/opt-in",
+          "json": {
+            "account_ids": ["{account_id}"]
+          },
+          "expect_status": [200, 202, 400, 403, 409],
+          "optional": true,
+          "group": "opt",
+          "_note": "optin (OptInRequest: account_ids is a LIST even for a single account, per doc's request_example). Fired AFTER opt-out precisely so this lifecycle's net effect restores/keeps the observed opted-in baseline. 409 Conflict ('already opted in') is an expected, honestly-classified outcome if opt-out above failed/no-op'd."
+        }
+      ]
+    }
+  ]
+}

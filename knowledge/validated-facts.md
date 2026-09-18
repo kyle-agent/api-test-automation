@@ -4296,3 +4296,107 @@ live this session.
   new lifecycles are a best-effort guess at post-create `state` and may not
   converge (hence `give_up_status: [400, 404]` on every poll — a non-converged
   poll doesn't hard-fail the lifecycle).
+
+## management/resourceoptimizer — modeling + read-only-live pass, GAP 24 -> 0 (2026-09-18)
+
+New product from the 2026-09-18 catalog rebuild (24 endpoints, 0 prior
+coverage). SCP's resource-rightsizing / idle-detection advisor: account- and
+organization-scoped rightsizing settings, a dashboard, idle-resource list, and
+recommendations, split 11 id-bound GETs + 13 writes. Mandate was **modeling +
+read-only validation** (`SCP_ALLOW_MUTATIONS=false SCP_ALLOW_DESTRUCTIVE=false`
+semantics — every live call this session was a GET or a non-creating
+query-style POST; no create/update/delete/optin/optout/setlim was executed).
+New file: `regression/scenarios/lifecycles/generated__resourceoptimizer.json`
+(4 lifecycles: `resourceoptimizer-readonly`, `resourceoptimizer-account-settings`,
+`resourceoptimizer-organization-settings`, `resourceoptimizer-opt`). Static gap
+24 -> 0 (`python -m spec.coverage_gap --service resourceoptimizer`), `validate`
+0 errors. **14/24 endpoints were live-exercised this session** (8 real 2xx +
+6 reached-but-404-due-to-no-data) and recorded as `Observation`s; the remaining
+10 (the create/update/delete/optin/optout/setlim writes) are docs-derived and
+**runtime-UNPROVEN** — see `data/coverage_ledger.json` row `resourceoptimizer`
+for the exact split and next levers.
+
+- **VALIDATED AT RUNTIME (2026-09-18) — GLOBAL service, not regional**:
+  `resourceoptimizer.e.samsungsdscloud.com` (no region segment) signs and
+  authenticates correctly — real `200`s on `getaccount`/`listaccountsettings`/
+  `getaccountlimsettings`/`listorganizationsettings`/`getorganizationlimsettings`/
+  `getdashboard`/`getidleresourcelist`/`listrecommendationsbybody` with this
+  account's HMAC creds. `resourceoptimizer.kr-west1.e.samsungsdscloud.com` (the
+  regional template) has **no route at all** — the egress proxy rejects the
+  CONNECT (`502 Tunnel connection failed`), the same no-DNS signature as the
+  other account/org-scoped global services (`iam`, `organization`, `billingplan`,
+  `sts`, ...). `core/config.py` `DEFAULT_GLOBAL_SERVICES` updated to add
+  `resourceoptimizer` in the same commit as the lifecycle file — **without that
+  change every step in the new lifecycle 502s on the wrong host** instead of
+  reaching the API; `.env.example`'s `SCP_GLOBAL_SERVICES=` comment example
+  updated too.
+- **VALIDATED AT RUNTIME — account_id/organization_id are self-discoverable,
+  no cross-service org lookup needed**: `GET /v1/accounts/{account_id}`
+  (getaccount, `account_id` soft-captured from `iam`'s `GET /v1/access-keys`
+  `$.access_keys[0].account_id` — the standard pattern from
+  `management__iam.json`/`management__loggingaudit.json`) returns
+  `{account_id, account_name, account_type, analysis_status, organization_id,
+  status}` — `$.organization_id` is a real, populated org id
+  (`o-6d249f756f0c475fa1730fa9a40e3e78` on this account) **even though this
+  account is org-MEMBER not org-master**. This matters because
+  `management/organization`'s own `GET /v1/organizations` returns an **empty
+  list** for member accounts (masters-only visibility, per
+  `management__organization.json`) — that would have been a dead end as an
+  organization_id source. resourceoptimizer's org-scoped GETs (`listorganizationsettings`,
+  `getorganizationlimsettings`) both returned real `200`s for this MEMBER
+  account using that self-captured `organization_id` — **read access to
+  org-scoped resourceoptimizer settings is NOT master-gated** (unlike
+  `management/organization`'s own org-level reads/writes). Whether
+  org-scoped **writes** (`createorganizationsettings` etc.) follow the same
+  member-friendly rule is UNPROVEN (not live-tested this session — see the
+  `needs-peer` blocker in the ledger).
+- **VALIDATED AT RUNTIME — docs/live mismatch on `PERFORMANCE_PRIORITY` query
+  params**: `getaccountsettingdetail`/`getorganizationsettingdetail`
+  (`GET .../settings/detail?category=&lookback_period=&utilization_preset=&
+  cpu_threshold=&cpu_headroom=&memory_headroom=`) — the doc page marks
+  `cpu_threshold`/`cpu_headroom`/`memory_headroom` as query-**optional**
+  (`any of [enum, null]`) and describes them as auto-derived from
+  `utilization_preset`'s mapping table (e.g. `PERFORMANCE_PRIORITY` =>
+  `P99.5/20/20`). **Live reality**: omitting them 400s —
+  `{"code":"BadRequest","detail":"When PERFORMANCE_PRIORITY is selected,
+  cpu_threshold is required"}` — the API does NOT auto-fill from the preset;
+  the caller must send all 6 query params explicitly (matching the preset's
+  own documented mapping values for `PERFORMANCE_PRIORITY`/`MAX_SAVINGS`/
+  `SAVINGS_PRIORITY`/`MAX_PERFORMANCE`, or arbitrary values for `CUSTOM`, or
+  `null`s for `NONE`). With all 6 supplied, the endpoint returns a correctly-
+  shaped `404 {"code":"ResourceNotFound","detail":"Setting not found"}` on
+  this account (0 settings exist yet) — confirms the endpoint/param contract
+  is right, just empty-state. `category`/`lookback_period`/`utilization_preset`
+  missing alone 400s `"Field required"` x3 (3 required fields, matching docs).
+- **From docs — response envelopes**: `createaccountsetting`/
+  `createorganizationsettings` (`RightsizingSettingsResponse`) return
+  `$.items[0].id` — **a LIST**, not `$.id`, even for a single-category create.
+  `updateaccountsetting`/`updateorganizationsetting`
+  (`RightsizingSettingUpdateRequest`, PATCH `.../settings/detail`) require
+  BOTH `origin` (must exactly match the setting's current stored values — doc
+  says "with origin validation") AND `new_values` (the desired new values),
+  plus top-level `category`/`region_ids`. `deleteaccountsettings`/
+  `deleteorganizationsettings` take `deletion_groups`: a **list of groups**,
+  each group a list of setting_ids that share identical values (e.g.
+  `[[id1, id2], [id3]]`) — NOT a flat id list. `optin` (`POST
+  /v1/accounts/opt-in`) takes `account_ids` as a **list** even for one account;
+  `optout` (`POST /v1/accounts/{account_id}/opt-out`) takes no body.
+  `setaccountlimactive`/`setorganizationlimactive` (`LimActiveRequest`, PUT
+  `.../settings/lim`) are account/org-wide **toggles**, not creatable/
+  deletable resources — the new lifecycle sets them active then immediately
+  reverts to the account's observed baseline (`{lim_settings:[]}` i.e.
+  inactive) rather than leaving the shared test account's LIM posture flipped.
+  All bodies verified against `data/api_bodies.json` + the live doc pages
+  (`https://docs.e.samsungsdscloud.com/apireference/management/resourceoptimizer/apis/<op>/1.0/`)
+  — **NOT runtime-mutation-proven**.
+- **UNCONFIRMED — recommendation data availability**: this account's
+  `analysis_status` is `PENDING` (live-confirmed via `getaccount`) and
+  `getidleresourcelist`/`listrecommendationsbybody` both return `200` with
+  `0` items — SCP has not produced any rightsizing analysis output for this
+  account yet, so `showrecommendation`/`getrecommendationmetrics` (id-bound on
+  `recommendation_id`) currently only reach a correctly-shaped `404
+  ResourceNotFound` with a synthetic id — there is no real recommendation to
+  probe with. `capture_soft` on the list steps is already wired so a future
+  run automatically picks up a real id once analysis completes (whether that
+  requires an explicit `optin` call first, or happens automatically, is
+  unknown — see the `heavy-prereq` blocker in the ledger).

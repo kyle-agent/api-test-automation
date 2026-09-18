@@ -1074,6 +1074,43 @@
       ],
       "notes": "2026-09-18: MODELING pass only (task mandate: no live mutations). Static coverage_gap 25 -> 0 via 4 new lifecycles in generated__messagehub.json (domain/email/phone fully modeled CRUD + setters; push-application list+soft-capture, honestly un-coverable past that without a create endpoint or an out-of-band resource). Host+auth live-confirmed read-only (covered=4 here = the 4 smoke-floor list GETs, matching python -m spec.coverage_gap's 'reachable now' count -- NOT a live-2xx-observation count, since no observations were recorded this session; see next_levers for why tools.coverage_headroom --write was not run globally). See knowledge/services.md 'application-service / messagehub' + knowledge/validated-facts.md 2026-09-18 entry for full provenance (from-docs vs validated-at-runtime).",
       "updated": "2026-09-18T00:00:00Z"
+    },
+    {
+      "service": "resourceoptimizer",
+      "covered": 8,
+      "total": 24,
+      "gap": 16,
+      "heavy": false,
+      "blockers": [
+        {
+          "key": "createaccountsetting/createorganizationsettings/updateaccountsetting/updateorganizationsetting/deleteaccountsettings/deleteorganizationsettings/setaccountlimactive/setorganizationlimactive/optin/optout: not live-executed by modeling agent",
+          "reason": "Session mandate was MODELING + read-only validation (SCP_ALLOW_MUTATIONS=false SCP_ALLOW_DESTRUCTIVE=false); regression/scenarios/lifecycles/generated__resourceoptimizer.json authors all 13 write endpoints with docs-derived bodies (data/api_bodies.json cross-checked against live doc pages) but none were called live. A future full run (mutations default ON) will exercise them for real and either promote them to covered or surface a real 4xx/403 to reclassify.",
+          "kind": "fixable"
+        },
+        {
+          "key": "showrecommendation/getrecommendationmetrics: no recommendation exists yet (0 data)",
+          "reason": "This test account's analysis_status is PENDING (live-confirmed via getaccount) and getidleresourcelist/listrecommendationsbybody both return 0 items — SCP has not finished (or not started) rightsizing analysis for this account, so there is no real recommendation_id to probe with. Live-confirmed the id-bound GET shape is correct (404 ResourceNotFound with a synthetic id). Will self-resolve once analysis produces data (capture_soft recommendation_id already wired in resourceoptimizer-readonly) or once optin (resourceoptimizer-opt lifecycle) is actually run and given time to analyze.",
+          "kind": "heavy-prereq"
+        },
+        {
+          "key": "getaccountsettingdetail/getorganizationsettingdetail/getaccountsetting/getorganizationsetting: no setting exists yet (0 data)",
+          "reason": "These 4 id-bound GETs correctly 404 (Setting not found / real query-param validation confirmed live) because no account/organization rightsizing setting has been created on this account yet — createaccountsetting/createorganizationsettings were not live-executed this session (see the create/update/delete blocker above). Once a future mutating run creates a setting, these 4 will resolve to real 2xx via the same lifecycle (resourceoptimizer-account-settings / resourceoptimizer-organization-settings already chain create -> capture setting_id -> these GETs).",
+          "kind": "fixable"
+        },
+        {
+          "key": "organization-scoped writes (createorganizationsettings etc.): possible member-vs-master gate, unproven",
+          "reason": "This test account is org-MEMBER not org-master (management/organization: listorganizations returns [] for members, most org writes 403). resourceoptimizer org-scoped READS were live-confirmed OPEN to a member (200s), but whether org-scoped WRITES follow the member-friendly read behavior or the organization-service master-only-write behavior is unproven (not live-tested per this session mandate). Watch for a systematic 403 across all org-write steps on the next full run -> would confirm master-only and this becomes an entitlement blocker instead of fixable.",
+          "kind": "needs-peer"
+        }
+      ],
+      "next_levers": [
+        "Run resourceoptimizer-account-settings and resourceoptimizer-organization-settings with mutations enabled (default) to prove createaccountsetting/getaccountsetting/getaccountsettingdetail/updateaccountsetting/setaccountlimactive/deleteaccountsettings (+ org mirror) for real 2xx; update this row + knowledge/validated-facts.md with the actual response shapes and whichever expect_status the API really returns (bodies are docs-derived, unproven).",
+        "Run resourceoptimizer-opt (optin/optout) with mutations enabled; after opt-in, wait for analysis_status to leave PENDING (poll getaccount) then re-run resourceoptimizer-readonly so listrecommendationsbybody/getidleresourcelist capture a real recommendation_id and showrecommendation/getrecommendationmetrics promote to 2xx.",
+        "If organization-scoped writes 403 systematically (member-not-master), reclassify that blocker from needs-peer to entitlement-403 and consider whether the account-scoped half of the lifecycles is sufficient coverage on its own.",
+        "Once api_docs.json finishes re-scraping for this service (was partial/background during this session), diff its rendered param tables against the search-index text this lifecycle was built from (spec.extract_catalog.index_body_texts) in case anything changed."
+      ],
+      "notes": "2026-09-18 (modeling+read-only-validation agent): NEW service catalog rebuild (0->24 endpoints). GLOBAL service confirmed live (resourceoptimizer.e.samsungsdscloud.com authenticates; regional host has no route) — core/config.py DEFAULT_GLOBAL_SERVICES updated same commit. Authored regression/scenarios/lifecycles/generated__resourceoptimizer.json (4 lifecycles, all 24 endpoints modeled, spec.coverage_gap gap 24->0). Live-validated 14/24 endpoints (8 real 2xx: getaccount, listaccountsettings, getaccountlimsettings, listorganizationsettings, getorganizationlimsettings, getdashboard, getidleresourcelist, listrecommendationsbybody; 6 reached-but-404 due to 0 data on this account: showrecommendation, getrecommendationmetrics, getaccountsettingdetail, getorganizationsettingdetail, getaccountsetting, getorganizationsetting). Key runtime quirk (docs mismatch): getaccountsettingdetail/getorganizationsettingdetail require cpu_threshold/cpu_headroom/memory_headroom even under utilization_preset=PERFORMANCE_PRIORITY, despite the doc marking them query-optional (\"any of [enum, null]\") — live 400 \"When PERFORMANCE_PRIORITY is selected, cpu_threshold is required\" without them. createaccountsetting/createorganizationsettings response envelope is $.items[0].id (list), not $.id. The 13 write endpoints (creates/updates/deletes/optin/optout/setlim) are modeled with docs-derived bodies but NOT live-executed (mandate: read-only validation only) — see blockers.",
+      "updated": "2026-09-18T04:30:07Z"
     }
   ]
 }
