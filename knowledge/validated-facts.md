@@ -4526,3 +4526,13 @@ for the exact split and next levers.
   'Latest snapshot is not available'(create 2초 뒤) → 코드 사다리 10s×6.
 - 잔여 actionable 은 전부 기지 픽스처/제품 클래스: scf codes/file 400 · scr private-acl 409 edit-conflict · filestorage access-rules
   404 · gen-heavy-vs-netops image member 404 · quick-query validate 500 · support 404 ×2 · rm tag-rg 403 · PF-54 ×2.
+
+## PF-54 근본 원인 좁힘 (2026-09-21): secretsmanager `check-namespace-error` 는 계정 전환 산물
+
+- 8/20 run 3e67 은 **같은 바디**(kms_id 실존·name 규격·acl_cidr·private_acl_enabled "false")로 `POST /v1/secrets` 201 (계정 d86edc08).
+  9/17 89de 부터 6런 연속 400 은 전부 **새 계정 81eccb26(API_Regression2)** — 바디·핀(secretsmanager 핀 없음)·코드 무변, 계정만 다름.
+- 결론: 새 계정에 Secrets Manager 네임스페이스(SCP 관리형 KMS 키)가 초기화돼 있지 않다. `POST /v1/secrets/kms-key`("create secrets
+  manager kms key", body `service_name`)가 2026-09 카탈로그에 재등장(7월엔 미라우팅 404 로 스텝 제거) — 이것이 초기화 API 로 추정.
+  오너 콘솔 활성화 또는 그 API 1회 호출 후 재런 판정. 그 전까지 PF-54 는 expected.
+- private-dns 는 생성 자체는 매 런 202(9~11s): 59a9 의 실패는 dns 호스트 read timeout 1회(환경). `POST /v1/private-dns/activate`
+  400 max-count-exceed 는 별개 — 계정 활성화 quota(1) 이미 소진 = 이미 활성화된 상태의 재활성화 거절(관용 처리됨).
