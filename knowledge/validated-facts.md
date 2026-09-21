@@ -4540,3 +4540,8 @@ for the exact split and next levers.
   (req-b850727d · req-d87318c1). 현재 카탈로그에 없는 엔드포인트(api_docs.json 의 항목은 7월 스크레이프 잔존 = stale; 1,492 vs 1,490 차이의
   하나). API 로는 네임스페이스 초기화 불가 → 콘솔 활성화 또는 SDS 문의. lifecycle 에 넣었던 프로브 스텝은 제거(매 런 404 소음 방지).
   "이미 KMS 에 키가 있는데?" → 그 30개는 전부 managed_type 'user'(우리 transit 키); check-namespace-error 가 가리키는 건 SCP 관리형(scp) 키다.
+- **(2026-09-21 10:54Z) 콘솔에서 secret 생성 후에도 API 는 그대로**: 오너가 콘솔(kyuh.choi+areg2, 암호화 키 scp/secretsmanager)로 secret 을
+  만들었다고 한 직후 `GET /v1/secrets` 는 **count 0**(API 키 사용자 732e2090… 에겐 보이지 않음), `POST /v1/secrets`(새 Active 사용자 키) 는 여전히
+  400 check-namespace-error. 즉 네임스페이스는 계정 단위가 아니라 **호출 주체(IAM 사용자/액세스키) 단위**로 보인다 — 구 계정 키의 사용자는
+  콘솔 사용자였고, 새 계정 키는 API 전용 사용자. 다음 판별: 콘솔 사용자의 액세스키로 같은 호출, 또는 SDS 문의(Secrets Manager 가 요구하는
+  사용자 네임스페이스 조건). 프로브 KMS 키 2개는 삭제(204).
