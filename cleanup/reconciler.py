@@ -1775,8 +1775,13 @@ def _pass_scr(c) -> int:
         if it.get("id") and _delete(c, "scr",
                                     f"/v1/repositories/{it['id']}"):
             deleted += 1
+    # "regr" too (2026-09-21): scr-repo-borrow's create-registry fallback names
+    # its registry regr{unique} (regr + 8 hex), not regrscr*. One such registry
+    # (regr0c552158, state Error since 2026-07-18) sat outside this prefix for
+    # two months and held CONTAINER_REGISTRY.VISIBILITY.MAX.COUNT=1EA — every
+    # run's scr-repo-borrow 403'd on quota because of it.
     for it in _select(c, "scr", "/v1/container-registries",
-                      name_prefixes=("regrscr",)):
+                      name_prefixes=("regrscr", "regr")):
         rid = it.get("id")
         for _ in range(4):
             st = _delete(c, "scr",

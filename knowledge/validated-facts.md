@@ -4415,3 +4415,14 @@ for the exact split and next levers.
   계열 전멸). 즉시 우회 `SCP_API_VERSION_OVERRIDES=vpc=1.3`는 수리 반영 후 제거.
 - 교훈: 버전 핀 상향은 **write 바디 모델 변경을 동반**할 수 있다. 다음 핀 상향 전 `data/api_bodies.json`
   (신규 모델 예시)과 시나리오 바디의 필수 필드 차이를 정적으로 대조하는 게이트가 필요(후속 큐).
+
+## 런 전 자원 정리 (2026-09-21) — 좀비 레지스트리 PF-58, IAM 게이트 로그그룹
+
+- `cleanup.verify_clean`(read-only) → 이 컨테이너의 오프라인 테스트가 남긴 가짜 원장(`reports/registry/*.jsonl`,
+  vpc-a/own-1 등)이 "vpc 37 · lb 6 survivors"로 잡혔다 — **오프라인 스위트 실행 후에는 원장 shard를 지우고 스캔**
+  (실자원 아님). 실자원 잔존은 scr 레지스트리 1 + servicewatch 로그그룹 20뿐.
+- 리컨실러 sweep(IGNORE_TTL): 로그그룹 5 삭제, ske 로그그룹 19는 IAM 게이트 자식 로그스트림 때문에 삭제 불가
+  (기지 클래스, 런에 무해). 레지스트리 `regr0c552158`는 DELETE/PUT 모두 409 delete-conflict "already deleting"
+  (Error 상태 2개월) — **PF-58**, API로 해제 불가, VISIBILITY quota 1EA를 점유 → scr-repo-borrow 403은 해제 전까지 expected.
+- 리컨실러 레지스트리 접두 `("regrscr",)` → `("regrscr","regr")`: borrow 폴백이 `regr{unique}`로 만든 레지스트리가
+  두 달간 소유 판정 밖에 있었다.
