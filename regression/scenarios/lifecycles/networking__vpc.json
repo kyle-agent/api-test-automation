@@ -192,7 +192,6 @@
           "path": "/v1/vpcs",
           "json": {
             "zone_type": "PUBLIC",
-            "zones": ["{zone}"],
             "name": "regrvpc{unique}",
             "description": "API regression PLS",
             "cidr": "10.141.0.0/20",
@@ -512,7 +511,6 @@
           "path": "/v1/vpcs",
           "json": {
             "zone_type": "PUBLIC",
-            "zones": ["{zone}"],
             "name": "regrvpc{unique}",
             "description": "API regression vpc-endpoint",
             "cidr": "10.129.0.0/20",
@@ -818,7 +816,6 @@
           "adopt": "vpc#a",
           "json": {
             "zone_type": "PUBLIC",
-            "zones": ["{zone}"],
             "name": "regrvpc{unique}",
             "description": "API regression peering",
             "cidr": "10.130.0.0/20",
@@ -864,7 +861,6 @@
           "adopt": "vpc#b",
           "json": {
             "zone_type": "PUBLIC",
-            "zones": ["{zone}"],
             "name": "regrvpcb{unique}",
             "description": "API regression peering approver",
             "cidr": "10.141.0.0/20",
@@ -1285,7 +1281,6 @@
           "path": "/v1/vpcs",
           "json": {
             "zone_type": "PUBLIC",
-            "zones": ["{zone}"],
             "name": "regrvpc{unique}",
             "description": "API regression tgw",
             "cidr": "10.131.0.0/20",
@@ -2178,7 +2173,6 @@
           "_note": "2026-07-13 오너 설계: net-VPC A(10.130/20) adopt — vip-nat은 A의 유일한 IGW 소유자. 폴백 cidr도 10.130/20으로 정렬(서브넷 10.130.9.0/24가 항상 VPC 대역 안이도록). 폴백에서 peering-A와 동시 존재 불가(cidr overlap)지만 단독 실행은 직렬이라 실충돌 없음.",
           "json": {
             "zone_type": "PUBLIC",
-            "zones": ["{zone}"],
             "name": "regrvpc{unique}",
             "description": "API regression vip-nat",
             "cidr": "10.130.0.0/20",
@@ -2979,7 +2973,6 @@
           "path": "/v1/vpcs",
           "json": {
             "zone_type": "PUBLIC",
-            "zones": ["{zone}"],
             "name": "regrvpc{unique}",
             "description": "API regression PLE",
             "cidr": "10.135.0.0/20",

@@ -116,7 +116,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 - **CURRENT (2026-09-21 — 병합 후 첫 런 d961: vpc 1.4 핀이 create-vpc를 죽임 → 수리):** run
   `20260921-094658-d961` 시작 2초 만에 VPC 계열 43 lifecycle 전멸(fail 6 · skip 37) — VpcCreateRequestV1Dot4
-  `zone_type` 필수(PF-57). 엔진 공유 VPC + 시나리오 70곳에 `zone_type: PUBLIC, zones: [{zone}]` 추가.
+  `zone_type` 필수(PF-57). 엔진 공유 VPC + 시나리오 70곳에 `zone_type: PUBLIC` 추가(zones는 PUBLIC에서 금지 — 라이브 프로브 201/400 확정, run 9420 재실패 후).
   오너 임시 우회 `SCP_API_VERSION_OVERRIDES=vpc=1.3`. 다음: 재런에서 VPC 계열 + 신규 lifecycle + 나머지
   버전 핀 실효 판정 · 핀 상향 전 바디 모델 필수필드 정적 대조 게이트(후속).
 - **CURRENT (2026-09-18 — 신규 API 모수 편입, 오너 "신규 API 모수 작업 시작"):** 문서 사이트

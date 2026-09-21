@@ -4408,8 +4408,10 @@ for the exact split and next levers.
   기존 바디(cidr/name/description/tags)만 보내던 엔진 공유 VPC 1곳 + 시나리오 create-vpc 70곳이 전부
   거절 → VPC를 만들거나 빌리는 43 lifecycle이 시작 2초 만에 fail 6 / skip 37(IB-049). GET 핀(vpc 1.4 ·
   mysql 1.3 · ske 1.6 · lb 1.4)은 200 — 핀 전체 문제가 아니라 **바디 모델 변경** 클래스.
-- 수리: 71곳에 `"zone_type": "PUBLIC", "zones": ["{zone}"]` — 단일존 VPC 유지(multi-zone은 DC에 uplink
-  존 쌍을 요구하고 형제 존 -a는 이 계정에 없음). 즉시 우회: `.env`에 `SCP_API_VERSION_OVERRIDES=vpc=1.3`
-  (오버라이드는 엔드포인트 핀보다 우선) — 수리 반영 후에는 제거.
+- 수리(2차, 라이브 프로브 2026-09-21 01:27Z): 1차 수리의 `zones: [{zone}]`도 거절 — **PUBLIC에는 zones를
+  주면 400 `scp-network.vpc.zone-cannot-be-specified` "Cannot specify zones when the zone type is PUBLIC"**;
+  `zone_type: PUBLIC` 단독은 201이고 응답 `vpc.zones=['kr-west1-b']`(서버가 계정 존 배정, 단일존). 문서 모델의
+  "zones 선택"은 PRIVATE/ACCELERATED에만 해당. 71곳 `zone_type: PUBLIC`만 전송(run 9420도 같은 사유로 VPC
+  계열 전멸). 즉시 우회 `SCP_API_VERSION_OVERRIDES=vpc=1.3`는 수리 반영 후 제거.
 - 교훈: 버전 핀 상향은 **write 바디 모델 변경을 동반**할 수 있다. 다음 핀 상향 전 `data/api_bodies.json`
   (신규 모델 예시)과 시나리오 바디의 필수 필드 차이를 정적으로 대조하는 게이트가 필요(후속 큐).

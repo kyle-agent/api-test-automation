@@ -81,10 +81,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -100,7 +97,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -697,10 +694,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -716,7 +710,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -1241,10 +1235,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -1260,7 +1251,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -1781,10 +1772,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -1800,7 +1788,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -2200,10 +2188,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -2219,7 +2204,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -2671,10 +2656,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -2690,7 +2672,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -3227,10 +3209,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -3246,7 +3225,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -3633,10 +3612,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -3652,7 +3628,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -4092,10 +4068,7 @@
             "description": "API regression suite",
             "cidr": "10.160.0.0/20",
             "tags": [],
-            "zone_type": "PUBLIC",
-            "zones": [
-              "{zone}"
-            ]
+            "zone_type": "PUBLIC"
           },
           "expect_status": [
             200,
@@ -4111,7 +4084,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
