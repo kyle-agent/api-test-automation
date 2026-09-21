@@ -2166,6 +2166,12 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
             nbody = _inject_owner_tags({
                 "name": nname, "description": f"API regression shared net VPC {tag.upper()}",
                 "cidr": cidr, "tags": [],
+                # vpc 1.4 (VpcCreateRequestV1Dot4): zone_type REQUIRED — the main
+                # shared-VPC body got this on 2026-09-21 but net-A/B were missed, so
+                # both 400'd silently in runs eb41/643b: vpc#a adopters fell back to
+                # self-created VPCs (networking-vpc-subnet CIDR mismatch) and net-B
+                # users (fw / DC / privatelink-service / vip-nat) IB-049-skipped.
+                "zone_type": "PUBLIC",
             }, axis="regression")
             ncreate = {"name": f"create-shared-net-vpc-{tag}", "method": "POST",
                        "service": "vpc"}

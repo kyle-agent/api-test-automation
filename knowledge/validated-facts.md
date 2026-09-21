@@ -4452,3 +4452,15 @@ for the exact split and next levers.
 - 미해결: networking-vpc-subnet `include-vp-cidr`(subnet 10.130.13.0/24 vs 자기 VPC 10.123.0.0/20) — net-A(10.130.0.0/20)를
   빌리지 못하고 자체 VPC를 만든 경로. 오너 런 로그의 provision 줄(`grep -nE "provision|shared" reports/console2-runs/20260921-105412-eb41.log`)
   로 net-A 미프로비저닝 사유 확인 필요.
+
+## run 643b 중간 판정 (2026-09-21, `20260921-123827-643b`) — 공유 net-A/B VPC 바디에 zone_type 누락
+
+- 신규 상품 편입 실효: eb41에서 빠졌던 신규 lifecycle 13개 전부 실행(10 pass; messagehub-email/phone create,
+  resourceoptimizer-readonly 실패 — 스텝 원인은 아티팩트 대기).
+- **eb41의 "skip 5 = VPC 5-cap" 판정은 오판**: skip 5(gen-direct-connect · gen-wave5-fw · networking-direct-connect-routing ·
+  vpc-privatelink-service · vpc-subnet-vip-nat)와 fail 1(networking-vpc-subnet)은 전부 `vpc#a`/`vpc#b` 채택자. 엔진
+  `provision_shared_vpc`의 **net-A/B 바디(`create-shared-net-vpc-a/b`)에 `zone_type`이 빠져** 9/21 1차 수리(메인 공유 VPC만)
+  이후에도 두 런 내내 400 → vpc#a 채택자는 자체 VPC(10.123.0.0/20)로 폴백해 서브넷 10.130.13.0/24가 CIDR 불일치, vpc#b
+  사용자는 IB-049 스킵. 프로비저닝 스텝은 아티팩트 events.jsonl에 기록되지 않아(콘솔 로그에만) 두 런 동안 보이지 않았다.
+  수리: net-A/B 바디 `zone_type: PUBLIC` + 오프라인 가드(모든 POST /v1/vpcs 바디 — 엔진·시나리오 — zone_type 필수).
+- gen-heavy-lb-members: hc set 뒤 settle 폴로 server-group create는 통과(eb41 대비 전진), 이후 스텝에서 실패 — 아티팩트 대기.

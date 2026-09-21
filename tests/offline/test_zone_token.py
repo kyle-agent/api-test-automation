@@ -73,3 +73,26 @@ def test_ske_nodepool_os_version_is_captured_not_hardcoded():
     ctx = {"kube_ver": "v1.34.3", "kube_ver_next": "v1.35.5"}
     assert engine._capture(imgs, cap["np_os_ver"], ctx) == "22.04"
     assert engine._capture(imgs, cap["np_os_ver_next"], ctx) == "24.04"
+
+
+def test_every_vpc_create_body_carries_zone_type():
+    """vpc 1.4 (VpcCreateRequestV1Dot4) makes zone_type REQUIRED. Runs eb41/643b
+    (2026-09-21): the engine's main shared VPC had it, the shared net-A/B bodies did
+    not -> both 400'd silently, vpc#a adopters fell back to self-created VPCs and
+    vpc#b users IB-049-skipped. Guard every POST /v1/vpcs body: engine + scenarios."""
+    import re
+    from pathlib import Path
+    from regression.scenarios.loader import load_lifecycles
+    src = Path("regression/scenarios/engine.py").read_text(encoding="utf-8")
+    # every dict literal that ends up in a _run_step(..., _VPC_CREATE_PATH, ...) call
+    # is built via _inject_owner_tags({...}); each such block must name zone_type.
+    blocks = re.findall(r"_inject_owner_tags\(\{(.*?)\}, axis=\"regression\"\)", src, re.S)
+    vpc_blocks = [b for b in blocks if '"cidr"' in b and '"name"' in b and "subnet" not in b.lower()]
+    assert vpc_blocks, "expected the engine's shared VPC create bodies"
+    for b in vpc_blocks:
+        assert '"zone_type"' in b, f"engine VPC create body without zone_type: {b[:120]!r}"
+    lcs, _ = load_lifecycles(with_sources=True)
+    missing = [(lc["id"], s.get("name")) for lc in lcs for s in lc.get("steps", [])
+               if s.get("method") == "POST" and s.get("path") == "/v1/vpcs"
+               and isinstance(s.get("json"), dict) and "zone_type" not in s["json"]]
+    assert not missing, f"scenario create-vpc bodies without zone_type: {missing}"
