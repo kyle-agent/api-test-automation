@@ -4536,3 +4536,7 @@ for the exact split and next levers.
   오너 콘솔 활성화 또는 그 API 1회 호출 후 재런 판정. 그 전까지 PF-54 는 expected.
 - private-dns 는 생성 자체는 매 런 202(9~11s): 59a9 의 실패는 dns 호스트 read timeout 1회(환경). `POST /v1/private-dns/activate`
   400 max-count-exceed 는 별개 — 계정 활성화 quota(1) 이미 소진 = 이미 활성화된 상태의 재활성화 거절(관용 처리됨).
+- **(2026-09-21 라이브, 오너 승인 "2번으로 해봐") `POST /v1/secrets/kms-key` 는 404 NotFound** — `service_name` "" 와 "secretsmanager" 모두
+  (req-b850727d · req-d87318c1). 현재 카탈로그에 없는 엔드포인트(api_docs.json 의 항목은 7월 스크레이프 잔존 = stale; 1,492 vs 1,490 차이의
+  하나). API 로는 네임스페이스 초기화 불가 → 콘솔 활성화 또는 SDS 문의. lifecycle 에 넣었던 프로브 스텝은 제거(매 런 404 소음 방지).
+  "이미 KMS 에 키가 있는데?" → 그 30개는 전부 managed_type 'user'(우리 transit 키); check-namespace-error 가 가리키는 건 SCP 관리형(scp) 키다.
