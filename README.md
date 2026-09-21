@@ -71,6 +71,12 @@ reports/      per-run output (gitignored)
 
 ## Setup & canonical commands
 
+One-shot local bootstrap: `./start.sh` creates `.venv` (if missing), installs
+both requirements files (only when they changed), runs the zone guard and
+launches the console at http://localhost:8800/testing/embed. `./start.sh
+--setup-only` prepares the venv only; `./start.sh -- <cmd>` runs a command
+inside it (e.g. `./start.sh -- python -m spec.summary`).
+
 ```bash
 pip install -r requirements.txt    # engine deps
 cp .env.example .env               # SCP_REGION + credentials (never commit .env)
