@@ -119,7 +119,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   → 수리) · ske(labels 전 클러스터 UPDATING → settle 수리). **대시보드**: 아티팩트→observations 복원(`tools.events_to_observations`)
   → `tools/publish_dashboard.sh` → dashboard-data 발행(ok 2015 · soft 369 · new 9 · known 5 · C3 82.4%). 콘솔이 다음 런부터
   observations/findings.jsonl 을 아티팩트에 미러. PF-54 는 새 계정 SM 네임스페이스(호출 주체 단위) 미초기화 — `/v1/secrets/kms-key` 404,
-  콘솔 secret 생성 후에도 API 400 → SDS 문의 대상. 잔존: 리컨실러 회수 중(hosted zone·private-dns·pg 클러스터·서브넷·로그그룹 20).
+  콘솔 secret 생성 후에도 API 400 → SDS 문의 대상. 잔존 정리: 리컨실러 8건 + 수동(레코드→hosted zone→private-dns) 삭제 완료; **FAILED pg 클러스터 5e3770db 는 DELETE 202 반복에도 미수렴**(PF-62 후속)이라 공유 DB 서브넷 ff9b688c + 그 VPC 67f5317c 가 붙들림 → 재확인 후 안 풀리면 오너 콘솔 강제 삭제. 로그그룹 20 은 IAM 게이트.
 - **PRIOR (2026-09-21 — 5th 런 59a9 최종):** 133 lifecycle **130 pass / 3 fail / 0 skip** (4beb 132/5, 643b 123/9, eb41 112/7).
   gen-wave5-fw · gen-heavy-lb-members 첫 완주, apigw privatelink fallback 실효. fail = PF-54 ×2 + heavy-shared-networking(dns 호스트
   read timeout — 환경 클래스, POST 무재전송 정책대로 fail). 수리: rm list-resources 를 공유 VPC 필터로, fs restore 409 사다리.
