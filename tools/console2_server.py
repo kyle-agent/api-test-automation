@@ -2673,6 +2673,13 @@ def _conformance_worker(rec: dict) -> None:
                 conf = ROOT / "data" / "conformance.json"
                 if conf.exists():
                     ups.append(conf)
+                # 통합 결과 저장소도 미러 (2026-09-21 오너 "대쉬보드에 결과도 반영"):
+                # 원격 세션이 dashboard.build 를 이 파일로 돌려 dashboard-data 에
+                # 발행한다. 없으면(read-only 런 등) 그냥 건너뜀. .jsonl 은 text/plain.
+                for _rf in ("observations.jsonl", "findings.jsonl"):
+                    _rp = ROOT / "reports" / "results" / _rf
+                    if _rp.exists():
+                        ups.append(_rp)
                 ups.extend(report_files)
                 for fp in ups:
                     if _oplog.put_text(f"runs/{rec['id']}/artifact/{fp.name}",
