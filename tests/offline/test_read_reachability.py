@@ -96,10 +96,14 @@ def test_real_run_has_sane_documented_distribution():
     self-param totals (960 produced / 19 waivers / 0 null) must hold."""
     rows_by_service, _skipped = rr.analyze()
     rows = [r for rows in rows_by_service.values() for r in rows]
-    # 317 since the 2026-09-18 search-index catalog rebuild (1,417 -> 1,490 endpoints;
+    # 332 since 2026-09-21: messagehub/resourceoptimizer/costnavigator got formal
+    # resource models (knowledge/formal/resources) so their 15 id-bound GETs joined
+    # the universe (skipped_no_model 15 -> 0; every catalog service is modeled now).
+    # 317 after the 2026-09-18 search-index catalog rebuild (1,417 -> 1,490 endpoints;
     # +2 id-bound GETs: ske listnamespacedpods, vpc privatelink-scp-services family);
     # was 315 (2026-07-18), 302 before. Re-pin deliberately on spec bumps.
-    assert len(rows) == 317, "id-bound GET universe changed unexpectedly"
+    assert len(rows) == 332, "id-bound GET universe changed unexpectedly"
+    assert _skipped == 0, "a catalog service has no formal resource model"
     totals = {v: sum(1 for r in rows if r["verdict"] == v) for v in rr._VERDICTS}
     assert sum(totals.values()) == len(rows)
     # every verdict is a recognised bucket

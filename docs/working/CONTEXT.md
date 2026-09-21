@@ -114,7 +114,14 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-09-21 — 병합 후 첫 런 d961: vpc 1.4 핀이 create-vpc를 죽임 → 수리):** run
+- **CURRENT (2026-09-21 — 재런 eb41 판정 + 신규 상품 콘솔 편입):** run `20260921-105412-eb41` 124 lifecycle **112 pass / 7 fail / 5 skip**
+  (406 0 · 존 에러 0 · skip=VPC 5-cap 규약). 실패 = 기지 3(PF-54 ×2 · PF-58) + 핀 상향 모델 변경 4(ske 1.6 `default_subnet_id`,
+  scf 1.5 `encryption` 필수, vpce `vpc_id` 쿼리 필수, ASG `zones` 누락 — **PF-59**, 시나리오 수리 완료) + lb 1.4 hc set→EDITING
+  경합(settle 폴 삽입) + networking-vpc-subnet CIDR(net-A 미차용 — 오너 provision 로그 확인 필요). **신규 상품이 "전체"에서
+  빠진 구조 결함 수리**: formal 노드 3파일(messagehub·resourceoptimizer·costnavigator) + lifecycle `_scope_include` 9곳 →
+  서비스 선택 시 13 lifecycle 합류(org-settings 쓰기는 오너 결정 대기). 다음: 재런에서 4수리 + 신규 13 lifecycle 실효 판정;
+  핀 상향 전 바디 필수필드 정적 대조 게이트(후속).
+- **PRIOR (2026-09-21 — 병합 후 첫 런 d961: vpc 1.4 핀이 create-vpc를 죽임 → 수리):** run
   `20260921-094658-d961` 시작 2초 만에 VPC 계열 43 lifecycle 전멸(fail 6 · skip 37) — VpcCreateRequestV1Dot4
   `zone_type` 필수(PF-57). 엔진 공유 VPC + 시나리오 70곳에 `zone_type: PUBLIC` 추가(zones는 PUBLIC에서 금지 — 라이브 프로브 201/400 확정, run 9420 재실패 후).
   런 전 정리(오너 지시): 실자원 잔존은 좀비 scr 레지스트리 1(PF-58, API 해제 불가 → SDS/콘솔) + IAM 게이트 ske

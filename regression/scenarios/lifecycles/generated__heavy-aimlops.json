@@ -348,17 +348,15 @@
           "json": {
             "name": "regrske{unique}",
             "kubernetes_version": "v1.33.5",
-            "cloud_logging_enabled": "false",
             "vpc_id": "{vpc_id}",
-            "subnet_id": "{subnet_id}",
             "security_group_id_list": [
               "{sg_id}"
             ],
             "private_endpoint_access_control_resources": [],
             "tags": [],
-            "volume_id": "{volume_id}",
             "public_endpoint_access_control_ip": "0.0.0.0/0",
-            "service_watch_logging_enabled": "true"
+            "service_watch_logging_enabled": "true",
+            "default_subnet_id": "{subnet_id}"
           },
           "expect_status": [
             200,
@@ -372,7 +370,8 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "ske"
-          }
+          },
+          "_note": "REPAIR 2026-09-21 (run eb41, ske 1.6 핀): ClusterCreateRequestV1Dot6 — subnet_id→default_subnet_id(필수), volume_id·cloud_logging_enabled 제거(모델에서 삭제), additional_subnet_id_list/nfs_volume_id/deletion_protection_enabled 선택. 구 바디는 400 'Field required'."
         },
         {
           "name": "wait-ske-cluster",

@@ -2830,17 +2830,15 @@
           "json": {
             "name": "regrske{unique}",
             "kubernetes_version": "{kube_ver}",
-            "cloud_logging_enabled": "false",
             "vpc_id": "{vpc_id}",
-            "subnet_id": "{subnet_id}",
             "security_group_id_list": [
               "{sg_id}"
             ],
             "private_endpoint_access_control_resources": [],
             "tags": [],
-            "volume_id": "{ske_vol_id}",
             "public_endpoint_access_control_ip": "0.0.0.0/0",
-            "service_watch_logging_enabled": "true"
+            "service_watch_logging_enabled": "true",
+            "default_subnet_id": "{subnet_id}"
           },
           "expect_status": [
             200,
@@ -2854,7 +2852,8 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "ske"
-          }
+          },
+          "_note": "REPAIR 2026-09-21 (run eb41, ske 1.6 핀): ClusterCreateRequestV1Dot6 — subnet_id→default_subnet_id(필수), volume_id·cloud_logging_enabled 제거(모델에서 삭제), additional_subnet_id_list/nfs_volume_id/deletion_protection_enabled 선택. 구 바디는 400 'Field required'."
         },
         {
           "name": "wait-cluster",
@@ -8937,6 +8936,9 @@
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/environment-variables",
           "json": {
+            "encryption": {
+              "server_side_encryption_enabled": false
+            },
             "variables": [
               {
                 "key": "sample",
@@ -8949,7 +8951,8 @@
             202
           ],
           "optional": true,
-          "group": "scf-vars"
+          "group": "scf-vars",
+          "_note": "REPAIR 2026-09-21 (run eb41, scf 1.5 핀): FunctionVariablesV1Dot5 — encryption.server_side_encryption_enabled 필수(구 바디 400 'Field required'). 915f(구 핀)에서는 200."
         },
         {
           "name": "wait-ready-scf-url",
@@ -10032,40 +10035,11 @@
           "optional": true,
           "json": {
             "listener": {
-              "condition_type": "URL_PATH",
-              "description": "",
-              "hsts_max_age": "",
-              "https_redirection": {
-                "port": "",
-                "protocol": "",
-                "response_code": ""
-              },
-              "idle_timeout": "",
-              "insert_client_ip": "",
-              "persistence": "",
-              "response_timeout": "",
-              "server_group_id": "",
-              "session_duration_time": "",
-              "sni_certificate": [
-                {
-                  "domain_name": "regr{unique}",
-                  "not_after_dt": "",
-                  "sni_cert_id": ""
-                }
-              ],
-              "ssl_certificate": {
-                "client_cert_id": "",
-                "client_cert_level": "",
-                "server_cert_level": ""
-              },
-              "support_http2": "",
-              "url_handler": "",
-              "url_redirection": "",
-              "x_forwarded_for": "",
-              "x_forwarded_port": "",
-              "x_forwarded_proto": ""
+              "description": "API regression shared-net (set)",
+              "session_duration_time": 120
             }
           },
+          "_note": "REPAIR 2026-09-21 (run eb41): 스펙 예제 그대로의 빈 문자열('') 바디 — port/idle_timeout/persistence 등 타입 필드에 ''를 보내 400. 최소 타입 바디(description + session_duration_time)로 축소. 그룹 optional 유지.",
           "expect_status": [
             200,
             201,

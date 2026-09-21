@@ -1144,6 +1144,25 @@
           "group": "lb-health-check"
         },
         {
+          "name": "wait-lb-health-check-after-set",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.lb_health_check.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "group": "lb-health-check",
+          "_note": "REPAIR 2026-09-21 (run eb41, loadbalancer 1.4 핀): PUT set 이 202 비동기로 hc 를 EDITING 으로 바꿔 직후 create-lb-server-group 이 400 scp-loadbalancer.lb-server-groups.LbHealthCheckInvalidState. set 뒤 ACTIVE settle 후 server-group 생성. 동기 200 경로는 즉시 통과."
+        },
+        {
           "name": "create-lb-server-group",
           "service": "loadbalancer",
           "method": "POST",

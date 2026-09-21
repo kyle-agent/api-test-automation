@@ -602,8 +602,10 @@
           "group": "vpce",
           "optional": true,
           "params": {
-            "resource_type": "FS"
+            "resource_type": "FS",
+            "vpc_id": "{vpc_id}"
           },
+          "_note_vpc_id": "REPAIR 2026-09-21 (run eb41, vpc 1.4 핀): 400 — vpc_id 쿼리 필수로 바뀜(915f 구 핀에서는 resource_type만으로 200). 미전달 시 capture_soft 미스 → create-vpc-endpoint 400 연쇄.",
           "expect_status": [
             200,
             400,

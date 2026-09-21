@@ -38,6 +38,7 @@ LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps", "credentials",
                   # owner-유예 (C-6 2026-07-08): scope 확장 제외 + 명시 선택 허용
                   # (console2_server._resolve_lifecycle_ids가 소비; 은퇴 아님).
                   "_scope_exclude",
+                  "_scope_include",
                   # loader가 로드 시점에 주입하는 파생 필드 (파일에는 없음) —
                   # HEAVY-PREMISE-CONTRACT §1 role(verify/probe).
                   "role"}

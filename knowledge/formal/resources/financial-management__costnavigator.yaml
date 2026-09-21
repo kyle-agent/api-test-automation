@@ -1,0 +1,18 @@
+# Resource-task model — financial-management/costnavigator (fm-cn group).
+# 2026-09-21 신규 상품(2026-09 스펙 범프). 조회 전용 lookup 노드 — 소스 lifecycle
+# costnavigator-reads-newapi-202609 (generated__newapi-202609.json). 글로벌 호스트.
+version: 1
+resources:
+  cn-cost-analysis:
+    lookup: true
+    code: "fm-cn-analysis"
+    service: financial-management/costnavigator
+    requires: []
+    create:
+      endpoint: "GET /v1/cost-analysis/dimension"
+    verify:
+      - {name: analyze, endpoint: "POST /v1/cost-analysis", expect_status: [200, 400, 403]}
+      - {name: compare, endpoint: "POST /v1/cost-analysis/comparison", expect_status: [200, 400, 403]}
+    provenance: docs
+    source: {lifecycle: costnavigator-reads-newapi-202609, steps: [get-cost-dimension-options, analyze-cost, analyze-cost-comparison]}
+    notes: "조회 전용 — dimension 옵션 GET 은 strict 200, 분석 POST 는 기간/필터 바디 유효성에 따라 400 관용(신규 API 도달성 프로브)."

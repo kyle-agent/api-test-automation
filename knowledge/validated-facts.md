@@ -4426,3 +4426,29 @@ for the exact split and next levers.
   (Error 상태 2개월) — **PF-58**, API로 해제 불가, VISIBILITY quota 1EA를 점유 → scr-repo-borrow 403은 해제 전까지 expected.
 - 리컨실러 레지스트리 접두 `("regrscr",)` → `("regrscr","regr")`: borrow 폴백이 `regr{unique}`로 만든 레지스트리가
   두 달간 소유 판정 밖에 있었다.
+
+## run eb41 판정 (2026-09-21, `20260921-105412-eb41`) — 124 lifecycle 112 pass / 7 fail / 5 skip
+
+- 406 NoSuchVersion 0건, 존 문자열은 kr-west1-b 뿐 → 9/18 버전 핀 29개 상향과 존 가드는 실효. skip 5 = VPC 5-cap
+  `exceed-max-count`(reserve→skip 규약, 실패 아님). 기지 실패: secretsmanager ×2(PF-54) · scr quota(PF-58).
+- **버전 핀 상향이 드러낸 write 모델 변경 4건(모두 시나리오 수리 완료, 라이브 미검증)**:
+  - ske 1.6 `POST /v1/clusters` — `ClusterCreateRequestV1Dot6`는 `subnet_id`→**`default_subnet_id`(필수)**, `volume_id`·
+    `cloud_logging_enabled` 삭제, `additional_subnet_id_list`/`nfs_volume_id`/`deletion_protection_enabled` 선택.
+    구 바디 400 `Field required` (container-ske-cluster-nodepool + cloudml/aimlops 3곳 수리).
+  - scf 1.5 `PUT .../environment-variables` — `FunctionVariablesV1Dot5`에 **`encryption.server_side_encryption_enabled` 필수**
+    (915f 구 핀 200 → eb41 400). `encryption: {server_side_encryption_enabled: false}` 추가.
+  - vpc 1.4 `GET /v1/vpc-endpoints/connectable-resources` — 쿼리 **`vpc_id` 필수**(카탈로그 params 일치). 미전달 400 → 캡처
+    미스 → create-vpc-endpoint 400 연쇄(2 lifecycle). params에 `vpc_id: {vpc_id}` 추가.
+  - virtualserver 1.4 `POST /v1/auto-scaling-groups` — `zones` 필수(7/15 실측·노트만 있고 바디 누락) → `zones: ["{zone}"]`.
+- loadbalancer 1.4: `PUT /v1/lb-health-checks/{id}` set이 **202 비동기 + hc를 EDITING으로 전이** → 직후 server-group create가 400
+  `LbHealthCheckInvalidState`. set 뒤 ACTIVE settle 폴(`wait-lb-health-check-after-set`) 삽입 (gen-heavy-lb-members).
+- heavy-shared-networking `setlblistener`: 스펙 예제 그대로의 빈 문자열 바디(`port: ""`, `idle_timeout: ""` …)는 타입 검증 400 —
+  최소 타입 바디(description + session_duration_time)로 축소. 예제 바디를 그대로 쓰면 안 되는 클래스.
+- **신규 상품이 "전체" 선택에서 빠진 이유(구조)**: 콘솔 UI는 formal 노드(lifecycle-bearing)가 있는 서비스만 열거·전송하고
+  (`console2.js allSelectableServices`), 서버 scope 확장은 `enabled AND role==verify`만 포함. messagehub/resourceoptimizer/
+  costnavigator는 formal 노드가 없어 서비스 자체가 전송되지 않았고, newapi probe 8종은 role=probe라 제외됐다(eb41에서
+  vpc-privatelink 1개만 실행). 수리: formal yaml 3파일(ap-mh · mg-ro · fm-cn 노드) + lifecycle `_scope_include`(명시 opt-in,
+  역할 파생은 유지) 9곳 → 서비스 선택 시 13 lifecycle 합류(resourceoptimizer-organization-settings는 오너 결정 대기로 미포함).
+- 미해결: networking-vpc-subnet `include-vp-cidr`(subnet 10.130.13.0/24 vs 자기 VPC 10.123.0.0/20) — net-A(10.130.0.0/20)를
+  빌리지 못하고 자체 VPC를 만든 경로. 오너 런 로그의 provision 줄(`grep -nE "provision|shared" reports/console2-runs/20260921-105412-eb41.log`)
+  로 net-A 미프로비저닝 사유 확인 필요.

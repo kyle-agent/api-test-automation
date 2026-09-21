@@ -236,6 +236,7 @@ def _build_model() -> dict:
             "role": lc.get("role"),
             # owner-유예 플래그 (C-6 2026-07-08): scope 확장 제외, 명시 선택 허용.
             "_scope_exclude": lc.get("_scope_exclude"),
+            "_scope_include": lc.get("_scope_include"),
             "n_steps": len(steps), "steps": steps, "source": sources.get(lc["id"], ""),
         }
 
@@ -837,7 +838,11 @@ def _resolve_lifecycle_ids(sel: dict) -> list[str]:
                 scoped.add(lid)
     scoped = {lid for lid in scoped
               if lid in lcs and lcs[lid].get("enabled")
-              and lcs[lid].get("role") == "verify"
+              # _scope_include (2026-09-21, run eb41): 신규 API 도달성 probe 는
+              # 파생 규칙상 CI-스윕 전용이라 "전체" 선택에서 조용히 빠졌다 —
+              # lifecycle 이 명시적으로 opt-in 하면 (사유 문자열) scope 확장에
+              # 합류한다. 역할 파생은 건드리지 않는다 (verify 승격 아님).
+              and (lcs[lid].get("role") == "verify" or lcs[lid].get("_scope_include"))
               # owner-유예(_scope_exclude): scope 확장에서 제외하되 명시 선택은
               # 허용 — enabled/커버리지 합집합 지위는 유지 (2026-07-08 C-6:
               # "aimlops는 추후 테스트로" — 은퇴가 아니라 운영 유예).

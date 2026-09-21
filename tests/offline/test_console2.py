@@ -1200,3 +1200,26 @@ def test_zone_gate_blocks_only_on_exit_2(monkeypatch, tmp_path):
     monkeypatch.setattr(C2.subprocess, "run", _boom)
     assert C2._zone_gate({}, log) is None          # 가드 실패는 런을 막지 않는다
     assert "[zone-guard] BLOCK" in log.getvalue()
+
+
+def test_resolve_lifecycle_ids_scope_include_and_new_services():
+    """2026-09-21 (run eb41): new-API reachability probes carry ``_scope_include``
+    so a service/whole selection runs them (role derivation untouched — still
+    probe); and the 2026-09 new products are selectable through formal nodes."""
+    m = C2._model()
+    for nid in ("mh-domain", "mh-email", "mh-phone", "ro-account", "cn-cost-analysis"):
+        assert nid in m["nodes"] and m["nodes"][nid]["lifecycle"], nid
+    got = set(C2._resolve_lifecycle_ids({"services": [
+        "application-service/messagehub", "management/resourceoptimizer",
+        "financial-management/costnavigator", "container/ske"]}))
+    # verify-role lifecycles of the new services
+    assert {"messagehub-domain-lifecycle", "messagehub-email-lifecycle",
+            "messagehub-phone-lifecycle", "resourceoptimizer-readonly"} <= got
+    # probe-role lifecycles that opted in
+    for lid in ("messagehub-pushapplication-coverage", "costnavigator-reads-newapi-202609",
+                "resourceoptimizer-account-settings", "container-ske-newapi-202609-coverage"):
+        assert m["lifecycles"][lid]["role"] == "probe", lid
+        assert lid in got, lid
+    # a probe WITHOUT the opt-in stays out of scope (org-scoped writes: owner decision pending)
+    assert "resourceoptimizer-organization-settings" not in got
+    assert m["lifecycles"]["resourceoptimizer-organization-settings"]["role"] == "probe"

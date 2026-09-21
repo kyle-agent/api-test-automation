@@ -217,10 +217,12 @@
             "state_check_delay_time": 300,
             "use_lb_state_check": false,
             "placement_strategy": "balanced",
+            "zones": ["{zone}"],
             "subnet_ids": ["{asg_subnet_id}"],
             "security_group_ids": ["{asg_sg_id}"],
             "tags": []
           },
+          "_note_zones": "REPAIR 2026-09-21 (run eb41, virtualserver 1.4 핀): 400 'Field \"zones\" is invalid' — 2026-07-15 노트가 zones 필수를 실측했는데 바디에 반영이 빠져 있었음. {zone} 토큰(엔진 기본 = 리전 -b 존, SCP_ZONE 오버라이드) 로 배선.",
           "expect_status": [200, 201, 202],
           "capture": {
             "auto_scaling_group_id": "$.id",
