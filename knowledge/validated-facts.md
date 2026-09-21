@@ -4545,3 +4545,21 @@ for the exact split and next levers.
   400 check-namespace-error. 즉 네임스페이스는 계정 단위가 아니라 **호출 주체(IAM 사용자/액세스키) 단위**로 보인다 — 구 계정 키의 사용자는
   콘솔 사용자였고, 새 계정 키는 API 전용 사용자. 다음 판별: 콘솔 사용자의 액세스키로 같은 호출, 또는 SDS 문의(Secrets Manager 가 요구하는
   사용자 네임스페이스 조건). 프로브 KMS 키 2개는 삭제(204).
+
+## run ec8b 최종 판정 (2026-09-21, `20260921-195626-ec8b`) — 133 lifecycle 116 pass / 17 fail / 0 skip (59a9 130/3)
+
+- **11:04~11:09Z kr-west1 프로비저닝 플레인 장애 창(PF-62)**: 같은 초(11:03:48)에 202 로 받은 DBaaS 클러스터 8개(mysql/mariadb/
+  postgresql/epas/cachestore/eventstreams 계열)가 3~5분 뒤 전부 state **FAILED**(터미널) · gen-heavy-backup 의 서버 **ERROR** ·
+  `POST /v1/servers` **500 ContactAdminForAssistance**(vs-server-actions-verify) · `POST /v1/volumes` **500 InternalServerError**
+  (gen-heavy-vs-netops) · compute-virtualserver-full 의 서버는 `addresses: []` 로 IP 없이 생성(→ gen-heavy-lb-members 멤버 IP 캡처 미스).
+  그 창 밖(11:10 이후) 의 같은 종류 create 는 정상. 시나리오 결함 아님 — 13 lifecycle 이 한 창에서 실패한 유일한 사례.
+- heavy-shared-networking: hosted zone 캡처 수리로 존 삭제가 처음 실제 실행 → **레코드 미삭제로 409** → private-dns 409 → VPC 409.
+  dns-record-create 에 `record_id: $.id` 캡처 + dns-record-delete 선행 스텝(networking__dns.json 동일 패턴).
+- ske: scale-up 뒤 `wait-scale-up` 이 노드풀 status 만 폴 → 클러스터 UPDATING 인 채 set-nodepool-labels 400 `scp-kubernetes.cluster.status-
+  invalid` → teardown 노드풀 delete 400 → VPC 409. labels 앞에 wait-cluster-running-before-labels 삽입.
+- 런 종료 sweep 이 8라운드 캡 안에서 끝냈지만 잔존: hosted zone(레코드 보유) · private-dns · postgresql 클러스터 1(FAILED 상태 삭제 지연) ·
+  서브넷 1 · 로그그룹 20 → 원격 리컨실러로 회수 시도(결과는 CONTEXT).
+- **대시보드 발행 경로 신설**: 원격 세션엔 로컬 결과 저장소가 없어 `tools/events_to_observations.py` 로 아티팩트 step-end 를 통합 저장소
+  형식으로 복원(엔진과 같은 키: `<lifecycle>:<step>` + write/params-GET 의 카탈로그 키) → `tools/publish_dashboard.sh` → dashboard-data.
+  한계: 엔진 `_probe_reads` 의 bare id-bound GET 은 아티팩트에 없어 누락 → 콘솔이 observations/findings.jsonl 을 아티팩트에 미러하도록
+  수정(다음 런부터 `artifact/observations.jsonl` 우선 사용). ec8b 발행: ok 2015 · soft 369 · new 9 · known 5, C3 82.4%, 검증 EP +532.

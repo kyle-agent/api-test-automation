@@ -3464,6 +3464,26 @@
           }
         },
         {
+          "name": "wait-cluster-running-before-labels",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          },
+          "_note": "REPAIR 2026-09-21 (run ec8b): scale-up 뒤 wait-scale-up 은 노드풀 status 만 폴라 클러스터가 UPDATING 인 채로 set-nodepool-labels 가 400 scp-kubernetes.cluster.status-invalid 'Cluster status (UPDATING) is not Running' → 이후 teardown 노드풀 delete 400 → VPC 409 연쇄. 다른 set-* 앞의 wait-cluster-running-* 와 같은 settle."
+        },
+        {
           "name": "set-nodepool-labels",
           "service": "ske",
           "method": "PUT",

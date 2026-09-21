@@ -114,7 +114,13 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-09-21 — 5th 런 59a9 최종):** 133 lifecycle **130 pass / 3 fail / 0 skip** (4beb 132/5, 643b 123/9, eb41 112/7).
+- **CURRENT (2026-09-21 — 6th 런 ec8b 최종 + 대시보드 발행):** 133 lifecycle **116 pass / 17 fail / 0 skip** — 13 은 11:04~11:09Z
+  kr-west1 프로비저닝 장애 창(PF-62: DB 클러스터 8 FAILED · 서버 ERROR · 서버/볼륨 create 500) 산물, 2 는 PF-54, hsn(레코드 미삭제 409
+  → 수리) · ske(labels 전 클러스터 UPDATING → settle 수리). **대시보드**: 아티팩트→observations 복원(`tools.events_to_observations`)
+  → `tools/publish_dashboard.sh` → dashboard-data 발행(ok 2015 · soft 369 · new 9 · known 5 · C3 82.4%). 콘솔이 다음 런부터
+  observations/findings.jsonl 을 아티팩트에 미러. PF-54 는 새 계정 SM 네임스페이스(호출 주체 단위) 미초기화 — `/v1/secrets/kms-key` 404,
+  콘솔 secret 생성 후에도 API 400 → SDS 문의 대상. 잔존: 리컨실러 회수 중(hosted zone·private-dns·pg 클러스터·서브넷·로그그룹 20).
+- **PRIOR (2026-09-21 — 5th 런 59a9 최종):** 133 lifecycle **130 pass / 3 fail / 0 skip** (4beb 132/5, 643b 123/9, eb41 112/7).
   gen-wave5-fw · gen-heavy-lb-members 첫 완주, apigw privatelink fallback 실효. fail = PF-54 ×2 + heavy-shared-networking(dns 호스트
   read timeout — 환경 클래스, POST 무재전송 정책대로 fail). 수리: rm list-resources 를 공유 VPC 필터로, fs restore 409 사다리.
   남은 실패는 전부 제품/픽스처 클래스(PF-54 secretsmanager, messagehub 유예). 다음: 재런에서 hsn 재현 여부 + 두 수리 판정.
