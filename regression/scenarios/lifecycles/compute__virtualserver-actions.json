@@ -17,7 +17,11 @@
             "name": "regrvavpc{unique}",
             "description": "API regression VS actions",
             "cidr": "10.176.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "expect_status": [
             200,
@@ -33,7 +37,7 @@
             "service": "vpc"
           },
           "adopt": "vpc",
-          "_note": "Adopts the session-shared VPC when SCP_SHARED_VPC_ID is set (engine seeds vpc_id, skips this create); self-create fallback CIDR 10.176.0.0/20 is a unique range (no overlap with any other fragment or the shared 10.124.0.0/20)."
+          "_note": "Adopts the session-shared VPC when SCP_SHARED_VPC_ID is set (engine seeds vpc_id, skips this create); self-create fallback CIDR 10.176.0.0/20 is a unique range (no overlap with any other fragment or the shared 10.124.0.0/20). || REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",

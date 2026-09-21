@@ -2130,6 +2130,13 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         # while keeping the 'regr' family root the reconciler matches on.
         "name": f"regrvpcsh{uniq}", "description": "API regression shared VPC",
         "cidr": _SHARED_VPC_CIDR, "tags": [],
+        # VpcCreateRequestV1Dot4 (vpc 1.4 pin, 2026-09-21 run d961): zone_type is
+        # REQUIRED (enum PUBLIC/PRIVATE/ACCELERATED); zones optional for PUBLIC.
+        # We pin ONE zone (the {zone} default) so the VPC stays single-zone —
+        # multi-zone mode flips direct-connect to require uplink zones and the
+        # account's sibling zone (-a) does not exist. Same shape as the 70
+        # scenario create-vpc steps.
+        "zone_type": "PUBLIC", "zones": [_default_zone(getattr(cfg, "region", "") or "kr-west1")],
     }, axis="regression")
     create = {"name": "create-shared-vpc", "method": "POST", "service": "vpc"}
     resp = _run_step(client, create, _VPC_CREATE_PATH, body, "vpc", {})

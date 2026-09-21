@@ -537,6 +537,8 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
+            "zones": ["{zone}"],
             "name": "regrw5vpc{unique}",
             "description": "API regression wave5 privatelink",
             "cidr": "10.163.0.0/20",

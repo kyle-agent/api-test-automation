@@ -16,7 +16,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -31,7 +35,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -1357,7 +1362,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -1372,7 +1381,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -2480,7 +2490,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -2495,7 +2509,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -3173,7 +3188,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -3188,7 +3207,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -5173,7 +5193,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -5188,7 +5212,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -6885,7 +6910,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -6900,7 +6929,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -7666,7 +7696,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -7681,7 +7715,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -9596,7 +9631,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -9611,7 +9650,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -11266,7 +11306,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -11281,7 +11325,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -12029,7 +12074,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -12044,7 +12093,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -13598,7 +13648,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -13613,7 +13667,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -14752,7 +14807,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -14767,7 +14826,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -15652,7 +15712,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression PG",
             "cidr": "10.133.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -15667,7 +15731,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -17644,7 +17709,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression PG",
             "cidr": "10.133.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -17659,7 +17728,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",
@@ -19376,7 +19446,11 @@
             "name": "regrvpc{unique}",
             "description": "API regression PG",
             "cidr": "10.133.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC",
+            "zones": [
+              "{zone}"
+            ]
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -19391,7 +19465,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC + zones=[{zone}] (단일존 유지: multi-zone VPC는 DC에 uplink 존 쌍을 요구하고 형제 존 -a는 이 계정에 없음)."
         },
         {
           "name": "wait-vpc",

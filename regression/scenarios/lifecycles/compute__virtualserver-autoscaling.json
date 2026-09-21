@@ -129,6 +129,8 @@
           "path": "/v1/vpcs",
           "service": "vpc",
           "json": {
+            "zone_type": "PUBLIC",
+            "zones": ["{zone}"],
             "name": "regraskpc{unique}",
             "description": "ASG coverage test VPC",
             "cidr": "10.175.0.0/20",
