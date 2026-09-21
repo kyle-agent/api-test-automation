@@ -3425,6 +3425,12 @@
           "service": "ske",
           "method": "PUT",
           "path": "/v1/nodepools/{nodepool_id}",
+          "retry_on_status": [
+            500
+          ],
+          "retries": 3,
+          "retry_interval": 60,
+          "_note": "REPAIR 2026-09-21 (run 643b, ske 1.6): 클러스터 업그레이드(v1.35.5→v1.36.3) 직후 노드풀 scale-up 이 500 ContactAdminForAssistance (PF-60 — 상태 충돌을 5xx 로 표면화, 4xx 상태 에러가 맞는 클래스). 일시 상태면 60s×3 사다리로 흡수, 지속되면 실패 유지(진짜 결함).",
           "json": {
             "desired_node_count": "2",
             "min_node_count": "1",
@@ -9847,8 +9853,9 @@
         {
           "name": "dns-activate",
           "service": "dns",
-          "group": "dns",
+          "group": "dns-activate",
           "optional": true,
+          "_note": "REPAIR 2026-09-21 (run 643b): 400 scp-network.private-dns.max-count-exceed — 계정에 private-dns 활성화 quota 가 이미 소진(활성화는 계정당 1회 성격). 같은 group 'dns' 에 있어 이 400 이 dns-privatedns-wait/zone 체인을 통째로 스킵시켰고, private-dns 가 CREATING 인 채 set/delete 가 400, VPC delete 가 409 related-resource 로 잔존(런 종료 sweep 이 회수). 별도 optional group 으로 분리해 wait 가 항상 돌게 함.",
           "method": "POST",
           "path": "/v1/private-dns/activate",
           "json": {
@@ -9989,10 +9996,11 @@
           "optional": true,
           "json": {
             "connected_vpc_ids": [
-              ""
+              "{vpc_id}"
             ],
             "description": "This is description"
           },
+          "_note": "REPAIR 2026-09-21 (run 643b): connected_vpc_ids [\"\"] 는 스펙 예제 빈 문자열 — 실제 VPC id 로 배선. 400 invalid-state(CREATING) 는 dns-activate group 분리로 wait 가 선행되면 해소.",
           "expect_status": [
             200,
             201,
@@ -10008,18 +10016,15 @@
           "optional": true,
           "json": {
             "lb_health_check": {
-              "description": "this is an lb server group",
+              "description": "API regression shared-net hc (set)",
               "health_check_count": 3,
               "health_check_interval": 5,
               "health_check_port": 80,
               "health_check_timeout": 5,
-              "health_check_url": "/test",
-              "http_method": "GET",
-              "protocol": "TCP",
-              "request_data": "username=admin&password=1234",
-              "response_code": "200"
+              "protocol": "TCP"
             }
           },
+          "_note": "REPAIR 2026-09-21 (run 643b): 400 InvalidParameter \"LB Health Check with protocol 'TCP' cannot have 'response_code' or 'http_method' or 'health_check_url' or 'request_data'\" — 스펙 예제(HTTP 필드 동봉)를 TCP hc 에 그대로 보낸 바디. HTTP 전용 필드 제거.",
           "expect_status": [
             200,
             201,
@@ -10168,6 +10173,9 @@
           "destructive": true,
           "retry_on_status": [
             409
+          ],
+          "retry_on_error_code": [
+            "scp-network.private-dns.invalid-state"
           ],
           "retries": 6,
           "retry_interval": 15

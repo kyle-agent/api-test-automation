@@ -52,12 +52,13 @@
           "service": "resourcemanager",
           "expect_status": [200],
           "capture_soft": {
-            "tag_region": "$.resources[0].region",
-            "tag_service": "$.resources[0].service",
-            "tag_resource_type": "$.resources[0].resource_type",
-            "tag_resource_id": "$.resources[0].id",
-            "tag_key_raw": "$.resources[0].tags[0]"
+            "tag_region": {"list": "$.resources", "where_prefix": {"region": "{region}"}, "get": "region"},
+            "tag_service": {"list": "$.resources", "where_prefix": {"region": "{region}"}, "get": "service"},
+            "tag_resource_type": {"list": "$.resources", "where_prefix": {"region": "{region}"}, "get": "resource_type"},
+            "tag_resource_id": {"list": "$.resources", "where_prefix": {"region": "{region}"}, "get": "id"},
+            "tag_key_raw": {"list": "$.resources", "where_prefix": {"region": "{region}"}, "get": "tags"}
           },
+          "_note_capture": "REPAIR 2026-09-21 (run 643b): resources[0] 이 글로벌 리소스(IAM group, region '')면 컴포넌트 경로가 /v1/tags//iam/... 로 빈 세그먼트를 만들고 서명 URL 과 서버 정규화 URL 이 어긋나 401 HmacValidFail (eb41 은 [0] 이 servicewatch log-group 이라 200). {region} 접두 필터로 리전 리소스를 고른다.",
           "_note": "listresources — covers GET /v1/resources. Soft-capture a resource tuple for component-tag tests. Response envelope: $.resources[] (NOT $.contents[] — confirmed 2026-06-19). id field is $.resources[0].id (not resource_identifier). tag_key_raw captures the first tag object key if any tags exist."
         },
         {

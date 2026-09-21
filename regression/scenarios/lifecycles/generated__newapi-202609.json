@@ -305,9 +305,7 @@
           "name": "seed-organization-id",
           "method": "GET",
           "path": "/v1/organizations",
-          "params": {
-            "limit": 1
-          },
+          "_note_params": "REPAIR 2026-09-21 (run 643b): ?limit=1 → 400 ValidationError 'Extra inputs are not permitted' — organization list 는 페이징 쿼리 미지원. 쿼리 제거.",
           "expect_status": [
             200,
             403

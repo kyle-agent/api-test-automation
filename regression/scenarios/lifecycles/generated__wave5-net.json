@@ -1195,6 +1195,25 @@
           "_note": "2026-07-10: ROUND_ROBIN→WEIGHTED_ROUND_ROBIN — member weight가 100도(run 377e) 부재도(run 2137) InvalidRequestMemberWeight로 거부돼(docs: optional·1~1000·예시100), 가중 알고리즘 그룹+weight 조합으로 전환해 검증 (PF-35 추적)."
         },
         {
+          "name": "wait-lb-server-group",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.lb_server_group.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          },
+          "group": "lb-server-group",
+          "_note": "REPAIR 2026-09-21 (run 643b, loadbalancer 1.4 핀): create 가 202 비동기(state CREATING)라 직후 PUT set 이 400 scp-loadbalancer.lb-server-groups.InvalidState. hc(eb41)와 같은 클래스 — ACTIVE settle 후 set."
+        },
+        {
           "name": "verify-lb-server-group-read",
           "service": "loadbalancer",
           "method": "GET",
