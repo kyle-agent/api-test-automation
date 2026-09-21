@@ -87,8 +87,9 @@ def test_every_vpc_create_body_carries_zone_type():
     # every dict literal that ends up in a _run_step(..., _VPC_CREATE_PATH, ...) call
     # is built via _inject_owner_tags({...}); each such block must name zone_type.
     blocks = re.findall(r"_inject_owner_tags\(\{(.*?)\}, axis=\"regression\"\)", src, re.S)
-    vpc_blocks = [b for b in blocks if '"cidr"' in b and '"name"' in b and "subnet" not in b.lower()]
-    assert vpc_blocks, "expected the engine's shared VPC create bodies"
+    # VPC bodies carry cidr+name and no vpc_id (subnet bodies reference a vpc_id)
+    vpc_blocks = [b for b in blocks if '"cidr"' in b and '"name"' in b and '"vpc_id"' not in b]
+    assert len(vpc_blocks) >= 2, "expected the main shared VPC body AND the net-A/B body"
     for b in vpc_blocks:
         assert '"zone_type"' in b, f"engine VPC create body without zone_type: {b[:120]!r}"
     lcs, _ = load_lifecycles(with_sources=True)
