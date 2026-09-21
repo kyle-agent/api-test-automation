@@ -4512,3 +4512,17 @@ for the exact split and next levers.
 - eventstreams `GET /v1/requests/{request_id}` 400 `Dbaas.ResourceError.NotFound`(643b 200) — create 응답 request_id 로 즉시 조회 시
   미등록 창 추정, optional 이라 non-red. 다음 런 재확인.
 - 런 후 잔존: IAM 게이트 ske 로그그룹 20 뿐(`cleanup.verify_clean`) — VPC/private-dns/hosted zone 전부 sweep 회수.
+
+## run 59a9 최종 판정 (2026-09-21, `20260921-172913-59a9`) — 133 lifecycle 130 pass / 3 fail / 0 skip
+
+- 4beb 수리 4건 라이브 확정(`--diff 4beb` 개선 6 / 회귀 4): firewall 1.2 rule set 래핑 202 → **gen-wave5-fw 첫 완주**; 멤버 IP 캡처 →
+  **gen-heavy-lb-members 첫 완주**(멤버 create/set/bulk + 2nd LB 포함, 4런에 걸쳐 hc→sg→listener→member 전진); privatelink service IP
+  fallback 200; eventstreams request GET 200(전 런 400 은 등록 지연 창). 실패 = 기지 PF-54 ×2 + heavy-shared-networking.
+- **heavy-shared-networking = 환경 클래스**: `POST /v1/private-dns` 가 dns 호스트 read timeout(60s) — 새 정책(POST 읽기 타임아웃은
+  재전송 안 함) 대로 raise → lifecycle fail, 이후 VPC delete 409 related-resource. 서버가 private-dns 를 만들었을 가능성(응답만 유실)
+  이라 sweep 이 회수(`verify_clean` 잔존 = 로그그룹 20 뿐). 구 정책이었다면 중복 생성으로 더 나빴을 케이스. 재현 시 dns 서비스 지연 PF 후보.
+- 회귀 4(모두 soft): resourcemanager 컴포넌트 경로 404 ×3 — 리전 필터 [0] 이 병렬 lifecycle 의 servicewatch 로그그룹이라 스텝 도중
+  삭제됨 → `resource_type=vpc&sort=created_at:asc` 로 공유 VPC 선택(라이브 미검증). filestorage snapshot restore 409
+  'Latest snapshot is not available'(create 2초 뒤) → 코드 사다리 10s×6.
+- 잔여 actionable 은 전부 기지 픽스처/제품 클래스: scf codes/file 400 · scr private-acl 409 edit-conflict · filestorage access-rules
+  404 · gen-heavy-vs-netops image member 404 · quick-query validate 500 · support 404 ×2 · rm tag-rg 403 · PF-54 ×2.

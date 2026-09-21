@@ -50,6 +50,8 @@
           "method": "GET",
           "path": "/v1/resources",
           "service": "resourcemanager",
+          "params": {"resource_type": "vpc", "region": "{region}", "sort": "created_at:asc"},
+          "_note_params": "REPAIR 2026-09-21 (run 59a9): 리전 필터만으로는 [0] 이 병렬 lifecycle 의 단명 리소스(servicewatch 로그그룹)라 컴포넌트 경로 스텝 도중 삭제돼 404 ×3 (4beb 는 운 좋게 200). resource_type=vpc + created_at:asc 로 런 내내 살아 있는 공유 VPC(regrvpcsh, 런 시작 시 생성)를 고른다 — 라이브 미검증: resource_type 값 'vpc' 는 docs 예시('virtual-server') 관례 추정, 빈 목록이면 종전처럼 capture_soft 미스로 soft(non-red).",
           "expect_status": [200],
           "capture_soft": {
             "tag_region": {"list": "$.resources", "where_prefix": {"region": "{region}"}, "get": "region"},

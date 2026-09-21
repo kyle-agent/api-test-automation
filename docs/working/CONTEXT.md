@@ -114,7 +114,11 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-09-21 — 4th 런 4beb 최종):** 137 lifecycle **132 pass / 5 fail / 0 skip** (643b 123/9/5, eb41 112/7/5).
+- **CURRENT (2026-09-21 — 5th 런 59a9 최종):** 133 lifecycle **130 pass / 3 fail / 0 skip** (4beb 132/5, 643b 123/9, eb41 112/7).
+  gen-wave5-fw · gen-heavy-lb-members 첫 완주, apigw privatelink fallback 실효. fail = PF-54 ×2 + heavy-shared-networking(dns 호스트
+  read timeout — 환경 클래스, POST 무재전송 정책대로 fail). 수리: rm list-resources 를 공유 VPC 필터로, fs restore 409 사다리.
+  남은 실패는 전부 제품/픽스처 클래스(PF-54 secretsmanager, messagehub 유예). 다음: 재런에서 hsn 재현 여부 + 두 수리 판정.
+- **PRIOR (2026-09-21 — 4th 런 4beb 최종):** 137 lifecycle **132 pass / 5 fail / 0 skip** (643b 123/9/5, eb41 112/7/5).
   fail = 기지 2(PF-54) + messagehub-phone(오너 유예) + gen-wave5-fw(firewall 1.2 rule set 래핑 — PF-59 확장, 수리) + gen-heavy-lb-members
   (멤버 IP 캡처 경로 — 수리). 추가 수리: hosted zone 캡처 `$.id`, privatelink service IP 충돌 fallback. 잔존 = 로그그룹 20 뿐.
   다음 런 판정: fw rule set, lb 멤버 체인, hsn DNS 체인 teardown, apigw privatelink 재전송, eventstreams request 조회.
