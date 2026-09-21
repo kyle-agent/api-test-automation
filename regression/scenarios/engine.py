@@ -810,6 +810,20 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         if ("timeout" not in _exc_name and "timed out" not in str(exc).lower()
                 and "connection" not in _exc_name and "proxy" not in _exc_name):
             raise
+        # 2026-09-21 run 643b (create-kms): a POST whose RESPONSE timed out had
+        # already been applied server-side (kms key created 03:39:14, client
+        # gave up ~60s later) — the blind re-send hit 400 kms.duplicate-name and
+        # left an orphan the lifecycle could not tear down. Same rule as
+        # core.http_client.NO_RETRY_ON_EXCEPTION: a non-idempotent verb is only
+        # re-sent when the request provably never reached the server (connect
+        # timeout / connection or proxy error); a read timeout is raised.
+        _read_timeout = ("readtimeout" in _exc_name
+                         or ("timeout" in _exc_name and "connect" not in _exc_name)
+                         or ("timed out" in str(exc).lower() and "connect" not in _exc_name))
+        if step["method"].upper() in ("POST", "PATCH") and _read_timeout:
+            print(f"  step '{step.get('name')}' {step['method']} read timeout — NOT re-sent "
+                  f"(non-idempotent; the server may have applied it): {exc}")
+            raise
         print(f"  step '{step.get('name')}' transport blip — retrying once ({exc})")
         time.sleep(5)
         resp = client.request(step["method"], path, json=body, service=service, params=params,

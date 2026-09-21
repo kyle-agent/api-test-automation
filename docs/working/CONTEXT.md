@@ -114,7 +114,13 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-09-21 — 재런 eb41 판정 + 신규 상품 콘솔 편입):** run `20260921-105412-eb41` 124 lifecycle **112 pass / 7 fail / 5 skip**
+- **CURRENT (2026-09-21 — 재런 643b 판정):** run `20260921-123827-643b` 137 lifecycle **123 pass / 9 fail / 5 skip**
+  (eb41 112/124). eb41 수리 5건 라이브 확정, 신규 상품 13 lifecycle 실행(10 pass). 남은 실패 = 기지 3(PF-54 ×2 · PF-58) +
+  **엔진 공유 net-A/B VPC 바디 zone_type 누락**(skip 5 + vpc-subnet 1 — eb41 "5-cap" 오판 정정, 수리) + messagehub email 409/
+  phone 400(PF-61, 수리) + resourceoptimizer opt-out 이 계정을 INACTIVE 로(opt-out 제거) + lb server-group set CREATING(settle) +
+  ske scale-up 500(PF-60, 사다리). 엔진 결함 수리: POST 읽기 타임아웃 후 맹목 재전송(create-kms 중복). 잔존 = PF-58 + 로그그룹 20.
+  다음 런 판정: net-A/B 채택자 6, messagehub email/phone, ro ACTIVE 복귀, lb-members, ske scale-up, rm 컴포넌트 경로.
+- **PRIOR (2026-09-21 — 재런 eb41 판정 + 신규 상품 콘솔 편입):** run `20260921-105412-eb41` 124 lifecycle **112 pass / 7 fail / 5 skip**
   (406 0 · 존 에러 0 · skip=VPC 5-cap 규약). 실패 = 기지 3(PF-54 ×2 · PF-58) + 핀 상향 모델 변경 4(ske 1.6 `default_subnet_id`,
   scf 1.5 `encryption` 필수, vpce `vpc_id` 쿼리 필수, ASG `zones` 누락 — **PF-59**, 시나리오 수리 완료) + lb 1.4 hc set→EDITING
   경합(settle 폴 삽입) + networking-vpc-subnet CIDR(net-A 미차용 — 오너 provision 로그 확인 필요). **신규 상품이 "전체"에서

@@ -35,7 +35,8 @@
           "name": "list-account-settings",
           "method": "GET",
           "path": "/v1/accounts/{account_id}/settings",
-          "expect_status": [200],
+          "expect_status": [200, 404],
+          "_note_404": "REPAIR 2026-09-21 (run 643b): 404 ResourceNotFound 'Account is not Active' — 같은 런에서 resourceoptimizer-opt 의 opt-out 이 200 으로 계정을 INACTIVE 로 만든 뒤(9/18 실측은 200 count:0 = ACTIVE) opt-in 은 PENDING 재가입만 반환. opt-out 스텝은 제거(공유 계정 상태 파괴). PENDING→ACTIVE 전환 전까지 404 관용; 다음 런에서 200 복귀 판정.",
           "group": "ro-read",
           "capture_soft": {
             "existing_account_setting_id": "$.items[0].id"
@@ -46,7 +47,8 @@
           "name": "get-account-lim-settings",
           "method": "GET",
           "path": "/v1/accounts/{account_id}/settings/lim",
-          "expect_status": [200],
+          "expect_status": [200, 404],
+          "_note_404": "REPAIR 2026-09-21 (run 643b): 404 ResourceNotFound 'Account is not Active' — 같은 런에서 resourceoptimizer-opt 의 opt-out 이 200 으로 계정을 INACTIVE 로 만든 뒤(9/18 실측은 200 count:0 = ACTIVE) opt-in 은 PENDING 재가입만 반환. opt-out 스텝은 제거(공유 계정 상태 파괴). PENDING→ACTIVE 전환 전까지 404 관용; 다음 런에서 200 복귀 판정.",
           "group": "ro-read",
           "_note": "LIVE-CONFIRMED 2026-09-18: 200 {lim_settings:[]} (LIM not configured). Strict [200]."
         },
@@ -54,7 +56,8 @@
           "name": "list-organization-settings",
           "method": "GET",
           "path": "/v1/organizations/{organization_id}/settings",
-          "expect_status": [200],
+          "expect_status": [200, 404],
+          "_note_404": "REPAIR 2026-09-21 (run 643b): 404 ResourceNotFound 'Account is not Active' — 같은 런에서 resourceoptimizer-opt 의 opt-out 이 200 으로 계정을 INACTIVE 로 만든 뒤(9/18 실측은 200 count:0 = ACTIVE) opt-in 은 PENDING 재가입만 반환. opt-out 스텝은 제거(공유 계정 상태 파괴). PENDING→ACTIVE 전환 전까지 404 관용; 다음 런에서 200 복귀 판정.",
           "group": "ro-read",
           "capture_soft": {
             "existing_org_setting_id": "$.items[0].id"
@@ -65,7 +68,8 @@
           "name": "get-organization-lim-settings",
           "method": "GET",
           "path": "/v1/organizations/{organization_id}/settings/lim",
-          "expect_status": [200],
+          "expect_status": [200, 404],
+          "_note_404": "REPAIR 2026-09-21 (run 643b): 404 ResourceNotFound 'Account is not Active' — 같은 런에서 resourceoptimizer-opt 의 opt-out 이 200 으로 계정을 INACTIVE 로 만든 뒤(9/18 실측은 200 count:0 = ACTIVE) opt-in 은 PENDING 재가입만 반환. opt-out 스텝은 제거(공유 계정 상태 파괴). PENDING→ACTIVE 전환 전까지 404 관용; 다음 런에서 200 복귀 판정.",
           "group": "ro-read",
           "_note": "LIVE-CONFIRMED 2026-09-18: 200 {lim_settings:[]}. Strict [200]."
         },
@@ -474,7 +478,7 @@
       "_scope_include": "2026-09-21 (run eb41): 신규 API 도달성 probe — 파생 역할(probe)은 유지하되 콘솔 전체/서비스 선택에 합류시켜 신규 모수를 매 런 실측한다. 관용 4xx 라 non-red; 2xx 확보 시 verify 로 재파생됨.",
       "service": "management/resourceoptimizer",
       "enabled": true,
-      "_note": "optin/optout — ACCOUNT-WIDE TOGGLES, not owned/deletable resources: opt-in enrolls this account into the resource-optimizer analysis pipeline (which is what produces the dashboard/idle-resource/recommendation data the other 3 lifecycles read); opt-out disables it. This account's OBSERVED baseline (getaccount, resourceoptimizer-readonly, 2026-09-18) is analysis_status:PENDING, which only makes sense if the account is ALREADY opted in — so this lifecycle deliberately orders opt-out THEN opt-in (never the reverse) so it always ends in the opted-in state regardless of which way the toggle started, instead of risking leaving a shared test account opted out of a service other lifecycles/agents depend on for data. NOT live-executed by the modeling agent (mandate: read-only validation only) — both calls are docs-derived and UNPROVEN; a future full run (mutations default ON) will exercise them for real and should re-verify analysis_status afterward.",
+      "_note": "REPAIR 2026-09-21 (run 643b): opt-out 스텝 제거 — 라이브에서 opt-out 200 이 공유 계정을 즉시 INACTIVE 로 만들고(analysis_status null, settings 404 'Account is not Active') 뒤이은 opt-in 은 PENDING 재가입만 반환해 분석 이력이 초기화됐다(9/18 baseline 은 ACTIVE). optout 엔드포인트 커버리지는 포기(상태 파괴). | 원문: optin/optout — ACCOUNT-WIDE TOGGLES, not owned/deletable resources: opt-in enrolls this account into the resource-optimizer analysis pipeline (which is what produces the dashboard/idle-resource/recommendation data the other 3 lifecycles read); opt-out disables it. This account's OBSERVED baseline (getaccount, resourceoptimizer-readonly, 2026-09-18) is analysis_status:PENDING, which only makes sense if the account is ALREADY opted in — so this lifecycle deliberately orders opt-out THEN opt-in (never the reverse) so it always ends in the opted-in state regardless of which way the toggle started, instead of risking leaving a shared test account opted out of a service other lifecycles/agents depend on for data. NOT live-executed by the modeling agent (mandate: read-only validation only) — both calls are docs-derived and UNPROVEN; a future full run (mutations default ON) will exercise them for real and should re-verify analysis_status afterward.",
       "steps": [
         {
           "name": "capture-account-id",
@@ -487,15 +491,6 @@
           "capture_soft": {
             "account_id": "$.access_keys[0].account_id"
           }
-        },
-        {
-          "name": "opt-out",
-          "method": "POST",
-          "path": "/v1/accounts/{account_id}/opt-out",
-          "expect_status": [200, 400, 403, 404, 409],
-          "optional": true,
-          "group": "opt",
-          "_note": "optout — no request body (doc example: empty). 404/400 is a legitimate 'not currently opted in' outcome, not a bug."
         },
         {
           "name": "opt-in",

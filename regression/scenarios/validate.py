@@ -140,7 +140,9 @@ def validate(service_filter=None):
             sname = step.get("name", f"step[{i}]")
             sw = f"{where} step '{sname}'"
             for k in step:
-                if k not in STEP_KEYS:
+                # '_note*' keys are free-form repair/provenance annotations
+                # (e.g. _note_zones, _note_404): documentation, never consumed.
+                if k not in STEP_KEYS and not k.startswith("_note"):
                     warnings.append(f"{sw}: unknown step key '{k}'")
             if "name" not in step:
                 errors.append(f"{sw}: missing 'name'")

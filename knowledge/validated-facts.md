@@ -4464,3 +4464,30 @@ for the exact split and next levers.
   사용자는 IB-049 스킵. 프로비저닝 스텝은 아티팩트 events.jsonl에 기록되지 않아(콘솔 로그에만) 두 런 동안 보이지 않았다.
   수리: net-A/B 바디 `zone_type: PUBLIC` + 오프라인 가드(모든 POST /v1/vpcs 바디 — 엔진·시나리오 — zone_type 필수).
 - gen-heavy-lb-members: hc set 뒤 settle 폴로 server-group create는 통과(eb41 대비 전진), 이후 스텝에서 실패 — 아티팩트 대기.
+
+## run 643b 최종 판정 (2026-09-21, `20260921-123827-643b`) — 137 lifecycle 123 pass / 9 fail / 5 skip
+
+- **eb41 수리 5건 전부 라이브 확정** (`tools.triage_run --diff eb41`: 개선 6 / 회귀 2): vpce connectable-resources `vpc_id` 200 →
+  create-vpc-endpoint 202 · ASG `zones` 201 · ske 1.6 `default_subnet_id` 202(노드풀까지 생성, OS 버전 캡처 실효) ·
+  scf `encryption` 200 · lb-listener 최소 바디 200. 신규 상품 13 lifecycle 전부 실행(10 pass).
+- **엔진 결함 — POST 읽기 타임아웃 후 맹목 재전송**: create-kms 는 03:39:14 에 서버가 키를 만들었지만 응답이 타임아웃(~60s)
+  → 엔진 `_run_step` 의 "transport blip 1회 재시도"가 같은 POST 를 다시 보내 400 `scp-security.kms.duplicate-name`, 고아 키
+  `regrswkmsa6dd4ca5` (sweep 이 접두로 회수). `core.http_client.NO_RETRY_ON_EXCEPTION` 과 같은 규칙을 엔진에도 적용: POST/PATCH 는
+  connect 계열(서버 미도달)만 재시도, read timeout 은 raise. 오프라인 테스트 4종.
+- messagehub: domain 전 과정 202/200 LIVE PROVEN. **email create 409 `Conflict` "An identical request is currently being processed"**
+  — 같은 초에 병렬 발사된 domain/email/phone create 를 서버가 동일 요청으로 오판(PF-61) → 409 사다리. **phone create 400**
+  "Phone number must be under 15 digits without hyphen" — `{epoch_now}` 단독 값이 정수로 직렬화된 게 원인(문자열 필수). `"01{epoch_now}"`.
+- resourceoptimizer: **opt-out 200 이 공유 계정을 즉시 INACTIVE 로**(9/18 baseline ACTIVE: settings 200 count:0) 만들고 opt-in 은
+  PENDING 재가입만 반환(분석 이력 초기화). 병렬 readonly 가 404 "Account is not Active" ×4. opt-out 스텝 제거(optout 커버리지 포기),
+  settings 4 스텝 404 관용 — 다음 런에서 ACTIVE 복귀 판정.
+- loadbalancer 1.4: server-group create 도 202 비동기(CREATING) → 직후 PUT set 400 InvalidState (hc 와 동일 클래스) → settle 폴 삽입.
+- ske 1.6: 클러스터 업그레이드(v1.35.5→v1.36.3) 직후 노드풀 scale-up **500 ContactAdminForAssistance** (PF-60). 60s×3 사다리.
+  teardown VPC delete 409 는 그 500 실패 후 cleanup 경로에서 클러스터 비동기 삭제가 VPC 를 잡은 타이밍 — sweep 회수 확인.
+- heavy-shared-networking: `POST /v1/private-dns/activate` 400 max-count-exceed(계정 활성화 quota 소진) 가 group 'dns' 를 통째로
+  스킵시켜 wait 미실행 → set/delete 400 CREATING → VPC delete 409 related-resource(private-dns). activate 를 별도 optional group 으로,
+  delete 에 invalid-state 코드 사다리, setprivatedns `connected_vpc_ids` 실 id, setlbhealthcheck TCP 바디에서 HTTP 전용 필드 제거
+  (400 InvalidParameter "protocol 'TCP' cannot have response_code/http_method/health_check_url/request_data").
+- resourcemanager 회귀 2(200→401 HmacValidFail): `list-resources[0]` 이 글로벌 IAM 리소스(region '')라 컴포넌트 경로가
+  `/v1/tags//iam/...` 빈 세그먼트 → 서명 불일치. `{region}` 접두 필터 캡처로 리전 리소스 선택.
+- organization `GET /v1/organizations?limit=1` 400 "Extra inputs are not permitted" — limit 쿼리 미지원, 제거.
+- 런 후 잔존: 좀비 scr 레지스트리(PF-58) + IAM 게이트 ske 로그그룹 20 뿐(`cleanup.verify_clean`); sweep 이 VPC/private-dns/kms 전부 회수.

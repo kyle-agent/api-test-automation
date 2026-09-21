@@ -110,7 +110,12 @@
             "path": "/v1/emails/{email_id}",
             "service": "messagehub"
           },
-          "_note": "EmailCreateRequest per data/api_bodies.json createemail. AsyncResponse (202).resource_id is the new email_id (same pattern as createdomain, confirmed by the doc's response_example + show/list envelopes both keying the resource on 'id'). Hard expect [202] (masked-defect rule: the create is the step that must actually prove something)."
+          "_note": "REPAIR 2026-09-21 (run 643b): 409 Conflict 'An identical request is currently being processed. Please try again later.' — 같은 계정에서 domain/email/phone create 가 같은 초에 병렬 발사되면 서버가 별개 리소스 요청을 '동일 요청'으로 중복 판정(PF-61). 409 사다리 20s×4.",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
         },
         {
           "name": "get-email",
@@ -234,7 +239,7 @@
             "country_code": "82",
             "description": "regression test phone",
             "owner": "regression-owner",
-            "phone_number": "{epoch_now}",
+            "phone_number": "01{epoch_now}",
             "tags": []
           },
           "expect_status": [
@@ -248,7 +253,7 @@
             "path": "/v1/phones/{phone_id}",
             "service": "messagehub"
           },
-          "_note": "PhoneCreateRequest per data/api_bodies.json createphone. AsyncResponse (202).resource_id is the new phone_id (same pattern as createdomain, confirmed by the doc's response_example + show/list envelopes both keying the resource on 'id'). Hard expect [202] (masked-defect rule: the create is the step that must actually prove something)."
+          "_note": "REPAIR 2026-09-21 (run 643b): 400 ValidationError 'Phone number must be under 15 digits without hyphen' — {epoch_now} 단독 토큰은 정수로 직렬화됐다(문자열 필수, 문서 예시 '01012341234'). '01'+epoch(10자리)=12자리 문자열로 유일성 유지."
         },
         {
           "name": "get-phone",
