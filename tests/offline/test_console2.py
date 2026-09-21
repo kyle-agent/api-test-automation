@@ -1213,10 +1213,14 @@ def test_resolve_lifecycle_ids_scope_include_and_new_services():
         "application-service/messagehub", "management/resourceoptimizer",
         "financial-management/costnavigator", "container/ske"]}))
     # verify-role lifecycles of the new services
-    assert {"messagehub-domain-lifecycle", "messagehub-email-lifecycle",
-            "messagehub-phone-lifecycle", "resourceoptimizer-readonly"} <= got
+    assert {"resourceoptimizer-readonly"} <= got
+    # owner 2026-09-21: messagehub deferred (_scope_exclude, "프로세스 확인 후 진행") —
+    # out of scope expansion, still runnable by explicit selection.
+    assert not any(lid.startswith("messagehub-") for lid in got)
+    assert "messagehub-domain-lifecycle" in C2._resolve_lifecycle_ids(
+        {"lifecycle_ids": ["messagehub-domain-lifecycle"]})
     # probe-role lifecycles that opted in
-    for lid in ("messagehub-pushapplication-coverage", "costnavigator-reads-newapi-202609",
+    for lid in ("costnavigator-reads-newapi-202609",
                 "resourceoptimizer-account-settings", "container-ske-newapi-202609-coverage"):
         assert m["lifecycles"][lid]["role"] == "probe", lid
         assert lid in got, lid

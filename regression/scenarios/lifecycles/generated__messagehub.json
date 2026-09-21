@@ -3,6 +3,7 @@
   "lifecycles": [
     {
       "id": "messagehub-domain-lifecycle",
+      "_scope_exclude": "owner 2026-09-21: 'messagehub는 일단 제외.. 프로세스 확인 후 진행' — 콘솔에서 회색(선택 해제). 신규 상품 온보딩 프로세스(발신 도메인/이메일/전화 검증 절차) 확인 전까지 scope 확장(전체/서비스 선택)에서 제외; 명시 lifecycle_ids 선택으로는 실행 가능. 은퇴 아님(run 643b/4beb 실측: domain 전 과정 2xx, email 409 사다리 후 pass, phone 400 형식 미해결). 재포함 = 이 키 삭제.",
       "service": "application-service/messagehub",
       "enabled": true,
       "heavy": false,
@@ -85,6 +86,7 @@
     },
     {
       "id": "messagehub-email-lifecycle",
+      "_scope_exclude": "owner 2026-09-21: 'messagehub는 일단 제외.. 프로세스 확인 후 진행' — 콘솔에서 회색(선택 해제). 신규 상품 온보딩 프로세스(발신 도메인/이메일/전화 검증 절차) 확인 전까지 scope 확장(전체/서비스 선택)에서 제외; 명시 lifecycle_ids 선택으로는 실행 가능. 은퇴 아님(run 643b/4beb 실측: domain 전 과정 2xx, email 409 사다리 후 pass, phone 400 형식 미해결). 재포함 = 이 키 삭제.",
       "service": "application-service/messagehub",
       "enabled": true,
       "heavy": false,
@@ -226,6 +228,7 @@
     },
     {
       "id": "messagehub-phone-lifecycle",
+      "_scope_exclude": "owner 2026-09-21: 'messagehub는 일단 제외.. 프로세스 확인 후 진행' — 콘솔에서 회색(선택 해제). 신규 상품 온보딩 프로세스(발신 도메인/이메일/전화 검증 절차) 확인 전까지 scope 확장(전체/서비스 선택)에서 제외; 명시 lifecycle_ids 선택으로는 실행 가능. 은퇴 아님(run 643b/4beb 실측: domain 전 과정 2xx, email 409 사다리 후 pass, phone 400 형식 미해결). 재포함 = 이 키 삭제.",
       "service": "application-service/messagehub",
       "enabled": true,
       "heavy": false,
@@ -379,7 +382,7 @@
     },
     {
       "id": "messagehub-pushapplication-coverage",
-      "_scope_include": "2026-09-21 (run eb41): 신규 API 도달성 probe — 파생 역할(probe)은 유지하되 콘솔 전체/서비스 선택에 합류시켜 신규 모수를 매 런 실측한다. 관용 4xx 라 non-red; 2xx 확보 시 verify 로 재파생됨.",
+      "_scope_exclude": "owner 2026-09-21: 'messagehub는 일단 제외.. 프로세스 확인 후 진행' — 콘솔에서 회색(선택 해제). 신규 상품 온보딩 프로세스(발신 도메인/이메일/전화 검증 절차) 확인 전까지 scope 확장(전체/서비스 선택)에서 제외; 명시 lifecycle_ids 선택으로는 실행 가능. 은퇴 아님(run 643b/4beb 실측: domain 전 과정 2xx, email 409 사다리 후 pass, phone 400 형식 미해결). 재포함 = 이 키 삭제.",
       "service": "application-service/messagehub",
       "enabled": true,
       "heavy": false,

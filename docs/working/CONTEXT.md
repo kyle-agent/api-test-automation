@@ -114,7 +114,11 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-09-21 — 재런 643b 판정):** run `20260921-123827-643b` 137 lifecycle **123 pass / 9 fail / 5 skip**
+- **CURRENT (2026-09-21 — 4th 런 4beb 진행 중 + messagehub 오너 유예):** run `20260921-155909-4beb`(레지스트리 삭제 후) 07:27Z 기준
+  137 시작 / 119 종료 = 114 pass · 5 fail · **skip 0** (net-A/B 채택자 4 pass, scr-borrow pass, email 409 사다리 pass, rm 401 해소).
+  오너: "messagehub는 일단 제외, 프로세스 확인 후 진행" → 4 lifecycle `_scope_exclude`(C-6 방식, 명시 선택 가능). 다음: 4beb 아티팩트
+  판정(lb-members · gen-wave5-fw 첫 실행 · phone 형식 · ske scale-up · DBaaS).
+- **PRIOR (2026-09-21 — 재런 643b 판정):** run `20260921-123827-643b` 137 lifecycle **123 pass / 9 fail / 5 skip**
   (eb41 112/124). eb41 수리 5건 라이브 확정, 신규 상품 13 lifecycle 실행(10 pass). 남은 실패 = 기지 3(PF-54 ×2 · PF-58) +
   **엔진 공유 net-A/B VPC 바디 zone_type 누락**(skip 5 + vpc-subnet 1 — eb41 "5-cap" 오판 정정, 수리) + messagehub email 409/
   phone 400(PF-61, 수리) + resourceoptimizer opt-out 이 계정을 INACTIVE 로(opt-out 제거) + lb server-group set CREATING(settle) +
