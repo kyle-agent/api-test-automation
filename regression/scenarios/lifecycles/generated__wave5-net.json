@@ -1303,7 +1303,7 @@
             200
           ],
           "poll": {
-            "field": "$.listener.status",
+            "field": "$.listener.state",
             "until": [
               "ACTIVE"
             ],
@@ -1311,6 +1311,7 @@
             "interval": 10
           },
           "group": "lb-listener",
+          "_note": "REPAIR 2026-09-21 (run 4beb): 폴 필드가 $.listener.status 였는데 리스너 show 모델(ListenerForShow/V1Dot3, docs)과 라이브 응답은 `state` — 존재하지 않는 필드를 300s 동안 폴하다 타임아웃(리스너 생성 07:07:48 → 실패 07:12:59). 이 lifecycle 이 리스너 단계까지 온 첫 런이라 지금 드러남. $.listener.state 로 수정.",
           "_note": "settle 신설 (2026-07-16 신규 전체런 실측): createlblistener 202 비동기 — 직후 PUT set이 400 scp-loadbalancer.listeners.NotUpdatableState(\"status: 'CREATING'\"). lb-health-check와 동일 클래스(agent-B 발견)의 listener 변종. ACTIVE settle 후 set — 동기 경로 무해."
         },
         {
