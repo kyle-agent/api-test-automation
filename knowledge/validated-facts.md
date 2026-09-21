@@ -4491,3 +4491,24 @@ for the exact split and next levers.
   `/v1/tags//iam/...` 빈 세그먼트 → 서명 불일치. `{region}` 접두 필터 캡처로 리전 리소스 선택.
 - organization `GET /v1/organizations?limit=1` 400 "Extra inputs are not permitted" — limit 쿼리 미지원, 제거.
 - 런 후 잔존: 좀비 scr 레지스트리(PF-58) + IAM 게이트 ske 로그그룹 20 뿐(`cleanup.verify_clean`); sweep 이 VPC/private-dns/kms 전부 회수.
+
+## run 4beb 최종 판정 (2026-09-21, `20260921-155909-4beb`, 레지스트리 삭제 후) — 137 lifecycle 132 pass / 5 fail / 0 skip
+
+- 643b 수리 실효(`--diff 643b` 개선 12 / 회귀 4): scr-repo-borrow pass(PF-58 해소), email 409 사다리 → 202, resourceoptimizer 계정
+  ACTIVE 복귀(settings 4 스텝 200; opt-in 은 이미 가입이라 400 — 관용), rm 컴포넌트 경로 401→200, ske scale-up 500→200(60s 사다리),
+  org list 400→200. **net-A/B zone_type 수리로 skip 0** — 채택자 6 전부 실행, 5 pass.
+- **gen-wave5-fw (첫 실제 실행, firewall 1.2)**: IGW→방화벽 조회→wait→show→rules→set-loggable→rule create/wait/show 까지 전부 2xx,
+  `PUT /v1/firewalls/rules/{id}` 만 400 'Field required' — 1.2 요청 모델 `FirewallRuleUpdateSingleRequest = {firewall_rule:
+  FirewallRuleCreateRequest}`(status 필수). 평면 1.1 바디를 래핑 + status. 방화벽 제품 핀은 없음(서버 CURRENT).
+- **gen-heavy-lb-members**: listener 폴 필드 `$.listener.status`→`state`(문서 ListenerForShowV1Dot3) 로 300s 타임아웃 해소 후,
+  멤버 create 400 'It is not a valid ip format.' — showserver 응답이 `$.addresses[{ip_address}]` 평면인데 캡처가
+  `addresses[0].ip_addresses[0].ip_address` 라 리터럴 `{member_vm_ip}` 송신. 캡처 수정. (런마다 한 단계씩 전진: hc→sg→listener→member)
+- **hosted zone 캡처**: createhostedzone 202 응답은 최상위 `{id,…}` — `$.hosted_zone.id` 미스(heavy-shared-networking + stale
+  networking-dns-hosted-zone). 미스 → zone delete 404 → private-dns delete 409 → VPC delete 409 related-resource(sweep 회수).
+- **privatelink service IP 충돌**: 고정 `service_ip_address 10.124.0.7` 이 공유 서브넷에서 병렬 lifecycle VM 의 DHCP 주소와 충돌
+  (400 service-ip-address-in-use; 643b 는 .8 배정이라 무충돌). in-use 코드에만 반응하는 fallback_on_error_code 로 .237/.238 재전송.
+- messagehub-phone(오너 유예): 문자열 `"011789973993"` 도 400 BadRequest 'Invalid phone number.' — 자릿수 규칙 통과 후 번호 유효성
+  검증 단계(실제 통신사 번호 형식 필요 추정). 온보딩 프로세스 확인 후 재개.
+- eventstreams `GET /v1/requests/{request_id}` 400 `Dbaas.ResourceError.NotFound`(643b 200) — create 응답 request_id 로 즉시 조회 시
+  미등록 창 추정, optional 이라 non-red. 다음 런 재확인.
+- 런 후 잔존: IAM 게이트 ske 로그그룹 20 뿐(`cleanup.verify_clean`) — VPC/private-dns/hosted zone 전부 sweep 회수.

@@ -114,7 +114,11 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **CURRENT (2026-09-21 — 4th 런 4beb 진행 중 + messagehub 오너 유예):** run `20260921-155909-4beb`(레지스트리 삭제 후) 07:27Z 기준
+- **CURRENT (2026-09-21 — 4th 런 4beb 최종):** 137 lifecycle **132 pass / 5 fail / 0 skip** (643b 123/9/5, eb41 112/7/5).
+  fail = 기지 2(PF-54) + messagehub-phone(오너 유예) + gen-wave5-fw(firewall 1.2 rule set 래핑 — PF-59 확장, 수리) + gen-heavy-lb-members
+  (멤버 IP 캡처 경로 — 수리). 추가 수리: hosted zone 캡처 `$.id`, privatelink service IP 충돌 fallback. 잔존 = 로그그룹 20 뿐.
+  다음 런 판정: fw rule set, lb 멤버 체인, hsn DNS 체인 teardown, apigw privatelink 재전송, eventstreams request 조회.
+- **PRIOR (2026-09-21 — 4th 런 4beb 진행 중 + messagehub 오너 유예):** run `20260921-155909-4beb`(레지스트리 삭제 후) 07:27Z 기준
   137 시작 / 119 종료 = 114 pass · 5 fail · **skip 0** (net-A/B 채택자 4 pass, scr-borrow pass, email 409 사다리 pass, rm 401 해소).
   오너: "messagehub는 일단 제외, 프로세스 확인 후 진행" → 4 lifecycle `_scope_exclude`(C-6 방식, 명시 선택 가능). 다음: 4beb 아티팩트
   판정(lb-members · gen-wave5-fw 첫 실행 · phone 형식 · ske scale-up · DBaaS).

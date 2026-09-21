@@ -246,22 +246,26 @@
           "method": "PUT",
           "path": "/v1/firewalls/rules/{firewall_rule_id}",
           "json": {
-            "action": "ALLOW",
-            "description": "API regression firewall rule (set)",
-            "destination_address": [
-              "10.0.0.1"
-            ],
-            "direction": "INBOUND",
-            "service": [
-              {
-                "service_type": "TCP",
-                "service_value": "443"
-              }
-            ],
-            "source_address": [
-              "192.168.1.1"
-            ]
+            "firewall_rule": {
+              "action": "ALLOW",
+              "description": "API regression firewall rule (set)",
+              "destination_address": [
+                "10.0.0.1"
+              ],
+              "direction": "INBOUND",
+              "service": [
+                {
+                  "service_type": "TCP",
+                  "service_value": "443"
+                }
+              ],
+              "source_address": [
+                "192.168.1.1"
+              ],
+              "status": "ENABLE"
+            }
           },
+          "_note": "REPAIR 2026-09-21 (run 4beb, firewall 1.2 — 이 lifecycle 첫 실제 실행): 400 ValidationError 'Field required'. setfirewallrule 1.2 요청 모델은 FirewallRuleUpdateSingleRequest = {firewall_rule: FirewallRuleCreateRequest}(status 필수) — 종전 평면 FirewallRuleSetRequest 바디는 1.1 형식. docs request_example 그대로 래핑 + status.",
           "expect_status": [
             200,
             202
@@ -1383,8 +1387,9 @@
             404
           ],
           "capture_soft": {
-            "member_vm_ip": "$.addresses[0].ip_addresses[0].ip_address"
+            "member_vm_ip": "$.addresses[0].ip_address"
           },
+          "_note_capture": "REPAIR 2026-09-21 (run 4beb): showserver 응답은 $.addresses[{ip_address, version}] 평면 배열 — 종전 $.addresses[0].ip_addresses[0].ip_address 는 미스 → create-lb-member 400 InvalidParameter 'It is not a valid ip format.'(리터럴 {member_vm_ip} 송신). 이 lifecycle 이 멤버 단계까지 온 첫 런.",
           "optional": true,
           "_note": "VM의 실제 IP를 member_ip로 — 응답은 무래퍼(validated-facts 2026-07-08), addresses[0].ip_addresses[0].ip_address. VM 부재 시 400/404 관용."
         },

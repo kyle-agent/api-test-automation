@@ -8208,8 +8208,9 @@
             202
           ],
           "capture": {
-            "hosted_zone_id": "$.hosted_zone.id"
+            "hosted_zone_id": "$.id"
           },
+          "_note_capture": "REPAIR 2026-09-21 (run 4beb): createhostedzone 202 응답은 최상위 {id, name, hosted_zone_type, private_dns_id, …}(networking-dns-hosted-zone-private 도 동일 실측) — $.hosted_zone.id 캡처 미스로 set/delete 가 리터럴 토큰(404) → hosted zone 잔존 → private-dns delete 409 → VPC delete 409 related-resource(sweep 이 회수). heavy-shared-networking 은 dns-activate 400 이 그룹을 스킵시켜 이전 런엔 여기까지 오지 않았다.",
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/hosted-zones/{hosted_zone_id}",
@@ -9905,8 +9906,9 @@
             "tags": []
           },
           "capture": {
-            "hosted_zone_id": "$.hosted_zone.id"
+            "hosted_zone_id": "$.id"
           },
+          "_note_capture": "REPAIR 2026-09-21 (run 4beb): createhostedzone 202 응답은 최상위 {id, name, hosted_zone_type, private_dns_id, …}(networking-dns-hosted-zone-private 도 동일 실측) — $.hosted_zone.id 캡처 미스로 set/delete 가 리터럴 토큰(404) → hosted zone 잔존 → private-dns delete 409 → VPC delete 409 related-resource(sweep 이 회수). heavy-shared-networking 은 dns-activate 400 이 그룹을 스킵시켜 이전 런엔 여기까지 오지 않았다.",
           "expect_status": [
             200,
             201,
