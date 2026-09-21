@@ -9927,6 +9927,10 @@
           "optional": true,
           "method": "POST",
           "path": "/v1/hosted-zones/{hosted_zone_id}/records",
+          "capture": {
+            "record_id": "$.id"
+          },
+          "_note_capture": "REPAIR 2026-09-21 (run ec8b): 레코드 id 미캡처 → 존 삭제 전 레코드 삭제 스텝이 없어 dns-zone-delete 409 → private-dns 409 → VPC 409 related-resource 연쇄(hosted zone 캡처 수리로 존 삭제가 처음 실제 실행돼 드러남). networking__dns.json 과 동일 $.id 캡처 + dns-record-delete 선행.",
           "json": {
             "name": "www.regr{ualpha}.example.com",
             "type": "A",
@@ -10140,6 +10144,25 @@
             201,
             202
           ]
+        },
+        {
+          "name": "dns-record-delete",
+          "service": "dns",
+          "group": "dns",
+          "method": "DELETE",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15
         },
         {
           "name": "dns-zone-delete",
