@@ -4563,3 +4563,10 @@ for the exact split and next levers.
   형식으로 복원(엔진과 같은 키: `<lifecycle>:<step>` + write/params-GET 의 카탈로그 키) → `tools/publish_dashboard.sh` → dashboard-data.
   한계: 엔진 `_probe_reads` 의 bare id-bound GET 은 아티팩트에 없어 누락 → 콘솔이 observations/findings.jsonl 을 아티팩트에 미러하도록
   수정(다음 런부터 `artifact/observations.jsonl` 우선 사용). ec8b 발행: ok 2015 · soft 369 · new 9 · known 5, C3 82.4%, 검증 EP +532.
+
+## PF-54 해소 (2026-09-22 04:19Z): Secrets Manager 개발팀 수정 후 API create 201
+
+- 오너 "개발팀에서 수정해 줬어" → 같은 lifecycle 바디(사용자 transit 키 kms_id · acl_cidr · private_acl_enabled "false")로 `POST /v1/secrets`
+  **201**, show 200, `POST .../values` 200(`{"k":"v"}` 복호화 확인), DELETE(waiting_time_ndays 7) 204. 6런 연속 400 check-namespace-error 는
+  서버측(새 계정/호출 주체 네임스페이스 초기화) 결함이었음이 확정 — 시나리오 변경 없이 다음 런에서 gen-wave2-sec·security-secretsmanager-writes
+  가 살아나는지 판정. 오너가 콘솔에서 만든 secret 은 오너가 삭제(API 사용자에겐 보이지 않았음).
