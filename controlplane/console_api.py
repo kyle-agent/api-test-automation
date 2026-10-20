@@ -29,11 +29,13 @@ while anything is running/queued (owner-tag reconciler would reap other runs).
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 # the original console2 backend — pure builder/worker functions on module state.
 # import-safe: its server only starts under ``if __name__ == '__main__'``.
 from tools import console2_server as c2
+# 실행 화면 녹화 (오너 요청 2026-10-20): run admit 시 녹화기 spawn + ▶ 영상 뷰/스트림
+from controlplane import recording
 
 # per-lifecycle 중단 채널 (owner 2026-07-09): embed 모드에선 이 컨트롤플레인이
 # /api/runs/{id}/commands 를 서빙하므로, 로컬 런 엔진 subprocess가 폴링할 URL을
@@ -128,6 +130,8 @@ def api_runs() -> JSONResponse:
     with c2._LOCK:
         rows = [c2._rec_view(r) for r in sorted(c2._RUNS.values(),
                                                 key=lambda x: x["started"], reverse=True)]
+    # ▶ 영상 (controlplane/recording.py): 파일이 있으면 video URL, 녹화기가 살아 있으면 video_status
+    rows = [{**v, **recording.view(v["id"])} for v in rows]
     return _json({"runs": rows})
 
 
@@ -166,7 +170,20 @@ def api_run(rid: str) -> JSONResponse:
         rec = c2._RUNS.get(rid)
     if not rec:
         return _json({"error": "no such run"}, 404)
-    return _json(c2._rec_view(rec, full=True))
+    return _json({**c2._rec_view(rec, full=True), **recording.view(rid)})
+
+
+@router.get("/api/runs/{rid}/video")
+def api_run_video(rid: str):
+    """The run's recorded 실행 화면 (WebM — tools/record_console.py, spawned by
+    ``recording.start`` when the run was admitted). 404 carries ``video_status``
+    (``recording`` while the recorder is still running, ``none`` otherwise)."""
+    if not recording.valid_rid(rid):
+        return _json({"error": "no such run"}, 404)
+    p = recording.video_path(rid)
+    if p.exists() and p.stat().st_size > 0:
+        return FileResponse(str(p), media_type="video/webm")
+    return _json({"error": "no video", "video_status": recording.status(rid)}, 404)
 
 
 # fold(공식 반영) 안내 수치의 시간창 여유 — 서버 시계 오차·로그 반영 지연 감안
@@ -364,6 +381,12 @@ async def api_run_start(request: Request) -> JSONResponse:
         worker = c2._simulate_worker
     rec["peak_vpcs"], rec["queued"] = peak, False
     c2._admit_or_queue(rec, worker)                        # reserve VPC slots or enqueue
+    # 실행 화면 녹화 (best-effort): 녹화기는 run 을 시작하지 않고, 방금 admit/queue 된 run 에
+    # 붙어 콘솔 리포트 화면을 WebM 으로 남긴다 (controlplane/recording.py). 실패해도 run 은 그대로.
+    try:
+        recording.start(rec["id"], recording.base_url_from_scope(request.scope))
+    except Exception as exc:                               # noqa: BLE001 — never fail the run
+        print(f"[recording] start skipped: {exc}")
     return _json(c2._rec_view(rec), 202)
 
 

@@ -114,6 +114,16 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **CURRENT (2026-10-20 — 실행 화면 동영상, 오너 "api test 화면을 녹화"):** 콘솔이 run 을 admit 하면(live/simulate)
+  `controlplane/recording.py` 가 `tools/record_console.py` 를 백그라운드로 띄워 headless Chromium 으로 Testing 콘솔
+  리포트 화면을 run 종료까지 녹화 → `reports/console2-runs/<rid>.webm`(gitignored). 콘솔 실행 기록 행·종료 카드 ▶ 영상 링크,
+  `GET /api/runs/{rid}/video`. Playwright 미설치면 건너뜀(`PLATFORM_RECORD_VIDEO=false` 로 끔). 검증: 로컬 uvicorn 에서
+  simulate 2 lifecycle 녹화 26초/2.2MB (1440×900 vp8), 오프라인 `tests/offline/test_console_video.py`.
+  **설명 투어** `tools/record_demo.py`(오너: "virtual server 를 예시로 연관관계 → 순서대로 API 테스트 → VPC 개수·순서 최적화 →
+  실행 → 대시보드 커버리지·개별 API"): 자막·챕터 카드를 넣어 Modeling → 구성 DAG/순서표 → 예상 타임라인/할당량 → simulate run 실행 화면 →
+  대시보드(서비스·API) 순으로 녹화, `reports/demo/`. 짧은 판 ~2분(`--speed 0.5 --run-ids compute-virtualserver-full`).
+  **LIVE run 은 녹화기가 시작하지 않는다**(콘솔 선택 + pre-flight 가 opt-in 그대로). 다음: 실제 LIVE run 에서 첫 영상 확인
+  (장시간 run 의 파일 크기 — vp8 ~1Mbps 상한, 정적 화면이라 실측은 훨씬 작을 것) · 필요하면 Dockerfile 에 Chromium.
 - **CURRENT (2026-09-21 — 6th 런 ec8b 최종 + 대시보드 발행):** 133 lifecycle **116 pass / 17 fail / 0 skip** — 13 은 11:04~11:09Z
   kr-west1 프로비저닝 장애 창(PF-62: DB 클러스터 8 FAILED · 서버 ERROR · 서버/볼륨 create 500) 산물, 2 는 PF-54, hsn(레코드 미삭제 409
   → 수리) · ske(labels 전 클러스터 UPDATING → settle 수리). **대시보드**: 아티팩트→observations 복원(`tools.events_to_observations`)

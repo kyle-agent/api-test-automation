@@ -84,6 +84,35 @@ The `index.html` + `assets/*` here are the SAME files the spine serves (mounted 
   now-playing bar, late-resource rescan, fail-closure on lifecycle end):
   `pytest tests/offline/test_console2_run_observability.py`.
 
+## 실행 화면 동영상 (run-screen recording)
+
+"실제 테스트하는 화면" 이 run 마다 WebM 으로 남는다 (오너 요청 2026-10-20). 서버가 run 을
+admit 하면(`POST /api/run`, live/simulate 모두) `controlplane/recording.py` 가
+`python -m tools.record_console --run <rid>` 를 백그라운드로 띄우고, 그 프로세스가 headless
+Chromium 으로 **이 콘솔 화면**(`/testing/console/?embed=1`)을 열어 run 에 바인딩한 뒤 run 이 끝날
+때까지 리포트 화면을 녹화한다 (상세 탭은 API → 로그 → 자원 순으로 20초마다 순환, 종료 카드까지
+몇 초 더). 결과: `reports/console2-runs/<rid>.webm` (gitignored, run 의 .log/.events.jsonl 옆).
+
+- 콘솔: 실행 기록 행과 종료 카드에 **▶ 영상** 링크(새 탭 재생), 녹화 중에는 **● REC** 칩.
+  `GET /api/runs/<rid>/video` 가 파일을 스트리밍하고, `/api/runs` 뷰에 `video`/`video_status` 가 붙는다.
+- 준비(선택): `pip install -r controlplane/requirements-video.txt && python -m playwright install chromium`.
+  없으면 서버 로그에 한 줄 안내 후 녹화만 건너뛴다 — run 에는 영향이 없다 (best-effort).
+- 끄기/조정: `PLATFORM_RECORD_VIDEO=false` · `PLATFORM_RECORD_SIZE=1440x900` · `PLATFORM_RECORD_TOUR=20`(0 = 탭 고정)
+  · `PLATFORM_RECORD_MAX_MINUTES=240` · `PLATFORM_RECORD_URL`(녹화기가 여는 콘솔 주소, 기본 `http://127.0.0.1:<포트>`).
+- 수동: `python -m tools.record_console [--run <rid> | --wait 300 | --simulate <lifecycle-id>…] [--url …] [--out …]`.
+  진행 중인 run 을 찾아 끝까지 녹화한다. **LIVE run 을 시작하지는 않는다** — 콘솔의 선택 + pre-flight 확인이
+  그대로 opt-in 이다 (`--simulate` 만 run 을 띄우며 클라우드 호출 0, 데모용).
+- 자동화 훅: `console2.js` 끝의 `window.__c2 = { go, loadRunIntoReport, setDetailTab }` — 녹화기가 run 화면으로
+  가서 바인딩하고 탭을 돌리는 데 쓴다. 앱 자체는 쓰지 않는다 (IIFE 안의 함수라 이 훅이 유일한 진입점).
+- 오프라인 테스트: `tests/offline/test_console_video.py` (Playwright + Chromium 이 있으면 simulate run 하나를 실제로 녹화한다).
+
+**설명 투어 영상** (`python -m tools.record_demo`, 오너 2026-10-20 "virtual server 를 예시로 … 이런 내용들"): 화면 아래
+자막과 챕터 카드를 넣어 ① Modeling(자원 연관관계 REQUIRES) → ② 구성(의존 폐쇄집합 DAG · 생성/검증/삭제 순서표) →
+③ 실행 계획(📊 예상 타임라인 워커·VPC 슬롯 · 할당량/vpc_schedule) → ④ 실행 화면(simulate run — 실행용량 · 자원/API/로그 ·
+종료 카드) → ⑤ 대시보드(커버리지 사다리 · 서비스 단위 · 개별 API 실행 여부) 순으로 녹화한다 → `reports/demo/<date>-<svc>.webm` (+ PATH 에 ffmpeg 가 있으면 같은 이름의 `.mp4`).
+`--service cat/svc`(기본 compute/virtualserver) · `--speed 0.5`(짧게) · `--run-ids compute-virtualserver-full`(④ 를 짧은 시나리오로) ·
+`--no-run`. ④ 는 항상 simulate(클라우드 호출 0) 이며 자막에도 그렇게 적힌다 — LIVE run 은 이 도구가 시작하지 않는다.
+
 ## Static demo snapshot (backend-free, for GitHub Pages)
 
 `build_static.py` assembles a **self-contained snapshot of the REAL app** so the

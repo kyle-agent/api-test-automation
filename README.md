@@ -76,6 +76,12 @@ both requirements files (only when they changed), runs the zone guard and
 launches the console at http://localhost:8800/testing/embed. `./start.sh
 --setup-only` prepares the venv only; `./start.sh -- <cmd>` runs a command
 inside it (e.g. `./start.sh -- python -m spec.summary`).
+Every run the console admits is also **recorded as a video** of the Testing screen
+(`reports/console2-runs/<rid>.webm`, ▶ 영상 link in the console) when Playwright +
+Chromium are installed (`pip install -r controlplane/requirements-video.txt &&
+python -m playwright install chromium`) — see console2/README.md "실행 화면 동영상". A captioned
+walkthrough (Modeling → DAG → VPC/order optimization → run screen → dashboard, Virtual Server as
+the example) is `python -m tools.record_demo`.
 
 ```bash
 pip install -r requirements.txt    # engine deps

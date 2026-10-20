@@ -2165,6 +2165,7 @@ function renderDoneCard(sum) {
     + `<div class="dc-row"><span class="dc-k">잔존</span> 종료 후 재스캔(+5m/+15m)이 늦출현을 감시합니다 —
          <button class="minibtn" id="dc-owned" title="지금 바로 실측 스캔 (POST /api/owned, 30~90초)">🔍 지금 확인</button></div>`);
   host.classList.remove("hidden");
+  renderDoneCardVideo();        // ▶ 실행 영상 — 이미 알고 있으면 바로, 아니면 종료 후 /api/runs 감시가 붙인다
   $("dc-close").onclick = () => { host.classList.add("hidden"); host._h = null; };
   const fb = $("dc-fails");
   if (fb) fb.onclick = () => { go("run"); railFilter = "fail"; renderLcPicker(); };
@@ -3581,6 +3582,8 @@ function stopR4Poll() {
 // 기본 필터 = "run만" (신규: owned/sim/클린업 스캔 기록 20여 건이 실제 run 1건을
 // 파묻는 도배 방지) — 토글로 전체 표시. sessionStorage 로 선택 유지.
 let runHistAll = false;
+// run id → ▶ 영상 URL (controlplane/recording.py 가 /api/runs 뷰에 video 를 붙인다). 종료 카드 링크용.
+let runVideos = {};
 try { runHistAll = sessionStorage.getItem("c2.histAll") === "1"; } catch (e) { /* private mode */ }
 function setRunHistAll(v) {
   runHistAll = !!v;
@@ -3624,7 +3627,29 @@ function runRowHtml(r) {
   return `<div class="runrow ${on ? "on" : ""}" data-id="${esc(r.id)}">
     <span><span class="kindtag">${tag}</span>${rehy} <b class="small">${icon} ${esc(r.id)}</b>
       <span class="muted small">${esc((r.lifecycle_ids || []).slice(0, 2).join(", "))}${(r.lifecycle_ids || []).length > 2 ? " …" : ""}</span>${late}</span>
-    <span class="muted small">${esc(r.summary || r.status)} · ${dur}</span></div>`;
+    <span class="muted small">${vidLink(r)}${esc(r.summary || r.status)} · ${dur}</span></div>`;
+}
+
+// ▶ 실행 화면 영상 (controlplane/recording.py · tools/record_console.py): run admit 때 headless
+// 브라우저가 이 리포트 화면을 녹화해 reports/console2-runs/<rid>.webm 으로 남긴다. 파일이 있으면
+// 링크(새 탭 재생), 녹화기가 아직 돌고 있으면 ● REC 칩. 없으면(비활성/미설치) 아무것도 안 그린다.
+function vidLink(r) {
+  if (r.video) return `<a class="vidlink" href="${esc(r.video)}" target="_blank" rel="noopener" title="실행 화면 녹화 (WebM) — 새 탭에서 재생">▶ 영상</a> `;
+  if (r.video_status === "recording") return `<span class="vidrec" title="실행 화면 녹화 중 — run 이 끝나면 ▶ 영상 링크로 바뀝니다">● REC</span> `;
+  return "";
+}
+
+// 종료 카드에 ▶ 영상 링크를 붙인다 — 카드는 이벤트로 먼저 그려지고 영상 파일은 몇 초 뒤에 생기므로,
+// 종료 후 /api/runs 감시(startRunsWatch → loadRunRecords)가 돌 때마다 없으면 넣어 준다.
+function renderDoneCardVideo() {
+  const head = document.querySelector("#donecard .dc-head");
+  const url = runId && runVideos[runId];
+  if (!head || !url || head.querySelector("a.vidlink")) return;
+  const a = document.createElement("a");
+  a.className = "vidlink"; a.href = url; a.target = "_blank"; a.rel = "noopener";
+  a.title = "이 run 의 실행 화면 녹화 (WebM) — 새 탭에서 재생"; a.textContent = "▶ 실행 영상";
+  const x = head.querySelector(".dc-x");
+  head.insertBefore(a, x || null);
 }
 
 // the fold header (count) + the always-visible row: 실행 중이면 히어로가 전면이라
@@ -3638,12 +3663,17 @@ function renderHistHead(runsOnly) {
   const lastDone = runsOnly.find(r => r.status !== "running" && r.status !== "queued");
   if (inFlight || !lastDone) { cur.innerHTML = ""; return; }
   cur.innerHTML = `<div class="hist-lastlbl muted small">최근 종료 — 클릭하면 리포트로</div>` + runRowHtml(lastDone);
-  els("#hist-current .runrow").forEach(row => row.onclick = () => loadRunIntoReport(row.dataset.id));
+  els("#hist-current .runrow").forEach(row => row.onclick = ev => {
+    if (ev.target.closest("a.vidlink")) return;      // ▶ 영상 클릭은 링크만 (행 재바인딩 안 함)
+    loadRunIntoReport(row.dataset.id);
+  });
 }
 
 function loadRunRecords() {
   fetch("/api/runs").then(r => r.json()).then(j => {
     const all = j.runs || [];
+    all.forEach(r => { if (r.video) runVideos[r.id] = r.video; });   // ▶ 영상 (종료 카드 링크용)
+    renderDoneCardVideo();
     handleLateAlerts(all);    // 종료 후 자원 늦출현 (신규1) — 알림 + 패널 재스캔 (필터와 무관)
     const host = $("report-side"); if (!host) return;
     const runsOnly = all.filter(r => r.kind === "lifecycle");
@@ -3661,7 +3691,10 @@ function loadRunRecords() {
       return;
     }
     host.innerHTML = filterBar + runs.map(runRowHtml).join("");
-    els("#report-side .runrow").forEach(row => row.onclick = () => loadRunIntoReport(row.dataset.id));
+    els("#report-side .runrow").forEach(row => row.onclick = ev => {
+      if (ev.target.closest("a.vidlink")) return;    // ▶ 영상 클릭은 링크만 (행 재바인딩 안 함)
+      loadRunIntoReport(row.dataset.id);
+    });
     wireHistFilter();
   }).catch(() => { const host = $("report-side"); if (host) host.innerHTML = '<p class="muted small">서버 연결 실패</p>'; });
 }
@@ -4008,4 +4041,7 @@ function badge(cat) {
   return `<span class="bdg ${c}" title="${esc(CAT_TIP[cat] || "")}">${esc(cat || "—")}</span>`;
 }
 
+// ---- automation hook (tools/record_console.py — 실행 화면 녹화기): 녹화기가 run 화면으로 가서
+// run 에 바인딩하고 상세 탭(리소스/API/로그)을 돌리는 데 쓴다. 콘솔 UI 자체는 이 객체를 쓰지 않는다.
+window.__c2 = { go, loadRunIntoReport, setDetailTab, version: 1 };
 })();

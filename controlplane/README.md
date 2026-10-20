@@ -50,6 +50,7 @@ SUPERSEDED). 두 런타임으로 깔끔히 분리됩니다:
 | Report (대시보드 임베드) | `/reporting?tab=…` — `summary` / `dashboard`(정식 커버리지·conformance 대시보드 **임베드**) / `runs`(목록·아카이브) / `triage`. 옛 coverage/conformance/trends 재렌더 탭은 제거 |
 | AI triage (B1) | run 종료 후 baseline 외 신규 fail을 Claude가 environment / spec_change / test_bug / real_regression으로 분류 + 조치 제안 |
 | 알림 (B2) | triage 요약을 webhook으로 push |
+| 실행 화면 녹화 | run admit 시 headless Chromium 이 Testing 콘솔 화면을 run 종료까지 WebM 으로 녹화 → `reports/console2-runs/<rid>.webm`, 콘솔 ▶ 영상 링크 + `GET /api/runs/{rid}/video` (`controlplane/recording.py`, `tools/record_console.py`; Playwright 없으면 건너뜀 — console2/README.md) |
 | 개입 명령 (M2) | run 상세 페이지(`/runs/{id}`)에서 run abort / 시나리오 skip / 폴링 강제 종료 명령을 쌓으면 **엔진이 step 경계마다 폴링**해 수행 (아래 명령 채널 API) |
 | 리소스 인벤토리 (M2) | `/testing/resources` — ingest된 resource 이벤트를 res_id별로 접어 live/gone 상태 표시, run 필터 |
 | 단일 리소스 삭제 (M2) | live 행의 삭제 버튼 — `cleanup/reconciler.py`의 `_delete` + kind별 DELETE 매핑 재사용, `SCP_ALLOW_DESTRUCTIVE=true` 필수, 시도는 `platform-delete` resource 이벤트로 기록 |
@@ -89,7 +90,9 @@ uvicorn controlplane.app:app --host 0.0.0.0 --port 8800
 
 의존성은 의도적으로 가볍게 분리돼 있습니다: `controlplane/requirements.txt`
 (FastAPI/uvicorn/jinja2/croniter) + 선택적 `controlplane/requirements-ai.txt`
-(`anthropic` — AI 기능용; 없어도 서버는 완전 동작, AI 섹션만 비활성 표시).
+(`anthropic` — AI 기능용; 없어도 서버는 완전 동작, AI 섹션만 비활성 표시) + 선택적
+`controlplane/requirements-video.txt` (`playwright` + `python -m playwright install chromium` —
+실행 화면 녹화용; 없으면 녹화만 건너뛴다).
 
 **worker 실행기 로컬 runbook** (M4 경로 — 상세: `docs/DEPLOY.md`):
 
@@ -116,6 +119,8 @@ python -m runner.worker --poll 15     # 상주 폴링 모드
 | `PLATFORM_AUTO_TRIAGE` | `true`면 run 종료(dashboard 마일스톤) 시 자동 triage |
 | `PLATFORM_GIT_PUSH` | `true`면 편집 저장(로컬 커밋) 후 `git push`까지 수행 — 기본 off (운영자 수동 push) |
 | `PLATFORM_NOTIFY_WEBHOOK` | triage 요약 POST(`{"text": ...}`, Slack 호환) |
+| `PLATFORM_RECORD_VIDEO` | `auto`(기본: Playwright+Chromium 있으면 run 화면 녹화) \| `false` — console2/README.md "실행 화면 동영상" |
+| `PLATFORM_RECORD_SIZE` / `PLATFORM_RECORD_TOUR` / `PLATFORM_RECORD_MAX_MINUTES` / `PLATFORM_RECORD_URL` | 녹화 크기(기본 1440x900) · 상세 탭 순환 초(기본 20, 0=고정) · 최대 녹화 분(기본 240) · 녹화기가 여는 콘솔 주소(기본 `http://127.0.0.1:<포트>`) |
 
 ## 워크플로우 연동 (라이브 이벤트)
 

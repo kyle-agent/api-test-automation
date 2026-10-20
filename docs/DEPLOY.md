@@ -122,3 +122,9 @@ compose 번들은 `docker-compose.yml`의 `environment:`로
 - **worker가 하지 않는 것**: PR 코멘트, GitHub Pages(dashboard-data 브랜치)
   발행, `refresh_catalog`, heavy.txt 셀프트리거, schema-live probe. 대시보드는
   호스트의 `dashboard/index.html` + run 스냅샷(S3 구성 시)으로 제공된다.
+- **실행 화면 녹화**: 서버 호스트에 Playwright+Chromium 이 있으면 run 마다 Testing
+  콘솔 화면을 `reports/console2-runs/<rid>.webm` 으로 남긴다(콘솔 ▶ 영상 링크). 기본
+  compose 이미지에는 Chromium 이 없어 자동으로 건너뛴다 — 넣으려면 Dockerfile 에
+  `pip install -r controlplane/requirements-video.txt && python -m playwright install --with-deps chromium`
+  을 추가하거나, 호스트에서 `python -m tools.record_console --url http://localhost:8800`
+  으로 진행 중 run 을 녹화한다. `PLATFORM_RECORD_VIDEO=false` 로 끈다 (console2/README.md).
