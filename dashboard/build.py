@@ -82,6 +82,36 @@ def obs_to_tsv_row(o: dict):
     )
 
 
+def conf_from_conformance_file(conf_file: dict) -> dict:
+    """Adapt a legacy ``data/conformance.json`` (static axis dual-write) to the
+    structure ``findings_to_conf`` produces, so the renderer can consume it as
+    the per-endpoint fallback when the unified findings store is absent.
+    Items keep the file's ``type/src/detail/issue`` fields; the per-endpoint
+    ``status`` and the summary are recomputed from the items' severities so a
+    hand-edited file can't carry a stale verdict."""
+    severity_order = {"red": 2, "yellow": 1, "green": 0}
+    by_endpoint: dict[str, dict] = {}
+    for key, rec in (conf_file.get("by_endpoint") or {}).items():
+        items = []
+        status = "green"
+        for it in rec.get("items") or []:
+            sev = it.get("sev") or "green"
+            items.append({
+                "type": it.get("type", ""),
+                "src": it.get("src", "static"),
+                "issue": it.get("issue", ""),
+                "detail": it.get("detail", ""),
+            })
+            if severity_order.get(sev, 0) > severity_order.get(status, 0):
+                status = sev
+        by_endpoint[key] = {"status": status, "items": items}
+    counts: Counter = Counter(v["status"] for v in by_endpoint.values())
+    summary = {"red": counts.get("red", 0), "yellow": counts.get("yellow", 0),
+               "green": counts.get("green", 0), "total": len(by_endpoint)}
+    return {"summary": summary, "systemic": conf_file.get("systemic", []),
+            "by_endpoint": by_endpoint}
+
+
 def findings_to_conf(findings: list[dict]) -> dict:
     """Convert a list of Finding dicts into the conformance.json structure that
     the existing renderer (render_conformance_section / conf_cell) consumes.
@@ -1790,11 +1820,25 @@ def build(
     #    unified store) from conformance.json when the static axis writes one.
     # ------------------------------------------------------------------
     conf = findings_to_conf(unified_findings)
+    conf_file = {}
     if os.path.exists(conformance):
         try:
-            conf["systemic"] = json.load(open(conformance)).get("systemic", [])
+            conf_file = json.load(open(conformance)) or {}
         except (ValueError, OSError):
-            pass
+            conf_file = {}
+    conf["systemic"] = conf_file.get("systemic", [])
+    # Per-endpoint fallback (owner 2026-10-24 "api 품질결과가 내용이 없네"): the
+    # unified findings store is machine-local (gitignored), so a publish from a
+    # machine that never ran `python -m conformance.static` rendered every API
+    # as 미평가 even though data/conformance.json — the SAME analysis, committed
+    # (and republished by the conformance job) — carried the full per-endpoint
+    # verdicts. That file IS evidence (static rules + folded probes), so use it
+    # when the local store is empty; the local store still wins when present
+    # (it is fresher on a machine that just ran the axis).
+    conf_fallback_used = False
+    if not unified_findings and conf_file.get("by_endpoint"):
+        conf = conf_from_conformance_file(conf_file)
+        conf_fallback_used = True
 
     # ------------------------------------------------------------------
     # 4. Load CRUD / lifecycle data (lifecycle definitions only).
@@ -1825,7 +1869,7 @@ def build(
     #         PF-21 createvolumetransfer 500) merge into by_endpoint as 결함 so
     #         they show on every machine. Automation-side bugs are OUR bugs, not
     #         API design defects — excluded.
-    conf["evaluated"] = bool(unified_findings)
+    conf["evaluated"] = bool(unified_findings) or conf_fallback_used
     for it in known_data.get("issues", []):
         ik = it.get("key") or ""
         typ = (it.get("type") or "").strip()

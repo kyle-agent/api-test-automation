@@ -114,6 +114,14 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **2026-10-24 (branch `claude/amazing-davinci-z2klhq` — 대시보드 API 품질결과 복구):** 발행본의
+  서비스 페이지가 전 API "미평가"(`CONF_EVAL=false` — 발행 머신에 로컬 findings 스토어 없음).
+  `conformance.static` 재실행(1490 API: 정상 995 · 개선 463 · 결함 32; baseline 대비 new 46 ·
+  regressed 10 · fixed 25) → CI 절차 그대로 재빌드(관측 0 가드: 회귀 셀·history·fail_new 불변) →
+  dashboard-data `3833f53` 발행(index · services · conformance.json · conformance_new.json).
+  **코드 수리**: `dashboard/build.py`가 로컬 findings 스토어가 비면 `data/conformance.json`의
+  per-endpoint 판정으로 폴백(`conf_from_conformance_file`) — 같은 증상 재발 차단. 런타임 프로브
+  (`conformance.runtime --probe all`)는 자격 없는 세션이라 미실행(이전 폴드 결과 유지).
 - **CURRENT (2026-09-21 — 6th 런 ec8b 최종 + 대시보드 발행):** 133 lifecycle **116 pass / 17 fail / 0 skip** — 13 은 11:04~11:09Z
   kr-west1 프로비저닝 장애 창(PF-62: DB 클러스터 8 FAILED · 서버 ERROR · 서버/볼륨 create 500) 산물, 2 는 PF-54, hsn(레코드 미삭제 409
   → 수리) · ske(labels 전 클러스터 UPDATING → settle 수리). **대시보드**: 아티팩트→observations 복원(`tools.events_to_observations`)
