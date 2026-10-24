@@ -526,23 +526,6 @@ def _default_zone(region: str) -> str:
     return f"{region}-b" if region == "kr-west1" else f"{region}-a"
 
 
-def _fs_zone(region: str) -> str:
-    """{zone_fs} — File Storage(filestorage) 볼륨 create 전용 가용영역.
-    filestorage는 kr-west1에서 **kr-west1-b에만** 존재한다 (오너 실측
-    2026-09-17: 오퍼링 캠페인의 SCP_ZONE=kr-west1-a 핀이 {zone}을 통째로
-    -a로 끌고 가자 filestorage create 9곳이 400 invalid-zone; 2026-07-15
-    LIVE도 kr-west1-b만 2xx, 복제쌍 kr-west1-b↔kr-east1-a). 그래서 SCP_ZONE
-    핀을 따라가지 않는 분리 토큰이다. 우선순위: SCP_ZONE_FS env → kr-west1이면
-    'kr-west1-b' 고정 → 그 외 리전은 _default_zone(region) (SCP_ZONE 포함).
-    parallel-filestorage는 실측 없음 — 그대로 {zone}."""
-    z = os.environ.get("SCP_ZONE_FS", "").strip()
-    if z:
-        return z
-    if region == "kr-west1":
-        return "kr-west1-b"
-    return _default_zone(region)
-
-
 def _alt_zone(zone: str) -> str:
     """{zone_alt} — {zone}의 반대편 가용영역 (…-a↔…-b 플립). SCP_ZONE_ALT
     env가 최우선. run 3e67 (2026-08-20) direct-connect 400 required-zone이
@@ -827,10 +810,56 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         if ("timeout" not in _exc_name and "timed out" not in str(exc).lower()
                 and "connection" not in _exc_name and "proxy" not in _exc_name):
             raise
+        # 2026-09-21 run 643b (create-kms): a POST whose RESPONSE timed out had
+        # already been applied server-side (kms key created 03:39:14, client
+        # gave up ~60s later) — the blind re-send hit 400 kms.duplicate-name and
+        # left an orphan the lifecycle could not tear down. Same rule as
+        # core.http_client.NO_RETRY_ON_EXCEPTION: a non-idempotent verb is only
+        # re-sent when the request provably never reached the server (connect
+        # timeout / connection or proxy error); a read timeout is raised.
+        _read_timeout = ("readtimeout" in _exc_name
+                         or ("timeout" in _exc_name and "connect" not in _exc_name)
+                         or ("timed out" in str(exc).lower() and "connect" not in _exc_name))
+        if step["method"].upper() in ("POST", "PATCH") and _read_timeout:
+            print(f"  step '{step.get('name')}' {step['method']} read timeout — NOT re-sent "
+                  f"(non-idempotent; the server may have applied it): {exc}")
+            raise
         print(f"  step '{step.get('name')}' transport blip — retrying once ({exc})")
         time.sleep(5)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
+    # fallback_on_error_code: 바디 에러 코드가 일치하면 **바디를 바꿔** 1회
+    # 재전송하는 조건부 변형 (2026-09-17 run 89de 계기). 서버가 같은 create를
+    # VPC 존 구성에 따라 반대로 요구하는 클래스 — direct-connect는 multi-zone
+    # VPC면 uplink_active/standby_zone 필수(400 required-zone, run 3e67), 단일존
+    # VPC면 그 필드가 금지(400 active-standby-zone-not-allowed, run 89de).
+    # 존 수를 read-only로 알 방법이 없어(VPC show에 zones 필드 없음) 서버의
+    # 거절 코드를 판정 신호로 쓴다. 형식:
+    #   [{"codes": [...], "merge": {...}, "drop": [...]}]  — merge 값은 ctx 토큰
+    # 치환, drop은 최상위 키 제거. 항목당 1회, 순서대로; 재전송 결과가 다시
+    # 4xx면 아래 상태/코드 사다리가 그대로 이어받는다.
+    fbs = step.get("fallback_on_error_code") or []
+    fbs = [fbs] if isinstance(fbs, dict) else list(fbs)
+    for fb in fbs:
+        if resp.status < 400:
+            break
+        codes = fb.get("codes") or fb.get("code") or []
+        codes = [codes] if isinstance(codes, str) else list(codes)
+        b = getattr(resp, "body", None)
+        errs = b.get("errors") if isinstance(b, dict) else None
+        if not any(isinstance(e, dict) and e.get("code") in codes for e in errs or []):
+            continue
+        nb = dict(body) if isinstance(body, dict) else body
+        if isinstance(nb, dict):
+            for k in fb.get("drop") or []:
+                nb.pop(k, None)
+            nb.update(_fill_obj(fb.get("merge") or {}, ctx))
+        print(f"  step '{step.get('name')}': error code {codes} on HTTP {resp.status} "
+              f"— re-sending with body variant (merge={list((fb.get('merge') or {}).keys())}, "
+              f"drop={fb.get('drop') or []})")
+        body = nb
+        resp = client.request(step["method"], path, json=body, service=service, params=params,
+                              headers=step.get("headers"))
     # 429 레이트리밋 재시도는 http_client.RETRY_STATUS(+Retry-After 존중)가
     # 전 요청 공통으로 처리한다 (run-c373 수리, 2026-07-13 — 병렬 세션이
     # 클라이언트 레벨로 먼저 반영) — 엔진 레벨 중복 백오프는 두지 않는다.
@@ -1219,9 +1248,6 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         # 하드코딩이 교차-리전 400 InvalidAvailabilityZone을 만든 게 계기).
         "zone": _default_zone(cfg.region),
         "zone_alt": _alt_zone(_default_zone(cfg.region)),
-        # {zone_fs} — filestorage 전용 존 (2026-09-17: SCP_ZONE=-a 핀에도
-        # filestorage는 kr-west1-b뿐이라 {zone}과 분리).
-        "zone_fs": _fs_zone(cfg.region),
         # 서버타입 세대 핀 (2026-07-29 — 오퍼링 자원부족 대응; capture 필터의
         # where_prefix 값에서 {token}으로 소비된다).
         "vs_server_type_prefix": _vs_server_type_prefix(),
@@ -2118,6 +2144,13 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         # while keeping the 'regr' family root the reconciler matches on.
         "name": f"regrvpcsh{uniq}", "description": "API regression shared VPC",
         "cidr": _SHARED_VPC_CIDR, "tags": [],
+        # VpcCreateRequestV1Dot4 (vpc 1.4 pin, 2026-09-21 runs d961/9420): zone_type
+        # is REQUIRED (enum PUBLIC/PRIVATE/ACCELERATED). Live-probed 2026-09-21:
+        # PUBLIC + zones -> 400 scp-network.vpc.zone-cannot-be-specified ("Cannot
+        # specify zones when the zone type is PUBLIC"); PUBLIC alone -> 201 and the
+        # server assigns the account's zones itself (['kr-west1-b'] here). Same
+        # shape as the 70 scenario create-vpc steps.
+        "zone_type": "PUBLIC",
     }, axis="regression")
     create = {"name": "create-shared-vpc", "method": "POST", "service": "vpc"}
     resp = _run_step(client, create, _VPC_CREATE_PATH, body, "vpc", {})
@@ -2147,6 +2180,12 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
             nbody = _inject_owner_tags({
                 "name": nname, "description": f"API regression shared net VPC {tag.upper()}",
                 "cidr": cidr, "tags": [],
+                # vpc 1.4 (VpcCreateRequestV1Dot4): zone_type REQUIRED — the main
+                # shared-VPC body got this on 2026-09-21 but net-A/B were missed, so
+                # both 400'd silently in runs eb41/643b: vpc#a adopters fell back to
+                # self-created VPCs (networking-vpc-subnet CIDR mismatch) and net-B
+                # users (fw / DC / privatelink-service / vip-nat) IB-049-skipped.
+                "zone_type": "PUBLIC",
             }, axis="regression")
             ncreate = {"name": f"create-shared-net-vpc-{tag}", "method": "POST",
                        "service": "vpc"}

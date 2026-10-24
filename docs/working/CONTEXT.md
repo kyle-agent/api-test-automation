@@ -28,11 +28,11 @@ Supports: `spec/` (extract+diff the spec), `dashboard/` (visualize both axes),
 
 ## The catalog at a glance (source of truth: `data/api_catalog.json`)
 
-- **1,416 endpoints** (2026-07 spec bump), 1,415 resolved / 1 unresolved.
-  13 categories present in the catalog.
-- By method: GET 546 · POST 392 · PUT 257 · DELETE 211 · PATCH 9.
-- Smoke-testability split: **231** GETs are directly testable (no path params);
-  **315** GETs need a resource id (reached via CRUD/read-chains); **869** are
+- **1,490 endpoints** (2026-09 spec bump, search-index discovery 2026-09-18), 1,490 resolved / 0 unresolved.
+  13 categories · 62 services (신규: messagehub 29 · resourceoptimizer 24 · costnavigator 3 · cnapp 2; 폐기: cssdlan).
+- By method: GET 570 · POST 408 · PUT 280 · DELETE 220 · PATCH 12.
+- Smoke-testability split: **238** GETs are directly testable (no path params);
+  **332** GETs need a resource id (reached via CRUD/read-chains); **920** are
   mutating (reached via CRUD lifecycles).
 - Re-run the live summary any time: `python -m spec.summary`.
 
@@ -114,12 +114,79 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **2026-09-17 (branch `claude/amazing-davinci-z2klhq`):** 오너 런 오류 ① filestorage
-  create가 `SCP_ZONE=kr-west1-a` 핀에 끌려 400 — filestorage는 kr-west1-b뿐.
-  `{zone_fs}` 토큰(`_fs_zone`: SCP_ZONE_FS → west1 `-b` 고정 → 그 외 `_default_zone`)
-  신설, create 9곳 전환 + 가드 테스트. 나머지 오류 점검(oplog 버킷 로그)은 오너가
-  별도 세션에서 진행 예정.
-- **CURRENT (2026-08-01 — s2 오퍼링 업그레이드 전/후 캠페인, 오너 콘솔 반복 런):**
+- **CURRENT (2026-09-21 — 6th 런 ec8b 최종 + 대시보드 발행):** 133 lifecycle **116 pass / 17 fail / 0 skip** — 13 은 11:04~11:09Z
+  kr-west1 프로비저닝 장애 창(PF-62: DB 클러스터 8 FAILED · 서버 ERROR · 서버/볼륨 create 500) 산물, 2 는 PF-54, hsn(레코드 미삭제 409
+  → 수리) · ske(labels 전 클러스터 UPDATING → settle 수리). **대시보드**: 아티팩트→observations 복원(`tools.events_to_observations`)
+  → `tools/publish_dashboard.sh` → dashboard-data 발행(ok 2015 · soft 369 · new 9 · known 5 · C3 82.4%). 콘솔이 다음 런부터
+  observations/findings.jsonl 을 아티팩트에 미러. **PF-54 해소(09-22 개발팀 수정, API create 201 라이브 검증)** — 다음 런에서 secretsmanager 2 lifecycle 복귀 판정. 잔존 정리: 리컨실러 8건 + 수동(레코드→hosted zone→private-dns) 삭제 완료; **FAILED pg 클러스터 5e3770db 는 DELETE 202 반복에도 미수렴**(PF-62 후속)이라 공유 DB 서브넷 ff9b688c + 그 VPC 67f5317c 가 붙들림 → 재확인 후 안 풀리면 오너 콘솔 강제 삭제. 로그그룹 20 은 IAM 게이트.
+- **PRIOR (2026-09-21 — 5th 런 59a9 최종):** 133 lifecycle **130 pass / 3 fail / 0 skip** (4beb 132/5, 643b 123/9, eb41 112/7).
+  gen-wave5-fw · gen-heavy-lb-members 첫 완주, apigw privatelink fallback 실효. fail = PF-54 ×2 + heavy-shared-networking(dns 호스트
+  read timeout — 환경 클래스, POST 무재전송 정책대로 fail). 수리: rm list-resources 를 공유 VPC 필터로, fs restore 409 사다리.
+  남은 실패는 전부 제품/픽스처 클래스(PF-54 secretsmanager, messagehub 유예). 다음: 재런에서 hsn 재현 여부 + 두 수리 판정.
+- **PRIOR (2026-09-21 — 4th 런 4beb 최종):** 137 lifecycle **132 pass / 5 fail / 0 skip** (643b 123/9/5, eb41 112/7/5).
+  fail = 기지 2(PF-54) + messagehub-phone(오너 유예) + gen-wave5-fw(firewall 1.2 rule set 래핑 — PF-59 확장, 수리) + gen-heavy-lb-members
+  (멤버 IP 캡처 경로 — 수리). 추가 수리: hosted zone 캡처 `$.id`, privatelink service IP 충돌 fallback. 잔존 = 로그그룹 20 뿐.
+  다음 런 판정: fw rule set, lb 멤버 체인, hsn DNS 체인 teardown, apigw privatelink 재전송, eventstreams request 조회.
+- **PRIOR (2026-09-21 — 4th 런 4beb 진행 중 + messagehub 오너 유예):** run `20260921-155909-4beb`(레지스트리 삭제 후) 07:27Z 기준
+  137 시작 / 119 종료 = 114 pass · 5 fail · **skip 0** (net-A/B 채택자 4 pass, scr-borrow pass, email 409 사다리 pass, rm 401 해소).
+  오너: "messagehub는 일단 제외, 프로세스 확인 후 진행" → 4 lifecycle `_scope_exclude`(C-6 방식, 명시 선택 가능). 다음: 4beb 아티팩트
+  판정(lb-members · gen-wave5-fw 첫 실행 · phone 형식 · ske scale-up · DBaaS).
+- **PRIOR (2026-09-21 — 재런 643b 판정):** run `20260921-123827-643b` 137 lifecycle **123 pass / 9 fail / 5 skip**
+  (eb41 112/124). eb41 수리 5건 라이브 확정, 신규 상품 13 lifecycle 실행(10 pass). 남은 실패 = 기지 3(PF-54 ×2 · PF-58) +
+  **엔진 공유 net-A/B VPC 바디 zone_type 누락**(skip 5 + vpc-subnet 1 — eb41 "5-cap" 오판 정정, 수리) + messagehub email 409/
+  phone 400(PF-61, 수리) + resourceoptimizer opt-out 이 계정을 INACTIVE 로(opt-out 제거) + lb server-group set CREATING(settle) +
+  ske scale-up 500(PF-60, 사다리). 엔진 결함 수리: POST 읽기 타임아웃 후 맹목 재전송(create-kms 중복). 잔존 = PF-58 + 로그그룹 20.
+  다음 런 판정: net-A/B 채택자 6, messagehub email/phone, ro ACTIVE 복귀, lb-members, ske scale-up, rm 컴포넌트 경로.
+- **PRIOR (2026-09-21 — 재런 eb41 판정 + 신규 상품 콘솔 편입):** run `20260921-105412-eb41` 124 lifecycle **112 pass / 7 fail / 5 skip**
+  (406 0 · 존 에러 0 · skip=VPC 5-cap 규약). 실패 = 기지 3(PF-54 ×2 · PF-58) + 핀 상향 모델 변경 4(ske 1.6 `default_subnet_id`,
+  scf 1.5 `encryption` 필수, vpce `vpc_id` 쿼리 필수, ASG `zones` 누락 — **PF-59**, 시나리오 수리 완료) + lb 1.4 hc set→EDITING
+  경합(settle 폴 삽입) + networking-vpc-subnet CIDR(net-A 미차용 — 오너 provision 로그 확인 필요). **신규 상품이 "전체"에서
+  빠진 구조 결함 수리**: formal 노드 3파일(messagehub·resourceoptimizer·costnavigator) + lifecycle `_scope_include` 9곳 →
+  서비스 선택 시 13 lifecycle 합류(org-settings 쓰기는 오너 결정 대기). 다음: 재런에서 4수리 + 신규 13 lifecycle 실효 판정;
+  핀 상향 전 바디 필수필드 정적 대조 게이트(후속).
+- **PRIOR (2026-09-21 — 병합 후 첫 런 d961: vpc 1.4 핀이 create-vpc를 죽임 → 수리):** run
+  `20260921-094658-d961` 시작 2초 만에 VPC 계열 43 lifecycle 전멸(fail 6 · skip 37) — VpcCreateRequestV1Dot4
+  `zone_type` 필수(PF-57). 엔진 공유 VPC + 시나리오 70곳에 `zone_type: PUBLIC` 추가(zones는 PUBLIC에서 금지 — 라이브 프로브 201/400 확정, run 9420 재실패 후).
+  런 전 정리(오너 지시): 실자원 잔존은 좀비 scr 레지스트리 1(PF-58, API 해제 불가 → SDS/콘솔) + IAM 게이트 ske
+  로그그룹 19(무해)뿐; VPC/서버/볼륨/클러스터 0. 다음: 재런에서 VPC 계열 + 신규 lifecycle + 나머지
+  버전 핀 실효 판정 · 핀 상향 전 바디 모델 필수필드 정적 대조 게이트(후속).
+- **CURRENT (2026-09-18 — 신규 API 모수 편입, 오너 "신규 API 모수 작업 시작"):** 문서 사이트
+  리디자인 대응으로 `spec.extract_catalog`를 search-index 기반으로 교체 → 카탈로그 **1,417→1,490**
+  (신규 74: messagehub 29 · resourceoptimizer 24 · ske 5 · servicewatch 4 · costnavigator 3 ·
+  organization 3 · budget 2 · cnapp 2 · baremetal 1 · vpc 1; 버전업 881; cssdlan 폐기). 바디
+  `--from-index` 재추출 477/477, `spec.refresh_versions` 신설로 버전 핀 29개 상향(다음 런에서 406
+  여부 판정 — 뒤지면 PIN=false). http_client 버전 매칭 구체성 규칙 수리. api_docs.json 재스크레이프
+  완료(1,492 EP · 2,815 모델, 에러 0) + enrich(자기 id 1,070: 생산자 1,050 · waiver 20 · null 0).
+  신규 lifecycle 3파일(generated__messagehub · generated__resourceoptimizer · generated__newapi-202609,
+  16 lifecycle, 74 신규 EP 전부 정적 도달; resourceoptimizer·costnavigator 글로벌 호스트 확정, cnapp은
+  양쪽 호스트 무라우팅 → blocked-owner). **정적 도달 1,337→1,402 / 1,490 (94.1%), 갭 153→88**
+  (잔여 = baremetal-blockstorage 35 · archivestorage 20 · cloudmonitoring 10 · cdn 8 등 waiver 클래스
+  + cnapp 2 + ske preferred-ips 1). 오프라인 764 passed. **다음 런 판정**: 신규 lifecycle 실제 실행
+  (messagehub 3종 create, resourceoptimizer 설정 CRUD/opt — 오너 결정), 버전 핀 29개 상향의 406 여부.
+- **CURRENT (2026-09-17 — run 89de 존 핀 stale + 존 가드, 스펙 사이트 리디자인):**
+  오늘 런 `20260917-085140-89de`(85 pass / 33 fail, 진행 중) 실패의 대부분이 오너 `.env`의
+  stale `SCP_ZONE=kr-west1-a`(8/1 캠페인 잔재) — 계정에서 `-a` 무효(`GET filestorage
+  /v1/replications/zones` 실측 `[]`, `-b`는 `['kr-east1-a']`). 조치: `.env` 핀 제거/`-b`.
+  **존 가드 신설** `regression/scenarios/zone_guard.py` — read-only 프로브로 `{zone}` 검증,
+  형제 존만 유효하면 차단(콘솔2 pre-flight·REAL 런 시작·`shared_infra --provision` 3곳,
+  `SCP_ZONE_CHECK=warn|false`). 89de 최종(124 lifecycle, 91 pass / 33 fail) 아티팩트 판정:
+  존 클래스 14(서버 `InvalidServerType.Zone`·볼륨 `InvalidAvailabilityZone`/`Invalid.zone`·
+  publicip `ip.invalid-zone`·ASG `ZonesSubnetMismatch`) + **DC 2건 회귀**: 8/20 수리가 넣은
+  uplink_active/standby_zone을 단일존 VPC가 `active-standby-zone-not-allowed`로 거부 → **수리**:
+  엔진 `fallback_on_error_code` 신설, DC create 3곳은 존 없이 보내고 required-zone일 때만 재전송.
+  **DBaaS 13건 = 신규 계약**: `Dbaas.ValidationError.
+  InvalidBlockStorageDataDiskCount` "ACTIVE instance group must have 1 or more DATA block
+  storage (current: 0)" — mysql/postgresql/mariadb/epas create 바디에 DATA 블록스토리지 필수화
+  → **수리**: 4엔진 create 32곳에 DATA 56 SSD 추가. **재런 915f 최종: 120 pass / 4 fail** (89de 91/33) —
+  존 에러 0 · DBaaS create 14/14 202 + add/resize 정상 · DC 기본 바디 202(fallback 미발동, 단일존). ske 실패 = k8s 목록이 밀려([1]=v1.35.5)
+  하드코딩 ubuntu 22.04가 무효(오너 지적) → list-images에서 OS 버전 캡처로 수리. 기타: secretsmanager create 400
+  `check-namespace-error` ×2(신규) · scr quota 403(기지) · gen-vpc-endpoint 409 직렬화(기지) ·
+  lb-members static-nats 404. 개선 36 / 회귀 55 vs 3e67 (`tools.triage_run --diff`).
+  스펙: 문서 사이트 리디자인으로 `spec.extract_catalog --fresh` **금지**(카탈로그 1개로
+  덮어씀) — changelog 기반 부분 diff `docs/working/SPEC-DIFF-20260917.md` (cssdlan 폐기,
+  messagehub 29 EP 신설, 25 서비스 버전업). 다음: 89de 아티팩트 판정 · discovery 재설계
+  (search-index.json) · messagehub 커버리지.
+- **PRIOR (2026-08-01 — s2 오퍼링 업그레이드 전/후 캠페인, 오너 콘솔 반복 런):**
   오퍼링(west1, 존 `-a`, 서버타입 s2/db2/ess2 세대) 부분런 반복 중 — env 레시피
   정본은 `environments/README.md` 전환 체크리스트 (oplog 3종 · PIN=false ·
   SCP_ZONE · SCP_VS_SERVER_TYPE_PREFIX=s2 · DB 이름 핀). 금일 main 반영 2건:

@@ -81,8 +81,16 @@ def fetch_bodies(
     key_substr: str = "",
     method_filter: str = "",
     limit: int = 0,
+    index_texts: dict[str, str] | None = None,
+    redo_keys: set[str] | None = None,
 ) -> int:
     """Fetch request bodies for matching endpoints and write to *out_path*.
+
+    ``index_texts`` (``{key: rendered page text}`` from
+    ``spec.extract_catalog.index_body_texts``) makes extraction page-fetch-free:
+    the search index body carries the "Request body {…} Example HTTP response"
+    example verbatim (2026-09-17). ``redo_keys`` forgets cached bodies for those
+    keys first (changed endpoints after a spec diff).
 
     Returns the number of newly fetched bodies.
     """
@@ -91,6 +99,8 @@ def fetch_bodies(
 
     cat = json.loads(catalog_path.read_text())
     out: dict = json.loads(out_path.read_text()) if out_path.exists() else {}
+    for k in (redo_keys or ()):
+        out.pop(k, None)
 
     target_methods = {method_filter.upper()} if method_filter else WRITE_METHODS
     todo = [
@@ -101,12 +111,16 @@ def fetch_bodies(
         and key_substr in e["key"]
         and e["key"] not in out
     ]
-    print(f"{len(todo)} endpoint(s) to fetch ({len(out)} already cached)")
+    print(f"{len(todo)} endpoint(s) to fetch ({len(out)} already cached)"
+          f"{' — from search index' if index_texts is not None else ''}")
 
     done = 0
     for e in todo:
         try:
-            body = extract_request_body(fetch(e["doc_url"]))
+            if index_texts is not None and index_texts.get(e["key"]):
+                body = extract_request_body(index_texts[e["key"]])
+            else:
+                body = extract_request_body(fetch(e["doc_url"]))
         except Exception as exc:
             print(f"  ERR  {e['key']}: {exc}")
             continue
@@ -137,7 +151,24 @@ def main() -> int:
     ap.add_argument("--key-substr", default="", help="only endpoints whose key contains this")
     ap.add_argument("--method", default="", help="restrict to one method (POST/PUT/PATCH)")
     ap.add_argument("--limit", type=int, default=0, help="stop after N fetches (0 = all)")
+    ap.add_argument("--from-index", action="store_true",
+                    help="take the example body from the cached docs search index "
+                         "(data/.search-index.json) instead of fetching each page")
+    ap.add_argument("--redo-marked", action="store_true",
+                    help="re-extract endpoints marked added/changed in data/spec_diff_latest.json")
     args = ap.parse_args()
+
+    index_texts = None
+    if args.from_index:
+        from spec.extract_catalog import get_search_index, index_body_texts
+        index_texts = index_body_texts(get_search_index(),
+                                       json.loads(Path(args.catalog).read_text()))
+    redo: set[str] = set()
+    if args.redo_marked:
+        marks = ROOT / "data" / "spec_diff_latest.json"
+        if marks.exists():
+            redo = set(json.loads(marks.read_text(encoding="utf-8")).get("marks", {}))
+        print(f"--redo-marked: {len(redo)} key(s) will be re-extracted")
 
     fetch_bodies(
         catalog_path=args.catalog,
@@ -145,6 +176,8 @@ def main() -> int:
         key_substr=args.key_substr,
         method_filter=args.method,
         limit=args.limit,
+        index_texts=index_texts,
+        redo_keys=redo,
     )
     return 0
 

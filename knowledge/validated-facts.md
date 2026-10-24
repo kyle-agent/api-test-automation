@@ -4112,18 +4112,461 @@ lifecycle은 대시보드에 'requires env/secret(s) not set'으로 표시된다
   (`tests/offline/test_quality_report.py`) — RULE_KR/SYS_KR 에 없는 유형이 conformance.json 에 생기면 실패하므로
   새 규칙 추가 시 한국어 문구도 같이 추가.
 
-## filestorage는 kr-west1-b 전용 — SCP_ZONE 핀과 분리된 `{zone_fs}` 토큰 (2026-09-17, 오너 실측)
+## 문서 사이트 리디자인 — `spec.extract_catalog --fresh` 금지 (2026-09-17 실측)
 
-- **filestorage 볼륨(POST /v1/volumes)은 kr-west1에서 `kr-west1-b`에만 생성된다.**
-  오퍼링 캠페인(존 `-a`)에서 `SCP_ZONE=kr-west1-a`를 핀하자 `{zone}` 토큰을 쓰던
-  filestorage create 9곳(filestorage-volume · filestorage-replication-schedule ·
-  container-ske-cluster-nodepool/create-vol · gen-wave2-fs · gen-cloudml-chain ·
-  gen-heavy-aimlops · gen-heavy-vs-netops · gen-vpc-endpoint · gen-wave5-vpce)이
-  일제히 invalid-zone으로 실패 — 2026-07-15 LIVE(kr-west1-b만 2xx, kr-west1-a는
-  `GET /v1/replications/zones` 대상 zones:[])와 일치.
-- **수리**: 엔진 `_fs_zone(region)` + `{zone_fs}` 토큰 신설. 우선순위
-  `SCP_ZONE_FS` env → kr-west1이면 `kr-west1-b` 고정 → 그 외 리전은
-  `_default_zone` (SCP_ZONE 포함). filestorage create 9곳 전부 `{zone_fs}`로 전환,
-  가드 테스트 `test_filestorage_volume_creates_use_zone_fs_token`이 `{zone}` 회귀를
-  막는다. parallel-filestorage는 실측이 없어 `{zone}` 유지 — 같은 증상이 나면
-  동일 방식으로 분리.
+- `docs.e.samsungsdscloud.com/apireference/` index가 5MB(전체 nav 임베드) → 31KB(카테고리 링크만)로
+  재구성됨. `python -m spec.extract_catalog --fresh`를 돌리면 **discovered 1개로 카탈로그가 통째로
+  덮어써진다**(1,417 → 1). 기본(resumable) 모드는 cache-hit no-op이라 변경 감지도 못 함. discovery
+  재설계 전까지 `--fresh` 금지 — 백업 후 원복 완료, `data/`는 커밋 상태 그대로.
+- 구식 per-endpoint 페이지(카탈로그 `doc_url`)는 아직 200 — 카탈로그 자체는 유효.
+- 대체 신호: 서비스 overview 페이지의 `Version` 표 + "API Version History" changelog
+  (`[신규]/[변경]/[삭제]`, `<code>METHOD /path</code>`). 63개 서비스 교차검증 결과는
+  `docs/working/SPEC-DIFF-20260917.md` — cssdlan 서비스 폐기(= 기존 unresolved 1건), messagehub 신설
+  29 EP(카탈로그 미포함), 25개 서비스 버전업(19개 method+path 상세, 6개 changelog 부재).
+- **재설계 경로 확정(같은 날 후속, SPEC-DIFF-20260917 §7)**: `https://docs.e.samsungsdscloud.com/
+  search-index.json`(86MB minisearch v2, 35,779 문서)의 `storedFields[*].ref/body`에서 ko
+  `/apireference/<cat>/<svc>/apis/<name>/<version>/` 리프 5,285행 추출 — body 첫 줄 `method path`가
+  카탈로그 1,390행과 0 불일치. 커버리지 1,390/1,417(미매치 27은 archivestorage 1.2 구페이지가
+  인덱스에서만 빠진 것, 라이브 200). 버전 드리프트 881 EP/25 서비스, 신규 이름 75 EP/11 서비스
+  (messagehub 29 · resourceoptimizer 24 — "스텁" 판정 정정, 실제 문서 있음). 콜드 8.8초.
+  주의: 인덱스의 구버전 보존이 서비스마다 달라 "인덱스에 없음 = 폐기"로 읽지 말 것; 카탈로그
+  쓰기는 기존 대비 ≥90% 바닥 게이트 필수(--fresh 1개 사고 재발 방지).
+
+## 존 핀 stale 클래스 + 실행 전 존 가드 (2026-09-17, run 20260917-085140-89de)
+
+- **원인**: 8/1 s2 오퍼링 캠페인 레시피의 `SCP_ZONE=kr-west1-a`가 오너 `.env`에 남아 있었고,
+  계정 존 구성이 바뀌어(8/20 run 3e67에서는 `-a` create가 202/201로 성공) `-a`가 무효가 되자
+  zone을 싣는 lifecycle 20여 개(볼륨·서버·publicip·ASG·복제·VPN·백업)가 첫 create에서
+  3~30초 만에 전멸(생성 자원 0). 엔진 기본값(kr-west1→`-b`)·시나리오 토큰화는 정상 — 코드가
+  아니라 **env 핀이 stale**한 클래스.
+- **읽기 전용 존 판정 신호**: `GET filestorage /v1/replications/zones?type_name=HDD&source_zone=
+  <zone>&replication_type=replication` — 유효 존이면 복제 대상 목록(`kr-west1-b` → `['kr-east1-a']`),
+  무효 존이면 `[]`(07-15·09-17 두 차례 동일). 카탈로그에 존을 열거하는 다른 GET은 없음
+  (VPC list/show도 09-17 현재 `zones` 필드 없음; backup region-relationship은 빈 목록).
+- **가드** `regression/scenarios/zone_guard.py`: `{zone}` 프로브가 비고 **형제 존(`{zone_alt}`)만
+  차 있을 때만** invalid(차단) — 둘 다 비거나 프로브 실패는 unknown(경고만, 런 사망 금지).
+  훅: `shared_infra.provision()`(exit 2, SCP_SHARED_* 미출력) · 콘솔2 `_preflight`(`zone` 키 +
+  경고, UI pfFail 차단) · 콘솔2 REAL 런 시작(`_zone_gate` 서브프로세스 → status=error).
+  `SCP_ZONE_CHECK=warn|false`. 라이브 확인 09-17: 기본 `-b` → ok, `SCP_ZONE=kr-west1-a` → exit 2.
+
+## run 89de 후속 수리 2건 — DC uplink 존 조건부 · DBaaS DATA 디스크 필수 (2026-09-17)
+
+- **direct-connect create는 VPC 존 구성에 따라 요구가 반대**: multi-zone VPC → `uplink_active_zone`/
+  `uplink_standby_zone` 필수(400 `scp-network.direct-connect.required-zone`, run 3e67 08-20); 단일존
+  VPC → 같은 필드 금지(400 `scp-network.direct-connect.active-standby-zone-not-allowed` "VPC has only
+  one zone", run 89de 09-17). VPC list/show에 존 필드가 없어 read-only로 미리 알 수 없다 → 엔진
+  **`fallback_on_error_code`** 신설: `[{"codes":[...], "merge":{...}, "drop":[...]}]` — 바디 에러 코드
+  일치 시 바디를 바꿔 1회 재전송(항목당 1회, 이후 기존 상태/코드 사다리가 이어받음). DC create 3곳
+  (gen-direct-connect · gen-private-nat · networking-direct-connect-routing)은 **기본 존 없이** 보내고
+  `required-zone`일 때만 `{zone}`/`{zone_alt}`를 붙인다. 8/20의 무조건 송신은 회귀였음.
+- **DBaaS create 계약 변경**: mysql/postgresql/mariadb/epas `POST /v1/clusters`가 OS-only 인스턴스
+  그룹을 400 `Dbaas.ValidationError.InvalidBlockStorageDataDiskCount` "ACTIVE instance group must have
+  1 or more DATA block storage (current: 0)"로 거절(run 89de, 13 lifecycle 동시). cachestore(DATA 56)·
+  eventstreams(DATA 16)는 이미 OS+DATA라 202. 수리: 4엔진 create 바디 32곳에 `{"role_type":"DATA",
+  "size_gb":56,"volume_type":"SSD"}` 추가(8의 배수 제약 준수). 후속 `add-block-storages`는 [2]로
+  붙고 resize 대상 `block_storage_groups[1]`은 여전히 DATA라 인덱스 캡처 무변경. sqlserver
+  (guarded, 미실측)만 OS-only 유지. 다음 런 판정: 4엔진 create 202 + add-block-storages/resize 정상.
+
+## SKE 노드 이미지 매트릭스는 k8s 버전에 종속 — OS 버전 하드코딩 금지 (2026-09-17, run 915f)
+
+- `GET /v1/kubernetes-versions` 09-17 실측: [0]=v1.36.3 · [1]=v1.35.5 · v1.34.3 · v1.33.5 · v1.32.8 ·
+  v1.31.8 · v1.30.6 · v1.29.8 (8개, 최신 먼저). 8/20(run 3e67)에는 [0]=v1.35.5·[1]=v1.34.3였다.
+- `GET /v1/images?scp_original_image_type=k8s` 09-17 실측 19종: **v1.36.3·v1.35.5는 ubuntu 24.04 ·
+  rhel 9.6뿐**, ubuntu 22.04는 v1.34.3 이하(rhel 9.4/8.10 동반), rhel 8.8은 end_of_support.
+  → 시나리오가 [1]로 생성하는 규약이라 목록이 한 칸 밀리는 순간 하드코딩 `image_os_version:
+  22.04`가 create-nodepool 400 `scp-kubernetes.nodepool.invalid-os-image`가 된다(3e67은 [1]=v1.34.3
+  이라 22.04로 통과, 915f는 [1]=v1.35.5라 실패). 문서(createnodepool 1.5/1.6) 예시는 여전히
+  `22.04 + v1.29.8` — 예시가 아니라 listimages 응답이 정본.
+- 수리: `list-images`에서 `{kube_ver}`/`{kube_ver_next}`에 맞는 ubuntu `os_version`을 캡처
+  (`np_os_ver`/`np_os_ver_next`, where_prefix 토큰 치환) → create-nodepool `image_os_version`,
+  upgrade-nodepool `os_version`에 주입. 같은 OS끼리(24.04→24.04) 노드풀 업그레이드는 미실측.
+- 잔여 하드코딩: gen-heavy-aimlops(create-ske-nodepool v1.33.5+22.04 핀, 아직 유효 쌍) ·
+  gen-quick-query(v1.33.5+22.04, 어차피 500 ContactAdmin 클래스) — v1.33.5가 목록에서 빠지면 동일 수리.
+
+## run 915f 최종 판정 — 9/17 수리 3건 라이브 확정 (2026-09-17, 20260917-171126-915f)
+
+- **결과**: 124 lifecycle · **120 pass / 4 fail** (89de 91/33 → 개선 53 EP / 회귀 2 EP, `tools.triage_run --diff`).
+- **존**: 요청 바디의 존 문자열 전부 `kr-west1-b`(34), 존 클래스 에러 0 — `.env` 핀 제거 + 존 가드 경로 정상.
+- **DBaaS DATA 디스크**: mysql 4 · postgresql 4 · mariadb 3 · epas 3 create 전부 202; 후속 `add-block-storages`
+  202 ×5, `block_storage_groups[1]`(DATA) resize 202 ×6 — 인덱스 캡처 무변경 판단 적중. (cachestore-version-
+  upgrade의 resize-block-storage 400 InvalidBlockStorageRoleType은 [0]=OS를 겨냥하는 기존 soft 스텝, 별건.)
+- **DC**: 3 lifecycle create 전부 **기본 바디(존 없음)로 202** — 이 계정(단일존)에서는 fallback 재전송이
+  발동하지 않았다. `required-zone` 경로는 오프라인 테스트로만 검증됨 — multi-zone 계정 런에서 첫 실측.
+- **ske**: `create-nodepool 400 scp-kubernetes.nodepool.invalid-os-image "No image matches request:
+  os_distro=ubuntu, os_version=22.04, k8s_version=v1.35.5, gpu_driver=None, server_type_id=s2v1m2"` —
+  진단 그대로. 수리(list-images 캡처)는 다음 런 판정.
+- **secretsmanager `check-namespace-error` (신규 클래스, PF 후보)**: `POST /v1/secrets` 완전한 바디(kms_id
+  실존·name 규격·acl_cidr)에 400 `scp-security.secretsmanager.check-namespace-error` "Secrets Manager Check
+  Namespace Error" — 89de·915f 두 런 연속, 두 lifecycle(gen-wave2-sec·security-secretsmanager-writes) 동일.
+  같은 lifecycle의 random-password 200. 서버측 네임스페이스 점검 장애로 추정 — 바디 결함 근거 없음.
+- **회귀 2**: resourcemanager `GET/PUT /v1/tags/{rg_srn}/bulk` 200→404 — 계정 픽스처 클래스(이전 403·404 왕복).
+
+## 신규 API 모수 편입 1단계 — search-index 기반 카탈로그 재수집 (2026-09-18)
+
+- `spec.extract_catalog` discovery를 `search-index.json`(minisearch storedFields, ko 리프 페이지)로 교체:
+  **1,417 → 1,490** (added 74 · removed 1 cssdlan · version-bumped 881, method/path 변경 0), 1,490 전부
+  resolved. 바닥 게이트(기존의 90% 미만이면 미기록, `--force`) 내장. 캐시 `data/.search-index.json`
+  (86MB, gitignore) — `--fresh`가 재다운로드. `spec.diff --mark` → `data/spec_diff_latest.json`(marks 955).
+- 요청 바디는 인덱스 본문의 "Request body {…} Example HTTP response"에서 페이지 fetch 없이 추출
+  (`spec.extract_bodies --from-index --redo-marked`): 변경/신규 write 477/477 확보(97개는 `_raw`).
+  `spec.scrape_docs --redo-marked`가 api_docs.json 재스크레이프(881 변경 + 74 신규 + 신규 모델).
+- **버전 핀 재생성기 신설** `spec.refresh_versions`: `api_endpoint_versions.json`은 카탈로그 CURRENT
+  버전(1,490/63 서비스), `api_versions.json`은 docs 버전 페이지(62) + 카탈로그 최대(costexplorer 1).
+  제품 핀 29개 상향(예: ske 1.5→1.6, vpc 1.3→1.4, mysql 1.2→1.3, sts 1.1→1.3; 신규 4 = 1.0).
+  **다음 런 판정 필수**: 오퍼링이 문서보다 뒤지면 406 NoSuchVersion 폭풍 — 그 경우 `SCP_API_VERSION_PIN=false`
+  (environments/README.md 3항) 또는 `SCP_API_VERSION_OVERRIDES`로 서비스별 되돌림.
+- `core.http_client._endpoint_version_for` 결함 표면화·수리: `GET /v1/replications/regions`(1.1)이
+  `GET /v1/replications/{}`(showreplication 1.2)와 동시 매치 → 종전 "2개 매치=모호" 규칙이 None →
+  제품 핀. 이제 리터럴 세그먼트가 많은 shape 우선(같은 구체성에서 버전이 갈릴 때만 None).
+- coverage_gap(카탈로그 갱신 직후, lifecycle 미작성): reachable 1,337/1,490 (89.7%), 갭 153 —
+  messagehub 25 · resourceoptimizer 24 · ske 6 · servicewatch 5 · budget 2 · costnavigator 2 ·
+  organization 2 · cnapp 2 · kms 2 · baremetal 1 · vpc 1 (+ 기존 baremetal-blockstorage 35 ·
+  archivestorage 20 · cloudmonitoring 10 · cdn 8 등 waiver 클래스).
+
+## application-service/messagehub — modeling pass, 0 -> 0 GAP (2026-09-18)
+
+New product from the 2026-09-18 catalog rebuild (29 endpoints, 0 prior coverage).
+This was a **read-only-live / docs-modeling** pass (mandate: no live mutations —
+`SCP_ALLOW_MUTATIONS=false SCP_ALLOW_DESTRUCTIVE=false` for every live call made).
+New file: `regression/scenarios/lifecycles/generated__messagehub.json` (4
+lifecycles: domain / email / phone / push-application). Static gap
+25 -> 0 (`python -m spec.coverage_gap --service messagehub`), `validate` 0
+errors/0 warnings. **Bodies/response-shape facts below are FROM DOCS** (docs
+search-index text via `spec.extract_catalog.index_body_texts` + the live doc
+pages, `data/api_bodies.json`) and are **NOT runtime-mutation-proven** — only
+the host/auth facts marked VALIDATED AT RUNTIME below were actually exercised
+live this session.
+
+- **VALIDATED AT RUNTIME (2026-09-18, kr-west1/e, read-only GET)**: host
+  resolves via the standard per-service regional template —
+  `https://messagehub.<region>.<env>.samsungsdscloud.com` (no
+  `SCP_SERVICE_HOSTS` override needed) — and HMAC auth works: `GET /v1/domains`,
+  `/v1/emails`, `/v1/phones`, `/v1/push-applications` all returned `200` with an
+  **empty** resource list (`{"count":0,"domains":[],...}` etc.) — this test
+  account currently owns zero messagehub resources of any kind.
+- **From docs — resource model**: 4 resource families — domain (5 endpoints),
+  email (8), phone (9), push-application (7). Every family has
+  create(POST)/list(GET)/show(GET id)/delete(DELETE id) + `PUT .../description`
+  (sync, 200, returns the full Show-shape response) EXCEPT push-application,
+  which has **no create endpoint at all** — confirmed by grepping
+  `core.catalog.endpoints()` for every `push`-keyed entry across **all**
+  services in the full 1,490-endpoint catalog: only list/show/delete/
+  set{description,private-acl,public-acl,private-endpoint} exist (7
+  endpoints, no POST /v1/push-applications). Push applications are evidently
+  provisioned out-of-band (console-only, or an uncatalogued mobile-push
+  registration flow) — **this is a genuine product/catalog gap**, not
+  something a coverage agent can work around from this API alone. Recorded as
+  a blocker in `data/coverage_ledger.json` (service `messagehub`).
+- **From docs — async envelope**: every create/delete AND every
+  `private-acl`/`public-acl`/`private-endpoint`/`use-caller` setter returns
+  `202 Accepted` with `AsyncResponse {account_id, global_request_id,
+  resource_id}` — `resource_id` IS the new resource's id (same field name the
+  show/list responses key the resource on: `id`). Only the `description`
+  setters (`setdomaindescription`/`setemaildescription`/`setphonedescription`/
+  `setpushapplicationdescription`) are **synchronous 200**, returning the full
+  Show-response envelope (`$.domain`/`$.email`/`$.phone`/`$.push_application`).
+- **From docs — bodies**: `createdomain` needs `email_domain` (+ optional
+  `description`/`tags[]`); `createemail` needs `email_address`; `createphone`
+  needs `country_code` + `phone_number` (+ optional `owner`/`description`/
+  `tags[]`); `private-acl` setters take `private_access_resources[]` (each
+  `{id, ips[], name, type}`, doc example `type: "virtual_server"`);
+  `public-acl` setters take `public_access_ip_addresses[]` (CIDR strings);
+  `private-endpoint` setters take `{private_endpoint_enabled: bool}`;
+  `setphoneusecaller` takes `{use_caller: bool}`. Exact example values live in
+  `data/api_bodies.json` under each `application-service/messagehub/<op>` key.
+- **UNCONFIRMED — `phone_number` format**: neither the search-index text nor
+  the live doc page HTML (`createphone/1.0`, fetched 2026-09-18 via the
+  agent-proxy CA bundle) exposes a regex/pattern for
+  `PhoneCreateRequest.phone_number` beyond the example `"01012341234"`
+  (11 digits, no separators, KR-mobile shape) — the docs site is a
+  client-rendered SPA and the SSR'd HTML only carries the same example text as
+  the search index, no schema-constraints section. The lifecycle uses
+  `{epoch_now}` (pure-digit builtin) directly as `phone_number` for
+  cross-run uniqueness (avoids `409 Conflict` on rerun); this does **not**
+  match the example's 11-digit shape and may 400 on a strict format check —
+  next live-mutation run should confirm and, per the masked-defect lesson, fix
+  from whatever the real error message names.
+- **UNCONFIRMED — verification lifecycle**: `domain`/`email` show responses
+  include `verification_state`/`spf_record_state` (doc example always shows
+  `CONFIRMED`, which is fake example data). Since this suite doesn't own
+  `example.com`, a real create against `regr{unique}.example.com` /
+  `regr{unique}@example.com` will likely stay `PENDING` — this should not
+  block the CRUD steps (create/show/set/delete all key off the resource id,
+  not verification state), but the `poll ... until ["ACTIVE"]` steps in the
+  new lifecycles are a best-effort guess at post-create `state` and may not
+  converge (hence `give_up_status: [400, 404]` on every poll — a non-converged
+  poll doesn't hard-fail the lifecycle).
+
+## management/resourceoptimizer — modeling + read-only-live pass, GAP 24 -> 0 (2026-09-18)
+
+New product from the 2026-09-18 catalog rebuild (24 endpoints, 0 prior
+coverage). SCP's resource-rightsizing / idle-detection advisor: account- and
+organization-scoped rightsizing settings, a dashboard, idle-resource list, and
+recommendations, split 11 id-bound GETs + 13 writes. Mandate was **modeling +
+read-only validation** (`SCP_ALLOW_MUTATIONS=false SCP_ALLOW_DESTRUCTIVE=false`
+semantics — every live call this session was a GET or a non-creating
+query-style POST; no create/update/delete/optin/optout/setlim was executed).
+New file: `regression/scenarios/lifecycles/generated__resourceoptimizer.json`
+(4 lifecycles: `resourceoptimizer-readonly`, `resourceoptimizer-account-settings`,
+`resourceoptimizer-organization-settings`, `resourceoptimizer-opt`). Static gap
+24 -> 0 (`python -m spec.coverage_gap --service resourceoptimizer`), `validate`
+0 errors. **14/24 endpoints were live-exercised this session** (8 real 2xx +
+6 reached-but-404-due-to-no-data) and recorded as `Observation`s; the remaining
+10 (the create/update/delete/optin/optout/setlim writes) are docs-derived and
+**runtime-UNPROVEN** — see `data/coverage_ledger.json` row `resourceoptimizer`
+for the exact split and next levers.
+
+- **VALIDATED AT RUNTIME (2026-09-18) — GLOBAL service, not regional**:
+  `resourceoptimizer.e.samsungsdscloud.com` (no region segment) signs and
+  authenticates correctly — real `200`s on `getaccount`/`listaccountsettings`/
+  `getaccountlimsettings`/`listorganizationsettings`/`getorganizationlimsettings`/
+  `getdashboard`/`getidleresourcelist`/`listrecommendationsbybody` with this
+  account's HMAC creds. `resourceoptimizer.kr-west1.e.samsungsdscloud.com` (the
+  regional template) has **no route at all** — the egress proxy rejects the
+  CONNECT (`502 Tunnel connection failed`), the same no-DNS signature as the
+  other account/org-scoped global services (`iam`, `organization`, `billingplan`,
+  `sts`, ...). `core/config.py` `DEFAULT_GLOBAL_SERVICES` updated to add
+  `resourceoptimizer` in the same commit as the lifecycle file — **without that
+  change every step in the new lifecycle 502s on the wrong host** instead of
+  reaching the API; `.env.example`'s `SCP_GLOBAL_SERVICES=` comment example
+  updated too.
+- **VALIDATED AT RUNTIME — account_id/organization_id are self-discoverable,
+  no cross-service org lookup needed**: `GET /v1/accounts/{account_id}`
+  (getaccount, `account_id` soft-captured from `iam`'s `GET /v1/access-keys`
+  `$.access_keys[0].account_id` — the standard pattern from
+  `management__iam.json`/`management__loggingaudit.json`) returns
+  `{account_id, account_name, account_type, analysis_status, organization_id,
+  status}` — `$.organization_id` is a real, populated org id
+  (`o-6d249f756f0c475fa1730fa9a40e3e78` on this account) **even though this
+  account is org-MEMBER not org-master**. This matters because
+  `management/organization`'s own `GET /v1/organizations` returns an **empty
+  list** for member accounts (masters-only visibility, per
+  `management__organization.json`) — that would have been a dead end as an
+  organization_id source. resourceoptimizer's org-scoped GETs (`listorganizationsettings`,
+  `getorganizationlimsettings`) both returned real `200`s for this MEMBER
+  account using that self-captured `organization_id` — **read access to
+  org-scoped resourceoptimizer settings is NOT master-gated** (unlike
+  `management/organization`'s own org-level reads/writes). Whether
+  org-scoped **writes** (`createorganizationsettings` etc.) follow the same
+  member-friendly rule is UNPROVEN (not live-tested this session — see the
+  `needs-peer` blocker in the ledger).
+- **VALIDATED AT RUNTIME — docs/live mismatch on `PERFORMANCE_PRIORITY` query
+  params**: `getaccountsettingdetail`/`getorganizationsettingdetail`
+  (`GET .../settings/detail?category=&lookback_period=&utilization_preset=&
+  cpu_threshold=&cpu_headroom=&memory_headroom=`) — the doc page marks
+  `cpu_threshold`/`cpu_headroom`/`memory_headroom` as query-**optional**
+  (`any of [enum, null]`) and describes them as auto-derived from
+  `utilization_preset`'s mapping table (e.g. `PERFORMANCE_PRIORITY` =>
+  `P99.5/20/20`). **Live reality**: omitting them 400s —
+  `{"code":"BadRequest","detail":"When PERFORMANCE_PRIORITY is selected,
+  cpu_threshold is required"}` — the API does NOT auto-fill from the preset;
+  the caller must send all 6 query params explicitly (matching the preset's
+  own documented mapping values for `PERFORMANCE_PRIORITY`/`MAX_SAVINGS`/
+  `SAVINGS_PRIORITY`/`MAX_PERFORMANCE`, or arbitrary values for `CUSTOM`, or
+  `null`s for `NONE`). With all 6 supplied, the endpoint returns a correctly-
+  shaped `404 {"code":"ResourceNotFound","detail":"Setting not found"}` on
+  this account (0 settings exist yet) — confirms the endpoint/param contract
+  is right, just empty-state. `category`/`lookback_period`/`utilization_preset`
+  missing alone 400s `"Field required"` x3 (3 required fields, matching docs).
+- **From docs — response envelopes**: `createaccountsetting`/
+  `createorganizationsettings` (`RightsizingSettingsResponse`) return
+  `$.items[0].id` — **a LIST**, not `$.id`, even for a single-category create.
+  `updateaccountsetting`/`updateorganizationsetting`
+  (`RightsizingSettingUpdateRequest`, PATCH `.../settings/detail`) require
+  BOTH `origin` (must exactly match the setting's current stored values — doc
+  says "with origin validation") AND `new_values` (the desired new values),
+  plus top-level `category`/`region_ids`. `deleteaccountsettings`/
+  `deleteorganizationsettings` take `deletion_groups`: a **list of groups**,
+  each group a list of setting_ids that share identical values (e.g.
+  `[[id1, id2], [id3]]`) — NOT a flat id list. `optin` (`POST
+  /v1/accounts/opt-in`) takes `account_ids` as a **list** even for one account;
+  `optout` (`POST /v1/accounts/{account_id}/opt-out`) takes no body.
+  `setaccountlimactive`/`setorganizationlimactive` (`LimActiveRequest`, PUT
+  `.../settings/lim`) are account/org-wide **toggles**, not creatable/
+  deletable resources — the new lifecycle sets them active then immediately
+  reverts to the account's observed baseline (`{lim_settings:[]}` i.e.
+  inactive) rather than leaving the shared test account's LIM posture flipped.
+  All bodies verified against `data/api_bodies.json` + the live doc pages
+  (`https://docs.e.samsungsdscloud.com/apireference/management/resourceoptimizer/apis/<op>/1.0/`)
+  — **NOT runtime-mutation-proven**.
+- **UNCONFIRMED — recommendation data availability**: this account's
+  `analysis_status` is `PENDING` (live-confirmed via `getaccount`) and
+  `getidleresourcelist`/`listrecommendationsbybody` both return `200` with
+  `0` items — SCP has not produced any rightsizing analysis output for this
+  account yet, so `showrecommendation`/`getrecommendationmetrics` (id-bound on
+  `recommendation_id`) currently only reach a correctly-shaped `404
+  ResourceNotFound` with a synthetic id — there is no real recommendation to
+  probe with. `capture_soft` on the list steps is already wired so a future
+  run automatically picks up a real id once analysis completes (whether that
+  requires an explicit `optin` call first, or happens automatically, is
+  unknown — see the `heavy-prereq` blocker in the ledger).
+
+## vpc 1.4 핀 → VpcCreateRequestV1Dot4 `zone_type` 필수 (2026-09-21, run 20260921-094658-d961)
+
+- 9/18 버전 핀 재생성으로 vpc 제품 핀이 1.3→1.4가 되자 `POST /v1/vpcs`가 즉사: V1Dot4 모델은
+  **`zone_type` 필수**(enum PUBLIC/PRIVATE/ACCELERATED), `zones` 선택(PRIVATE/ACCELERATED는 1개 필수).
+  기존 바디(cidr/name/description/tags)만 보내던 엔진 공유 VPC 1곳 + 시나리오 create-vpc 70곳이 전부
+  거절 → VPC를 만들거나 빌리는 43 lifecycle이 시작 2초 만에 fail 6 / skip 37(IB-049). GET 핀(vpc 1.4 ·
+  mysql 1.3 · ske 1.6 · lb 1.4)은 200 — 핀 전체 문제가 아니라 **바디 모델 변경** 클래스.
+- 수리(2차, 라이브 프로브 2026-09-21 01:27Z): 1차 수리의 `zones: [{zone}]`도 거절 — **PUBLIC에는 zones를
+  주면 400 `scp-network.vpc.zone-cannot-be-specified` "Cannot specify zones when the zone type is PUBLIC"**;
+  `zone_type: PUBLIC` 단독은 201이고 응답 `vpc.zones=['kr-west1-b']`(서버가 계정 존 배정, 단일존). 문서 모델의
+  "zones 선택"은 PRIVATE/ACCELERATED에만 해당. 71곳 `zone_type: PUBLIC`만 전송(run 9420도 같은 사유로 VPC
+  계열 전멸). 즉시 우회 `SCP_API_VERSION_OVERRIDES=vpc=1.3`는 수리 반영 후 제거.
+- 교훈: 버전 핀 상향은 **write 바디 모델 변경을 동반**할 수 있다. 다음 핀 상향 전 `data/api_bodies.json`
+  (신규 모델 예시)과 시나리오 바디의 필수 필드 차이를 정적으로 대조하는 게이트가 필요(후속 큐).
+
+## 런 전 자원 정리 (2026-09-21) — 좀비 레지스트리 PF-58, IAM 게이트 로그그룹
+
+- `cleanup.verify_clean`(read-only) → 이 컨테이너의 오프라인 테스트가 남긴 가짜 원장(`reports/registry/*.jsonl`,
+  vpc-a/own-1 등)이 "vpc 37 · lb 6 survivors"로 잡혔다 — **오프라인 스위트 실행 후에는 원장 shard를 지우고 스캔**
+  (실자원 아님). 실자원 잔존은 scr 레지스트리 1 + servicewatch 로그그룹 20뿐.
+- 리컨실러 sweep(IGNORE_TTL): 로그그룹 5 삭제, ske 로그그룹 19는 IAM 게이트 자식 로그스트림 때문에 삭제 불가
+  (기지 클래스, 런에 무해). 레지스트리 `regr0c552158`는 DELETE/PUT 모두 409 delete-conflict "already deleting"
+  (Error 상태 2개월) — **PF-58**, API로 해제 불가, VISIBILITY quota 1EA를 점유 → scr-repo-borrow 403은 해제 전까지 expected.
+- 리컨실러 레지스트리 접두 `("regrscr",)` → `("regrscr","regr")`: borrow 폴백이 `regr{unique}`로 만든 레지스트리가
+  두 달간 소유 판정 밖에 있었다.
+
+## run eb41 판정 (2026-09-21, `20260921-105412-eb41`) — 124 lifecycle 112 pass / 7 fail / 5 skip
+
+- 406 NoSuchVersion 0건, 존 문자열은 kr-west1-b 뿐 → 9/18 버전 핀 29개 상향과 존 가드는 실효. skip 5 = VPC 5-cap
+  `exceed-max-count`(reserve→skip 규약, 실패 아님). 기지 실패: secretsmanager ×2(PF-54) · scr quota(PF-58).
+- **버전 핀 상향이 드러낸 write 모델 변경 4건(모두 시나리오 수리 완료, 라이브 미검증)**:
+  - ske 1.6 `POST /v1/clusters` — `ClusterCreateRequestV1Dot6`는 `subnet_id`→**`default_subnet_id`(필수)**, `volume_id`·
+    `cloud_logging_enabled` 삭제, `additional_subnet_id_list`/`nfs_volume_id`/`deletion_protection_enabled` 선택.
+    구 바디 400 `Field required` (container-ske-cluster-nodepool + cloudml/aimlops 3곳 수리).
+  - scf 1.5 `PUT .../environment-variables` — `FunctionVariablesV1Dot5`에 **`encryption.server_side_encryption_enabled` 필수**
+    (915f 구 핀 200 → eb41 400). `encryption: {server_side_encryption_enabled: false}` 추가.
+  - vpc 1.4 `GET /v1/vpc-endpoints/connectable-resources` — 쿼리 **`vpc_id` 필수**(카탈로그 params 일치). 미전달 400 → 캡처
+    미스 → create-vpc-endpoint 400 연쇄(2 lifecycle). params에 `vpc_id: {vpc_id}` 추가.
+  - virtualserver 1.4 `POST /v1/auto-scaling-groups` — `zones` 필수(7/15 실측·노트만 있고 바디 누락) → `zones: ["{zone}"]`.
+- loadbalancer 1.4: `PUT /v1/lb-health-checks/{id}` set이 **202 비동기 + hc를 EDITING으로 전이** → 직후 server-group create가 400
+  `LbHealthCheckInvalidState`. set 뒤 ACTIVE settle 폴(`wait-lb-health-check-after-set`) 삽입 (gen-heavy-lb-members).
+- heavy-shared-networking `setlblistener`: 스펙 예제 그대로의 빈 문자열 바디(`port: ""`, `idle_timeout: ""` …)는 타입 검증 400 —
+  최소 타입 바디(description + session_duration_time)로 축소. 예제 바디를 그대로 쓰면 안 되는 클래스.
+- **신규 상품이 "전체" 선택에서 빠진 이유(구조)**: 콘솔 UI는 formal 노드(lifecycle-bearing)가 있는 서비스만 열거·전송하고
+  (`console2.js allSelectableServices`), 서버 scope 확장은 `enabled AND role==verify`만 포함. messagehub/resourceoptimizer/
+  costnavigator는 formal 노드가 없어 서비스 자체가 전송되지 않았고, newapi probe 8종은 role=probe라 제외됐다(eb41에서
+  vpc-privatelink 1개만 실행). 수리: formal yaml 3파일(ap-mh · mg-ro · fm-cn 노드) + lifecycle `_scope_include`(명시 opt-in,
+  역할 파생은 유지) 9곳 → 서비스 선택 시 13 lifecycle 합류(resourceoptimizer-organization-settings는 오너 결정 대기로 미포함).
+- 미해결: networking-vpc-subnet `include-vp-cidr`(subnet 10.130.13.0/24 vs 자기 VPC 10.123.0.0/20) — net-A(10.130.0.0/20)를
+  빌리지 못하고 자체 VPC를 만든 경로. 오너 런 로그의 provision 줄(`grep -nE "provision|shared" reports/console2-runs/20260921-105412-eb41.log`)
+  로 net-A 미프로비저닝 사유 확인 필요.
+
+## run 643b 중간 판정 (2026-09-21, `20260921-123827-643b`) — 공유 net-A/B VPC 바디에 zone_type 누락
+
+- 신규 상품 편입 실효: eb41에서 빠졌던 신규 lifecycle 13개 전부 실행(10 pass; messagehub-email/phone create,
+  resourceoptimizer-readonly 실패 — 스텝 원인은 아티팩트 대기).
+- **eb41의 "skip 5 = VPC 5-cap" 판정은 오판**: skip 5(gen-direct-connect · gen-wave5-fw · networking-direct-connect-routing ·
+  vpc-privatelink-service · vpc-subnet-vip-nat)와 fail 1(networking-vpc-subnet)은 전부 `vpc#a`/`vpc#b` 채택자. 엔진
+  `provision_shared_vpc`의 **net-A/B 바디(`create-shared-net-vpc-a/b`)에 `zone_type`이 빠져** 9/21 1차 수리(메인 공유 VPC만)
+  이후에도 두 런 내내 400 → vpc#a 채택자는 자체 VPC(10.123.0.0/20)로 폴백해 서브넷 10.130.13.0/24가 CIDR 불일치, vpc#b
+  사용자는 IB-049 스킵. 프로비저닝 스텝은 아티팩트 events.jsonl에 기록되지 않아(콘솔 로그에만) 두 런 동안 보이지 않았다.
+  수리: net-A/B 바디 `zone_type: PUBLIC` + 오프라인 가드(모든 POST /v1/vpcs 바디 — 엔진·시나리오 — zone_type 필수).
+- gen-heavy-lb-members: hc set 뒤 settle 폴로 server-group create는 통과(eb41 대비 전진), 이후 스텝에서 실패 — 아티팩트 대기.
+
+## run 643b 최종 판정 (2026-09-21, `20260921-123827-643b`) — 137 lifecycle 123 pass / 9 fail / 5 skip
+
+- **eb41 수리 5건 전부 라이브 확정** (`tools.triage_run --diff eb41`: 개선 6 / 회귀 2): vpce connectable-resources `vpc_id` 200 →
+  create-vpc-endpoint 202 · ASG `zones` 201 · ske 1.6 `default_subnet_id` 202(노드풀까지 생성, OS 버전 캡처 실효) ·
+  scf `encryption` 200 · lb-listener 최소 바디 200. 신규 상품 13 lifecycle 전부 실행(10 pass).
+- **엔진 결함 — POST 읽기 타임아웃 후 맹목 재전송**: create-kms 는 03:39:14 에 서버가 키를 만들었지만 응답이 타임아웃(~60s)
+  → 엔진 `_run_step` 의 "transport blip 1회 재시도"가 같은 POST 를 다시 보내 400 `scp-security.kms.duplicate-name`, 고아 키
+  `regrswkmsa6dd4ca5` (sweep 이 접두로 회수). `core.http_client.NO_RETRY_ON_EXCEPTION` 과 같은 규칙을 엔진에도 적용: POST/PATCH 는
+  connect 계열(서버 미도달)만 재시도, read timeout 은 raise. 오프라인 테스트 4종.
+- messagehub: domain 전 과정 202/200 LIVE PROVEN. **email create 409 `Conflict` "An identical request is currently being processed"**
+  — 같은 초에 병렬 발사된 domain/email/phone create 를 서버가 동일 요청으로 오판(PF-61) → 409 사다리. **phone create 400**
+  "Phone number must be under 15 digits without hyphen" — `{epoch_now}` 단독 값이 정수로 직렬화된 게 원인(문자열 필수). `"01{epoch_now}"`.
+- resourceoptimizer: **opt-out 200 이 공유 계정을 즉시 INACTIVE 로**(9/18 baseline ACTIVE: settings 200 count:0) 만들고 opt-in 은
+  PENDING 재가입만 반환(분석 이력 초기화). 병렬 readonly 가 404 "Account is not Active" ×4. opt-out 스텝 제거(optout 커버리지 포기),
+  settings 4 스텝 404 관용 — 다음 런에서 ACTIVE 복귀 판정.
+- loadbalancer 1.4: server-group create 도 202 비동기(CREATING) → 직후 PUT set 400 InvalidState (hc 와 동일 클래스) → settle 폴 삽입.
+- ske 1.6: 클러스터 업그레이드(v1.35.5→v1.36.3) 직후 노드풀 scale-up **500 ContactAdminForAssistance** (PF-60). 60s×3 사다리.
+  teardown VPC delete 409 는 그 500 실패 후 cleanup 경로에서 클러스터 비동기 삭제가 VPC 를 잡은 타이밍 — sweep 회수 확인.
+- heavy-shared-networking: `POST /v1/private-dns/activate` 400 max-count-exceed(계정 활성화 quota 소진) 가 group 'dns' 를 통째로
+  스킵시켜 wait 미실행 → set/delete 400 CREATING → VPC delete 409 related-resource(private-dns). activate 를 별도 optional group 으로,
+  delete 에 invalid-state 코드 사다리, setprivatedns `connected_vpc_ids` 실 id, setlbhealthcheck TCP 바디에서 HTTP 전용 필드 제거
+  (400 InvalidParameter "protocol 'TCP' cannot have response_code/http_method/health_check_url/request_data").
+- resourcemanager 회귀 2(200→401 HmacValidFail): `list-resources[0]` 이 글로벌 IAM 리소스(region '')라 컴포넌트 경로가
+  `/v1/tags//iam/...` 빈 세그먼트 → 서명 불일치. `{region}` 접두 필터 캡처로 리전 리소스 선택.
+- organization `GET /v1/organizations?limit=1` 400 "Extra inputs are not permitted" — limit 쿼리 미지원, 제거.
+- 런 후 잔존: 좀비 scr 레지스트리(PF-58) + IAM 게이트 ske 로그그룹 20 뿐(`cleanup.verify_clean`); sweep 이 VPC/private-dns/kms 전부 회수.
+
+## run 4beb 최종 판정 (2026-09-21, `20260921-155909-4beb`, 레지스트리 삭제 후) — 137 lifecycle 132 pass / 5 fail / 0 skip
+
+- 643b 수리 실효(`--diff 643b` 개선 12 / 회귀 4): scr-repo-borrow pass(PF-58 해소), email 409 사다리 → 202, resourceoptimizer 계정
+  ACTIVE 복귀(settings 4 스텝 200; opt-in 은 이미 가입이라 400 — 관용), rm 컴포넌트 경로 401→200, ske scale-up 500→200(60s 사다리),
+  org list 400→200. **net-A/B zone_type 수리로 skip 0** — 채택자 6 전부 실행, 5 pass.
+- **gen-wave5-fw (첫 실제 실행, firewall 1.2)**: IGW→방화벽 조회→wait→show→rules→set-loggable→rule create/wait/show 까지 전부 2xx,
+  `PUT /v1/firewalls/rules/{id}` 만 400 'Field required' — 1.2 요청 모델 `FirewallRuleUpdateSingleRequest = {firewall_rule:
+  FirewallRuleCreateRequest}`(status 필수). 평면 1.1 바디를 래핑 + status. 방화벽 제품 핀은 없음(서버 CURRENT).
+- **gen-heavy-lb-members**: listener 폴 필드 `$.listener.status`→`state`(문서 ListenerForShowV1Dot3) 로 300s 타임아웃 해소 후,
+  멤버 create 400 'It is not a valid ip format.' — showserver 응답이 `$.addresses[{ip_address}]` 평면인데 캡처가
+  `addresses[0].ip_addresses[0].ip_address` 라 리터럴 `{member_vm_ip}` 송신. 캡처 수정. (런마다 한 단계씩 전진: hc→sg→listener→member)
+- **hosted zone 캡처**: createhostedzone 202 응답은 최상위 `{id,…}` — `$.hosted_zone.id` 미스(heavy-shared-networking + stale
+  networking-dns-hosted-zone). 미스 → zone delete 404 → private-dns delete 409 → VPC delete 409 related-resource(sweep 회수).
+- **privatelink service IP 충돌**: 고정 `service_ip_address 10.124.0.7` 이 공유 서브넷에서 병렬 lifecycle VM 의 DHCP 주소와 충돌
+  (400 service-ip-address-in-use; 643b 는 .8 배정이라 무충돌). in-use 코드에만 반응하는 fallback_on_error_code 로 .237/.238 재전송.
+- messagehub-phone(오너 유예): 문자열 `"011789973993"` 도 400 BadRequest 'Invalid phone number.' — 자릿수 규칙 통과 후 번호 유효성
+  검증 단계(실제 통신사 번호 형식 필요 추정). 온보딩 프로세스 확인 후 재개.
+- eventstreams `GET /v1/requests/{request_id}` 400 `Dbaas.ResourceError.NotFound`(643b 200) — create 응답 request_id 로 즉시 조회 시
+  미등록 창 추정, optional 이라 non-red. 다음 런 재확인.
+- 런 후 잔존: IAM 게이트 ske 로그그룹 20 뿐(`cleanup.verify_clean`) — VPC/private-dns/hosted zone 전부 sweep 회수.
+
+## run 59a9 최종 판정 (2026-09-21, `20260921-172913-59a9`) — 133 lifecycle 130 pass / 3 fail / 0 skip
+
+- 4beb 수리 4건 라이브 확정(`--diff 4beb` 개선 6 / 회귀 4): firewall 1.2 rule set 래핑 202 → **gen-wave5-fw 첫 완주**; 멤버 IP 캡처 →
+  **gen-heavy-lb-members 첫 완주**(멤버 create/set/bulk + 2nd LB 포함, 4런에 걸쳐 hc→sg→listener→member 전진); privatelink service IP
+  fallback 200; eventstreams request GET 200(전 런 400 은 등록 지연 창). 실패 = 기지 PF-54 ×2 + heavy-shared-networking.
+- **heavy-shared-networking = 환경 클래스**: `POST /v1/private-dns` 가 dns 호스트 read timeout(60s) — 새 정책(POST 읽기 타임아웃은
+  재전송 안 함) 대로 raise → lifecycle fail, 이후 VPC delete 409 related-resource. 서버가 private-dns 를 만들었을 가능성(응답만 유실)
+  이라 sweep 이 회수(`verify_clean` 잔존 = 로그그룹 20 뿐). 구 정책이었다면 중복 생성으로 더 나빴을 케이스. 재현 시 dns 서비스 지연 PF 후보.
+- 회귀 4(모두 soft): resourcemanager 컴포넌트 경로 404 ×3 — 리전 필터 [0] 이 병렬 lifecycle 의 servicewatch 로그그룹이라 스텝 도중
+  삭제됨 → `resource_type=vpc&sort=created_at:asc` 로 공유 VPC 선택(라이브 미검증). filestorage snapshot restore 409
+  'Latest snapshot is not available'(create 2초 뒤) → 코드 사다리 10s×6.
+- 잔여 actionable 은 전부 기지 픽스처/제품 클래스: scf codes/file 400 · scr private-acl 409 edit-conflict · filestorage access-rules
+  404 · gen-heavy-vs-netops image member 404 · quick-query validate 500 · support 404 ×2 · rm tag-rg 403 · PF-54 ×2.
+
+## PF-54 근본 원인 좁힘 (2026-09-21): secretsmanager `check-namespace-error` 는 계정 전환 산물
+
+- 8/20 run 3e67 은 **같은 바디**(kms_id 실존·name 규격·acl_cidr·private_acl_enabled "false")로 `POST /v1/secrets` 201 (계정 d86edc08).
+  9/17 89de 부터 6런 연속 400 은 전부 **새 계정 81eccb26(API_Regression2)** — 바디·핀(secretsmanager 핀 없음)·코드 무변, 계정만 다름.
+- 결론: 새 계정에 Secrets Manager 네임스페이스(SCP 관리형 KMS 키)가 초기화돼 있지 않다. `POST /v1/secrets/kms-key`("create secrets
+  manager kms key", body `service_name`)가 2026-09 카탈로그에 재등장(7월엔 미라우팅 404 로 스텝 제거) — 이것이 초기화 API 로 추정.
+  오너 콘솔 활성화 또는 그 API 1회 호출 후 재런 판정. 그 전까지 PF-54 는 expected.
+- private-dns 는 생성 자체는 매 런 202(9~11s): 59a9 의 실패는 dns 호스트 read timeout 1회(환경). `POST /v1/private-dns/activate`
+  400 max-count-exceed 는 별개 — 계정 활성화 quota(1) 이미 소진 = 이미 활성화된 상태의 재활성화 거절(관용 처리됨).
+- **(2026-09-21 라이브, 오너 승인 "2번으로 해봐") `POST /v1/secrets/kms-key` 는 404 NotFound** — `service_name` "" 와 "secretsmanager" 모두
+  (req-b850727d · req-d87318c1). 현재 카탈로그에 없는 엔드포인트(api_docs.json 의 항목은 7월 스크레이프 잔존 = stale; 1,492 vs 1,490 차이의
+  하나). API 로는 네임스페이스 초기화 불가 → 콘솔 활성화 또는 SDS 문의. lifecycle 에 넣었던 프로브 스텝은 제거(매 런 404 소음 방지).
+  "이미 KMS 에 키가 있는데?" → 그 30개는 전부 managed_type 'user'(우리 transit 키); check-namespace-error 가 가리키는 건 SCP 관리형(scp) 키다.
+- **(2026-09-21 10:54Z) 콘솔에서 secret 생성 후에도 API 는 그대로**: 오너가 콘솔(kyuh.choi+areg2, 암호화 키 scp/secretsmanager)로 secret 을
+  만들었다고 한 직후 `GET /v1/secrets` 는 **count 0**(API 키 사용자 732e2090… 에겐 보이지 않음), `POST /v1/secrets`(새 Active 사용자 키) 는 여전히
+  400 check-namespace-error. 즉 네임스페이스는 계정 단위가 아니라 **호출 주체(IAM 사용자/액세스키) 단위**로 보인다 — 구 계정 키의 사용자는
+  콘솔 사용자였고, 새 계정 키는 API 전용 사용자. 다음 판별: 콘솔 사용자의 액세스키로 같은 호출, 또는 SDS 문의(Secrets Manager 가 요구하는
+  사용자 네임스페이스 조건). 프로브 KMS 키 2개는 삭제(204).
+
+## run ec8b 최종 판정 (2026-09-21, `20260921-195626-ec8b`) — 133 lifecycle 116 pass / 17 fail / 0 skip (59a9 130/3)
+
+- **11:04~11:09Z kr-west1 프로비저닝 플레인 장애 창(PF-62)**: 같은 초(11:03:48)에 202 로 받은 DBaaS 클러스터 8개(mysql/mariadb/
+  postgresql/epas/cachestore/eventstreams 계열)가 3~5분 뒤 전부 state **FAILED**(터미널) · gen-heavy-backup 의 서버 **ERROR** ·
+  `POST /v1/servers` **500 ContactAdminForAssistance**(vs-server-actions-verify) · `POST /v1/volumes` **500 InternalServerError**
+  (gen-heavy-vs-netops) · compute-virtualserver-full 의 서버는 `addresses: []` 로 IP 없이 생성(→ gen-heavy-lb-members 멤버 IP 캡처 미스).
+  그 창 밖(11:10 이후) 의 같은 종류 create 는 정상. 시나리오 결함 아님 — 13 lifecycle 이 한 창에서 실패한 유일한 사례.
+- heavy-shared-networking: hosted zone 캡처 수리로 존 삭제가 처음 실제 실행 → **레코드 미삭제로 409** → private-dns 409 → VPC 409.
+  dns-record-create 에 `record_id: $.id` 캡처 + dns-record-delete 선행 스텝(networking__dns.json 동일 패턴).
+- ske: scale-up 뒤 `wait-scale-up` 이 노드풀 status 만 폴 → 클러스터 UPDATING 인 채 set-nodepool-labels 400 `scp-kubernetes.cluster.status-
+  invalid` → teardown 노드풀 delete 400 → VPC 409. labels 앞에 wait-cluster-running-before-labels 삽입.
+- 런 종료 sweep 이 8라운드 캡 안에서 끝냈지만 잔존: hosted zone(레코드 보유) · private-dns · postgresql 클러스터 1(FAILED 상태 삭제 지연) ·
+  서브넷 1 · 로그그룹 20 → 원격 리컨실러로 회수 시도(결과는 CONTEXT).
+- **대시보드 발행 경로 신설**: 원격 세션엔 로컬 결과 저장소가 없어 `tools/events_to_observations.py` 로 아티팩트 step-end 를 통합 저장소
+  형식으로 복원(엔진과 같은 키: `<lifecycle>:<step>` + write/params-GET 의 카탈로그 키) → `tools/publish_dashboard.sh` → dashboard-data.
+  한계: 엔진 `_probe_reads` 의 bare id-bound GET 은 아티팩트에 없어 누락 → 콘솔이 observations/findings.jsonl 을 아티팩트에 미러하도록
+  수정(다음 런부터 `artifact/observations.jsonl` 우선 사용). ec8b 발행: ok 2015 · soft 369 · new 9 · known 5, C3 82.4%, 검증 EP +532.
+
+## PF-54 해소 (2026-09-22 04:19Z): Secrets Manager 개발팀 수정 후 API create 201
+
+- 오너 "개발팀에서 수정해 줬어" → 같은 lifecycle 바디(사용자 transit 키 kms_id · acl_cidr · private_acl_enabled "false")로 `POST /v1/secrets`
+  **201**, show 200, `POST .../values` 200(`{"k":"v"}` 복호화 확인), DELETE(waiting_time_ndays 7) 204. 6런 연속 400 check-namespace-error 는
+  서버측(새 계정/호출 주체 네임스페이스 초기화) 결함이었음이 확정 — 시나리오 변경 없이 다음 런에서 gen-wave2-sec·security-secretsmanager-writes
+  가 살아나는지 판정. 오너가 콘솔에서 만든 secret 은 오너가 삭제(API 사용자에겐 보이지 않았음).

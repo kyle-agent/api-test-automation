@@ -251,6 +251,18 @@ def provision():
     # our explicit SCP_SHARED_*= lines below reach STDOUT.
     import contextlib
     import os
+    # 존 가드 (2026-09-17 run 89de): stale한 SCP_ZONE 핀(kr-west1-a)이 zone을
+    # 싣는 lifecycle 20여 개를 첫 create에서 전멸시켰다. 공유 VPC를 세우기
+    # 전에 read-only 프로브로 `{zone}`을 검증하고, 형제 존만 유효하다고
+    # 확정되면(enforce 기본) 여기서 멈춘다 — exit 2, SCP_SHARED_* 미출력.
+    # 프로브 실패/판정불가는 경고만(가드가 런을 죽이면 안 됨). SCP_ZONE_CHECK
+    # =warn|false 로 강등/생략. 콘솔2는 같은 가드를 pre-flight에서 먼저 돈다.
+    from regression.scenarios import zone_guard as _zg
+    try:
+        _zg.enforce(client, cfg, log=_eprint)
+    except _zg.ZoneGuardError as exc:
+        _eprint(f"[shared_infra] 존 가드 차단 — 프로비저닝 중단: {exc}")
+        return 2
     shared_ctx = {}
     needs = shared_needs()   # ONE PASS: main/db/net/tgw/igw — 선택 기반 세분화
     # 기본 no-wait (2026-07-13, 오너 풀런에서 conftest 인라인 경로가 구식 대기를

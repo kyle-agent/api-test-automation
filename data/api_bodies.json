@@ -45,6 +45,17 @@
       "zone": "kr-west1-a"
     }
   },
+  "ai-ml/aimlops-platform/updateaimlopsplatformv1": {
+    "ai_ml_ops_platform_domain_service": {
+      "dns_id": "acdd205d-b1d3-44e7-ab7a-429ca090e941",
+      "domain_service_name": "sample.aimlopsplatform.com",
+      "ip": "192.168.3.197",
+      "operation_type": "CREATE | UPDATE | DELETE",
+      "record_id": "8af744b9-4893-4f98-881d-4df984de7162",
+      "record_name": "sample"
+    },
+    "ai_ml_ops_platform_endpoint_type": "Public | Private"
+  },
   "ai-ml/cloud-ml/createcloudml": {
     "analytics_resource": {
       "cpu": 0,
@@ -78,10 +89,370 @@
   "ai-ml/cloud-ml/updatecloudml": {
     "description": "147@53A69a"
   },
+  "application-service/apigateway/approveprivatelinkendpoint": {
+    "api_id": "31e749b7b260868f441e862b",
+    "type": "APPROVE"
+  },
+  "application-service/apigateway/connectprivatelinkendpoint": {
+    "api_id": "31e749b7b260868f441e862b",
+    "type": "DISCONNECT"
+  },
+  "application-service/apigateway/createaccesscontrols": {
+    "allowed_ip_addr": [
+      "127.0.0.1/24,192.168.127.12"
+    ],
+    "connected_stages": [
+      "dev,stg"
+    ],
+    "description": "description",
+    "name": "DenyTest"
+  },
+  "application-service/apigateway/createapi": {
+    "description": "description",
+    "endpoint_type": "REGION",
+    "id": "",
+    "name": "test-api",
+    "tags": [
+      {
+        "key": "key",
+        "value": "value"
+      }
+    ]
+  },
   "application-service/apigateway/createapideployment": {
     "description": "description",
     "stage_name": "test-stage",
     "stage_type": "new"
+  },
+  "application-service/apigateway/createapikey": {
+    "description": "description",
+    "name": "api-key-name"
+  },
+  "application-service/apigateway/createauth": {
+    "connected_stages": [
+      "dev,stg"
+    ],
+    "expiration_period": "90",
+    "name": "Token01"
+  },
+  "application-service/apigateway/createmethod": {
+    "api_key_required": false,
+    "endpoint_url": "https://127.0.0.1:8000",
+    "function_id": "27bb070b564349f8a31cc60734cc36a5",
+    "iam_enabled": false,
+    "integration_type": "HTTP",
+    "method_type": "GET",
+    "privatelink_endpoint_id": "27bb070b564349f8a31cc60734cc36a5",
+    "query_strings": "{'param1': 'value1', 'param2': 'value2'}",
+    "request_headers": "{'test1' : True}"
+  },
+  "application-service/apigateway/createprivatelinkendpoint": {
+    "description": "description",
+    "name": "endpoint",
+    "privatelink_service_id": "000000000000000"
+  },
+  "application-service/apigateway/createresource": {
+    "path_part": "test"
+  },
+  "application-service/apigateway/createstage": {
+    "deployment_id": "31e749b7b260868f441e862b",
+    "description": "description",
+    "stage_name": "test-stage"
+  },
+  "application-service/apigateway/createusageplan": {
+    "description": "description",
+    "limit": 10,
+    "name": "usage-plan-name",
+    "rate": "day"
+  },
+  "application-service/apigateway/requestprivatelinkendpoint": {
+    "type": "CANCEL"
+  },
+  "application-service/apigateway/setaccesscontrol": {
+    "allowed_ip_addr": [
+      "127.0.0.1/24,192.168.127.12"
+    ],
+    "connected_stages": [
+      "dev,stg"
+    ],
+    "description": "description"
+  },
+  "application-service/apigateway/setapidescription": {
+    "description": "description"
+  },
+  "application-service/apigateway/setapikeydescription": {
+    "description": "description"
+  },
+  "application-service/apigateway/setauth": {
+    "connected_stages": [
+      "dev,stg"
+    ]
+  },
+  "application-service/apigateway/setmethod": {
+    "api_key_required": false,
+    "endpoint_url": "https://127.0.0.1:8000",
+    "function_id": "27bb070b564349f8a31cc60734cc36a5",
+    "iam_enabled": false,
+    "integration_type": "HTTP",
+    "privatelink_endpoint_id": "27bb070b564349f8a31cc60734cc36a5",
+    "query_strings": "{'param1': 'value1', 'param2': 'value2'}",
+    "request_headers": "{'test1' : True}"
+  },
+  "application-service/apigateway/setprivatelinkendpoint": {
+    "description": "description"
+  },
+  "application-service/apigateway/setresourcepolicy": {
+    "policy_document": {
+      "Statement": [
+        {
+          "Action": [
+            "apigateway:InvokeApigatewayRegion"
+          ],
+          "Condition": {
+            "SrnLike": {
+              "scp:RequestAttribute/body['method-srn']": [
+                "srn:dev2::27bb070b564349f8a31cc60734cc36a5:kr-west1::apigateway:method/a4b19a70b596467fb010d3c3/*/GET/n-f"
+              ]
+            }
+          },
+          "Effect": "Allow",
+          "Principal": "*",
+          "Resource": [
+            "srn:dev2::27bb070b564349f8a31cc60734cc36a5:kr-west1::apigateway:api/a4b19a70b596467fb010d3c3"
+          ],
+          "Sid": "Statement1"
+        }
+      ],
+      "Version": "2024-07-01"
+    }
+  },
+  "application-service/apigateway/setstageactivedeployment": {
+    "deployment_id": "31e749b7b260868f441e862b"
+  },
+  "application-service/apigateway/setstageconfiguration": {
+    "allow_credentials": true,
+    "allow_headers": [
+      "Content-Type",
+      "Authorization"
+    ],
+    "allow_methods": [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH"
+    ],
+    "allow_origins": [
+      "*"
+    ],
+    "connected_api_keys": [
+      "key1",
+      "key2"
+    ],
+    "cors_enabled": false,
+    "description": "description",
+    "expose_headers": [
+      "test1",
+      "test2"
+    ],
+    "jwt_enabled": false,
+    "max_age": 3600,
+    "usage_plan_id": "27bb070b564349f8a31cc60734cc36a5"
+  },
+  "application-service/apigateway/setusageplandescription": {
+    "description": "description"
+  },
+  "application-service/apigateway/setusageplanquota": {
+    "limit": 10,
+    "rate": "day"
+  },
+  "application-service/messagehub/createdomain": {
+    "description": "description",
+    "email_domain": "example.com",
+    "tags": [
+      {
+        "key": "tagKey",
+        "value": "tagValue"
+      }
+    ]
+  },
+  "application-service/messagehub/createemail": {
+    "description": "description",
+    "email_address": "sample@example.com",
+    "tags": [
+      {
+        "key": "tagKey",
+        "value": "tagValue"
+      }
+    ]
+  },
+  "application-service/messagehub/createphone": {
+    "country_code": "82",
+    "description": "description",
+    "owner": "sample-owner",
+    "phone_number": "01012341234",
+    "tags": [
+      {
+        "key": "tagKey",
+        "value": "tagValue"
+      }
+    ]
+  },
+  "application-service/messagehub/setdomaindescription": {
+    "description": "description"
+  },
+  "application-service/messagehub/setemaildescription": {
+    "description": "description"
+  },
+  "application-service/messagehub/setemailprivateacl": {
+    "private_access_resources": [
+      {
+        "id": "8c9f6c1c928a45b4bbd1e4da5531d656",
+        "ips": [],
+        "name": "sample",
+        "type": "virtual_server"
+      }
+    ]
+  },
+  "application-service/messagehub/setemailpublicacl": {
+    "public_access_ip_addresses": [
+      "10.0.0.0/24"
+    ]
+  },
+  "application-service/messagehub/setenableemailprivateendpoint": {
+    "private_endpoint_enabled": true
+  },
+  "application-service/messagehub/setenablephoneprivateendpoint": {
+    "private_endpoint_enabled": true
+  },
+  "application-service/messagehub/setenablepushapplicationprivateendpoint": {
+    "private_endpoint_enabled": true
+  },
+  "application-service/messagehub/setphonedescription": {
+    "description": "description"
+  },
+  "application-service/messagehub/setphoneprivateacl": {
+    "private_access_resources": [
+      {
+        "id": "8c9f6c1c928a45b4bbd1e4da5531d656",
+        "ips": [],
+        "name": "sample",
+        "type": "virtual_server"
+      }
+    ]
+  },
+  "application-service/messagehub/setphonepublicacl": {
+    "public_access_ip_addresses": [
+      "10.0.0.0/24"
+    ]
+  },
+  "application-service/messagehub/setphoneusecaller": {
+    "use_caller": true
+  },
+  "application-service/messagehub/setpushapplicationdescription": {
+    "description": "description"
+  },
+  "application-service/messagehub/setpushapplicationprivateacl": {
+    "private_access_resources": [
+      {
+        "id": "8c9f6c1c928a45b4bbd1e4da5531d656",
+        "ips": [],
+        "name": "sample",
+        "type": "virtual_server"
+      }
+    ]
+  },
+  "application-service/messagehub/setpushapplicationpublicacl": {
+    "public_access_ip_addresses": [
+      "10.0.0.0/24"
+    ]
+  },
+  "application-service/queueservice/createqueue": {
+    "content_based_deduplication": false,
+    "data_key_reuse_period": 40,
+    "data_key_reuse_period_unit": "minute",
+    "deduplication_scope": "Queue",
+    "delivery_delay": 0,
+    "delivery_delay_unit": "minute",
+    "description": "Queue description",
+    "encryption": {
+      "id": "8c9f6c1c928a45b4bbd1e4da5531d656",
+      "name": "test-kms"
+    },
+    "message_retention_period": 40,
+    "message_retention_period_unit": "minute",
+    "message_size": 256,
+    "name": "test-queue.fifo",
+    "receive_message_wait_time_seconds": 0,
+    "redrive_allow_policy": {
+      "redrive_permission": "byQueue",
+      "source_queue_srns": [
+        "srn:dev2::8c9f6c1c928a45b4bbd1e4da5531d656:kr-west1::queueservice:queue/8c9f6c1c928a45b4bbd1e4da5531d656"
+      ]
+    },
+    "redrive_policy": {
+      "dead_letter_target_srn": "srn:dev2::8c9f6c1c928a45b4bbd1e4da5531d656:kr-west1::queueservice:queue/8c9f6c1c928a45b4bbd1e4da5531d656",
+      "max_receive_count": 10
+    },
+    "tags": [
+      {
+        "key": "key1",
+        "value": "value1"
+      }
+    ],
+    "visibility_timeout": 30,
+    "visibility_timeout_unit": "minute"
+  },
+  "application-service/queueservice/setacl": {
+    "ip_address": [
+      "192.168.0.0",
+      "172.16.0.0/12"
+    ]
+  },
+  "application-service/queueservice/updatequeueconfig": {
+    "data_key_reuse_period": 40,
+    "data_key_reuse_period_unit": "minute",
+    "delivery_delay": 0,
+    "delivery_delay_unit": "minute",
+    "encryption": {
+      "id": "8c9f6c1c928a45b4bbd1e4da5531d656",
+      "name": "test-kms"
+    },
+    "message_retention_period": 40,
+    "message_retention_period_unit": "minute",
+    "message_size": 256,
+    "receive_message_wait_time_seconds": 0,
+    "redrive_allow_policy": {
+      "redrive_permission": "byQueue",
+      "source_queue_srns": [
+        "srn:dev2::8c9f6c1c928a45b4bbd1e4da5531d656:kr-west1::queueservice:queue/8c9f6c1c928a45b4bbd1e4da5531d656"
+      ]
+    },
+    "redrive_policy": {
+      "dead_letter_target_srn": "srn:dev2::8c9f6c1c928a45b4bbd1e4da5531d656:kr-west1::queueservice:queue/8c9f6c1c928a45b4bbd1e4da5531d656",
+      "max_receive_count": 10
+    },
+    "visibility_timeout": 30,
+    "visibility_timeout_unit": "minute"
+  },
+  "application-service/queueservice/updatequeuededuplication": {
+    "content_based_deduplication": false
+  },
+  "application-service/queueservice/updatequeuededuplicationscope": {
+    "deduplication_scope": "Queue"
+  },
+  "application-service/queueservice/updatequeuedescription": {
+    "description": "Queue description"
+  },
+  "compute/baremetal/assignbaremetalprivatenatip": {
+    "private_nat_id": "a4fd0216cd32442a82733bbb8be0e82b",
+    "private_nat_ip_id": "03cd065d8acc4e47b11a11dc1411323e"
+  },
+  "compute/baremetal/assignbaremetalpublicnatip": {
+    "public_ip_address_id": "20c507a036c447cdb3b19468d8ea62ac"
+  },
+  "compute/baremetal/attachlocalsubnetbaremetal": {
+    "local_subnet_id": "ab313c43291e4b678f4bacffe10768ae",
+    "local_subnet_ip": "192.168.0.1"
   },
   "compute/baremetal/createbaremetals": {
     "image_id": "IMAGE-7XFMaJpLsapKvskFMjCtmm",
@@ -122,6 +493,34 @@
     "use_placement_group": false,
     "vpc_id": "e58348b1bc9148e5af86500fd4ef99ca"
   },
+  "compute/baremetal/detachlocalsubnetbaremetal": {
+    "local_subnet_id": "ab313c43291e4b678f4bacffe10768ae",
+    "local_subnet_ip": "192.168.0.1"
+  },
+  "compute/baremetal/lockbaremetalserver": {
+    "_raw": "{baremetal_id}"
+  },
+  "compute/baremetal/startbaremetals": {
+    "bare_metal_server_ids": [
+      "20c507a036c447cdb3b19468d8ea62ac"
+    ]
+  },
+  "compute/baremetal/stopbaremetals": {
+    "bare_metal_server_ids": [
+      "20c507a036c447cdb3b19468d8ea62ac"
+    ]
+  },
+  "compute/baremetal/unlockbaremetalserver": {
+    "_raw": "{baremetal_id}"
+  },
+  "compute/baremetal/updatebaremetalcpucores": {
+    "core_disable_use": true,
+    "cpu_core_active": 4,
+    "hyperthreading_use": true
+  },
+  "compute/multinodegpucluster/assigngpunodepublicnatip": {
+    "public_ip_address_id": "20c507a036c447cdb3b19468d8ea62ac"
+  },
   "compute/multinodegpucluster/creategpunodes": {
     "cluster_fabric_details": {
       "cluster_fabric_id": "20c507a036c447cdb3b19468d8ea62ac",
@@ -153,8 +552,140 @@
     ],
     "vpc_id": "e58348b1bc9148e5af86500fd4ef99ca"
   },
+  "compute/multinodegpucluster/lockgpunode": {
+    "_raw": "{gpu_node_id}"
+  },
+  "compute/multinodegpucluster/modifyclusterfabricmembers": {
+    "after_cluster_fabric_id": "20c507a036c447cdb3b19468d8ea62ac",
+    "before_cluster_fabric_id": "20c507a036c447cdb3b19468d8ea62ac",
+    "gpu_node_id_list": [
+      "20c507a036c447cdb3b19468d8ea62ac"
+    ]
+  },
+  "compute/multinodegpucluster/startgpunodes": {
+    "gpu_node_ids": [
+      "20c507a036c447cdb3b19468d8ea62ac"
+    ]
+  },
+  "compute/multinodegpucluster/stopgpunodes": {
+    "gpu_node_ids": [
+      "20c507a036c447cdb3b19468d8ea62ac"
+    ]
+  },
+  "compute/multinodegpucluster/unlockgpunode": {
+    "_raw": "{gpu_node_id}"
+  },
+  "compute/scf/approveprivatelinkendpoint": {
+    "type": "APPROVE"
+  },
+  "compute/scf/connectprivatelinkendpoint": {
+    "type": "RECONNECT"
+  },
+  "compute/scf/createcloudfunction": {
+    "content": "sample",
+    "name": "sample-function-name",
+    "runtime": "Node.js:20",
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ]
+  },
+  "compute/scf/createcloudfunctionapigatewaytrigger": {
+    "apigateway_api_id": "31e749b7b260868f441e862b",
+    "apigateway_stage_name": "sample",
+    "cloud_function_id": "8c9f6c1c928a45b4bbd1e4da5531d656"
+  },
+  "compute/scf/createcloudfunctioncronjobtrigger": {
+    "cloud_function_id": "8c9f6c1c928a45b4bbd1e4da5531d656",
+    "schedule": "* * * * 0",
+    "timezone": "Asia/Tokyo"
+  },
+  "compute/scf/createprivatelinkendpoint": {
+    "endpoint": {
+      "alias": "sample",
+      "service_id": "8c9f6c1c928a45b4bbd1e4da5531d656"
+    }
+  },
+  "compute/scf/requestprivatelinkendpoint": {
+    "type": "CANCEL"
+  },
+  "compute/scf/setcloudfunctioncodefile": {
+    "class_name": "com.example.Handler",
+    "method_name": "handleRequest",
+    "obs_url": "https://obs.kr-east1.scp-in.com:8443/sample/java-sample-1.0-SNAPSHOT.jar"
+  },
+  "compute/scf/setresourcepolicy": {
+    "policy_document": {
+      "Statement": [
+        {
+          "Action": [
+            "scf:InvokeFunction"
+          ],
+          "Condition": {
+            "StringEquals": {
+              "scf:CloudFunctionAuthType": [
+                "SCP_IAM"
+              ]
+            }
+          },
+          "Effect": "Allow",
+          "Principal": "*",
+          "Resource": [
+            "srn:e::27bb070b564349f8a31cc60734cc36a5:kr-west1::scf:cloud-function/1a2afa4bfb854a828602c93009cf4447"
+          ],
+          "Sid": "Statement1"
+        }
+      ],
+      "Version": "2024-07-01"
+    }
+  },
+  "compute/scf/updatecloudfunctioncode": {
+    "content": "print(\"Hello World\")"
+  },
+  "compute/scf/updatecloudfunctionconfig": {
+    "max_scale": "5",
+    "memory": "256",
+    "min_scale": "1",
+    "timeout": "100"
+  },
+  "compute/scf/updatecloudfunctioncronjobtrigger": {
+    "cloud_function_id": "8c9f6c1c928a45b4bbd1e4da5531d656",
+    "schedule": "* * * * 0",
+    "timezone": "Asia/Tokyo"
+  },
+  "compute/scf/updatecloudfunctionurl": {
+    "allow_ips": [],
+    "auth_type": "NONE",
+    "public_ip_acl_enabled": true,
+    "url_enabled": true
+  },
+  "compute/scf/updatecloudfunctionvariables": {
+    "encryption": {
+      "key_id": "sample",
+      "key_version": "sample",
+      "server_side_encryption_enabled": true
+    },
+    "variables": [
+      {
+        "key": "sample",
+        "value": "sample"
+      }
+    ]
+  },
+  "compute/scf/updateprivatelinkservice": {
+    "privatelink_service_enabled": true
+  },
+  "compute/virtualserver/acceptvolumetransfer": {
+    "auth_key": "f5972fdb456897eb"
+  },
   "compute/virtualserver/attachvirtualserversecuritygroup": {
     "security_group_id": "c09c3f05-03d9-443f-b27a-40e0f973c75f"
+  },
+  "compute/virtualserver/attachvolumetovirtualserver": {
+    "delete_on_termination": false,
+    "server_id": "2a9be312-5d4b-4bc8-b2ae-35100fa9241f"
   },
   "compute/virtualserver/createautoscalinggroup": {
     "desired_server_count": 1,
@@ -189,6 +720,103 @@
       "kr-west1-b"
     ]
   },
+  "compute/virtualserver/createautoscalinggroupnotification": {
+    "notification_events": [
+      "SCALE_OUT",
+      "SCALE_OUT_FAIL"
+    ],
+    "user_ids": [
+      "570907805e5447be84b618450ef52o0t"
+    ]
+  },
+  "compute/virtualserver/createautoscalinggrouppolicy": {
+    "comparison_operator": "ge",
+    "cooldown_seconds": 300,
+    "evaluation_minutes": 5,
+    "metric_method": "AVG",
+    "metric_type": "CPU",
+    "name": "policy-name",
+    "scale_method": "AMOUNT",
+    "scale_type": "SCALE_OUT",
+    "scale_value": 10,
+    "threshold": 60
+  },
+  "compute/virtualserver/createautoscalinggroupschedule": {
+    "day_of_month": "-1,1",
+    "day_of_week": "SU,SA",
+    "description": "description",
+    "desired_server_count": 1,
+    "end_date": "2025-01-01",
+    "frequency": "WEEKLY",
+    "hour": 9,
+    "max_server_count": 2,
+    "min_server_count": 1,
+    "minute": 0,
+    "name": "schedulename",
+    "start_date": "2024-01-01",
+    "state": "ACTIVE",
+    "timezone": "Asia/Seoul"
+  },
+  "compute/virtualserver/createimage": {
+    "container_format": "bare",
+    "disk_format": "qcow2",
+    "min_disk": 100,
+    "min_ram": 0,
+    "name": "imagename",
+    "os_distro": "alma",
+    "protected": false,
+    "tags": [
+      {
+        "key": "key",
+        "value": "value"
+      }
+    ],
+    "url": "https://object-store.kr-west1.s.samsungsdscloud.com/8989447062e04a818baf9e073fd04fa7/bucket/object.qcow2",
+    "visibility": "private"
+  },
+  "compute/virtualserver/createimagemember": {
+    "member_id": "a8f10467abfc4b87b64614ab36eb9ae4"
+  },
+  "compute/virtualserver/createkeypair": {
+    "name": "keypairname",
+    "public_key": "ssh-rsa fakeKey Generated-by-SCP",
+    "tags": [
+      {
+        "key": "key",
+        "value": "value"
+      }
+    ]
+  },
+  "compute/virtualserver/createlaunchconfiguration": {
+    "image_id": "70a599e0-31e7-49b7-b260-868f441e862b",
+    "keypair_name": "keypairname",
+    "name": "launch-configuration-name",
+    "server_type_id": "s1v1m2",
+    "tags": [
+      {
+        "key": "key",
+        "value": "value"
+      }
+    ],
+    "user_data": "IyEvYmluL2Jhc2gKL2Jpbi9zdQplY2hvICJJIGFtIGluIHlvdSEiCg==",
+    "volumes": [
+      {
+        "boot_index": 0,
+        "size": 104,
+        "type": "SSD"
+      }
+    ]
+  },
+  "compute/virtualserver/createservergroup": {
+    "name": "server-group",
+    "policy": "anti-affinity",
+    "tags": [
+      {
+        "key": "key",
+        "value": "value"
+      }
+    ]
+  },
   "compute/virtualserver/createserverinterface": {
     "fixed_ips": [
       {
@@ -198,10 +826,20 @@
     "port_id": "91424c08-0b26-49fb-9808-ed042292ceef",
     "subnet_id": "78b2ee3f074145c580ab6abac4821f97"
   },
+  "compute/virtualserver/createserverinterfacenat": {
+    "publicip_id": "615fa9cd5cff486c9de679b3ce63e601"
+  },
+  "compute/virtualserver/createserverinterfaceprivatenat": {
+    "private_nat_id": "3a6c1dc6b1b24e02a444d672c2798a1c",
+    "private_nat_ip_id": "1f0cb5390c40483592ddc5a282f53496"
+  },
   "compute/virtualserver/createservervolume": {
     "delete_on_termination": false,
     "device": "/dev/vda",
     "volume_id": "3f500f00-ed80-4566-a057-e31760226f9a"
+  },
+  "compute/virtualserver/createsharingimage": {
+    "_raw": "{image_id}"
   },
   "compute/virtualserver/createsnapshot": {
     "description": "description",
@@ -216,6 +854,7 @@
       "949bd9c7-2098-4284-9685-13268d193117"
     ],
     "image_id": "70a599e0-31e7-49b7-b260-868f441e862b",
+    "is_spot": false,
     "keypair_name": "keypairname",
     "lock": false,
     "max_count": 2,
@@ -257,6 +896,12 @@
     ],
     "zone": "kr-west1-a"
   },
+  "compute/virtualserver/createvirtualservercustomimage": {
+    "image_name": "imagename"
+  },
+  "compute/virtualserver/createvirtualserverdump": {
+    "_raw": "{server_id}"
+  },
   "compute/virtualserver/createvolume": {
     "max_iops": 10000,
     "max_throughput": 500,
@@ -279,17 +924,107 @@
   "compute/virtualserver/extendvolume": {
     "size": 104
   },
+  "compute/virtualserver/importimage": {
+    "url": "https://object-store.kr-west1.s.samsungsdscloud.com/8989447062e04a818baf9e073fd04fa7/bucket/object.qcow2"
+  },
   "compute/virtualserver/lockvirtualserver": {
     "_raw": "{server_id}"
   },
   "compute/virtualserver/rebootvirtualserver": {
     "reboot_type": "SOFT"
   },
+  "compute/virtualserver/rebuildvirtualserver": {
+    "_raw": "{server_id}"
+  },
+  "compute/virtualserver/revertvolumetosnapshot": {
+    "snapshot_id": "cceed636-1f1e-4bb0-b85c-4e5b9e0bf790"
+  },
+  "compute/virtualserver/setvirtualservertype": {
+    "server_type": "s1v1m2"
+  },
+  "compute/virtualserver/setvolumeqos": {
+    "max_iops": 10000,
+    "max_throughput": 500
+  },
   "compute/virtualserver/showvirtualserverpassword": {
     "private_key": "-----BEGIN RSA PRIVATE KEY-----\nfakeKey\n-----END RSA PRIVATE KEY-----"
   },
+  "compute/virtualserver/startvirtualserver": {
+    "_raw": "{server_id}"
+  },
+  "compute/virtualserver/stopvirtualserver": {
+    "_raw": "{server_id}"
+  },
   "compute/virtualserver/unlockvirtualserver": {
     "_raw": "{server_id}"
+  },
+  "compute/virtualserver/updateautoscalinggroup": {
+    "desired_server_count_editable": true,
+    "drain_enabled": true,
+    "drain_timeout": 300,
+    "launch_configuration_id": "b5aea5a675fc4f6b9e0fcd1288354c5f",
+    "security_group_ids": [
+      "c09c3f05-03d9-443f-b27a-40e0f973c75f"
+    ],
+    "state_check_delay_time": 300,
+    "use_lb_state_check": true
+  },
+  "compute/virtualserver/updateautoscalinggrouplbservergroups": {
+    "lb_server_groups": [
+      {
+        "id": "d06e87d3-ca9a-461b-8e88-077a542a7335",
+        "port": 8080
+      }
+    ]
+  },
+  "compute/virtualserver/updateautoscalinggroupnotification": {
+    "notification_events": [
+      "SCALE_OUT",
+      "SCALE_OUT_FAIL"
+    ],
+    "notification_state": "ACTIVE"
+  },
+  "compute/virtualserver/updateautoscalinggrouppolicy": {
+    "comparison_operator": "ge",
+    "cooldown_seconds": 300,
+    "evaluation_minutes": 5,
+    "metric_method": "AVG",
+    "metric_type": "CPU",
+    "scale_method": "AMOUNT",
+    "scale_type": "SCALE_OUT",
+    "scale_value": 10,
+    "state": "ACTIVE",
+    "threshold": 60
+  },
+  "compute/virtualserver/updateautoscalinggroupschedule": {
+    "day_of_month": "-1,1",
+    "day_of_week": "SU,SA",
+    "description": "description",
+    "desired_server_count": 1,
+    "end_date": "2025-01-01",
+    "frequency": "WEEKLY",
+    "hour": 9,
+    "max_server_count": 2,
+    "min_server_count": 1,
+    "minute": 0,
+    "name": "schedulename",
+    "start_date": "2024-01-01",
+    "state": "ACTIVE",
+    "timezone": "Asia/Seoul"
+  },
+  "compute/virtualserver/updateautoscalinggroupservercount": {
+    "desired_server_count": 1,
+    "max_server_count": 2,
+    "min_server_count": 1
+  },
+  "compute/virtualserver/updateimage": {
+    "min_disk": 100,
+    "min_ram": 0,
+    "protected": false,
+    "visibility": "private"
+  },
+  "compute/virtualserver/updateimagemember": {
+    "status": "pending"
   },
   "compute/virtualserver/updateserverinterface": {
     "fixed_ip_address": "192.169.3.2",
@@ -298,6 +1033,48 @@
   "compute/virtualserver/updateservervolume": {
     "delete_on_termination": false,
     "volume_id": "3f500f00-ed80-4566-a057-e31760226f9a"
+  },
+  "compute/virtualserver/updatesnapshot": {
+    "description": "description",
+    "name": "snapshot-1"
+  },
+  "compute/virtualserver/updatevirtualserver": {
+    "name": "servername"
+  },
+  "compute/virtualserver/updatevolume": {
+    "name": "volume01"
+  },
+  "container/scr/checktagsvulnerability": {
+    "_raw": "{tags_id}"
+  },
+  "container/scr/createregistry": {
+    "name": "sample",
+    "private_acl_enabled": true,
+    "private_acl_resources": [
+      {
+        "resource_id": "558496f6c49d43459e61e191fb3c08fe",
+        "resource_ips": "[]",
+        "resource_name": "sample",
+        "resource_type": "virtualServer"
+      }
+    ],
+    "public_acl_enabled": true,
+    "public_acl_resources": [
+      {
+        "resource_id": "558496f6c49d43459e61e191fb3c08fe",
+        "resource_ips": "[]",
+        "resource_name": "sample",
+        "resource_type": "virtualServer"
+      }
+    ],
+    "public_endpoint_enabled": true,
+    "public_visible_enabled": true,
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ]
   },
   "container/scr/createrepository": {
     "description": "Carpe diem.",
@@ -336,17 +1113,135 @@
       }
     ]
   },
+  "container/scr/runimagelifecyclepolicypreview": {
+    "_raw": "{image_id}"
+  },
+  "container/scr/updateimagedescription": {
+    "description": "Carpe diem."
+  },
+  "container/scr/updateimagelifecyclepolicy": {
+    "lifecycle_policy": {
+      "lifecycle_policy_enabled": true,
+      "outdated_rule_duration": 90,
+      "outdated_rule_enabled": true,
+      "outdated_rule_tag_expression": "*",
+      "untagged_rule_duration": 90,
+      "untagged_rule_enabled": true
+    }
+  },
+  "container/scr/updateimagelockpolicy": {
+    "lock_policy": {
+      "locked": true
+    }
+  },
+  "container/scr/updateimagepullpolicy": {
+    "pull_policy": {
+      "critical_limit": 20,
+      "high_limit": 20,
+      "unmodified_excepted": true,
+      "unscanned_image_pull_prevented": true,
+      "vulnerable_image_pull_prevented": true
+    }
+  },
+  "container/scr/updateimagescanpolicy": {
+    "scan_policy": {
+      "auto_scan_enabled": true,
+      "fixed_version_excepted": true,
+      "language_excepted": true,
+      "scan_policy_enabled": true,
+      "secret_excepted": true,
+      "severity_limit": "High"
+    }
+  },
+  "container/scr/updateprivateacl": {
+    "private_acl_enabled": true,
+    "private_acl_resources": [
+      {
+        "resource_id": "558496f6c49d43459e61e191fb3c08fe",
+        "resource_ips": "[]",
+        "resource_name": "sample",
+        "resource_type": "virtualServer"
+      }
+    ]
+  },
+  "container/scr/updatepublicacl": {
+    "public_acl_enabled": true,
+    "public_acl_resources": [
+      {
+        "resource_id": "558496f6c49d43459e61e191fb3c08fe",
+        "resource_ips": "[]",
+        "resource_name": "sample",
+        "resource_type": "virtualServer"
+      }
+    ]
+  },
+  "container/scr/updatepublicendpointenabled": {
+    "public_endpoint_enabled": true
+  },
+  "container/scr/updaterepositorydescription": {
+    "description": "Carpe diem."
+  },
+  "container/scr/updaterepositorylifecyclepolicy": {
+    "lifecycle_policy": {
+      "lifecycle_policy_enabled": true,
+      "outdated_rule_duration": 90,
+      "outdated_rule_enabled": true,
+      "outdated_rule_tag_expression": "*",
+      "untagged_rule_duration": 90,
+      "untagged_rule_enabled": true
+    }
+  },
+  "container/scr/updaterepositorylockpolicy": {
+    "lock_policy": {
+      "locked": true
+    }
+  },
+  "container/scr/updaterepositorypullpolicy": {
+    "pull_policy": {
+      "critical_limit": 20,
+      "high_limit": 20,
+      "unmodified_excepted": true,
+      "unscanned_image_pull_prevented": true,
+      "vulnerable_image_pull_prevented": true
+    }
+  },
+  "container/scr/updaterepositoryscanpolicy": {
+    "scan_policy": {
+      "auto_scan_enabled": true,
+      "fixed_version_excepted": true,
+      "language_excepted": true,
+      "scan_policy_enabled": true,
+      "secret_excepted": true,
+      "severity_limit": "High"
+    }
+  },
+  "container/scr/updatetagslockpolicy": {
+    "lock_policy": {
+      "locked": true
+    }
+  },
   "container/ske/createcluster": {
-    "cloud_logging_enabled": true,
+    "additional_subnet_id_list": [
+      "023c57b14f11483689338d085e061492",
+      "617b3d0e90c24a5fa1f65a3824861354"
+    ],
+    "default_subnet_id": "023c57b14f11483689338d085e061492",
+    "deletion_protection_enabled": false,
     "kubernetes_version": "v1.29.8",
+    "linked_resources": [
+      {
+        "id": "res-12345678",
+        "name": "my-resource",
+        "type": "fs"
+      }
+    ],
     "name": "sample-cluster",
+    "nfs_volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438",
     "private_endpoint_access_control_resources": [],
     "public_endpoint_access_control_ip": "192.168.0.0",
     "security_group_id_list": [],
     "service_watch_logging_enabled": true,
-    "subnet_id": "023c57b14f11483689338d085e061492",
     "tags": [],
-    "volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438",
     "vpc_id": "7df8abb4912e4709b1cb237daccca7a8"
   },
   "container/ske/createnodepool": {
@@ -402,8 +1297,93 @@
     "volume_type_name": "SSD_Provisioned",
     "zone": "kr-west1-a"
   },
+  "container/ske/setclusterdeletionprotection": {
+    "deletion_protection_enabled": false
+  },
+  "container/ske/setclusterlinkedresources": {
+    "linked_resources": [
+      {
+        "id": "res-12345678",
+        "name": "my-resource",
+        "type": "fs"
+      }
+    ]
+  },
+  "container/ske/setclusterlogging": {
+    "cloud_logging_enabled": true
+  },
+  "container/ske/setclusternfsvolume": {
+    "nfs_volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438"
+  },
+  "container/ske/setclusterprivateaccesscontrol": {
+    "private_endpoint_access_control_resources": [
+      {
+        "id": "2a9be312-5d4b-4bc8-b2ae-35100fa9241f",
+        "name": "sample-name",
+        "type": "vm"
+      }
+    ]
+  },
+  "container/ske/setclusterpublicaccesscontrol": {
+    "public_endpoint_access_control_ip": "192.168.0.0"
+  },
+  "container/ske/setclustersecuritygroups": {
+    "security_group_id_list": [
+      "bdfda539-bd2e-4a5c-9021-ec6d52d1ca79",
+      "bdfda539-bd2e-4a5c-9021-ec6d52d1ca79"
+    ]
+  },
+  "container/ske/setclusterservicewatchlogging": {
+    "service_watch_logging_enabled": true
+  },
+  "container/ske/setclustersubnets": {
+    "additional_subnet_id_list": [
+      "023c57b14f11483689338d085e061492",
+      "617b3d0e90c24a5fa1f65a3824861354"
+    ]
+  },
+  "container/ske/setclusterupgrade": {
+    "kubernetes_version": "v1.29.8"
+  },
+  "container/ske/setnodepool": {
+    "desired_node_count": 2,
+    "is_auto_recovery": true,
+    "is_auto_scale": true,
+    "max_node_count": 5,
+    "min_node_count": 1
+  },
+  "container/ske/setnodepoollabels": {
+    "labels": [
+      {
+        "key": "example.com/my-app",
+        "value": "bar"
+      }
+    ]
+  },
+  "container/ske/setnodepoollinkedresources": {
+    "linked_resources": [
+      {
+        "id": "res-12345678",
+        "name": "my-resource",
+        "type": "fs"
+      }
+    ]
+  },
   "container/ske/setnodepoolpreferredips": {
     "preferred_ips": "192.168.0.0-192.168.0.255,192.168.99.0"
+  },
+  "container/ske/setnodepooltaints": {
+    "taints": [
+      {
+        "effect": "NoSchedule",
+        "key": "example.com/my-app",
+        "value": "bar"
+      }
+    ]
+  },
+  "container/ske/setnodepoolupgrade": {
+    "os_version": "22.04",
+    "scp_gpu_driver": ""
   },
   "data-analytics/data-flow/createdataflow": {
     "account": {
@@ -481,6 +1461,105 @@
         "tag_value": ""
       }
     ]
+  },
+  "data-analytics/data-flow/dataflowservicevalidateresourcescreation": {
+    "service_workload": {
+      "nifi": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "1",
+        "version": "1.27.1"
+      },
+      "nifi_registry": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "1",
+        "version": "1.27.1"
+      },
+      "zookeeper": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "3",
+        "version": "3.9.2"
+      }
+    }
+  },
+  "data-analytics/data-flow/dataflowservicevalidateresourcesupdate": {
+    "service_workload": {
+      "nifi": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "1",
+        "version": "1.27.1"
+      },
+      "nifi_registry": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "1",
+        "version": "1.27.1"
+      },
+      "zookeeper": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "3",
+        "version": "3.9.2"
+      }
+    }
+  },
+  "data-analytics/data-flow/updatedataflow": {
+    "account": {
+      "account_id": "",
+      "account_password": ""
+    },
+    "description": "",
+    "domain": "",
+    "host_alias_list": [
+      {
+        "hostnames": [
+          ""
+        ],
+        "ip": ""
+      }
+    ],
+    "node_selector": ""
+  },
+  "data-analytics/data-flow/updatedataflowserviceconsole": {
+    "account": {
+      "account_id": "",
+      "account_password": ""
+    },
+    "description": "",
+    "domain": "",
+    "host_alias": {
+      "enabled": "true",
+      "host_alias_list": [
+        {
+          "hostname": "",
+          "ip": ""
+        }
+      ]
+    },
+    "node_selector": "",
+    "service_workload": {
+      "nifi": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "1",
+        "version": "1.27.1"
+      },
+      "nifi_registry": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "1",
+        "version": "1.27.1"
+      },
+      "zookeeper": {
+        "cpu": "2000",
+        "memory": "1024",
+        "replica": "3",
+        "version": "3.9.2"
+      }
+    }
   },
   "data-analytics/data-ops/createdataops": {
     "account": {
@@ -566,6 +1645,111 @@
     ],
     "worker_type": ""
   },
+  "data-analytics/data-ops/getdataopsservicevalidateresourcescreation": {
+    "service_workload": {
+      "scheduler": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      },
+      "web_server": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      },
+      "worker": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      }
+    }
+  },
+  "data-analytics/data-ops/getdataopsservicevalidateresourcesupdate": {
+    "service_workload": {
+      "scheduler": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      },
+      "web_server": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      },
+      "worker": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      }
+    }
+  },
+  "data-analytics/data-ops/updatedataopsservice": {
+    "description": "",
+    "domain": "",
+    "host_alias": {
+      "enabled": "true",
+      "host_alias_list": [
+        {
+          "hostname": "",
+          "ip": ""
+        }
+      ]
+    },
+    "node_selector": "",
+    "service_workload": {
+      "scheduler": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      },
+      "web_server": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      },
+      "worker": {
+        "cpu": "",
+        "memory": "",
+        "replica": "",
+        "version": ""
+      }
+    },
+    "worker_type": ""
+  },
+  "data-analytics/data-ops/updatedataopsv1": {
+    "account": {
+      "account_id": "",
+      "account_password": ""
+    },
+    "description": "",
+    "domain": "",
+    "host_alias_list": [
+      {
+        "hostnames": [
+          ""
+        ],
+        "ip": ""
+      }
+    ],
+    "node_selector": ""
+  },
+  "data-analytics/eventstreams/eventstreamsaddinstances": {
+    "instance_count": 1,
+    "public_ip_ids": [
+      ""
+    ],
+    "service_ip_addresses": [
+      ""
+    ]
+  },
   "data-analytics/eventstreams/eventstreamscreatecluster": {
     "akhq_enabled": false,
     "allowable_ip_addresses": [],
@@ -618,6 +1802,56 @@
     "subnet_id": "{subnet_id}",
     "tags": [],
     "timezone": "Asia/Seoul"
+  },
+  "data-analytics/eventstreams/eventstreamspatchminorversion": {
+    "dbaas_engine": "MySQL",
+    "software_version": "8.4.7"
+  },
+  "data-analytics/eventstreams/eventstreamsrestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/eventstreams/eventstreamssetblockstoragesize": {
+    "size_gb": 16
+  },
+  "data-analytics/eventstreams/eventstreamssetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "data-analytics/eventstreams/eventstreamssetparametervalues": {
+    "parameters": [
+      {
+        "id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+        "new_value": "1",
+        "old_value": "0"
+      }
+    ]
+  },
+  "data-analytics/eventstreams/eventstreamssetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "data-analytics/eventstreams/eventstreamssetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "data-analytics/eventstreams/eventstreamsstartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/eventstreams/eventstreamsstopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/eventstreams/eventstreamssyncclusterstate": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/eventstreams/eventstreamssyncparametervalues": {
+    "_raw": "{cluster_id}"
   },
   "data-analytics/quick-query/createquickquery": {
     "kubernetes_engine_create_request": {
@@ -686,13 +1920,75 @@
       }
     ]
   },
+  "data-analytics/quick-query/updatequickquerydescription": {
+    "description": ""
+  },
+  "data-analytics/quick-query/updatequickquerydomain": {
+    "domain": ""
+  },
+  "data-analytics/quick-query/updatequickquerydscdomain": {
+    "dsc_domain": ""
+  },
+  "data-analytics/quick-query/updatequickqueryengine": {
+    "cluster_size": "",
+    "cpu": "",
+    "memory": "",
+    "replica": ""
+  },
+  "data-analytics/quick-query/updatequickqueryhostalias": {
+    "host_alias_list": [
+      {
+        "hostnames": [
+          ""
+        ],
+        "ip": ""
+      }
+    ]
+  },
+  "data-analytics/quick-query/validatequickqueryresources": {
+    "cluster_id": "",
+    "node_pool_validation_request": [
+      {
+        "auto_scale": "",
+        "desired_node_count": "",
+        "max_node_count": "",
+        "min_node_count": "",
+        "scale_name": ""
+      }
+    ],
+    "quick_query_engine_request": {
+      "auto_scale": "",
+      "cluster_size": "",
+      "cpu": "",
+      "is_engine_type_private": "",
+      "memory": "",
+      "replica": ""
+    }
+  },
+  "data-analytics/searchengine/searchengineaddblockstorages": {
+    "role_type": "DATA",
+    "size_gb": 104,
+    "volume_type": "SSD"
+  },
+  "data-analytics/searchengine/searchengineaddinstances": {
+    "instance_count": 1,
+    "public_ip_ids": [
+      ""
+    ],
+    "service_ip_addresses": [
+      ""
+    ]
+  },
   "data-analytics/searchengine/searchenginecreatecluster": {
-    "allowable_ip_addresses": [],
-    "dbaas_engine_version_id": "",
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "dbaas_engine_version_id": "632ba9283657453da4644ff85a1d81fd",
     "init_config_option": {
       "backup_option": {
-        "retention_period_day": "",
-        "starting_time_hour": ""
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
       },
       "database_port": 2866,
       "database_user_name": "mydatabaseusr",
@@ -716,14 +2012,14 @@
           {
             "public_ip_id": "",
             "role_type": "DATA",
-            "service_ip_address": "192.168.10.10/32"
+            "service_ip_address": "192.168.10.10"
           }
         ],
         "role_type": "DATA",
         "server_type_name": "ses1v2m4"
       }
     ],
-    "instance_name_prefix": "",
+    "instance_name_prefix": "myprefix",
     "is_combined": false,
     "license": "",
     "maintenance_option": {
@@ -731,23 +2027,115 @@
       "starting_day_of_week": "MON",
       "starting_time": "0000"
     },
-    "name": "",
-    "nat_enabled": false,
+    "name": "mycluster",
+    "nat_enabled": true,
     "service_watch_log_collection": true,
-    "subnet_id": "",
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
     "tags": [],
-    "timezone": ""
+    "timezone": "Asia/Seoul"
+  },
+  "data-analytics/searchengine/searchenginecreaterestore": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "backup_history_number": "202501010000",
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "role_type": "DATA"
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "license": "",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ]
   },
   "data-analytics/searchengine/searchenginemanualbackup": {
     "_raw": "{cluster_id}"
   },
+  "data-analytics/searchengine/searchenginepatchminorversion": {
+    "dbaas_engine": "MySQL",
+    "software_version": "8.4.7"
+  },
+  "data-analytics/searchengine/searchengineremovebackuphistories": {
+    "backup_history_number": [
+      ""
+    ],
+    "session_id": ""
+  },
+  "data-analytics/searchengine/searchenginerestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/searchengine/searchenginerestartdashboard": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/searchengine/searchenginesetbackup": {
+    "retention_period_day": "7",
+    "starting_time_hour": "2"
+  },
+  "data-analytics/searchengine/searchenginesetblockstoragesize": {
+    "size_gb": 16
+  },
+  "data-analytics/searchengine/searchenginesetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "data-analytics/searchengine/searchenginesetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "data-analytics/searchengine/searchenginesetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "data-analytics/searchengine/searchenginestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/searchengine/searchenginestopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/searchengine/searchenginesyncclusterstate": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/vertica/verticaaddblockstorages": {
+    "role_type": "DATA",
+    "size_gb": 104,
+    "volume_type": "SSD"
+  },
   "data-analytics/vertica/verticacreatecluster": {
-    "allowable_ip_addresses": [],
-    "dbaas_engine_version_id": "",
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "dbaas_engine_version_id": "632ba9283657453da4644ff85a1d81fd",
     "init_config_option": {
       "backup_option": {
-        "retention_period_day": "",
-        "starting_time_hour": ""
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
       },
       "database_locale": "ko_KR.utf8",
       "database_name": "mydatabase",
@@ -772,39 +2160,120 @@
           {
             "public_ip_id": "",
             "role_type": "DATA",
-            "service_ip_address": "192.168.10.10/32"
+            "service_ip_address": "192.168.10.10"
           }
         ],
         "role_type": "DATA",
         "server_type_name": "db1v2m4"
       }
     ],
-    "instance_name_prefix": "",
-    "license": "",
+    "instance_name_prefix": "myprefix",
+    "license": "BYOL",
     "maintenance_option": {
       "period_hour": "5",
       "starting_day_of_week": "MON",
       "starting_time": "0000"
     },
-    "name": "",
-    "nat_enabled": false,
+    "name": "mycluster",
+    "nat_enabled": true,
     "service_watch_log_collection": true,
-    "subnet_id": "",
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
     "tags": [],
-    "timezone": ""
+    "timezone": "Asia/Seoul"
+  },
+  "data-analytics/vertica/verticacreaterestore": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "backup_history_number": "202501010000",
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "role_type": "DATA",
+        "server_type_name": "db1v2m4"
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "license": "BYOL",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ]
+  },
+  "data-analytics/vertica/verticaremovebackuphistories": {
+    "backup_history_number": [
+      ""
+    ],
+    "session_id": ""
+  },
+  "data-analytics/vertica/verticarestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/vertica/verticasetbackup": {
+    "retention_period_day": "7",
+    "starting_time_hour": "2"
+  },
+  "data-analytics/vertica/verticasetblockstoragesize": {
+    "size_gb": 16
+  },
+  "data-analytics/vertica/verticasetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "data-analytics/vertica/verticasetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "data-analytics/vertica/verticasetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "data-analytics/vertica/verticastartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/vertica/verticastopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "data-analytics/vertica/verticasyncclusterstate": {
+    "_raw": "{cluster_id}"
   },
   "database/cachestore/cachestorecreatecluster": {
-    "allowable_ip_addresses": [],
-    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
-    "ha_enabled": false,
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "dbaas_engine_version_id": "632ba9283657453da4644ff85a1d81fd",
+    "ha_enabled": true,
     "init_config_option": {
       "backup_option": {
         "retention_period_day": "7",
         "starting_time_hour": "2"
       },
-      "database_port": 6378,
+      "database_port": 2866,
       "database_user_password": "test123!",
-      "sentinel_port": 26378
+      "sentinel_port": 26379
     },
     "instance_groups": [
       {
@@ -824,7 +2293,7 @@
           {
             "public_ip_id": "",
             "role_type": "MASTER",
-            "service_ip_address": "192.168.10.10/32"
+            "service_ip_address": "192.168.10.10"
           }
         ],
         "role_type": "MASTER",
@@ -838,17 +2307,124 @@
       "starting_time": "0000"
     },
     "name": "mycluster",
-    "nat_enabled": false,
-    "replica_count": 0,
+    "nat_enabled": true,
+    "replica_count": 1,
     "service_watch_log_collection": true,
     "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
     "tags": [],
     "timezone": "Asia/Seoul"
   },
+  "database/cachestore/cachestorecreaterestore": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "backup_history_number": "202501010000",
+    "backup_recovery_time": "2025-01-01 00:00:00",
+    "block_storage_groups": [
+      {
+        "role_type": "DATA",
+        "size_gb": 56,
+        "volume_type": "SSD"
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "server_type_name": "redis1v2m4",
+    "tags": []
+  },
+  "database/cachestore/cachestorepatchminorversion": {
+    "dbaas_engine": "MySQL",
+    "software_version": "8.4.7"
+  },
+  "database/cachestore/cachestoreremovebackuphistories": {
+    "backup_history_number": [
+      ""
+    ],
+    "session_id": ""
+  },
+  "database/cachestore/cachestorerestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/cachestore/cachestoresetbackup": {
+    "retention_period_day": "7",
+    "starting_time_hour": "2"
+  },
+  "database/cachestore/cachestoresetblockstoragesize": {
+    "size_gb": 16
+  },
+  "database/cachestore/cachestoresetcommands": {
+    "commands": [
+      {
+        "id": "",
+        "name": "",
+        "new_value": "1"
+      }
+    ]
+  },
+  "database/cachestore/cachestoresetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "database/cachestore/cachestoresetparametervalues": {
+    "parameters": [
+      {
+        "id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+        "new_value": "1",
+        "old_value": "0"
+      }
+    ]
+  },
+  "database/cachestore/cachestoresetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "database/cachestore/cachestoresetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "database/cachestore/cachestorestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/cachestore/cachestorestopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/cachestore/cachestoreswitchovercluster": {
+    "switch_host_name": "myhost"
+  },
+  "database/cachestore/cachestoresyncclusterstate": {
+    "_raw": "{cluster_id}"
+  },
+  "database/cachestore/cachestoresynccommands": {
+    "_raw": "{cluster_id}"
+  },
+  "database/cachestore/cachestoresyncparametervalues": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epasaddblockstorages": {
+    "role_type": "DATA",
+    "size_gb": 104,
+    "volume_type": "SSD"
+  },
   "database/epas/epascreatecluster": {
-    "allowable_ip_addresses": [],
-    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
-    "ha_enabled": false,
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "dbaas_engine_version_id": "632ba9283657453da4644ff85a1d81fd",
+    "ha_enabled": true,
     "init_config_option": {
       "audit_enabled": false,
       "backup_option": {
@@ -856,8 +2432,8 @@
         "retention_period_day": "7",
         "starting_time_hour": "2"
       },
-      "database_encoding": "UTF-8",
-      "database_locale": "C",
+      "database_encoding": "UTF8",
+      "database_locale": "ko_KR.utf8",
       "database_name": "mydatabase",
       "database_port": 2866,
       "database_user_name": "mydatabaseusr",
@@ -881,7 +2457,7 @@
           {
             "public_ip_id": "",
             "role_type": "ACTIVE",
-            "service_ip_address": "192.168.10.10/32"
+            "service_ip_address": "192.168.10.10"
           }
         ],
         "role_type": "ACTIVE",
@@ -895,22 +2471,235 @@
       "starting_time": "0000"
     },
     "name": "mycluster",
-    "nat_enabled": false,
-    "origin_cluster_id": "",
+    "nat_enabled": true,
+    "origin_cluster_id": "109a585ae67b4e8482fdafc8a4a5be74",
     "service_watch_log_collection": true,
     "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
     "tags": [],
     "timezone": "Asia/Seoul",
-    "vip_public_ip_id": "",
-    "virtual_ip_address": ""
+    "vip_public_ip_id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+    "virtual_ip_address": "192.168.10.12"
+  },
+  "database/epas/epascreateotherregionreplica": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "nat_enabled": true,
+    "region": "kr-west-1",
+    "replica_count": 1,
+    "replicas": [
+      {
+        "instance_groups": [
+          {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              }
+            ],
+            "instances": [
+              {
+                "public_ip_id": "",
+                "role_type": "REPLICA",
+                "service_ip_address": "192.168.10.10"
+              }
+            ],
+            "role_type": "REPLICA",
+            "server_type_name": "db1v2m4"
+          }
+        ],
+        "name": "replica001"
+      }
+    ],
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": []
+  },
+  "database/epas/epascreatereplica": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "replica_count": 1,
+    "replicas": [
+      {
+        "instance_groups": [
+          {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              }
+            ],
+            "instances": [
+              {
+                "public_ip_id": "",
+                "role_type": "REPLICA",
+                "service_ip_address": "192.168.10.10"
+              }
+            ],
+            "role_type": "REPLICA",
+            "server_type_name": "db1v2m4"
+          }
+        ],
+        "name": "replica001"
+      }
+    ],
+    "tags": []
+  },
+  "database/epas/epascreaterestore": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "backup_history_number": "202501010000",
+    "backup_recovery_time": "2025-01-01 00:00:00",
+    "block_storage_groups": [],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "server_type_name": "db1v2m4",
+    "tags": []
+  },
+  "database/epas/epasexportlog": {
+    "_raw": "{log_type}"
   },
   "database/epas/epasmanualbackup": {
     "_raw": "{cluster_id}"
   },
+  "database/epas/epaspatchminorversion": {
+    "software_version": "8.4.7"
+  },
+  "database/epas/epaspromotereplicacluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epasregisterlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "bucket_name": "examplebucket",
+    "delete_on_export": true,
+    "log_type": "alert",
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/epas/epasremovebackuphistories": {
+    "backup_history_number": [
+      ""
+    ],
+    "session_id": ""
+  },
+  "database/epas/epasresetreplica": {
+    "_raw": "{replica_cluster_id}"
+  },
+  "database/epas/epasrestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epassetarchiveconfig": {
+    "archive_enabled": true,
+    "retention_period_day": "7"
+  },
+  "database/epas/epassetauditlog": {
+    "use_audit_log": true
+  },
+  "database/epas/epassetbackup": {
+    "archive_frequency_minute": "60",
+    "retention_period_day": "7",
+    "starting_time_hour": "2"
+  },
+  "database/epas/epassetblockstoragesize": {
+    "size_gb": 16
+  },
+  "database/epas/epassetlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "delete_on_export": true,
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/epas/epassetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "database/epas/epassetparametervalues": {
+    "parameters": [
+      {
+        "id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+        "new_value": "1",
+        "old_value": "0"
+      }
+    ]
+  },
+  "database/epas/epassetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "database/epas/epassetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "database/epas/epasstartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epasstopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epasswitchovercluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epassyncarchiveconfig": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epassyncclusterstate": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epassyncparametervalues": {
+    "_raw": "{cluster_id}"
+  },
+  "database/epas/epassyncreplicastate": {
+    "_raw": "{origin_cluster_id}"
+  },
+  "database/epas/epasupgradekernel": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbaddblockstorages": {
+    "role_type": "DATA",
+    "size_gb": 104,
+    "volume_type": "SSD"
+  },
   "database/mariadb/mariadbcreatecluster": {
-    "allowable_ip_addresses": [],
-    "dbaas_engine_version_id": "5828d309085e4094808614ce0694e8c6",
-    "ha_enabled": false,
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "dbaas_engine_version_id": "632ba9283657453da4644ff85a1d81fd",
+    "ha_enabled": true,
     "init_config_option": {
       "audit_enabled": false,
       "backup_option": {
@@ -918,11 +2707,11 @@
         "retention_period_day": "7",
         "starting_time_hour": "2"
       },
-      "database_character_set": "utf8",
-      "database_name": "regrdb",
+      "database_character_set": "UTF8",
+      "database_name": "mydatabase",
       "database_port": 2866,
-      "database_user_name": "regruser",
-      "database_user_password": "Regr1ss@2026"
+      "database_user_name": "mydatabaseusr",
+      "database_user_password": "test123!"
     },
     "instance_groups": [
       {
@@ -931,16 +2720,22 @@
             "role_type": "OS",
             "size_gb": 104,
             "volume_type": "SSD"
+          },
+          {
+            "role_type": "DATA",
+            "size_gb": 56,
+            "volume_type": "SSD"
           }
         ],
         "instances": [
           {
-            "public_ip_id": null,
-            "role_type": "ACTIVE"
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10"
           }
         ],
         "role_type": "ACTIVE",
-        "server_type_name": "db1v10m20"
+        "server_type_name": "db1v2m4"
       }
     ],
     "instance_name_prefix": "myprefix",
@@ -950,95 +2745,248 @@
       "starting_time": "0000"
     },
     "name": "mycluster",
-    "nat_enabled": false,
-    "origin_cluster_id": null,
+    "nat_enabled": true,
+    "origin_cluster_id": "109a585ae67b4e8482fdafc8a4a5be74",
     "service_watch_log_collection": true,
-    "subnet_id": "{subnet_id}",
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
     "tags": [],
     "timezone": "Asia/Seoul",
-    "vip_public_ip_id": null,
-    "virtual_ip_address": null
+    "vip_public_ip_id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+    "virtual_ip_address": "192.168.10.12"
+  },
+  "database/mariadb/mariadbcreateotherregionreplica": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "nat_enabled": true,
+    "region": "kr-west-1",
+    "replica_count": 1,
+    "replicas": [
+      {
+        "instance_groups": [
+          {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              }
+            ],
+            "instances": [
+              {
+                "public_ip_id": "",
+                "role_type": "REPLICA",
+                "service_ip_address": "192.168.10.10"
+              }
+            ],
+            "role_type": "REPLICA",
+            "server_type_name": "db1v2m4"
+          }
+        ],
+        "name": "replica001"
+      }
+    ],
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": []
+  },
+  "database/mariadb/mariadbcreatereplica": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "replica_count": 1,
+    "replicas": [
+      {
+        "instance_groups": [
+          {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              }
+            ],
+            "instances": [
+              {
+                "public_ip_id": "",
+                "role_type": "REPLICA",
+                "service_ip_address": "192.168.10.10"
+              }
+            ],
+            "role_type": "REPLICA",
+            "server_type_name": "db1v2m4"
+          }
+        ],
+        "name": "replica001"
+      }
+    ],
+    "tags": []
+  },
+  "database/mariadb/mariadbcreaterestore": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "backup_history_number": "202501010000",
+    "backup_recovery_time": "2025-01-01 00:00:00",
+    "block_storage_groups": [],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "server_type_name": "db1v2m4",
+    "tags": []
+  },
+  "database/mariadb/mariadbexportlog": {
+    "_raw": "{log_type}"
   },
   "database/mariadb/mariadbmanualbackup": {
     "_raw": "{cluster_id}"
   },
+  "database/mariadb/mariadbpatchminorversion": {
+    "software_version": "8.4.7"
+  },
+  "database/mariadb/mariadbpromotereplicacluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbregisterlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "bucket_name": "examplebucket",
+    "delete_on_export": true,
+    "log_type": "alert",
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/mariadb/mariadbremovebackuphistories": {
+    "backup_history_number": [
+      ""
+    ],
+    "session_id": ""
+  },
+  "database/mariadb/mariadbresetreplica": {
+    "_raw": "{replica_cluster_id}"
+  },
+  "database/mariadb/mariadbrestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbsetarchiveconfig": {
+    "archive_enabled": true,
+    "retention_period_day": "7"
+  },
+  "database/mariadb/mariadbsetauditlog": {
+    "use_audit_log": true
+  },
+  "database/mariadb/mariadbsetbackup": {
+    "archive_frequency_minute": "60",
+    "retention_period_day": "7",
+    "starting_time_hour": "2"
+  },
+  "database/mariadb/mariadbsetblockstoragesize": {
+    "size_gb": 16
+  },
+  "database/mariadb/mariadbsetlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "delete_on_export": true,
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/mariadb/mariadbsetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "database/mariadb/mariadbsetparametervalues": {
+    "parameters": [
+      {
+        "id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+        "new_value": "1",
+        "old_value": "0"
+      }
+    ]
+  },
+  "database/mariadb/mariadbsetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "database/mariadb/mariadbsetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "database/mariadb/mariadbstartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbstopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbswitchovercluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbsyncarchiveconfig": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbsyncclusterstate": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbsyncparametervalues": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mariadb/mariadbsyncreplicastate": {
+    "_raw": "{origin_cluster_id}"
+  },
+  "database/mariadb/mariadbupgradekernel": {
+    "_raw": "{cluster_id}"
+  },
   "database/mariadb/mariadbupgrademajorversion": {
-    "dbaas_engine": "",
-    "software_version": ""
+    "dbaas_engine": "MySQL",
+    "software_version": "8.4.7"
+  },
+  "database/mysql/mysqladdblockstorages": {
+    "role_type": "DATA",
+    "size_gb": 104,
+    "volume_type": "SSD"
   },
   "database/mysql/mysqlcreatecluster": {
-    "allowable_ip_addresses": [],
-    "dbaas_engine_version_id": "{engine_version_id}",
-    "ha_enabled": false,
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "dbaas_engine_version_id": "632ba9283657453da4644ff85a1d81fd",
+    "ha_enabled": true,
     "init_config_option": {
-      "audit_enabled": null,
+      "audit_enabled": "",
       "backup_option": {
         "archive_frequency_minute": "60",
         "retention_period_day": "7",
         "starting_time_hour": "2"
       },
       "database_case_sensitive": false,
-      "database_character_set": "utf8mb4",
-      "database_name": "regrdb",
-      "database_port": 2866,
-      "database_user_name": "regruser",
-      "database_user_password": "Regr1ss@2026"
-    },
-    "instance_groups": [
-      {
-        "block_storage_groups": [
-          {
-            "role_type": "OS",
-            "size_gb": 104,
-            "volume_type": "SSD"
-          }
-        ],
-        "instances": [
-          {
-            "public_ip_id": null,
-            "role_type": "ACTIVE"
-          }
-        ],
-        "role_type": "ACTIVE",
-        "server_type_name": "db1v2m4"
-      }
-    ],
-    "instance_name_prefix": "myprefix",
-    "maintenance_option": {
-      "period_hour": "5",
-      "starting_day_of_week": "MON",
-      "starting_time": "0000"
-    },
-    "name": "mycluster",
-    "nat_enabled": false,
-    "origin_cluster_id": null,
-    "service_watch_log_collection": true,
-    "subnet_id": "{subnet_id}",
-    "tags": [],
-    "timezone": "Asia/Seoul",
-    "vip_public_ip_id": null,
-    "virtual_ip_address": null
-  },
-  "database/mysql/mysqlmanualbackup": {
-    "_raw": "{cluster_id}"
-  },
-  "database/mysql/mysqlupgrademajorversion": {
-    "dbaas_engine": "",
-    "software_version": ""
-  },
-  "database/postgresql/postgresqlcreatecluster": {
-    "allowable_ip_addresses": [],
-    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
-    "ha_enabled": false,
-    "init_config_option": {
-      "audit_enabled": false,
-      "backup_option": {
-        "archive_frequency_minute": "60",
-        "retention_period_day": "7",
-        "starting_time_hour": "2"
-      },
-      "database_encoding": "UTF-8",
-      "database_locale": "C",
+      "database_character_set": "UTF8",
       "database_name": "mydatabase",
       "database_port": 2866,
       "database_user_name": "mydatabaseusr",
@@ -1062,7 +3010,7 @@
           {
             "public_ip_id": "",
             "role_type": "ACTIVE",
-            "service_ip_address": "192.168.10.10/32"
+            "service_ip_address": "192.168.10.10"
           }
         ],
         "role_type": "ACTIVE",
@@ -1076,46 +3024,542 @@
       "starting_time": "0000"
     },
     "name": "mycluster",
-    "nat_enabled": false,
-    "origin_cluster_id": "",
+    "nat_enabled": true,
+    "origin_cluster_id": "109a585ae67b4e8482fdafc8a4a5be74",
     "service_watch_log_collection": true,
     "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
     "tags": [],
     "timezone": "Asia/Seoul",
-    "vip_public_ip_id": "",
-    "virtual_ip_address": ""
+    "vip_public_ip_id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+    "virtual_ip_address": "192.168.10.12"
+  },
+  "database/mysql/mysqlcreateotherregionreplica": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "nat_enabled": true,
+    "region": "kr-west-1",
+    "replica_count": 1,
+    "replicas": [
+      {
+        "instance_groups": [
+          {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              }
+            ],
+            "instances": [
+              {
+                "public_ip_id": "",
+                "role_type": "REPLICA",
+                "service_ip_address": "192.168.10.10"
+              }
+            ],
+            "role_type": "REPLICA",
+            "server_type_name": "db1v2m4"
+          }
+        ],
+        "name": "replica001"
+      }
+    ],
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": []
+  },
+  "database/mysql/mysqlcreatereplica": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "replica_count": 1,
+    "replicas": [
+      {
+        "instance_groups": [
+          {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              }
+            ],
+            "instances": [
+              {
+                "public_ip_id": "",
+                "role_type": "REPLICA",
+                "service_ip_address": "192.168.10.10"
+              }
+            ],
+            "role_type": "REPLICA",
+            "server_type_name": "db1v2m4"
+          }
+        ],
+        "name": "replica001"
+      }
+    ],
+    "tags": []
+  },
+  "database/mysql/mysqlcreaterestore": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "backup_history_number": "202501010000",
+    "backup_recovery_time": "2025-01-01 00:00:00",
+    "block_storage_groups": [],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "server_type_name": "db1v2m4",
+    "tags": []
+  },
+  "database/mysql/mysqlexportlog": {
+    "_raw": "{log_type}"
+  },
+  "database/mysql/mysqlmanualbackup": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlpatchminorversion": {
+    "software_version": "8.4.7"
+  },
+  "database/mysql/mysqlpromotereplicacluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlregisterlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "bucket_name": "examplebucket",
+    "delete_on_export": true,
+    "log_type": "alert",
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/mysql/mysqlremovebackuphistories": {
+    "backup_history_number": [
+      ""
+    ],
+    "session_id": ""
+  },
+  "database/mysql/mysqlresetreplica": {
+    "_raw": "{replica_cluster_id}"
+  },
+  "database/mysql/mysqlrestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlsetarchiveconfig": {
+    "archive_enabled": true,
+    "retention_period_day": "7"
+  },
+  "database/mysql/mysqlsetbackup": {
+    "archive_frequency_minute": "60",
+    "retention_period_day": "7",
+    "starting_time_hour": "2"
+  },
+  "database/mysql/mysqlsetblockstoragesize": {
+    "size_gb": 16
+  },
+  "database/mysql/mysqlsetlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "delete_on_export": true,
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/mysql/mysqlsetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "database/mysql/mysqlsetparametervalues": {
+    "parameters": [
+      {
+        "id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+        "new_value": "1",
+        "old_value": "0"
+      }
+    ]
+  },
+  "database/mysql/mysqlsetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "database/mysql/mysqlsetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "database/mysql/mysqlstartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlstopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlswitchovercluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlsyncarchiveconfig": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlsyncclusterstate": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlsyncparametervalues": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlsyncreplicastate": {
+    "_raw": "{origin_cluster_id}"
+  },
+  "database/mysql/mysqlupgradekernel": {
+    "_raw": "{cluster_id}"
+  },
+  "database/mysql/mysqlupgrademajorversion": {
+    "dbaas_engine": "MySQL",
+    "software_version": "8.4.7"
+  },
+  "database/postgresql/postgresqladdblockstorages": {
+    "role_type": "DATA",
+    "size_gb": 104,
+    "volume_type": "SSD"
+  },
+  "database/postgresql/postgresqlcreatecluster": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "dbaas_engine_version_id": "632ba9283657453da4644ff85a1d81fd",
+    "ha_enabled": true,
+    "init_config_option": {
+      "audit_enabled": false,
+      "backup_option": {
+        "archive_frequency_minute": "60",
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
+      },
+      "database_encoding": "UTF8",
+      "database_locale": "ko_KR.utf8",
+      "database_name": "mydatabase",
+      "database_port": 2866,
+      "database_user_name": "mydatabaseusr",
+      "database_user_password": "test123!"
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          },
+          {
+            "role_type": "DATA",
+            "size_gb": 56,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10"
+          }
+        ],
+        "role_type": "ACTIVE",
+        "server_type_name": "db1v2m4"
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "nat_enabled": true,
+    "origin_cluster_id": "109a585ae67b4e8482fdafc8a4a5be74",
+    "service_watch_log_collection": true,
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": [],
+    "timezone": "Asia/Seoul",
+    "vip_public_ip_id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+    "virtual_ip_address": "192.168.10.12"
+  },
+  "database/postgresql/postgresqlcreateotherregionreplica": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "nat_enabled": true,
+    "region": "kr-west-1",
+    "replica_count": 1,
+    "replicas": [
+      {
+        "instance_groups": [
+          {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              }
+            ],
+            "instances": [
+              {
+                "public_ip_id": "",
+                "role_type": "REPLICA",
+                "service_ip_address": "192.168.10.10"
+              }
+            ],
+            "role_type": "REPLICA",
+            "server_type_name": "db1v2m4"
+          }
+        ],
+        "name": "replica001"
+      }
+    ],
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": []
+  },
+  "database/postgresql/postgresqlcreatereplica": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "replica_count": 1,
+    "replicas": [
+      {
+        "instance_groups": [
+          {
+            "block_storage_groups": [
+              {
+                "role_type": "DATA",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              }
+            ],
+            "instances": [
+              {
+                "public_ip_id": "",
+                "role_type": "REPLICA",
+                "service_ip_address": "192.168.10.10"
+              }
+            ],
+            "role_type": "REPLICA",
+            "server_type_name": "db1v2m4"
+          }
+        ],
+        "name": "replica001"
+      }
+    ],
+    "tags": []
+  },
+  "database/postgresql/postgresqlcreaterestore": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "backup_history_number": "202501010000",
+    "backup_recovery_time": "2025-01-01 00:00:00",
+    "block_storage_groups": [],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "server_type_name": "db1v2m4",
+    "tags": []
+  },
+  "database/postgresql/postgresqlexportlog": {
+    "_raw": "{log_type}"
   },
   "database/postgresql/postgresqlmanualbackup": {
     "_raw": "{cluster_id}"
   },
+  "database/postgresql/postgresqlpatchminorversion": {
+    "software_version": "8.4.7"
+  },
+  "database/postgresql/postgresqlpromotereplicacluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/postgresql/postgresqlregisterlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "bucket_name": "examplebucket",
+    "delete_on_export": true,
+    "log_type": "alert",
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/postgresql/postgresqlremovebackuphistories": {
+    "backup_history_number": [
+      ""
+    ],
+    "session_id": ""
+  },
+  "database/postgresql/postgresqlresetreplica": {
+    "_raw": "{replica_cluster_id}"
+  },
+  "database/postgresql/postgresqlrestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/postgresql/postgresqlsetarchiveconfig": {
+    "archive_enabled": true,
+    "retention_period_day": "7"
+  },
+  "database/postgresql/postgresqlsetauditlog": {
+    "use_audit_log": true
+  },
+  "database/postgresql/postgresqlsetbackup": {
+    "archive_frequency_minute": "60",
+    "retention_period_day": "7",
+    "starting_time_hour": "2"
+  },
+  "database/postgresql/postgresqlsetblockstoragesize": {
+    "size_gb": 16
+  },
+  "database/postgresql/postgresqlsetlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "delete_on_export": true,
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/postgresql/postgresqlsetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "database/postgresql/postgresqlsetparametervalues": {
+    "parameters": [
+      {
+        "id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+        "new_value": "1",
+        "old_value": "0"
+      }
+    ]
+  },
+  "database/postgresql/postgresqlsetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "database/postgresql/postgresqlsetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "database/postgresql/postgresqlstartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/postgresql/postgresqlstopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/postgresql/postgresqlswitchovercluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/postgresql/postgresqlsyncarchiveconfig": {
+    "_raw": "{cluster_id}"
+  },
+  "database/postgresql/postgresqlsyncclusterstate": {
+    "_raw": "{cluster_id}"
+  },
+  "database/postgresql/postgresqlsyncparametervalues": {
+    "_raw": "{cluster_id}"
+  },
+  "database/postgresql/postgresqlsyncreplicastate": {
+    "_raw": "{origin_cluster_id}"
+  },
+  "database/postgresql/postgresqlupgradekernel": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserveraddblockstorages": {
+    "role_type": "DATA",
+    "size_gb": 104,
+    "volume_type": "SSD"
+  },
   "database/sqlserver/sqlserveradddrsecondary": {
     "ad_user_id": "aduser123",
     "ad_user_password": "test123!",
-    "license": "",
-    "name": "",
-    "region": "",
-    "service_ip_address": "",
-    "subnet_id": ""
+    "license": "BYOL",
+    "name": "mycluster",
+    "region": "kr-west-1",
+    "service_ip_address": "192.168.10.10",
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321"
+  },
+  "database/sqlserver/sqlserveraddsecondary": {
+    "ad_user_id": "aduser123",
+    "ad_user_password": "test123!",
+    "license": "BYOL",
+    "name": "mycluster",
+    "service_ip_address": "192.168.10.10"
   },
   "database/sqlserver/sqlservercreatecluster": {
-    "allowable_ip_addresses": [],
-    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
-    "ha_enabled": false,
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "dbaas_engine_version_id": "632ba9283657453da4644ff85a1d81fd",
+    "ha_enabled": true,
     "init_config_option": {
       "ad_config": {
         "ad_dns_servers": [
           ""
         ],
-        "ad_domain_name": "",
-        "ad_netbios_name": "",
-        "ad_user_id": "",
+        "ad_domain_name": "example.com",
+        "ad_netbios_name": "EXAMPLE",
+        "ad_user_id": "aduser123",
         "ad_user_password": "test123!",
-        "failover_cluster_name": ""
+        "failover_cluster_name": "myfci"
       },
       "ad_enabled": false,
       "audit_enabled": false,
       "backup_option": {
-        "archive_frequency_minute": "",
+        "archive_frequency_minute": "60",
         "full_backup_day_of_week": "SUN",
         "retention_period_day": "7",
         "starting_time_hour": "2"
@@ -1128,8 +3572,8 @@
       "database_user_password": "test123!",
       "databases": [
         {
-          "database_name": "",
-          "drive_letter": "E"
+          "database_name": "mydatabase",
+          "drive_letter": "D"
         }
       ],
       "license": "AAAAA-AAAAA-AAAAA-AAAAA"
@@ -1152,55 +3596,464 @@
           {
             "public_ip_id": "",
             "role_type": "ACTIVE",
-            "service_ip_address": "192.168.10.10/32"
+            "service_ip_address": "192.168.10.10"
           }
         ],
         "role_type": "ACTIVE",
         "server_type_name": "db1v2m4"
       }
     ],
-    "instance_name_prefix": "",
+    "instance_name_prefix": "myprefix",
     "maintenance_option": {
       "period_hour": "5",
       "starting_day_of_week": "MON",
       "starting_time": "0000"
     },
     "name": "mycluster",
-    "nat_enabled": false,
+    "nat_enabled": true,
     "service_watch_log_collection": true,
     "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
     "tags": [],
     "timezone": "Asia/Seoul",
-    "vip_public_ip_id": "",
-    "virtual_ip_address": ""
+    "vip_public_ip_id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+    "virtual_ip_address": "192.168.10.12"
+  },
+  "database/sqlserver/sqlservercreaterestore": {
+    "allowable_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "backup_history_number": "202501010000",
+    "backup_recovery_time": "2025-01-01 00:00:00",
+    "block_storage_groups": [],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "server_type_name": "db1v2m4",
+    "tags": []
+  },
+  "database/sqlserver/sqlserverexportlog": {
+    "_raw": "{log_type}"
   },
   "database/sqlserver/sqlservermanualbackup": {
     "_raw": "{cluster_id}"
   },
+  "database/sqlserver/sqlserverpatchminorversion": {
+    "software_version": "8.4.7"
+  },
   "database/sqlserver/sqlserverpromotedrsecondary": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserverregisterlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "bucket_name": "examplebucket",
+    "delete_on_export": true,
+    "log_type": "alert",
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/sqlserver/sqlserverremovebackuphistories": {
+    "backup_history_number": [
+      ""
+    ],
+    "session_id": ""
+  },
+  "database/sqlserver/sqlserverrestartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserversetauditlog": {
+    "use_audit_log": true
+  },
+  "database/sqlserver/sqlserversetbackup": {
+    "archive_frequency_minute": "60",
+    "full_backup_day_of_week": "SUN",
+    "retention_period_day": "7",
+    "starting_time_hour": "2"
+  },
+  "database/sqlserver/sqlserversetblockstoragesize": {
+    "size_gb": 16
+  },
+  "database/sqlserver/sqlserversetdatabases": {
+    "add_databases": [],
+    "del_databases": []
+  },
+  "database/sqlserver/sqlserversetlogexportconfig": {
+    "access_key": "13952a8851244213f2de8d95069bf161",
+    "delete_on_export": true,
+    "schedule_day_of_month": "28",
+    "schedule_day_of_week": "MON",
+    "schedule_frequency_type": "DAY",
+    "schedule_hour": "12",
+    "secret_key": "secretkey"
+  },
+  "database/sqlserver/sqlserversetmaintenance": {
+    "start_day_of_week": "MON",
+    "start_minute": "30",
+    "start_time": "13",
+    "term_hour": "5"
+  },
+  "database/sqlserver/sqlserversetparametervalues": {
+    "parameters": [
+      {
+        "id": "a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d",
+        "new_value": "1",
+        "old_value": "0"
+      }
+    ]
+  },
+  "database/sqlserver/sqlserversetsecuritygrouprules": {
+    "add_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ],
+    "del_ip_addresses": [
+      "192.168.10.10",
+      "192.168.10.11"
+    ]
+  },
+  "database/sqlserver/sqlserversetservertype": {
+    "server_type_name": "db1v2m4"
+  },
+  "database/sqlserver/sqlserverstartcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserverstopcluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserverswitchovercluster": {
+    "_raw": "{cluster_id}"
+  },
+  "database/sqlserver/sqlserversyncclusterstate": {
     "_raw": "{cluster_id}"
   },
   "database/sqlserver/sqlserversyncdrsecondarystate": {
     "_raw": "{cluster_id}"
   },
+  "database/sqlserver/sqlserversyncparametervalues": {
+    "_raw": "{cluster_id}"
+  },
+  "devops-tools/devopsservice/createdevopsservice": {
+    "members": [
+      ""
+    ],
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ],
+    "tenant_code": "",
+    "tenant_name": ""
+  },
+  "financial-management/billingplan/createplannedcomputes": {
+    "contract_type": "01",
+    "os_type": "OPEN_SOURCE",
+    "server_type": "s1v1m2",
+    "service_id": "VIRTUAL_SERVER",
+    "service_name": "Virtual Server",
+    "tag": [
+      {
+        "key": "key1",
+        "value": "value1"
+      }
+    ]
+  },
+  "financial-management/billingplan/showcancellationfee": {
+    "planned_compute_id": "5f3688a192094ddeb0c94166a3e88935",
+    "region": "kr-west1"
+  },
+  "financial-management/billingplan/updateplannedcompute": {
+    "action": "EXTEND_CHANGE",
+    "contract_type": "01",
+    "server_type": "s1v1m2"
+  },
+  "financial-management/budget/createaccountbudget": {
+    "amount": 1000000,
+    "name": "test_budget",
+    "notifications": {
+      "is_use_notification": true,
+      "notification_send_period": "FIRST",
+      "receivers": [
+        "test_user1@test.com",
+        "test_user2@test.com"
+      ],
+      "thresholds": [
+        80
+      ]
+    },
+    "prevention": {
+      "is_use_prevention": true,
+      "receivers": [
+        "test_user1@test.com",
+        "test_user2@test.com"
+      ],
+      "threshold": 80
+    },
+    "start_month": "2026-01",
+    "unit": "MONTHLY"
+  },
+  "financial-management/budget/setaccountbudget": {
+    "amount": 1000000,
+    "name": "test_budget",
+    "notifications": {
+      "is_use_notification": true,
+      "notification_send_period": "FIRST",
+      "receivers": [
+        "test_user1@test.com",
+        "test_user2@test.com"
+      ],
+      "thresholds": [
+        80
+      ]
+    },
+    "prevention": {
+      "is_use_prevention": true,
+      "receivers": [
+        "test_user1@test.com",
+        "test_user2@test.com"
+      ],
+      "threshold": 80
+    },
+    "start_month": "2026-01",
+    "unit": "MONTHLY"
+  },
+  "financial-management/budget/setaccountcostlinkage": {
+    "_raw": "{budget_id}"
+  },
+  "financial-management/costnavigator/analyzecost": {
+    "filter": {
+      "dimensions": {
+        "key": "region",
+        "operator": "INCLUDES",
+        "values": [
+          "kr-west1"
+        ]
+      }
+    },
+    "granularity": "MONTHLY",
+    "group_by": [
+      {
+        "key": "service_id",
+        "type": "DIMENSION"
+      }
+    ],
+    "marker": "eyJvIjoxLCJsIjoxMH0",
+    "time_period": {
+      "end_date": "2026-06-30",
+      "start_date": "2026-01-01"
+    }
+  },
+  "financial-management/costnavigator/analyzecostcomparison": {
+    "baseline_period": {
+      "end_date": "2026-03-31",
+      "start_date": "2026-01-01"
+    },
+    "comparison_period": {
+      "end_date": "2026-06-30",
+      "start_date": "2026-04-01"
+    },
+    "filter": {
+      "dimensions": {
+        "key": "region",
+        "operator": "INCLUDES",
+        "values": [
+          "kr-west1"
+        ]
+      }
+    },
+    "granularity": "MONTHLY",
+    "group_by": [
+      {
+        "key": "service_id",
+        "type": "DIMENSION"
+      }
+    ],
+    "marker": "eyJvIjoxLCJsIjoxMH0"
+  },
+  "management/cloudcontrol/addbaselineassignment": {
+    "agree_yn": "Y",
+    "landing_zone_id": "2c8a138f8d78e1fc29a449dbfa8681",
+    "parent_unit_id": "ou-fc8c29a138d78e24bf1fa86812fc8b",
+    "resource_type": "OU",
+    "sso_user_name": "testuser",
+    "sso_user_real_name": "test user"
+  },
+  "management/cloudcontrol/createaccountfactoryaccount": {
+    "email": "myaccount@example.com",
+    "landing_zone_id": "2c8a138f8d78e1fc29a449dbfa8681",
+    "name": "foo-account",
+    "parent_unit_id": "ou-b30e9fcc39f84a20bf9e7458e5ec3801",
+    "sso_user_email": "user_email@example.com",
+    "sso_user_name": "John Doe",
+    "sso_user_real_name": "John Doe"
+  },
+  "management/cloudcontrol/createlandingzone": {
+    "additional_ou_name": "Sandbox",
+    "agree_yn": "Y",
+    "audit_account_name": "AUDIT",
+    "audit_login_id": "audit@samsung.com",
+    "basic_ou_name": "Security",
+    "detective_guardrail_status": "ENABLED",
+    "log_archive_account_name": "LOG_ARCHIVE",
+    "log_archive_login_id": "log-archive@samsung.com",
+    "sso_type": "ID_CENTER"
+  },
+  "management/cloudcontrol/enableguardrailbindings": {
+    "guardrail_ids": [
+      "f98e76d54c32b10a9z8y7x6w5v4u3"
+    ],
+    "landing_zone_id": "2c8a138f8d78e1fc29a449dbfa8681",
+    "unit_ids": [
+      "ou-1a2b3c4d5e6f7g8h9i0j1k2l3m4n5"
+    ]
+  },
+  "management/cloudcontrol/setlandingzone": {
+    "detective_guardrail_status": "ENABLED"
+  },
+  "management/cloudcontrol/updatebaselineassignment": {
+    "agree_yn": "Y",
+    "landing_zone_id": "2c8a138f8d78e1fc29a449dbfa8681"
+  },
+  "management/cloudmonitoring/getmetricperfdatalist": {
+    "ignoreInvalid": "Y",
+    "metricDataConditions": [
+      {
+        "metricKey": "system.diskio.read.bytes",
+        "objectType": "replicaset",
+        "productResourceInfos": [
+          {
+            "objectList": [
+              "kube-01",
+              "kube-02"
+            ],
+            "productResourceId": "INSTANCE-c4Hsd27ttDaLw533X4B6Sp"
+          }
+        ],
+        "statisticsPeriod": 5,
+        "statisticsTypeList": [
+          "SUM",
+          "MIN"
+        ]
+      }
+    ],
+    "queryEndDt": "2022-08-07T23:59:00.000Z",
+    "queryStartDt": "2022-08-07T23:50:00.000Z"
+  },
+  "management/cloudmonitoring/modifyeventpolicy": {
+    "eventPolicyRequest": {
+      "disableYn": "N",
+      "eventLevel": "WARNING",
+      "eventMessagePrefix": "SCP",
+      "eventOccurTimeZone": "GMT+9",
+      "eventPolicyStatistics": {
+        "eventPolicyStatisticsPeriod": 10,
+        "eventPolicyStatisticsType": "MAX"
+      },
+      "eventThreshold": {
+        "metricFunction": "delta",
+        "rangeThreshold": {
+          "maxComparisonOperator": "LT",
+          "maxValue": 90,
+          "minComparisonOperator": "GT",
+          "minValue": 80
+        },
+        "singleThreshold": {
+          "comparisonOperator": "LT",
+          "value": 10
+        },
+        "thresholdType": "RANGE_VALUE"
+      },
+      "ftCount": 3,
+      "objectDisplayName": "cpu0",
+      "objectName": "cpu0",
+      "objectType": "cluster",
+      "podObjectDisplayName": "cpu0",
+      "podObjectName": "cpu0"
+    },
+    "notificationRecipients": [
+      {
+        "notificationMethods": [
+          {
+            "eventLevel": "FATAL",
+            "notificationMethod": "",
+            "sendMethod": [
+              "MAIL"
+            ]
+          }
+        ],
+        "recipientKey": "1347",
+        "recipientType": "USER"
+      }
+    ]
+  },
+  "management/cloudmonitoring/puteventpolicy": {
+    "eventPolicyRequest": {
+      "disableYn": "N",
+      "eventLevel": "WARNING",
+      "eventMessagePrefix": "SCP",
+      "eventOccurTimeZone": "GMT+9",
+      "eventPolicyStatistics": {
+        "eventPolicyStatisticsPeriod": 10,
+        "eventPolicyStatisticsType": "MAX"
+      },
+      "eventThreshold": {
+        "metricFunction": "delta",
+        "rangeThreshold": {
+          "maxComparisonOperator": "LT",
+          "maxValue": 90,
+          "minComparisonOperator": "GT",
+          "minValue": 80
+        },
+        "singleThreshold": {
+          "comparisonOperator": "LT",
+          "value": 10
+        },
+        "thresholdType": "RANGE_VALUE"
+      },
+      "ftCount": 3,
+      "isLogMetric": "N",
+      "metricKey": "system.diskio.read.bytes",
+      "metricName": "",
+      "objectDisplayName": "dm0",
+      "objectName": "dm0",
+      "objectType": "SCP",
+      "podObjectDisplayName": "dm0",
+      "podObjectName": "dm0"
+    },
+    "notificationRecipients": [
+      {
+        "notificationMethods": [
+          {
+            "eventLevel": "FATAL",
+            "notificationMethod": "",
+            "sendMethod": [
+              "MAIL"
+            ]
+          }
+        ],
+        "recipientKey": "1347",
+        "recipientType": "USER"
+      }
+    ],
+    "productResourceId": "INSTANCE-c4Hsd27ttDaLw533X4B6Sp"
+  },
   "management/iam-identity-center/createaccountassignment": {
     "accounts": [
       {
-        "target_account_email": "target_account@example.com",
-        "target_account_id": "3265ab469f0d406d83073da3e11e7a6c",
-        "target_account_name": "target_account@example.com"
+        "target_account_id": "3265ab469f0d406d83073da3e11e7a6c"
       }
     ],
     "instance_id": "ssoins-12345",
     "permission_sets": [
       {
-        "custom_policies": [],
-        "inline_policies": [],
-        "managed_policies": [],
-        "permission_set_id": "e8d4b9f2c1a7e5d3f0b6c9a2d8e4f7b1",
-        "permission_set_name": "Permission Set",
-        "permission_set_srn": "srn:<offering>::<project-id>:<region>::permissionSet/${InstanceId}/${permissionId}",
-        "session_duration": 3600
+        "permission_set_id": "e8d4b9f2c1a7e5d3f0b6c9a2d8e4f7b1"
       }
     ],
     "principals": [
@@ -1286,7 +4139,8 @@
       "users_dn": "OU=Employees,OU=Accounts,DC=sub,DC=org"
     },
     "identity_store_type": "IDENTITY_CENTER_DIRECTORY",
-    "name": "My Instance"
+    "name": "My Instance",
+    "self_managed_password": false
   },
   "management/iam-identity-center/setpermissionset": {
     "description": "My Instance Description",
@@ -1615,6 +4469,256 @@
     "password": "",
     "temporary_password": false
   },
+  "management/loggingaudit/createtrail": {
+    "account_id": "ACCOUNT_ID-ABCDEF1234",
+    "bucket_name": "TestBucket00",
+    "bucket_region": "RegionOne",
+    "iam_role_id": "IAM_ROLE_ID-ABCDEF1234",
+    "log_archive_account_id": "ACCOUNT_ID-ABCDEF1234",
+    "log_group_name": "/scp/loggingaudit/trail/trailname-log-group-20260205120000",
+    "log_type_total_yn": "N",
+    "log_verification_yn": "N",
+    "organization_trail_yn": "N",
+    "region_names": [],
+    "region_total_yn": "Y",
+    "resource_type_total_yn": "Y",
+    "service_watch_yn": "Y",
+    "tag_create_requests": [
+      {
+        "key": "11",
+        "value": "22"
+      }
+    ],
+    "target_log_types": [],
+    "target_resource_types": [],
+    "target_users": [],
+    "trail_description": "This is a test trail",
+    "trail_name": "TestTrail01",
+    "trail_save_type": "JSON",
+    "user_total_yn": "Y"
+  },
+  "management/loggingaudit/downloadlogs": {
+    "end_at": "2026-02-26T08:00:00Z",
+    "file_type": "JSON",
+    "product_name": "",
+    "region": "",
+    "resource_name": "",
+    "resource_type": "",
+    "root_resource_id": "",
+    "start_at": "2025-11-28T08:00:00Z",
+    "status": "",
+    "time_zone_info": "Asia/Seoul",
+    "user_name": ""
+  },
+  "management/loggingaudit/settrail": {
+    "iam_role_id": "IAM_ROLE_ID-ABCDEF1234",
+    "log_group_name": "/scp/loggingaudit/trail/trailname-log-group-20260205120000",
+    "log_type_total_yn": "N",
+    "log_verification_yn": "N",
+    "organization_trail_yn": "Y",
+    "region_names": [],
+    "region_total_yn": "Y",
+    "resource_type_total_yn": "Y",
+    "service_watch_yn": "Y",
+    "target_log_types": [],
+    "target_resource_types": [],
+    "target_users": [],
+    "trail_description": "This is a test trail",
+    "trail_save_type": "JSON",
+    "user_total_yn": "Y"
+  },
+  "management/loggingaudit/starttrail": {
+    "_raw": "{trail_id}"
+  },
+  "management/loggingaudit/stoptrail": {
+    "_raw": "{trail_id}"
+  },
+  "management/network-logging/createnetworkloggingstorage": {
+    "bucket_name": "",
+    "resource_type": "FIREWALL"
+  },
+  "management/organization/acceptinvitation": {
+    "_raw": "{invitation_id}"
+  },
+  "management/organization/attachpolicybindings": {
+    "entity": "POLICY",
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5",
+    "policy_ids": [
+      "f98e76d54c32b10a9z8y7x6w5v4u3"
+    ],
+    "target_ids": [
+      "ou-1a2b3c4d5e6f7g8h9i0j1k2l3m4n5"
+    ]
+  },
+  "management/organization/cancelinvitations": {
+    "ids": [
+      "138c2fc8c29a449dbfa8681f8f1d78e2"
+    ],
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5"
+  },
+  "management/organization/createaccount": {
+    "login_id": "log-archive@samsung.com",
+    "name": "score-account",
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5",
+    "role_name": "OrganizationAccountAccessRole"
+  },
+  "management/organization/createdelegationpolicy": {
+    "document": {
+      "Statement": [
+        {
+          "Action": [
+            "organization:CreateServiceControlPolicy",
+            "organization:DeleteServiceControlPolicies",
+            "organization:SetServiceControlPolicy",
+            "organization:ShowServiceControlPolicy",
+            "organization:ListServiceControlPolicies",
+            "organization:ShowAccount",
+            "organization:ListAccounts",
+            "organization:ListOrganizationUnits",
+            "organization:ListOrganizationInvitations",
+            "organization:ListParents",
+            "organization:ListPoliciesForTarget",
+            "organization:ListTargetsForPolicy",
+            "organization:AttachPolicyBindings",
+            "organization:RemovePolicyBindings",
+            "organization:ShowDelegatePolicy"
+          ],
+          "Effect": "Allow",
+          "Principal": {
+            "scp": [
+              "srn:dev2::f045159f40c64125a1fe61bd71d1c14c:::iam:user/e3a6e3f99c1040639e9a3c8f8b7427df"
+            ]
+          },
+          "Resource": [
+            "*"
+          ],
+          "Sid": "statement1"
+        }
+      ],
+      "Version": "2024-07-01"
+    },
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5"
+  },
+  "management/organization/createinvitation": {
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5",
+    "target_login_ids": [
+      "score-1@samsung.com"
+    ]
+  },
+  "management/organization/createorganization": {
+    "name": "My Organization"
+  },
+  "management/organization/createorganizationunit": {
+    "description": "Score Organization Unit",
+    "name": "score-organization-unit",
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5",
+    "parent_unit_id": "ou-fc8c29a138d78e24bf1fa86812fc8b",
+    "policy_ids": [
+      "f98e76d54c32b10a9z8y7x6w5v4u3"
+    ]
+  },
+  "management/organization/createservicecontrolpolicy": {
+    "description": "This is an example policy.",
+    "document": {
+      "Statement": [
+        {
+          "Action": [
+            "*"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "*"
+          ],
+          "Sid": "statement1"
+        }
+      ],
+      "Version": "2024-07-01"
+    },
+    "name": "MyPolicy",
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5",
+    "type": "MANAGED"
+  },
+  "management/organization/declineinvitation": {
+    "_raw": "{invitation_id}"
+  },
+  "management/organization/moveaccount": {
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5",
+    "parent_unit_id": "ou-1a2b3c4d5e6f7g8h9i0j1k2l3m4n5",
+    "target_account_ids": [
+      "b4d3f2h1j0l9n8p7r6t5v4x3z2y1w0"
+    ]
+  },
+  "management/organization/registerdelegatedadministrator": {
+    "account_id": "b4d3f2h1j0l9n8p7r6t5v4x3z2y1w0",
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5",
+    "service_type": "identity-center"
+  },
+  "management/organization/setdelegationpolicy": {
+    "document": {
+      "Statement": [
+        {
+          "Action": [
+            "organization:CreateServiceControlPolicy",
+            "organization:DeleteServiceControlPolicies",
+            "organization:SetServiceControlPolicy",
+            "organization:ShowServiceControlPolicy",
+            "organization:ListServiceControlPolicies",
+            "organization:ShowAccount",
+            "organization:ListAccounts",
+            "organization:ListOrganizationUnits",
+            "organization:ListOrganizationInvitations",
+            "organization:ListParents",
+            "organization:ListPoliciesForTarget",
+            "organization:ListTargetsForPolicy",
+            "organization:AttachPolicyBindings",
+            "organization:RemovePolicyBindings",
+            "organization:ShowDelegatePolicy"
+          ],
+          "Effect": "Allow",
+          "Principal": {
+            "scp": [
+              "srn:dev2::f045159f40c64125a1fe61bd71d1c14c:::iam:user/e3a6e3f99c1040639e9a3c8f8b7427df"
+            ]
+          },
+          "Resource": [
+            "*"
+          ],
+          "Sid": "statement1"
+        }
+      ],
+      "Version": "2024-07-01"
+    },
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5"
+  },
+  "management/organization/setorganization": {
+    "name": "My Organization",
+    "use_scp_yn": true
+  },
+  "management/organization/setorganizationunit": {
+    "description": "Score Organization Unit",
+    "name": "score-organization-unit",
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5"
+  },
+  "management/organization/setservicecontrolpolicy": {
+    "description": "This is an example policy.",
+    "document": {
+      "Statement": [
+        {
+          "Action": [
+            "*"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+            "*"
+          ],
+          "Sid": "statement1"
+        }
+      ],
+      "Version": "2024-07-01"
+    },
+    "name": "MyPolicy",
+    "organization_id": "o-x9y8z7w6v5u4t3s2r1q0p9o8n7m6l5"
+  },
   "management/resourcemanager/createresourcegroup": {
     "description": "resource group 1",
     "name": "resource-group-1",
@@ -1659,10 +4763,175 @@
       ]
     }
   },
+  "management/resourceoptimizer/createaccountsetting": {
+    "category": "VIRTUAL_SERVER",
+    "cpu_headroom": 20,
+    "cpu_threshold": "P99.5",
+    "lookback_period": "14d",
+    "memory_headroom": 20,
+    "region_ids": [
+      "kr-west1",
+      "kr-west2"
+    ],
+    "utilization_preset": "PERFORMANCE_PRIORITY"
+  },
+  "management/resourceoptimizer/createorganizationsettings": {
+    "category": "VIRTUAL_SERVER",
+    "cpu_headroom": 20,
+    "cpu_threshold": "P99.5",
+    "lookback_period": "14d",
+    "memory_headroom": 20,
+    "region_ids": [
+      "kr-west1",
+      "kr-west2"
+    ],
+    "utilization_preset": "PERFORMANCE_PRIORITY"
+  },
+  "management/resourceoptimizer/getdashboard": {
+    "account_id": "1bcf39b344ac41cbaf0466ff0d2bebad",
+    "region_id": [
+      "kr-west1"
+    ],
+    "tags": [
+      {
+        "key": "env",
+        "value": [
+          "prod"
+        ]
+      }
+    ]
+  },
+  "management/resourceoptimizer/getidleresourcelist": {
+    "category": [
+      "VIRTUAL_SERVER"
+    ],
+    "idle_state": [
+      "IDLE"
+    ],
+    "page": 0,
+    "region_id": [
+      "kr-west1"
+    ],
+    "resource_name": "web-server-01",
+    "size": 20,
+    "sort": "duration:desc",
+    "tags": [
+      {
+        "key": "env",
+        "value": [
+          "prod"
+        ]
+      }
+    ],
+    "target_account_id": "1bcf39b344ac41cbaf0466ff0d2bebad"
+  },
+  "management/resourceoptimizer/listrecommendationsbybody": {
+    "analysis_filters": [
+      {
+        "judge_result": "",
+        "result_reason": ""
+      }
+    ],
+    "category": "virtual-server",
+    "judge_result": "",
+    "keyword_resource_id": "",
+    "keyword_resource_name": "",
+    "page": 0,
+    "region_id": "",
+    "result_reason": "",
+    "size": 20,
+    "sort_by": "",
+    "sort_order": "asc",
+    "tags": [
+      {
+        "key": "",
+        "value": [
+          ""
+        ]
+      }
+    ],
+    "target_account_id": ""
+  },
+  "management/resourceoptimizer/optin": {
+    "account_ids": [
+      "1bcf39b344ac41cbaf0466ff0d2bebad"
+    ]
+  },
+  "management/resourceoptimizer/optout": {
+    "_raw": "{account_id}"
+  },
+  "management/resourceoptimizer/setaccountlimactive": {
+    "lim_settings": [
+      {
+        "category": "VIRTUAL_SERVER",
+        "regions": [
+          {
+            "lim_enabled_yn": "Y",
+            "region_id": "kr-west1"
+          }
+        ]
+      }
+    ]
+  },
+  "management/resourceoptimizer/setorganizationlimactive": {
+    "lim_settings": [
+      {
+        "category": "VIRTUAL_SERVER",
+        "regions": [
+          {
+            "lim_enabled_yn": "Y",
+            "region_id": "kr-west1"
+          }
+        ]
+      }
+    ]
+  },
+  "management/resourceoptimizer/updateaccountsetting": {
+    "category": "VIRTUAL_SERVER",
+    "new_values": {
+      "cpu_headroom": 20,
+      "cpu_threshold": "P99.5",
+      "lookback_period": "14d",
+      "memory_headroom": 20,
+      "utilization_preset": "PERFORMANCE_PRIORITY"
+    },
+    "origin": {
+      "cpu_headroom": 20,
+      "cpu_threshold": "P99.5",
+      "lookback_period": "14d",
+      "memory_headroom": 20,
+      "utilization_preset": "PERFORMANCE_PRIORITY"
+    },
+    "region_ids": [
+      "kr-west1",
+      "kr-west2"
+    ]
+  },
+  "management/resourceoptimizer/updateorganizationsetting": {
+    "category": "VIRTUAL_SERVER",
+    "new_values": {
+      "cpu_headroom": 20,
+      "cpu_threshold": "P99.5",
+      "lookback_period": "14d",
+      "memory_headroom": 20,
+      "utilization_preset": "PERFORMANCE_PRIORITY"
+    },
+    "origin": {
+      "cpu_headroom": 20,
+      "cpu_threshold": "P99.5",
+      "lookback_period": "14d",
+      "memory_headroom": 20,
+      "utilization_preset": "PERFORMANCE_PRIORITY"
+    },
+    "region_ids": [
+      "kr-west1",
+      "kr-west2"
+    ]
+  },
   "management/servicewatch/createalert": {
-    "description": "Alert1 Description",
+    "description": "Description for Alert Test",
     "dimension": {
-      "key": "InstanceId",
+      "key": "resource_id",
       "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
     },
     "dimensions": [],
@@ -1675,16 +4944,17 @@
     ],
     "level": "HIGH",
     "lower_bound": 80.0,
-    "metric_id": "d91097ac-0387-4e69-adb2-7b8d453b8db5",
+    "metric_id": "f13aab3b88c341b2bc73f8925a0e8cc5",
     "missing_data_option": "BREACHING",
-    "name": "Alert1",
-    "namespace_id": "d583a229-9766-4eb8-96c4-ec389902ba3d",
+    "name": "Alert Test",
+    "namespace_id": "1d9d05af5c624f2cb80a45f2c911e2f4",
     "operator": "RANGE",
     "period": 300,
-    "recipient_ids": [
-      "1234da92-634a-4f8c-932e-9d650599ab1b",
-      "1234da92-634a-4f8c-932e-9d650599ab1a",
-      "1234da92-634a-4f8c-932e-9d650599ab1c"
+    "recipients": [
+      {
+        "recipient_id": "cfff0a3976cb472c88e90d4533731975",
+        "recipient_type": "USER"
+      }
     ],
     "statistic": "AVG",
     "tags": [
@@ -1857,7 +5127,7 @@
               "color": "#ff7f0e",
               "dimensions": [
                 {
-                  "key": "InstanceId",
+                  "key": "resource_id",
                   "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
                 }
               ],
@@ -1902,6 +5172,7 @@
       "4af4507824924a7a9988a7bd3bd09bb7",
       "c0e4f5d4b0cf4dc5b8f6f915602949d5"
     ],
+    "recipient_type": "USER",
     "resource_type_id": "596bf16709e84e27b7df397bf59b877c",
     "service_id": "2778de83d7e247609445bbd570a4eba9",
     "srn_list": [
@@ -1961,7 +5232,7 @@
           }
         ],
         "display_name": "Virtual Server | VirtualServer001 | CPU Usage/Core[Basic]",
-        "name": "CPU Usage/Core[Basic]",
+        "name": "CPU Usage",
         "namespace_name": "Virtual Server",
         "period": 300,
         "statistic_type": "AVG"
@@ -1985,7 +5256,7 @@
           }
         ],
         "display_name": "Virtual Server | VirtualServer001 | CPU Usage/Core[Basic]",
-        "name": "CPU Usage/Core[Basic]",
+        "name": "CPU Usage",
         "namespace_name": "Virtual Server",
         "period": 300,
         "statistic_type": "AVG"
@@ -1996,7 +5267,7 @@
     "statistic_type": "AVG"
   },
   "management/servicewatch/listmetricinfos": {
-    "metric_name": "CPU Usage/Core[Basic]",
+    "metric_name": "CPU Usage",
     "namespaces": [
       {
         "dimensions": "[[\"resource_id\"]]",
@@ -2014,7 +5285,7 @@
   },
   "management/servicewatch/setalert": {
     "dimension": {
-      "key": "InstanceId",
+      "key": "resource_id",
       "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
     },
     "dimensions": [],
@@ -2027,9 +5298,9 @@
     ],
     "level": "HIGH",
     "lower_bound": 80.0,
-    "metric_id": "d91097ac-0387-4e69-adb2-7b8d453b8db5",
+    "metric_id": "f13aab3b88c341b2bc73f8925a0e8cc5",
     "missing_data_option": "BREACHING",
-    "namespace_id": "d583a229-9766-4eb8-96c4-ec389902ba3d",
+    "namespace_id": "1d9d05af5c624f2cb80a45f2c911e2f4",
     "operator": "RANGE",
     "period": 300,
     "statistic": "AVG",
@@ -2041,10 +5312,19 @@
     "activated_yn": "Y"
   },
   "management/servicewatch/setalertdescription": {
-    "description": "Alert1 Description"
+    "description": "Description for Alert Test"
   },
   "management/servicewatch/setalertnotifications": {
-    "user_ids": [
+    "recipients": [
+      {
+        "recipient_id": "cfff0a3976cb472c88e90d4533731975",
+        "recipient_type": "USER"
+      }
+    ]
+  },
+  "management/servicewatch/setalertnotificationsactivated": {
+    "activated_yn": "Y",
+    "recipient_ids": [
       "1234da92-634a-4f8c-932e-9d650599ab1b",
       "1234da92-634a-4f8c-932e-9d650599ab1a",
       "1234da92-634a-4f8c-932e-9d650599ab1c"
@@ -2062,7 +5342,7 @@
               "color": "#ff7f0e",
               "dimensions": [
                 {
-                  "key": "InstanceId",
+                  "key": "resource_id",
                   "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
                 }
               ],
@@ -2114,6 +5394,7 @@
       "4af4507824924a7a9988a7bd3bd09bb7",
       "c0e4f5d4b0cf4dc5b8f6f915602949d5"
     ],
+    "recipient_type": "USER",
     "resource_type_id": "596bf16709e84e27b7df397bf59b877c",
     "service_id": "2778de83d7e247609445bbd570a4eba9",
     "srn_list": [
@@ -2127,6 +5408,97 @@
   "management/servicewatch/setloggroup": {
     "retention_period": 365
   },
+  "management/servicewatch/setwidgets": {
+    "widgets": [
+      {
+        "height": 1,
+        "order": 1,
+        "properties": {
+          "metrics": [
+            {
+              "color": "#ff7f0e",
+              "dimensions": [
+                {
+                  "key": "resource_id",
+                  "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+                }
+              ],
+              "display_name": "EC2-Prod-CPU",
+              "individual_items": [
+                {
+                  "key": "BucketId",
+                  "value": "b-1234567890abcdef0"
+                }
+              ],
+              "name": "CPUUtilization",
+              "namespace_name": "Virtual Server",
+              "period": 300,
+              "statistic_type": "AVG"
+            }
+          ],
+          "period": 300,
+          "stacked": false,
+          "statistic_type": "AVG",
+          "title": "Virtual Server | CPU Utilization",
+          "view": "line"
+        },
+        "type": "metric",
+        "width": 1
+      }
+    ]
+  },
+  "networking/cdn/createcdnservice": {
+    "cache_expiry_time": 86400,
+    "cache_key_hostname": "REQUEST_HOST_HEADER",
+    "caching_option": "CACHE",
+    "cdn_origin_hostname": "test.example.com",
+    "cdn_origin_port": 443,
+    "cdn_origin_protocol": "HTTPS",
+    "cdn_service_domain_prefix": "global1",
+    "cdn_service_origin_path": "/test/global/",
+    "content_policy": "ONLY_VALIDATED_CONTENTS",
+    "custom_forward_host_header": "",
+    "description": "추가 정보 입력 - 설명",
+    "forward_host_header": "REQUEST_HOST_HEADER",
+    "name": "test1",
+    "origin_hostname_type": "DOMAIN",
+    "query_string_ignored": true,
+    "range_request_allowed": true,
+    "request_custom_headers": "",
+    "response_custom_headers": "",
+    "tags": []
+  },
+  "networking/cdn/purgecdnservice": {
+    "custom_url": "/test/",
+    "target_content": "INVALIDATED_CONTENT",
+    "target_url": "CUSTOM"
+  },
+  "networking/cdn/startcdnservice": {
+    "_raw": "{id}"
+  },
+  "networking/cdn/stopcdnservice": {
+    "_raw": "{id}"
+  },
+  "networking/cdn/updatecdnservice": {
+    "cache_expiry_time": 86400,
+    "cache_key_hostname": "REQUEST_HOST_HEADER",
+    "caching_option": "CACHE",
+    "cdn_origin_hostname": "test.example.com",
+    "cdn_origin_port": 443,
+    "cdn_origin_protocol": "HTTPS",
+    "cdn_service_origin_path": "/test/global/",
+    "content_policy": "ONLY_VALIDATED_CONTENTS",
+    "custom_forward_host_header": "",
+    "forward_host_header": "REQUEST_HOST_HEADER",
+    "origin_hostname_type": "DOMAIN",
+    "query_string_ignored": true,
+    "range_request_allowed": true,
+    "request_custom_headers": "",
+    "response_custom_headers": ""
+  },
+  "networking/cdn/updatedescriptionofcdnservice": {
+    "description": "추가 정보 입력 - 설명"
+  },
   "networking/direct-connect/createdirectconnect": {
     "bandwidth": 1,
     "description": "Direct-connect Description",
@@ -2138,13 +5510,22 @@
     "uplink_standby_zone": "kr-west1-b",
     "vpc_id": "7df8abb4912e4709b1cb237daccca7a8"
   },
+  "networking/direct-connect/createroutingrule": {
+    "description": "TransitGateway Description",
+    "destination_cidr": "11.11.11.0/24",
+    "destination_resource_id": "be3c84238562488e81e4e0675f86be62",
+    "destination_type": "ON_PREMISE"
+  },
+  "networking/direct-connect/setdirectconnect": {
+    "description": "Direct-connect Description"
+  },
   "networking/dns/activateprivatedns": {
     "name": "private-dns01"
   },
   "networking/dns/createhostedzone": {
     "description": "This is description",
     "name": "my-zone.com",
-    "private_dns_id": "10fjkewefprivatedns3193rud543",
+    "private_dns_id": "fedcba9876543210fedcba9876543210",
     "tags": [],
     "type": "private"
   },
@@ -2158,18 +5539,21 @@
     "type": "A"
   },
   "networking/dns/createprivatedns": {
-    "connected_vpc_ids": [],
+    "connected_vpc_ids": [
+      "1234567890abcdef1234567890abcdef",
+      "fedcba0987654321fedcba0987654321"
+    ],
     "description": "This is description",
     "name": "private-dns01",
     "tags": [
       {
-        "key": "",
-        "value": ""
+        "key": "env",
+        "value": "prod"
       }
     ]
   },
   "networking/dns/createpublicdomainname": {
-    "address_type": "DOMESTIC",
+    "address_type": "",
     "auto_extension": true,
     "description": "This is description",
     "domestic_first_address_en": "125 Olympic-ro 35-gil, Songpa-gu, Seoul",
@@ -2184,13 +5568,19 @@
     "register_email": "admin@example.com",
     "register_name_en": "Hong Gildong",
     "register_name_ko": "홍길동",
-    "register_telno": "010-1234-5678",
-    "tags": []
+    "register_telno": "",
+    "tags": [
+      {
+        "key": "env",
+        "value": "prod"
+      }
+    ]
   },
   "networking/dns/sethostedzone": {
     "description": "This is description"
   },
   "networking/dns/sethostedzonerecord": {
+    "description": "This is description",
     "records": [
       "12345.ns.private.kr-west1.dev2.samsungsdscloud.com"
     ],
@@ -2198,7 +5588,8 @@
   },
   "networking/dns/setprivatedns": {
     "connected_vpc_ids": [
-      ""
+      "1234567890abcdef1234567890abcdef",
+      "fedcba0987654321fedcba0987654321"
     ],
     "description": "This is description"
   },
@@ -2207,7 +5598,7 @@
     "description": "This is description"
   },
   "networking/dns/setpublicdomainnamewhoisinfo": {
-    "address_type": "DOMESTIC",
+    "address_type": "",
     "domestic_first_address_en": "125 Olympic-ro 35-gil, Songpa-gu, Seoul",
     "domestic_first_address_ko": "서울특별시 송파구 올림픽로35길 125 (신천동)",
     "domestic_second_address_en": "West Campus 1F",
@@ -2217,11 +5608,119 @@
     "overseas_third_address": "NY 10001",
     "postal_code": "12345",
     "register_email": "admin@example.com",
-    "register_telno": "010-1234-5678"
+    "register_telno": ""
   },
   "networking/dns/transferpublicdomainname": {
     "target_account_id": "003dffc50eb123a1cbf4f2e5c71d4f15",
     "type": "REQUEST"
+  },
+  "networking/firewall/createfirewallrule": {
+    "firewall_id": "b156740b6335468d8354eb9ef8eddf5a",
+    "firewall_rule": {
+      "action": "ALLOW",
+      "description": "Firewall rule description example",
+      "destination_address": [
+        "10.0.0.1",
+        "10.0.0.2"
+      ],
+      "direction": "INBOUND",
+      "order_direction": "BEFORE",
+      "order_rule_id": "043aa63459da466faad71fe4fe587031",
+      "service": [
+        {
+          "service_type": "TCP",
+          "service_value": "443"
+        }
+      ],
+      "source_address": [
+        "192.168.1.1",
+        "192.168.1.2"
+      ],
+      "status": "ENABLE"
+    }
+  },
+  "networking/firewall/setfirewall": {
+    "flavor_name": "EXSMALL",
+    "loggable": false
+  },
+  "networking/firewall/setfirewallrule": {
+    "firewall_rule": {
+      "action": "ALLOW",
+      "description": "Firewall rule description example",
+      "destination_address": [
+        "10.0.0.1",
+        "10.0.0.2"
+      ],
+      "direction": "INBOUND",
+      "order_direction": "BEFORE",
+      "order_rule_id": "043aa63459da466faad71fe4fe587031",
+      "service": [
+        {
+          "service_type": "TCP",
+          "service_value": "443"
+        }
+      ],
+      "source_address": [
+        "192.168.1.1",
+        "192.168.1.2"
+      ],
+      "status": "ENABLE"
+    }
+  },
+  "networking/gslb/creategslb": {
+    "algorithm": "ROUND_ROBIN",
+    "description": "Example Description for GSLB",
+    "env_usage": "",
+    "health_check": {
+      "health_check_interval": 5,
+      "health_check_probe_timeout": 5,
+      "health_check_user_id": "user",
+      "health_check_user_password": "Passw0rd!",
+      "protocol": "https",
+      "receive_string": "OK",
+      "send_string": "GET /",
+      "service_port": 1,
+      "timeout": 6
+    },
+    "name": "example.gslb.e.samsungsdscloud.com",
+    "resources": [
+      {
+        "description": "",
+        "destination": "192.168.1.100",
+        "region": "KR-WEST-1",
+        "weight": 10
+      }
+    ],
+    "tags": []
+  },
+  "networking/gslb/setgslb": {
+    "algorithm": "ROUND_ROBIN",
+    "description": ""
+  },
+  "networking/gslb/setgslbhealthcheck": {
+    "health_check_interval": 5,
+    "health_check_probe_timeout": 5,
+    "health_check_user_id": "user",
+    "health_check_user_password": "Passw0rd!",
+    "protocol": "https",
+    "receive_string": "OK",
+    "send_string": "GET /",
+    "service_port": 1,
+    "timeout": 6
+  },
+  "networking/gslb/setgslbregionalroutingcontrol": {
+    "region": "KR-WEST-1",
+    "status": "ENABLE"
+  },
+  "networking/gslb/setgslbresources": {
+    "resources": [
+      {
+        "description": "",
+        "destination": "192.168.1.100",
+        "region": "KR-WEST-1",
+        "weight": 10
+      }
+    ]
   },
   "networking/loadbalancer/addlbservergroupmembers": {
     "members": [
@@ -2473,6 +5972,12 @@
     "name": "ExampleAG1",
     "tags": []
   },
+  "networking/security-group/createsecuritygroup": {
+    "description": "Example Description for Security Group",
+    "loggable": false,
+    "name": "ExampleSG1",
+    "tags": []
+  },
   "networking/security-group/createsecuritygrouprule": {
     "description": "Example Description for Security Group Rule",
     "direction": "Ingress",
@@ -2495,8 +6000,29 @@
   "networking/security-group/setaddressgroup": {
     "description": "Example Description for Address Group"
   },
+  "networking/security-group/setsecuritygroup": {
+    "description": "Example Description for Security Group",
+    "loggable": false
+  },
+  "networking/vpc/addvpccidr": {
+    "cidr": "192.167.0.0/18"
+  },
   "networking/vpc/approvalvpcpeering": {
     "type": "CREATE_APPROVE"
+  },
+  "networking/vpc/approveprivatelinkendpoint": {
+    "type": "APPROVE"
+  },
+  "networking/vpc/connectprivatelinkendpoint": {
+    "type": "DISCONNECT"
+  },
+  "networking/vpc/createinternetgateway": {
+    "description": "Internet Gateway Description",
+    "firewall_enabled": false,
+    "firewall_loggable": false,
+    "tags": [],
+    "type": "IGW",
+    "vpc_id": "7df8abb4912e4709b1cb237daccca7a8"
   },
   "networking/vpc/createnatgateway": {
     "description": "VpcEndpoint Description",
@@ -2520,6 +6046,7 @@
     "description": "PrivateLink Endpoint Description",
     "endpoint_ip_address": "192.167.1.5",
     "name": "EndpointName",
+    "privatelink_scp_service_id": "e3df2e8e3b374fbb81d4e322b52ca50d",
     "privatelink_service_id": "e3df2e8e3b374fbb81d4e322b52ca50d",
     "security_group_ids": "['17776b52-0a64-440d-9e93-b4fc37be935b']",
     "subnet_id": "023c57b14f11483689338d085e061492",
@@ -2607,6 +6134,18 @@
   "networking/vpc/createtransitgatewayvpcconnection": {
     "vpc_id": "7df8abb4912e4709b1cb237daccca7a8"
   },
+  "networking/vpc/createvpc": {
+    "cidr": "192.167.0.0/18",
+    "description": "VPC Description",
+    "name": "vpcName",
+    "tags": [],
+    "zone_type": "PUBLIC",
+    "zones": [
+      "zone-a",
+      "zone-b",
+      "zone-c"
+    ]
+  },
   "networking/vpc/createvpcendpoint": {
     "description": "VpcEndpoint Description",
     "endpoint_ip_address": "192.167.0.5",
@@ -2630,6 +6169,215 @@
     "destination_cidr": "",
     "destination_vpc_type": "REQUESTER_VPC",
     "tags": []
+  },
+  "networking/vpc/requestprivatelinkendpoint": {
+    "type": "CANCEL"
+  },
+  "networking/vpc/setinternetgateway": {
+    "description": "Internet Gateway Description",
+    "loggable": ""
+  },
+  "networking/vpc/setnatgateway": {
+    "description": "VpcEndpoint Description"
+  },
+  "networking/vpc/setport": {
+    "description": "Port Description",
+    "security_groups": [
+      ""
+    ]
+  },
+  "networking/vpc/setprivatelinkendpoint": {
+    "description": "PrivateLink Endpoint Description"
+  },
+  "networking/vpc/setprivatelinkservice": {
+    "description": "PrivateLink Service Description"
+  },
+  "networking/vpc/setprivatenat": {
+    "description": "PrivateNat Description"
+  },
+  "networking/vpc/setpublicip": {
+    "description": "Public IP Description"
+  },
+  "networking/vpc/setsubnet": {
+    "description": "Subnet Description",
+    "dhcp_ip_address": "192.167.1.2"
+  },
+  "networking/vpc/setsubnetvip": {
+    "description": "Subnet VIP Description"
+  },
+  "networking/vpc/settransitgateway": {
+    "description": "TransitGateway Description"
+  },
+  "networking/vpc/setvpc": {
+    "description": "vpcDescription"
+  },
+  "networking/vpc/setvpcendpoint": {
+    "description": "VpcEndpoint Description"
+  },
+  "networking/vpc/setvpcpeering": {
+    "description": "vpcPeering Description"
+  },
+  "networking/vpn/createvpngateway": {
+    "description": "Example Description for VPN Gateway",
+    "ip_address": "123.0.0.1",
+    "ip_id": "fcde872f75c145a0893d656cc698f13e",
+    "ip_type": "PUBLIC",
+    "name": "ExampleVpnGW1",
+    "tags": [],
+    "vpc_id": "ceb44ea5ecb34a49b16495f9a63b0718"
+  },
+  "networking/vpn/createvpntunnel": {
+    "description": "Example Description for VPN Tunnel",
+    "name": "ExampleVpnTunnel1",
+    "phase1": {
+      "dpd_retry_interval": 60,
+      "ike_version": 2,
+      "peer_gateway_ip": "123.0.0.2",
+      "phase1_diffie_hellman_groups": [
+        30,
+        31,
+        32
+      ],
+      "phase1_encryptions": [
+        "des-md5",
+        "chacha20poly1305-prfsha256"
+      ],
+      "phase1_life_time": 86400,
+      "pre_shared_key": "PreSharedKey1"
+    },
+    "phase2": {
+      "perfect_forward_secrecy": "ENABLE",
+      "phase2_diffie_hellman_groups": [
+        30,
+        31,
+        32
+      ],
+      "phase2_encryptions": [
+        "null-md5",
+        "aes128gcm",
+        "chacha20poly1305"
+      ],
+      "phase2_life_time": 43200,
+      "remote_subnets": [
+        "10.1.1.0/24",
+        "10.1.2.0/24",
+        "10.1.3.0/24"
+      ]
+    },
+    "tags": [],
+    "vpn_gateway_id": "b156740b6335468d8354eb9ef8eddf5a"
+  },
+  "networking/vpn/setvpngateway": {
+    "description": "Example Description for VPN Gateway"
+  },
+  "networking/vpn/setvpntunnel": {
+    "description": "Example Description for VPN Tunnel",
+    "phase1": {
+      "dpd_retry_interval": 60,
+      "ike_version": 2,
+      "peer_gateway_ip": "123.0.0.2",
+      "phase1_diffie_hellman_groups": [
+        30,
+        31,
+        32
+      ],
+      "phase1_encryptions": [
+        "des-md5",
+        "chacha20poly1305-prfsha256"
+      ],
+      "phase1_life_time": 86400,
+      "pre_shared_key": "PreSharedKey1"
+    },
+    "phase2": {
+      "perfect_forward_secrecy": "ENABLE",
+      "phase2_diffie_hellman_groups": [
+        30,
+        31,
+        32
+      ],
+      "phase2_encryptions": [
+        "null-md5",
+        "aes128gcm",
+        "chacha20poly1305"
+      ],
+      "phase2_life_time": 43200,
+      "remote_subnets": [
+        "10.1.1.0/24",
+        "10.1.2.0/24",
+        "10.1.3.0/24"
+      ]
+    }
+  },
+  "platform/sts/assumerole": {
+    "duration_seconds": 900,
+    "role_indicator": "dev2:afd580f490394896a6bceabf77683c6bd:role_name",
+    "role_session_name": ""
+  },
+  "platform/sts/assumerolewithsaml": {
+    "duration_seconds": 900,
+    "principal_indicator": "dev2:afd580f490394896a6bceabf77683c6bd:principal_name",
+    "role_indicator": "dev2:afd580f490394896a6bceabf77683c6bd:role_name",
+    "saml_assertion": ""
+  },
+  "platform/sts/objectstoreauthorization": {
+    "method": "",
+    "region": "kr-west1",
+    "service": "s3",
+    "url": "",
+    "x_amz_content_sha256": "",
+    "x_amz_date": ""
+  },
+  "security/certificatemanager/checknameduplication": {
+    "name": ""
+  },
+  "security/certificatemanager/createcertificate": {
+    "cert_body": "",
+    "cert_chain": "",
+    "name": "test-certificate",
+    "private_key": "",
+    "recipients": [
+      {
+        "region": "",
+        "user_id": "sdaFDQSDADZ2488e195c0e97d9b9eb",
+        "user_name": "kildong.hong"
+      }
+    ],
+    "region": "west1",
+    "tags": [],
+    "timezone": "Asia/Seoul"
+  },
+  "security/certificatemanager/selfsigncert": {
+    "cn": "test.go.kr",
+    "name": "test-certificate",
+    "not_after_dt": "20251212",
+    "not_before_dt": "20250101",
+    "organization": "samsungSDS",
+    "recipients": [],
+    "region": "west1",
+    "tags": [],
+    "timezone": "Asia/Seoul"
+  },
+  "security/certificatemanager/validatecertificate": {
+    "cert_body": "",
+    "cert_chain": "",
+    "private_key": ""
+  },
+  "security/cnapp/sendnotification": {
+    "authenticate_key": "auth-key-example-value",
+    "nation_id": "",
+    "otp": "123456",
+    "to": "user@example.com",
+    "type": "mail"
+  },
+  "security/cnapp/updatecnapptenantstatusbycallback": {
+    "account_id": "f8e7d6c5b4a39281706f5e4d3c2b1a09",
+    "authenticate_key": "",
+    "cnapp_tenant_id": "",
+    "license_type": "ESSENTIAL",
+    "scp_tenant_id": "3fcce04b-fad5-4250-8740-6e84adca8e94",
+    "srn": "srn:dev3::f8e7d6c5b4a39281706f5e4d3c2b1a09:kr-west1::cnapp:cnapp/3fcce04b-fad5-4250-8740-6e84adca8e94",
+    "status": "SUCCESS",
+    "tenant_name": "test-tenant"
   },
   "security/configinspection/creatediagnosisobject": {
     "account_id": "0e3dffc50eb247a1adf4f2e5c82c4f99",
@@ -2779,6 +6527,77 @@
   "security/secretsmanager/updatesecretsmanagersecretvalue": {
     "secret_value": "{\"key1\":\"value1\",\"key2\":\"value2\"}"
   },
+  "security/secretvault/createsecretvault": {
+    "access_key_id": "b754b12b39da4ce29a40c5e324650bd0",
+    "acl_cidr": "192.168.1.1/24, 10.0.0.1/16",
+    "description": "description",
+    "name": "name",
+    "tags": [],
+    "temporary_key_ttl_nhours": "3",
+    "vault_token_ttl_ndays": "720"
+  },
+  "security/secretvault/terminatedsecretvault": {
+    "waiting_time_ndays": 7
+  },
+  "storage/archivestorage/cancelarchiving": {
+    "_raw": "{id}"
+  },
+  "storage/archivestorage/cancelrecovery": {
+    "_raw": "{id}"
+  },
+  "storage/archivestorage/createarchivingpolicy": {
+    "archiving_policy_name": "my-policy",
+    "archiving_prefix": "/",
+    "archiving_source": {
+      "bucket_name": "obs-bucket-name",
+      "zone": "kr-west1-sds"
+    },
+    "object_lifecycle": "1"
+  },
+  "storage/archivestorage/createbucket": {
+    "name": "astest",
+    "tags": [
+      {
+        "key": "key",
+        "value": "value"
+      }
+    ]
+  },
+  "storage/archivestorage/recoverobjects": {
+    "overwrite": true,
+    "recovery_infos": [
+      {
+        "object_type": "FILE",
+        "source_object_path": "/"
+      }
+    ],
+    "recovery_target": {
+      "bucket_name": "obs-bucket-name",
+      "zone": "kr-west1-sds"
+    }
+  },
+  "storage/archivestorage/recoverobjectversions": {
+    "overwrite": true,
+    "recovery_target": {
+      "bucket_name": "obs-bucket-name",
+      "zone": "kr-west1-sds"
+    },
+    "source_object_path": "/",
+    "source_object_version": "Oc9nEYWV.6VjzsIMXFZWM1zL8HcYvKl"
+  },
+  "storage/archivestorage/setarchivingpolicy": {
+    "archiving_policy_name": "my-policy",
+    "object_lifecycle": "1"
+  },
+  "storage/archivestorage/setarchivingpolicystate": {
+    "state": "ACTIVE"
+  },
+  "storage/archivestorage/setbucketencryption": {
+    "enabled": true
+  },
+  "storage/archivestorage/setbucketversioning": {
+    "enabled": true
+  },
   "storage/backup/createbackup": {
     "dr_enabled": false,
     "encrypt_enabled": true,
@@ -2801,7 +6620,7 @@
         "type": "FULL"
       }
     ],
-    "server_category": "VIRTUAL_SERVER",
+    "server_category": "VIRTUAL_SERVER | GPU_SERVER | BAREMETAL_SERVER",
     "server_guid": "9ab33c66-3dbd-46cd-b0af-abccd3eb3170",
     "server_uuid": "89f5ef44-1021-4a5c-8e06-fbb289eac366",
     "tags": [
@@ -2809,9 +6628,11 @@
         "key": "",
         "value": ""
       }
-    ]
+    ],
+    "zone": "kr-west1-a"
   },
   "storage/backup/createbackupagent": {
+    "server_backup_agent_ip": "11.22.33.44",
     "server_uuid": "89f5ef44-1021-4a5c-8e06-fbb289eac366",
     "subnet_id": "023c57b14f11483689338d085e061492",
     "tags": [
@@ -2819,7 +6640,8 @@
         "key": "",
         "value": ""
       }
-    ]
+    ],
+    "zone": "kr-west1-a"
   },
   "storage/backup/manualbackup": {
     "_raw": "{backup_id}"
@@ -2844,6 +6666,7 @@
     "restore_region": "kr-west1",
     "restore_server_name": "restoretest1",
     "restore_target_id": "ca1a8e76-af49-40ea-93f8-a5989ffe138b",
+    "restore_zone": "kr-west1-a",
     "security_groups": [
       "023c57b14f11483689338d085e061492"
     ],
@@ -2872,6 +6695,11 @@
   },
   "storage/backup/updateretentionperiod": {
     "retention_period": "WEEK_2"
+  },
+  "storage/baremetal-blockstorage/addvolumegroupmembers": {
+    "volume_ids": [
+      "13666d6c32d4456e8421f7768d0bf225"
+    ]
   },
   "storage/baremetal-blockstorage/createvolume": {
     "attachments": [
@@ -2954,6 +6782,56 @@
     "day_of_week": "SUN",
     "hour": 18
   },
+  "storage/baremetal-blockstorage/removevolumegroupmembers": {
+    "volume_ids": [
+      "13666d6c32d4456e8421f7768d0bf225"
+    ]
+  },
+  "storage/baremetal-blockstorage/restorevolumegroupsnapshot": {
+    "_raw": "{snapshot_id}"
+  },
+  "storage/baremetal-blockstorage/restorevolumesnapshot": {
+    "_raw": "{snapshot_id}"
+  },
+  "storage/baremetal-blockstorage/setvolumegroupreplicationcycle": {
+    "cycle": "5MIN"
+  },
+  "storage/baremetal-blockstorage/setvolumegroupreplicationpolicy": {
+    "policy": "RESYNC"
+  },
+  "storage/baremetal-blockstorage/setvolumegroupsnapshotschedule": {
+    "day_of_week": "SUN",
+    "hour": 18
+  },
+  "storage/baremetal-blockstorage/setvolumeqos": {
+    "iops": 5000,
+    "throughput": 250
+  },
+  "storage/baremetal-blockstorage/setvolumereplicationcycle": {
+    "cycle": "5MIN"
+  },
+  "storage/baremetal-blockstorage/setvolumereplicationpolicy": {
+    "policy": "RESYNC"
+  },
+  "storage/baremetal-blockstorage/setvolumesnapshotrate": {
+    "snapshot_rate": 100
+  },
+  "storage/baremetal-blockstorage/setvolumesnapshotschedule": {
+    "day_of_week": "SUN",
+    "hour": 18
+  },
+  "storage/filestorage/createsnapshot": {
+    "volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438"
+  },
+  "storage/filestorage/createsnapshotschedule": {
+    "snapshot_retention_count": 10,
+    "snapshot_schedule": {
+      "day_of_week": "MON",
+      "frequency": "WEEKLY",
+      "hour": "23"
+    },
+    "volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438"
+  },
   "storage/filestorage/createvolume": {
     "cifs_password": "cifspwd0!!",
     "name": "my_volume",
@@ -2977,6 +6855,34 @@
     "volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438",
     "zone": "kr-west1-a"
   },
+  "storage/filestorage/restoresnapshot": {
+    "_raw": "{volume_id}"
+  },
+  "storage/filestorage/setaccessrule": {
+    "action": "add",
+    "object_id": "43fq3347-02q4-4aa8-ccf9-affe4917bb6f",
+    "object_type": "VM"
+  },
+  "storage/filestorage/setsnapshotschedule": {
+    "snapshot_retention_count": 10,
+    "snapshot_schedule": {
+      "day_of_week": "MON",
+      "frequency": "WEEKLY",
+      "hour": "23"
+    }
+  },
+  "storage/filestorage/setvolume": {
+    "file_unit_recovery_enabled": true
+  },
+  "storage/filestorage/setvolumereplication": {
+    "backup_retention_count": 2,
+    "replication_frequency": "5min",
+    "replication_policy": "use",
+    "replication_update_type": "policy"
+  },
+  "storage/parallel-filestorage/createsnapshot": {
+    "volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438"
+  },
   "storage/parallel-filestorage/createvolume": {
     "capacity_tb": 100,
     "name": "my_volume",
@@ -2987,5 +6893,25 @@
       }
     ],
     "zone": "kr-west1-a"
+  },
+  "storage/parallel-filestorage/restoresnapshot": {
+    "_raw": "{volume_id}"
+  },
+  "storage/parallel-filestorage/setaccessrule": {
+    "add_access_rules": [
+      {
+        "object_id": "43fq3347-02q4-4aa8-ccf9-affe4917bb6f",
+        "object_type": "GPU_NODE"
+      }
+    ],
+    "remove_access_rules": [
+      {
+        "object_id": "43fq3347-02q4-4aa8-ccf9-affe4917bb6f",
+        "object_type": "GPU_NODE"
+      }
+    ]
+  },
+  "storage/parallel-filestorage/setvolumecapacity": {
+    "capacity_tb": 100
   }
 }

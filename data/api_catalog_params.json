@@ -1358,6 +1358,380 @@
   ],
   "query_params": []
  },
+ "application-service/messagehub/deletedomain": {
+  "path_params": [
+   {
+    "name": "domain_id",
+    "resource_type": "messagehub/domain",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createdomain",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/deleteemail": {
+  "path_params": [
+   {
+    "name": "email_id",
+    "resource_type": "messagehub/email",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createemail",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/deletephone": {
+  "path_params": [
+   {
+    "name": "phone_id",
+    "resource_type": "messagehub/phone",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createphone",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/deletepushapplication": {
+  "path_params": [
+   {
+    "name": "application_id",
+    "resource_type": "messagehub/push-application",
+    "role": "self",
+    "produced_by": "application-service/messagehub/listpushapplications",
+    "producer_kind": "lookup",
+    "capture": "$.contents[0].id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/listdomains": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "email_domain",
+    "required": false
+   }
+  ]
+ },
+ "application-service/messagehub/listemails": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "email_address",
+    "required": false
+   }
+  ]
+ },
+ "application-service/messagehub/listphones": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "phone_number",
+    "required": false
+   },
+   {
+    "name": "country_code",
+    "required": false
+   }
+  ]
+ },
+ "application-service/messagehub/listpushapplications": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "name",
+    "required": false
+   }
+  ]
+ },
+ "application-service/messagehub/setdomaindescription": {
+  "path_params": [
+   {
+    "name": "domain_id",
+    "resource_type": "messagehub/domain",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createdomain",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setemaildescription": {
+  "path_params": [
+   {
+    "name": "email_id",
+    "resource_type": "messagehub/email",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createemail",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setemailprivateacl": {
+  "path_params": [
+   {
+    "name": "email_id",
+    "resource_type": "messagehub/email",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createemail",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setemailpublicacl": {
+  "path_params": [
+   {
+    "name": "email_id",
+    "resource_type": "messagehub/email",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createemail",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setenableemailprivateendpoint": {
+  "path_params": [
+   {
+    "name": "email_id",
+    "resource_type": "messagehub/email",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createemail",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setenablephoneprivateendpoint": {
+  "path_params": [
+   {
+    "name": "phone_id",
+    "resource_type": "messagehub/phone",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createphone",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setenablepushapplicationprivateendpoint": {
+  "path_params": [
+   {
+    "name": "application_id",
+    "resource_type": "messagehub/push-application",
+    "role": "self",
+    "produced_by": "application-service/messagehub/listpushapplications",
+    "producer_kind": "lookup",
+    "capture": "$.contents[0].id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setphonedescription": {
+  "path_params": [
+   {
+    "name": "phone_id",
+    "resource_type": "messagehub/phone",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createphone",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setphoneprivateacl": {
+  "path_params": [
+   {
+    "name": "phone_id",
+    "resource_type": "messagehub/phone",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createphone",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setphonepublicacl": {
+  "path_params": [
+   {
+    "name": "phone_id",
+    "resource_type": "messagehub/phone",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createphone",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setphoneusecaller": {
+  "path_params": [
+   {
+    "name": "phone_id",
+    "resource_type": "messagehub/phone",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createphone",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setpushapplicationdescription": {
+  "path_params": [
+   {
+    "name": "application_id",
+    "resource_type": "messagehub/push-application",
+    "role": "self",
+    "produced_by": "application-service/messagehub/listpushapplications",
+    "producer_kind": "lookup",
+    "capture": "$.contents[0].id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setpushapplicationprivateacl": {
+  "path_params": [
+   {
+    "name": "application_id",
+    "resource_type": "messagehub/push-application",
+    "role": "self",
+    "produced_by": "application-service/messagehub/listpushapplications",
+    "producer_kind": "lookup",
+    "capture": "$.contents[0].id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/setpushapplicationpublicacl": {
+  "path_params": [
+   {
+    "name": "application_id",
+    "resource_type": "messagehub/push-application",
+    "role": "self",
+    "produced_by": "application-service/messagehub/listpushapplications",
+    "producer_kind": "lookup",
+    "capture": "$.contents[0].id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/showdomain": {
+  "path_params": [
+   {
+    "name": "domain_id",
+    "resource_type": "messagehub/domain",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createdomain",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/showemail": {
+  "path_params": [
+   {
+    "name": "email_id",
+    "resource_type": "messagehub/email",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createemail",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/showphone": {
+  "path_params": [
+   {
+    "name": "phone_id",
+    "resource_type": "messagehub/phone",
+    "role": "self",
+    "produced_by": "application-service/messagehub/createphone",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "application-service/messagehub/showpushapplication": {
+  "path_params": [
+   {
+    "name": "application_id",
+    "resource_type": "messagehub/push-application",
+    "role": "self",
+    "produced_by": "application-service/messagehub/listpushapplications",
+    "producer_kind": "lookup",
+    "capture": "$.contents[0].id"
+   }
+  ],
+  "query_params": []
+ },
  "application-service/queueservice/checkqueuenameduplication": {
   "path_params": [],
   "query_params": [
@@ -1649,6 +2023,19 @@
   "query_params": []
  },
  "compute/baremetal/unlockbaremetalserver": {
+  "path_params": [
+   {
+    "name": "baremetal_id",
+    "resource_type": "baremetal/baremetal",
+    "role": "self",
+    "produced_by": "compute/baremetal/createbaremetals",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "compute/baremetal/updatebaremetalcpucores": {
   "path_params": [
    {
     "name": "baremetal_id",
@@ -3364,6 +3751,10 @@
    {
     "name": "sort",
     "required": false
+   },
+   {
+    "name": "zone",
+    "required": false
    }
   ]
  },
@@ -3412,6 +3803,10 @@
    },
    {
     "name": "auto_scaling_group_id",
+    "required": false
+   },
+   {
+    "name": "zone",
     "required": false
    }
   ]
@@ -3462,6 +3857,10 @@
    },
    {
     "name": "bootable",
+    "required": false
+   },
+   {
+    "name": "zone",
     "required": false
    }
   ]
@@ -4859,6 +5258,27 @@
    }
   ]
  },
+ "container/ske/listnamespacedpods": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "ske/cluster",
+    "role": "ancestor",
+    "produced_by": "container/ske/createcluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "namespace_name",
+    "resource_type": "ske/namespace",
+    "role": "self",
+    "produced_by": null,
+    "producer_kind": "waiver",
+    "capture": null
+   }
+  ],
+  "query_params": []
+ },
  "container/ske/listnodepoolnodes": {
   "path_params": [
    {
@@ -4919,7 +5339,46 @@
    }
   ]
  },
+ "container/ske/setclusterdeletionprotection": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "ske/cluster",
+    "role": "self",
+    "produced_by": "container/ske/createcluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "container/ske/setclusterlinkedresources": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "ske/cluster",
+    "role": "self",
+    "produced_by": "container/ske/createcluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "container/ske/setclusterlogging": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "ske/cluster",
+    "role": "self",
+    "produced_by": "container/ske/createcluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "container/ske/setclusternfsvolume": {
   "path_params": [
    {
     "name": "cluster_id",
@@ -4984,6 +5443,19 @@
   ],
   "query_params": []
  },
+ "container/ske/setclustersubnets": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "ske/cluster",
+    "role": "self",
+    "produced_by": "container/ske/createcluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "container/ske/setclusterupgrade": {
   "path_params": [
    {
@@ -5024,6 +5496,19 @@
   "query_params": []
  },
  "container/ske/setnodepoollinkedresources": {
+  "path_params": [
+   {
+    "name": "nodepool_id",
+    "resource_type": "ske/nodepool",
+    "role": "self",
+    "produced_by": "container/ske/createnodepool",
+    "producer_kind": "create",
+    "capture": "$.nodepool.id"
+   }
+  ],
+  "query_params": []
+ },
+ "container/ske/setnodepoolpreferredips": {
   "path_params": [
    {
     "name": "nodepool_id",
@@ -5826,6 +6311,27 @@
   ],
   "query_params": []
  },
+ "data-analytics/eventstreams/eventstreamsshowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "eventstreams/cluster",
+    "role": "ancestor",
+    "produced_by": "data-analytics/eventstreams/eventstreamscreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "eventstreams/instance",
+    "role": "self",
+    "produced_by": "data-analytics/eventstreams/eventstreamsshowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
+   }
+  ],
+  "query_params": []
+ },
  "data-analytics/eventstreams/eventstreamsshowrequest": {
   "path_params": [
    {
@@ -6190,6 +6696,19 @@
    }
   ]
  },
+ "data-analytics/searchengine/searchenginemanualbackup": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "searchengine/cluster",
+    "role": "self",
+    "produced_by": "data-analytics/searchengine/searchenginecreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "data-analytics/searchengine/searchenginepatchminorversion": {
   "path_params": [
    {
@@ -6316,6 +6835,27 @@
     "produced_by": "data-analytics/searchengine/searchenginecreatecluster",
     "producer_kind": "create",
     "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "data-analytics/searchengine/searchengineshowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "searchengine/cluster",
+    "role": "ancestor",
+    "produced_by": "data-analytics/searchengine/searchenginecreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "searchengine/instance",
+    "role": "self",
+    "produced_by": "data-analytics/searchengine/searchengineshowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
    }
   ],
   "query_params": []
@@ -6630,6 +7170,27 @@
     "produced_by": "data-analytics/vertica/verticacreatecluster",
     "producer_kind": "create",
     "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "data-analytics/vertica/verticashowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "vertica/cluster",
+    "role": "ancestor",
+    "produced_by": "data-analytics/vertica/verticacreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "vertica/instance",
+    "role": "self",
+    "produced_by": "data-analytics/vertica/verticashowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
    }
   ],
   "query_params": []
@@ -7038,6 +7599,27 @@
   ],
   "query_params": []
  },
+ "database/cachestore/cachestoreshowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "cachestore/cluster",
+    "role": "ancestor",
+    "produced_by": "database/cachestore/cachestorecreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "cachestore/instance",
+    "role": "self",
+    "produced_by": "database/cachestore/cachestoreshowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
+   }
+  ],
+  "query_params": []
+ },
  "database/cachestore/cachestoreshowrequest": {
   "path_params": [
    {
@@ -7438,6 +8020,19 @@
    }
   ]
  },
+ "database/epas/epasmanualbackup": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "epas/cluster",
+    "role": "self",
+    "produced_by": "database/epas/epascreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "database/epas/epaspatchminorversion": {
   "path_params": [
    {
@@ -7663,6 +8258,27 @@
     "produced_by": "database/epas/epascreatecluster",
     "producer_kind": "create",
     "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "database/epas/epasshowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "epas/cluster",
+    "role": "ancestor",
+    "produced_by": "database/epas/epascreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "epas/instance",
+    "role": "self",
+    "produced_by": "database/epas/epasshowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
    }
   ],
   "query_params": []
@@ -8096,6 +8712,19 @@
    }
   ]
  },
+ "database/mariadb/mariadbmanualbackup": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "mariadb/cluster",
+    "role": "self",
+    "produced_by": "database/mariadb/mariadbcreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "database/mariadb/mariadbpatchminorversion": {
   "path_params": [
    {
@@ -8325,6 +8954,27 @@
   ],
   "query_params": []
  },
+ "database/mariadb/mariadbshowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "mariadb/cluster",
+    "role": "ancestor",
+    "produced_by": "database/mariadb/mariadbcreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "mariadb/instance",
+    "role": "self",
+    "produced_by": "database/mariadb/mariadbshowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
+   }
+  ],
+  "query_params": []
+ },
  "database/mariadb/mariadbshowrequest": {
   "path_params": [
    {
@@ -8477,6 +9127,19 @@
   "query_params": []
  },
  "database/mariadb/mariadbupgradekernel": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "mariadb/cluster",
+    "role": "self",
+    "produced_by": "database/mariadb/mariadbcreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "database/mariadb/mariadbupgrademajorversion": {
   "path_params": [
    {
     "name": "cluster_id",
@@ -8754,6 +9417,19 @@
    }
   ]
  },
+ "database/mysql/mysqlmanualbackup": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "mysql/cluster",
+    "role": "self",
+    "produced_by": "database/mysql/mysqlcreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "database/mysql/mysqlpatchminorversion": {
   "path_params": [
    {
@@ -8970,6 +9646,27 @@
   ],
   "query_params": []
  },
+ "database/mysql/mysqlshowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "mysql/cluster",
+    "role": "ancestor",
+    "produced_by": "database/mysql/mysqlcreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "mysql/instance",
+    "role": "self",
+    "produced_by": "database/mysql/mysqlshowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
+   }
+  ],
+  "query_params": []
+ },
  "database/mysql/mysqlshowrequest": {
   "path_params": [
    {
@@ -9122,6 +9819,19 @@
   "query_params": []
  },
  "database/mysql/mysqlupgradekernel": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "mysql/cluster",
+    "role": "self",
+    "produced_by": "database/mysql/mysqlcreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "database/mysql/mysqlupgrademajorversion": {
   "path_params": [
    {
     "name": "cluster_id",
@@ -9417,6 +10127,19 @@
    }
   ]
  },
+ "database/postgresql/postgresqlmanualbackup": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "postgresql/cluster",
+    "role": "self",
+    "produced_by": "database/postgresql/postgresqlcreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "database/postgresql/postgresqlpatchminorversion": {
   "path_params": [
    {
@@ -9646,6 +10369,27 @@
   ],
   "query_params": []
  },
+ "database/postgresql/postgresqlshowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "postgresql/cluster",
+    "role": "ancestor",
+    "produced_by": "database/postgresql/postgresqlcreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "postgresql/instance",
+    "role": "self",
+    "produced_by": "database/postgresql/postgresqlshowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
+   }
+  ],
+  "query_params": []
+ },
  "database/postgresql/postgresqlshowrequest": {
   "path_params": [
    {
@@ -9823,6 +10567,19 @@
   ],
   "query_params": []
  },
+ "database/sqlserver/sqlserveradddrsecondary": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "sqlserver/cluster",
+    "role": "self",
+    "produced_by": "database/sqlserver/sqlservercreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "database/sqlserver/sqlserveraddsecondary": {
   "path_params": [
    {
@@ -9933,6 +10690,19 @@
     "required": false
    }
   ]
+ },
+ "database/sqlserver/sqlserverlistdrsecondaries": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "sqlserver/cluster",
+    "role": "self",
+    "produced_by": "database/sqlserver/sqlservercreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
  },
  "database/sqlserver/sqlserverlistengineversionproperties": {
   "path_params": [
@@ -10049,7 +10819,33 @@
    }
   ]
  },
+ "database/sqlserver/sqlservermanualbackup": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "sqlserver/cluster",
+    "role": "self",
+    "produced_by": "database/sqlserver/sqlservercreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
  "database/sqlserver/sqlserverpatchminorversion": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "sqlserver/cluster",
+    "role": "self",
+    "produced_by": "database/sqlserver/sqlservercreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "database/sqlserver/sqlserverpromotedrsecondary": {
   "path_params": [
    {
     "name": "cluster_id",
@@ -10239,6 +11035,27 @@
   ],
   "query_params": []
  },
+ "database/sqlserver/sqlservershowinstance": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "sqlserver/cluster",
+    "role": "ancestor",
+    "produced_by": "database/sqlserver/sqlservercreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   },
+   {
+    "name": "instance_name",
+    "resource_type": "sqlserver/instance",
+    "role": "self",
+    "produced_by": "database/sqlserver/sqlservershowcluster",
+    "producer_kind": "detail-read",
+    "capture": "$.instance_groups[0].instances[0].name"
+   }
+  ],
+  "query_params": []
+ },
  "database/sqlserver/sqlservershowrequest": {
   "path_params": [
    {
@@ -10292,6 +11109,19 @@
   "query_params": []
  },
  "database/sqlserver/sqlserversyncclusterstate": {
+  "path_params": [
+   {
+    "name": "cluster_id",
+    "resource_type": "sqlserver/cluster",
+    "role": "self",
+    "produced_by": "database/sqlserver/sqlservercreatecluster",
+    "producer_kind": "create",
+    "capture": "$.resource_id"
+   }
+  ],
+  "query_params": []
+ },
+ "database/sqlserver/sqlserversyncdrsecondarystate": {
   "path_params": [
    {
     "name": "cluster_id",
@@ -10580,6 +11410,19 @@
   ],
   "query_params": []
  },
+ "financial-management/budget/deleteaccountcostlinkage": {
+  "path_params": [
+   {
+    "name": "budget_id",
+    "resource_type": "budget/account",
+    "role": "self",
+    "produced_by": "financial-management/budget/createaccountbudget",
+    "producer_kind": "create",
+    "capture": "$.budget.id"
+   }
+  ],
+  "query_params": []
+ },
  "financial-management/budget/listaccountbudgets": {
   "path_params": [],
   "query_params": [
@@ -10602,10 +11445,27 @@
    {
     "name": "budget_name",
     "required": false
+   },
+   {
+    "name": "is_cost_linked",
+    "required": false
    }
   ]
  },
  "financial-management/budget/setaccountbudget": {
+  "path_params": [
+   {
+    "name": "budget_id",
+    "resource_type": "budget/account",
+    "role": "self",
+    "produced_by": "financial-management/budget/createaccountbudget",
+    "producer_kind": "create",
+    "capture": "$.budget.id"
+   }
+  ],
+  "query_params": []
+ },
+ "financial-management/budget/setaccountcostlinkage": {
   "path_params": [
    {
     "name": "budget_id",
@@ -10763,6 +11623,19 @@
    {
     "name": "page",
     "required": false
+   }
+  ]
+ },
+ "financial-management/costnavigator/getcostdimensionoptions": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "start_date",
+    "required": true
+   },
+   {
+    "name": "end_date",
+    "required": true
    }
   ]
  },
@@ -12323,6 +13196,10 @@
     "required": false
    },
    {
+    "name": "account_id",
+    "required": false
+   },
+   {
     "name": "policy_name",
     "required": false
    },
@@ -12427,6 +13304,10 @@
    },
    {
     "name": "exclude_policy_id",
+    "required": false
+   },
+   {
+    "name": "principal",
     "required": false
    }
   ]
@@ -12562,6 +13443,10 @@
    },
    {
     "name": "id",
+    "required": false
+   },
+   {
+    "name": "account_id",
     "required": false
    },
    {
@@ -13347,6 +14232,35 @@
    },
    {
     "name": "type",
+    "required": false
+   }
+  ]
+ },
+ "management/organization/listdelegatedadministrators": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "organization_id",
+    "required": false
+   },
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "service_type",
+    "required": false
+   },
+   {
+    "name": "account_id",
     "required": false
    }
   ]
@@ -14448,6 +15362,360 @@
   ],
   "query_params": []
  },
+ "management/resourceoptimizer/createaccountsetting": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/createorganizationsettings": {
+  "path_params": [
+   {
+    "name": "organization_id",
+    "resource_type": "resourceoptimizer/organization",
+    "role": "self",
+    "produced_by": "management/organization/createorganization",
+    "producer_kind": "create-xsvc",
+    "capture": "$.organization.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/deleteaccountsettings": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/deleteorganizationsettings": {
+  "path_params": [
+   {
+    "name": "organization_id",
+    "resource_type": "resourceoptimizer/organization",
+    "role": "self",
+    "produced_by": "management/organization/createorganization",
+    "producer_kind": "create-xsvc",
+    "capture": "$.organization.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/getaccount": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/getaccountlimsettings": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/getaccountsetting": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "ancestor",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   },
+   {
+    "name": "setting_id",
+    "resource_type": "resourceoptimizer/setting",
+    "role": "self",
+    "produced_by": "management/resourceoptimizer/createaccountsetting",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/getaccountsettingdetail": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "category",
+    "required": true
+   },
+   {
+    "name": "lookback_period",
+    "required": true
+   },
+   {
+    "name": "utilization_preset",
+    "required": true
+   },
+   {
+    "name": "cpu_threshold",
+    "required": false
+   },
+   {
+    "name": "cpu_headroom",
+    "required": false
+   },
+   {
+    "name": "memory_headroom",
+    "required": false
+   }
+  ]
+ },
+ "management/resourceoptimizer/getorganizationlimsettings": {
+  "path_params": [
+   {
+    "name": "organization_id",
+    "resource_type": "resourceoptimizer/organization",
+    "role": "self",
+    "produced_by": "management/organization/createorganization",
+    "producer_kind": "create-xsvc",
+    "capture": "$.organization.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/getorganizationsetting": {
+  "path_params": [
+   {
+    "name": "organization_id",
+    "resource_type": "resourceoptimizer/organization",
+    "role": "ancestor",
+    "produced_by": "management/organization/createorganization",
+    "producer_kind": "create-xsvc",
+    "capture": "$.organization.id"
+   },
+   {
+    "name": "setting_id",
+    "resource_type": "resourceoptimizer/setting",
+    "role": "self",
+    "produced_by": "management/resourceoptimizer/createorganizationsettings",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/getorganizationsettingdetail": {
+  "path_params": [
+   {
+    "name": "organization_id",
+    "resource_type": "resourceoptimizer/organization",
+    "role": "self",
+    "produced_by": "management/organization/createorganization",
+    "producer_kind": "create-xsvc",
+    "capture": "$.organization.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "category",
+    "required": true
+   },
+   {
+    "name": "lookback_period",
+    "required": true
+   },
+   {
+    "name": "utilization_preset",
+    "required": true
+   },
+   {
+    "name": "cpu_threshold",
+    "required": false
+   },
+   {
+    "name": "cpu_headroom",
+    "required": false
+   },
+   {
+    "name": "memory_headroom",
+    "required": false
+   }
+  ]
+ },
+ "management/resourceoptimizer/getrecommendationmetrics": {
+  "path_params": [
+   {
+    "name": "recommendation_id",
+    "resource_type": "resourceoptimizer/recommendation",
+    "role": "self",
+    "produced_by": "management/resourceoptimizer/listrecommendationsbybody",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "statistics",
+    "required": false
+   },
+   {
+    "name": "time_range",
+    "required": false
+   },
+   {
+    "name": "target_account_id",
+    "required": false
+   }
+  ]
+ },
+ "management/resourceoptimizer/listaccountsettings": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "category",
+    "required": false
+   }
+  ]
+ },
+ "management/resourceoptimizer/listorganizationsettings": {
+  "path_params": [
+   {
+    "name": "organization_id",
+    "resource_type": "resourceoptimizer/organization",
+    "role": "self",
+    "produced_by": "management/organization/createorganization",
+    "producer_kind": "create-xsvc",
+    "capture": "$.organization.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "category",
+    "required": false
+   }
+  ]
+ },
+ "management/resourceoptimizer/optout": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/setaccountlimactive": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/setorganizationlimactive": {
+  "path_params": [
+   {
+    "name": "organization_id",
+    "resource_type": "resourceoptimizer/organization",
+    "role": "self",
+    "produced_by": "management/organization/createorganization",
+    "producer_kind": "create-xsvc",
+    "capture": "$.organization.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/showrecommendation": {
+  "path_params": [
+   {
+    "name": "recommendation_id",
+    "resource_type": "resourceoptimizer/recommendation",
+    "role": "self",
+    "produced_by": "management/resourceoptimizer/listrecommendationsbybody",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "target_account_id",
+    "required": false
+   }
+  ]
+ },
+ "management/resourceoptimizer/updateaccountsetting": {
+  "path_params": [
+   {
+    "name": "account_id",
+    "resource_type": "resourceoptimizer/account",
+    "role": "self",
+    "produced_by": "management/cloudcontrol/createaccountfactoryaccount",
+    "producer_kind": "create-xsvc",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/resourceoptimizer/updateorganizationsetting": {
+  "path_params": [
+   {
+    "name": "organization_id",
+    "resource_type": "resourceoptimizer/organization",
+    "role": "self",
+    "produced_by": "management/organization/createorganization",
+    "producer_kind": "create-xsvc",
+    "capture": "$.organization.id"
+   }
+  ],
+  "query_params": []
+ },
  "management/servicewatch/createloggrouplogstream": {
   "path_params": [
    {
@@ -14457,6 +15725,19 @@
     "produced_by": "management/servicewatch/createloggroup",
     "producer_kind": "create",
     "capture": "$.log_group.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/servicewatch/deletebulkalertnotifications": {
+  "path_params": [
+   {
+    "name": "id",
+    "resource_type": "servicewatch/alert",
+    "role": "self",
+    "produced_by": "management/servicewatch/createalert",
+    "producer_kind": "create",
+    "capture": "$.id"
    }
   ],
   "query_params": []
@@ -14473,6 +15754,93 @@
    }
   ],
   "query_params": []
+ },
+ "management/servicewatch/listalertnotifications": {
+  "path_params": [
+   {
+    "name": "id",
+    "resource_type": "servicewatch/alert",
+    "role": "self",
+    "produced_by": "management/servicewatch/createalert",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "recipient_type",
+    "required": true
+   },
+   {
+    "name": "recipient_name",
+    "required": false
+   }
+  ]
+ },
+ "management/servicewatch/listalerts": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "name",
+    "required": false
+   },
+   {
+    "name": "activated_yn",
+    "required": false
+   },
+   {
+    "name": "states",
+    "required": false
+   },
+   {
+    "name": "levels",
+    "required": false
+   },
+   {
+    "name": "from_last_policy_updated_at",
+    "required": false
+   },
+   {
+    "name": "to_last_policy_updated_at",
+    "required": false
+   },
+   {
+    "name": "namespace_ids",
+    "required": false
+   },
+   {
+    "name": "namespace_names",
+    "required": false
+   },
+   {
+    "name": "type",
+    "required": false
+   }
+  ]
  },
  "management/servicewatch/listdashboards": {
   "path_params": [],
@@ -14507,6 +15875,52 @@
    },
    {
     "name": "service_code",
+    "required": false
+   },
+   {
+    "name": "namespace_code",
+    "required": false
+   }
+  ]
+ },
+ "management/servicewatch/listloggrouplogstreamslogevents": {
+  "path_params": [
+   {
+    "name": "log_group_id",
+    "resource_type": "servicewatch/log-group",
+    "role": "self",
+    "produced_by": "management/servicewatch/createloggroup",
+    "producer_kind": "create",
+    "capture": "$.log_group.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "log_stream_id",
+    "required": false
+   },
+   {
+    "name": "start_time",
+    "required": false
+   },
+   {
+    "name": "end_time",
+    "required": false
+   },
+   {
+    "name": "message",
+    "required": false
+   },
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "search_after",
     "required": false
    }
   ]
@@ -14579,6 +15993,32 @@
   ],
   "query_params": []
  },
+ "management/servicewatch/setalertnotifications": {
+  "path_params": [
+   {
+    "name": "id",
+    "resource_type": "servicewatch/alert",
+    "role": "self",
+    "produced_by": "management/servicewatch/createalert",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/servicewatch/setalertnotificationsactivated": {
+  "path_params": [
+   {
+    "name": "id",
+    "resource_type": "servicewatch/alert",
+    "role": "self",
+    "produced_by": "management/servicewatch/createalert",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
+  "query_params": []
+ },
  "management/servicewatch/setdashboard": {
   "path_params": [
    {
@@ -14614,6 +16054,19 @@
     "produced_by": "management/servicewatch/createloggroup",
     "producer_kind": "create",
     "capture": "$.log_group.id"
+   }
+  ],
+  "query_params": []
+ },
+ "management/servicewatch/setwidgets": {
+  "path_params": [
+   {
+    "name": "dashboard_id",
+    "resource_type": "servicewatch/dashboard",
+    "role": "self",
+    "produced_by": "management/servicewatch/createdashboard",
+    "producer_kind": "create",
+    "capture": "$.id"
    }
   ],
   "query_params": []
@@ -15497,10 +16950,6 @@
    {
     "name": "status",
     "required": false
-   },
-   {
-    "name": "fetch_all",
-    "required": false
    }
   ]
  },
@@ -16114,6 +17563,45 @@
   ],
   "query_params": []
  },
+ "networking/loadbalancer/setlblistenercertificate": {
+  "path_params": [
+   {
+    "name": "listener_id",
+    "resource_type": "loadbalancer/lb-listener",
+    "role": "self",
+    "produced_by": "networking/loadbalancer/createlblistener",
+    "producer_kind": "create",
+    "capture": "$.listener.id"
+   }
+  ],
+  "query_params": []
+ },
+ "networking/loadbalancer/setlblistenerresource": {
+  "path_params": [
+   {
+    "name": "listener_id",
+    "resource_type": "loadbalancer/lb-listener",
+    "role": "self",
+    "produced_by": "networking/loadbalancer/createlblistener",
+    "producer_kind": "create",
+    "capture": "$.listener.id"
+   }
+  ],
+  "query_params": []
+ },
+ "networking/loadbalancer/setlblistenerrule": {
+  "path_params": [
+   {
+    "name": "listener_id",
+    "resource_type": "loadbalancer/lb-listener",
+    "role": "self",
+    "produced_by": "networking/loadbalancer/createlblistener",
+    "producer_kind": "create",
+    "capture": "$.listener.id"
+   }
+  ],
+  "query_params": []
+ },
  "networking/loadbalancer/setlbservergroup": {
   "path_params": [
    {
@@ -16273,6 +17761,32 @@
   ],
   "query_params": []
  },
+ "networking/security-group/addaddressgroupcidrs": {
+  "path_params": [
+   {
+    "name": "address_group_id",
+    "resource_type": "security-group/address-group",
+    "role": "self",
+    "produced_by": "networking/security-group/createaddressgroup",
+    "producer_kind": "create",
+    "capture": "$.address_group.id"
+   }
+  ],
+  "query_params": []
+ },
+ "networking/security-group/deleteaddressgroup": {
+  "path_params": [
+   {
+    "name": "address_group_id",
+    "resource_type": "security-group/address-group",
+    "role": "self",
+    "produced_by": "networking/security-group/createaddressgroup",
+    "producer_kind": "create",
+    "capture": "$.address_group.id"
+   }
+  ],
+  "query_params": []
+ },
  "networking/security-group/deletesecuritygroup": {
   "path_params": [
    {
@@ -16298,6 +17812,61 @@
    }
   ],
   "query_params": []
+ },
+ "networking/security-group/listaddressgroupcidrs": {
+  "path_params": [
+   {
+    "name": "address_group_id",
+    "resource_type": "security-group/address-group",
+    "role": "self",
+    "produced_by": "networking/security-group/createaddressgroup",
+    "producer_kind": "create",
+    "capture": "$.address_group.id"
+   }
+  ],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "address",
+    "required": false
+   }
+  ]
+ },
+ "networking/security-group/listaddressgroups": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "id",
+    "required": false
+   },
+   {
+    "name": "name",
+    "required": false
+   }
+  ]
  },
  "networking/security-group/listsecuritygrouprules": {
   "path_params": [],
@@ -16369,6 +17938,32 @@
    }
   ]
  },
+ "networking/security-group/removeaddressgroupcidrs": {
+  "path_params": [
+   {
+    "name": "address_group_id",
+    "resource_type": "security-group/address-group",
+    "role": "self",
+    "produced_by": "networking/security-group/createaddressgroup",
+    "producer_kind": "create",
+    "capture": "$.address_group.id"
+   }
+  ],
+  "query_params": []
+ },
+ "networking/security-group/setaddressgroup": {
+  "path_params": [
+   {
+    "name": "address_group_id",
+    "resource_type": "security-group/address-group",
+    "role": "self",
+    "produced_by": "networking/security-group/createaddressgroup",
+    "producer_kind": "create",
+    "capture": "$.address_group.id"
+   }
+  ],
+  "query_params": []
+ },
  "networking/security-group/setsecuritygroup": {
   "path_params": [
    {
@@ -16378,6 +17973,19 @@
     "produced_by": "networking/security-group/createsecuritygroup",
     "producer_kind": "create",
     "capture": "$.security_group.id"
+   }
+  ],
+  "query_params": []
+ },
+ "networking/security-group/showaddressgroup": {
+  "path_params": [
+   {
+    "name": "address_group_id",
+    "resource_type": "security-group/address-group",
+    "role": "self",
+    "produced_by": "networking/security-group/createaddressgroup",
+    "producer_kind": "create",
+    "capture": "$.address_group.id"
    }
   ],
   "query_params": []
@@ -17094,6 +18702,10 @@
    {
     "name": "state",
     "required": false
+   },
+   {
+    "name": "multi_zone_enabled",
+    "required": false
    }
   ]
  },
@@ -17190,7 +18802,23 @@
     "required": false
    },
    {
+    "name": "service_type",
+    "required": false
+   },
+   {
     "name": "privatelink_service_id",
+    "required": false
+   },
+   {
+    "name": "privatelink_scp_service_id",
+    "required": false
+   },
+   {
+    "name": "privatelink_scp_service_type",
+    "required": false
+   },
+   {
+    "name": "privatelink_scp_service_name",
     "required": false
    },
    {
@@ -17199,6 +18827,19 @@
    },
    {
     "name": "state",
+    "required": false
+   }
+  ]
+ },
+ "networking/vpc/listprivatelinkscpservices": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "type",
+    "required": false
+   },
+   {
+    "name": "name",
     "required": false
    }
   ]
@@ -17393,6 +19034,10 @@
    {
     "name": "type",
     "required": false
+   },
+   {
+    "name": "zone",
+    "required": false
    }
   ]
  },
@@ -17463,6 +19108,18 @@
    },
    {
     "name": "vpc_name",
+    "required": false
+   },
+   {
+    "name": "category",
+    "required": false
+   },
+   {
+    "name": "zone",
+    "required": false
+   },
+   {
+    "name": "primary_subnet_id",
     "required": false
    }
   ]
@@ -17589,6 +19246,10 @@
    {
     "name": "firewall_connection_state",
     "required": false
+   },
+   {
+    "name": "uplink_zone_state",
+    "required": false
    }
   ]
  },
@@ -17643,7 +19304,7 @@
    },
    {
     "name": "vpc_id",
-    "required": false
+    "required": true
    }
   ]
  },
@@ -17832,6 +19493,10 @@
    },
    {
     "name": "cidr",
+    "required": false
+   },
+   {
+    "name": "zone",
     "required": false
    }
   ]
@@ -18587,6 +20252,39 @@
    }
   ]
  },
+ "security/configinspection/getchecklistversion": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "size",
+    "required": false
+   },
+   {
+    "name": "page",
+    "required": false
+   },
+   {
+    "name": "sort",
+    "required": false
+   },
+   {
+    "name": "csp_type",
+    "required": false
+   },
+   {
+    "name": "diagnosis_check_type",
+    "required": false
+   },
+   {
+    "name": "checklist_name",
+    "required": false
+   },
+   {
+    "name": "check_list_version",
+    "required": false
+   }
+  ]
+ },
  "security/configinspection/getdiagnosisobjectdetail": {
   "path_params": [
    {
@@ -18787,11 +20485,50 @@
   ],
   "query_params": []
  },
+ "security/kms/exportpublickey": {
+  "path_params": [
+   {
+    "name": "key_id",
+    "resource_type": "kms/public-key",
+    "role": "self",
+    "produced_by": "security/kms/createkey",
+    "producer_kind": "create",
+    "capture": "$.key.id"
+   }
+  ],
+  "query_params": []
+ },
  "security/kms/hmac": {
   "path_params": [
    {
     "name": "key_id",
     "resource_type": "kms/hmac",
+    "role": "self",
+    "produced_by": "security/kms/createkey",
+    "producer_kind": "create",
+    "capture": "$.key.id"
+   }
+  ],
+  "query_params": []
+ },
+ "security/kms/kmssetaclcidr": {
+  "path_params": [
+   {
+    "name": "key_id",
+    "resource_type": "kms/transit",
+    "role": "self",
+    "produced_by": "security/kms/createkey",
+    "producer_kind": "create",
+    "capture": "$.key.id"
+   }
+  ],
+  "query_params": []
+ },
+ "security/kms/kmssetprivateacl": {
+  "path_params": [
+   {
+    "name": "key_id",
+    "resource_type": "kms/transit",
     "role": "self",
     "produced_by": "security/kms/createkey",
     "producer_kind": "create",
@@ -19183,11 +20920,11 @@
   "path_params": [],
   "query_params": [
    {
-    "name": "id",
+    "name": "bucket_id",
     "required": true
    },
    {
-    "name": "bucket_id",
+    "name": "id",
     "required": true
    }
   ]
@@ -19196,17 +20933,35 @@
   "path_params": [],
   "query_params": [
    {
-    "name": "id",
+    "name": "bucket_id",
     "required": true
    },
    {
-    "name": "bucket_id",
+    "name": "id",
     "required": true
    }
   ]
  },
  "storage/archivestorage/createarchivingpolicy": {
   "path_params": [],
+  "query_params": [
+   {
+    "name": "bucket_id",
+    "required": true
+   }
+  ]
+ },
+ "storage/archivestorage/deletearchivingpolicy": {
+  "path_params": [
+   {
+    "name": "archiving_policy_id",
+    "resource_type": "archivestorage/archiving-policy",
+    "role": "self",
+    "produced_by": "storage/archivestorage/createarchivingpolicy",
+    "producer_kind": "create",
+    "capture": "$.id"
+   }
+  ],
   "query_params": [
    {
     "name": "bucket_id",
@@ -19257,8 +21012,20 @@
   "path_params": [],
   "query_params": [
    {
+    "name": "archiving_policy_id",
+    "required": true
+   },
+   {
     "name": "bucket_id",
     "required": true
+   },
+   {
+    "name": "limit",
+    "required": false
+   },
+   {
+    "name": "offset",
+    "required": false
    },
    {
     "name": "start_at_from",
@@ -19271,14 +21038,6 @@
    {
     "name": "state",
     "required": false
-   },
-   {
-    "name": "limit",
-    "required": false
-   },
-   {
-    "name": "offset",
-    "required": false
    }
   ]
  },
@@ -19288,6 +21047,10 @@
    {
     "name": "bucket_id",
     "required": true
+   },
+   {
+    "name": "sort",
+    "required": false
    }
   ]
  },
@@ -19304,11 +21067,11 @@
   ],
   "query_params": [
    {
-    "name": "marker",
+    "name": "limit",
     "required": false
    },
    {
-    "name": "object_path",
+    "name": "marker",
     "required": false
    },
    {
@@ -19316,11 +21079,11 @@
     "required": false
    },
    {
-    "name": "object_type",
+    "name": "object_path",
     "required": false
    },
    {
-    "name": "limit",
+    "name": "object_type",
     "required": false
    }
   ]
@@ -19338,15 +21101,15 @@
   ],
   "query_params": [
    {
+    "name": "limit",
+    "required": false
+   },
+   {
     "name": "object_path",
     "required": true
    },
    {
     "name": "offset",
-    "required": false
-   },
-   {
-    "name": "limit",
     "required": false
    }
   ]
@@ -19355,11 +21118,11 @@
   "path_params": [],
   "query_params": [
    {
-    "name": "name",
+    "name": "limit",
     "required": false
    },
    {
-    "name": "limit",
+    "name": "name",
     "required": false
    }
   ]
@@ -19372,6 +21135,14 @@
     "required": true
    },
    {
+    "name": "limit",
+    "required": false
+   },
+   {
+    "name": "offset",
+    "required": false
+   },
+   {
     "name": "start_at_from",
     "required": true
    },
@@ -19381,14 +21152,6 @@
    },
    {
     "name": "state",
-    "required": false
-   },
-   {
-    "name": "limit",
-    "required": false
-   },
-   {
-    "name": "offset",
     "required": false
    }
   ]
@@ -19485,11 +21248,11 @@
   "path_params": [],
   "query_params": [
    {
-    "name": "id",
+    "name": "bucket_id",
     "required": true
    },
    {
-    "name": "bucket_id",
+    "name": "id",
     "required": true
    }
   ]
@@ -19555,11 +21318,11 @@
   "path_params": [],
   "query_params": [
    {
-    "name": "id",
+    "name": "bucket_id",
     "required": true
    },
    {
-    "name": "bucket_id",
+    "name": "id",
     "required": true
    }
   ]
@@ -19659,10 +21422,6 @@
     "required": true
    },
    {
-    "name": "policy_type",
-    "required": true
-   },
-   {
     "name": "region",
     "required": false
    },
@@ -19672,6 +21431,14 @@
    },
    {
     "name": "size",
+    "required": false
+   },
+   {
+    "name": "policy_type",
+    "required": true
+   },
+   {
+    "name": "zone",
     "required": false
    }
   ]
@@ -19753,6 +21520,10 @@
    {
     "name": "server_name",
     "required": false
+   },
+   {
+    "name": "zone",
+    "required": false
    }
   ]
  },
@@ -19802,7 +21573,7 @@
     "required": false
    },
    {
-    "name": "from_availability_zone",
+    "name": "from_zone",
     "required": false
    },
    {
@@ -19810,7 +21581,7 @@
     "required": false
    },
    {
-    "name": "to_availability_zone",
+    "name": "to_zone",
     "required": false
    },
    {
@@ -19880,6 +21651,10 @@
    {
     "name": "region",
     "required": true
+   },
+   {
+    "name": "zone",
+    "required": false
    }
   ]
  },
@@ -20786,6 +22561,23 @@
   "query_params": [
    {
     "name": "volume_id",
+    "required": true
+   }
+  ]
+ },
+ "storage/filestorage/listvolumereplicationzones": {
+  "path_params": [],
+  "query_params": [
+   {
+    "name": "type_name",
+    "required": true
+   },
+   {
+    "name": "source_zone",
+    "required": true
+   },
+   {
+    "name": "replication_type",
     "required": true
    }
   ]

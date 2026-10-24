@@ -47,51 +47,53 @@ def test_no_literal_zone_hardcodes_left():
     assert not bad, f"존 리터럴/준-리터럴 하드코딩 잔존 (값 위치): {bad}"
 
 
-# ── {zone_fs} — filestorage 전용 존 (2026-09-17) ──────────────────────────────
-# 오퍼링 캠페인의 SCP_ZONE=kr-west1-a 핀이 {zone}을 통째로 -a로 끌고 가자
-# filestorage create 9곳이 400 — filestorage는 kr-west1-b에만 있다 (오너 실측).
-
-
-def test_fs_zone_west_is_b_even_when_scp_zone_pins_a(monkeypatch):
-    monkeypatch.delenv("SCP_ZONE_FS", raising=False)
-    monkeypatch.setenv("SCP_ZONE", "kr-west1-a")
-    assert engine._default_zone("kr-west1") == "kr-west1-a"
-    assert engine._fs_zone("kr-west1") == "kr-west1-b"
-
-
-def test_fs_zone_other_regions_follow_default(monkeypatch):
-    monkeypatch.delenv("SCP_ZONE_FS", raising=False)
-    monkeypatch.delenv("SCP_ZONE", raising=False)
-    assert engine._fs_zone("kr-east1") == "kr-east1-a"
-    monkeypatch.setenv("SCP_ZONE", "kr-east1-z")
-    assert engine._fs_zone("kr-east1") == "kr-east1-z"
-
-
-def test_scp_zone_fs_env_wins(monkeypatch):
-    monkeypatch.setenv("SCP_ZONE_FS", "kr-west1-c")
-    monkeypatch.setenv("SCP_ZONE", "kr-west1-a")
-    assert engine._fs_zone("kr-west1") == "kr-west1-c"
-
-
-def test_filestorage_volume_creates_use_zone_fs_token():
-    """filestorage POST /v1/volumes 스텝이 {zone}을 쓰면 SCP_ZONE 핀에
-    다시 끌려간다 — 반드시 {zone_fs}. (parallel-filestorage는 실측 없어 제외.)"""
+def test_ske_nodepool_os_version_is_captured_not_hardcoded():
+    """2026-09-17 run 915f: k8s 버전 목록이 밀려 [1]=v1.35.5가 되자 하드코딩
+    ubuntu 22.04(v1.34.3 이하에만 존재)가 create-nodepool을 죽였다. OS 버전은
+    list-images 응답에서 {kube_ver}/{kube_ver_next}에 맞춰 캡처한다."""
     import json
     root = pathlib.Path(engine.__file__).resolve().parent
-    files = list((root / "lifecycles").glob("*.json")) + [root / "scenarios.json"]
-    bad, seen = [], 0
-    for p in files:
-        d = json.loads(p.read_text(encoding="utf-8"))
-        lcs = d["lifecycles"] if isinstance(d, dict) and "lifecycles" in d else d
-        for lc in lcs:
-            for st in lc.get("steps", []):
-                svc = st.get("service") or lc.get("service", "")
-                body = st.get("json")
-                if ("filestorage" in svc and "parallel" not in svc
-                        and st.get("path") == "/v1/volumes"
-                        and isinstance(body, dict) and "zone" in body):
-                    seen += 1
-                    if body["zone"] != "{zone_fs}":
-                        bad.append(f"{p.name}:{lc['id']}/{st.get('name')}={body['zone']}")
-    assert seen >= 9, f"filestorage create 스텝 탐지 실패 (seen={seen})"
-    assert not bad, f"filestorage create의 zone은 {{zone_fs}}여야 한다: {bad}"
+    d = json.loads((root / "scenarios.json").read_text(encoding="utf-8"))
+    lc = next(l for l in d["lifecycles"] if l["id"] == "container-ske-cluster-nodepool")
+    steps = {s["name"]: s for s in lc["steps"]}
+    cap = steps["list-images"]["capture"]
+    assert cap["np_os_ver"]["where_prefix"] == {"kubernetes_version": "{kube_ver}", "os": "ubuntu"}
+    assert cap["np_os_ver_next"]["where_prefix"] == {"kubernetes_version": "{kube_ver_next}", "os": "ubuntu"}
+    assert steps["create-nodepool"]["json"]["image_os_version"] == "{np_os_ver}"
+    assert steps["upgrade-nodepool"]["json"]["os_version"] == "{np_os_ver_next}"
+    names = [s["name"] for s in lc["steps"]]
+    assert names.index("list-images") < names.index("create-nodepool")
+    imgs = {"nodepool_images": [
+        {"kubernetes_version": "v1.36.3", "os": "ubuntu", "os_version": "24.04"},
+        {"kubernetes_version": "v1.35.5", "os": "rhel", "os_version": "9.6"},
+        {"kubernetes_version": "v1.35.5", "os": "ubuntu", "os_version": "24.04"},
+        {"kubernetes_version": "v1.34.3", "os": "ubuntu", "os_version": "22.04"}]}
+    ctx = {"kube_ver": "v1.35.5", "kube_ver_next": "v1.36.3"}
+    assert engine._capture(imgs, cap["np_os_ver"], ctx) == "24.04"
+    ctx = {"kube_ver": "v1.34.3", "kube_ver_next": "v1.35.5"}
+    assert engine._capture(imgs, cap["np_os_ver"], ctx) == "22.04"
+    assert engine._capture(imgs, cap["np_os_ver_next"], ctx) == "24.04"
+
+
+def test_every_vpc_create_body_carries_zone_type():
+    """vpc 1.4 (VpcCreateRequestV1Dot4) makes zone_type REQUIRED. Runs eb41/643b
+    (2026-09-21): the engine's main shared VPC had it, the shared net-A/B bodies did
+    not -> both 400'd silently, vpc#a adopters fell back to self-created VPCs and
+    vpc#b users IB-049-skipped. Guard every POST /v1/vpcs body: engine + scenarios."""
+    import re
+    from pathlib import Path
+    from regression.scenarios.loader import load_lifecycles
+    src = Path("regression/scenarios/engine.py").read_text(encoding="utf-8")
+    # every dict literal that ends up in a _run_step(..., _VPC_CREATE_PATH, ...) call
+    # is built via _inject_owner_tags({...}); each such block must name zone_type.
+    blocks = re.findall(r"_inject_owner_tags\(\{(.*?)\}, axis=\"regression\"\)", src, re.S)
+    # VPC bodies carry cidr+name and no vpc_id (subnet bodies reference a vpc_id)
+    vpc_blocks = [b for b in blocks if '"cidr"' in b and '"name"' in b and '"vpc_id"' not in b]
+    assert len(vpc_blocks) >= 2, "expected the main shared VPC body AND the net-A/B body"
+    for b in vpc_blocks:
+        assert '"zone_type"' in b, f"engine VPC create body without zone_type: {b[:120]!r}"
+    lcs, _ = load_lifecycles(with_sources=True)
+    missing = [(lc["id"], s.get("name")) for lc in lcs for s in lc.get("steps", [])
+               if s.get("method") == "POST" and s.get("path") == "/v1/vpcs"
+               and isinstance(s.get("json"), dict) and "zone_type" not in s["json"]]
+    assert not missing, f"scenario create-vpc bodies without zone_type: {missing}"

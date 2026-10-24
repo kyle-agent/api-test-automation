@@ -1,0 +1,25 @@
+# Resource-task model — management/resourceoptimizer (mg-ro group).
+# 2026-09-21 신규 상품(2026-09 스펙 범프). 조회 전용 lookup 노드 — 소스 lifecycle
+# resourceoptimizer-readonly (generated__resourceoptimizer.json). 설정 쓰기
+# (account/organization settings, opt-in/out) 는 probe lifecycle 이며 콘솔 scope
+# 포함 여부는 lifecycle 의 _scope_include 로 결정 (organization 쓰기는 오너 결정
+# 대기 — 미포함). 글로벌 호스트(core/config.py DEFAULT_GLOBAL_SERVICES).
+version: 1
+resources:
+  ro-account:
+    lookup: true
+    code: "mg-ro-account"
+    service: management/resourceoptimizer
+    requires: []
+    create:
+      endpoint: "GET /v1/access-keys"
+    capture: {account_id: "$.access_keys[0].account_id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/accounts/{account_id}", expect_status: [200]}
+      - {name: settings, endpoint: "GET /v1/accounts/{account_id}/settings", expect_status: [200]}
+      - {name: lim-settings, endpoint: "GET /v1/accounts/{account_id}/settings/lim", expect_status: [200]}
+      - {name: recommendations, endpoint: "POST /v1/recommendations", expect_status: [200],
+         note: "읽기 의미의 POST 리스팅(필터 바디) — dashboard/idle-resources 도 같은 꼴. 항목 id 는 capture_soft 로 show/metrics 에 이어진다."}
+    provenance: docs
+    source: {lifecycle: resourceoptimizer-readonly, steps: [capture-account-id, get-account, list-account-settings, get-account-lim-settings, list-recommendations]}
+    notes: "조회 전용 lookup — 계정 id 는 iam access-keys 리스팅(다른 서비스 엔드포인트, validator WARN 의도됨)에서 얻는다: 옵티마이저 자체에는 계정 리스팅 API 가 없다."

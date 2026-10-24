@@ -2,7 +2,7 @@
 
 Automated testing **platform** for the Samsung Cloud Platform (SCP) Open APIs
 documented at <https://docs.e.samsungsdscloud.com/apireference/>
-(**13 categories / ~60 services / 1,416 endpoints** as of the 2026-07 version
+(**13 categories / ~62 services / 1,490 endpoints** as of the 2026-09 spec bump
 bump — `python -m spec.summary` is the live source of truth). Engineered by a team of
 AI agents (`docs/agent-team.md`); session entry point: `START_HERE.md`; current
 state: `docs/working/CONTEXT.md`; doc index: `docs/INDEX.md`.
@@ -70,6 +70,12 @@ reports/      per-run output (gitignored)
 ```
 
 ## Setup & canonical commands
+
+One-shot local bootstrap: `./start.sh` creates `.venv` (if missing), installs
+both requirements files (only when they changed), runs the zone guard and
+launches the console at http://localhost:8800/testing/embed. `./start.sh
+--setup-only` prepares the venv only; `./start.sh -- <cmd>` runs a command
+inside it (e.g. `./start.sh -- python -m spec.summary`).
 
 ```bash
 pip install -r requirements.txt    # engine deps

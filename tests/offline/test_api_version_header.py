@@ -216,3 +216,17 @@ def test_override_still_wins_over_endpoint_pin(monkeypatch):
     hdr = hc.api_version_header(
         "scf", "GET", "/v1/cloud-functions/abc123/metrics")
     assert hdr == {hc.API_VERSION_HEADER: "scf 9.9"}
+
+
+def test_endpoint_pin_prefers_literal_shape_over_wildcard(monkeypatch):
+    """2026-09-18: `GET /v1/replications/regions`(1.1) vs `GET /v1/replications/{}`
+    (showreplication, 1.2) — 버전업으로 둘의 버전이 갈리자 종전 '2개 매치 = 모호'
+    규칙이 None → 제품 핀으로 떨어뜨렸다. 리터럴 세그먼트가 많은 shape가 이긴다."""
+    from core import http_client as hc
+    hc._endpoint_versions.cache_clear()
+    monkeypatch.setattr(hc, "_endpoint_versions", lambda: {
+        "fs": {("GET", 4): [(("", "v1", "replications", "{}"), "1.2"),
+                            (("", "v1", "replications", "regions"), "1.1"),
+                            (("", "v1", "replications", "{}"), "1.3")]}})
+    assert hc._endpoint_version_for("fs", "GET", "/v1/replications/regions") == "1.1"
+    assert hc._endpoint_version_for("fs", "GET", "/v1/replications/abc") is None   # 같은 구체성, 버전 갈림

@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 84 docs · 33 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 85 docs · 34 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -28,6 +28,7 @@
 | [`working/DOCS-MCP-FEASIBILITY.md`](working/DOCS-MCP-FEASIBILITY.md) | all | SCP Docs MCP Server — 도입 타당성 조사 (2026-07-15) | 🟢 active |
 | [`working/NEWAPI-DBAAS-INSTANCE-OPS.md`](working/NEWAPI-DBAAS-INSTANCE-OPS.md) | coverage-service (database/*, data-analytics/*) · coverage-validator · orchestrator | NEWAPI — DBaaS instance-ops 설계 메모 (2026-07-15) | 🟢 active |
 | [`working/SPEC-DIFF-20260715.md`](working/SPEC-DIFF-20260715.md) | orchestrator | SPEC-DIFF — 전체 명세 리프레시 + diff (2026-07-15, 버전업 대응) | 🟢 active |
+| [`working/SPEC-DIFF-20260917.md`](working/SPEC-DIFF-20260917.md) | orchestrator | SPEC-DIFF — 2026-09-17 (사이트 리디자인으로 표준 리프레시 실패, 대체 방법론으로 부분 diff) | 🟢 active |
 
 ## Working — plans
 | Doc | For | Summary | Status |

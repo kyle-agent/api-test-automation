@@ -38,6 +38,7 @@ LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps", "credentials",
                   # owner-유예 (C-6 2026-07-08): scope 확장 제외 + 명시 선택 허용
                   # (console2_server._resolve_lifecycle_ids가 소비; 은퇴 아님).
                   "_scope_exclude",
+                  "_scope_include",
                   # loader가 로드 시점에 주입하는 파생 필드 (파일에는 없음) —
                   # HEAVY-PREMISE-CONTRACT §1 role(verify/probe).
                   "role"}
@@ -49,7 +50,7 @@ STATUS_ENUM = {"done-modeled", "timing-gated", "blocked-engine",
 STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
              "expect_status", "capture", "capture_soft", "cleanup", "poll",
              "wait", "retries", "retry_interval", "retry_on_status",
-             "retry_on_error_code",
+             "retry_on_error_code", "fallback_on_error_code",
              "group", "optional", "destructive", "adopt", "probe_reads",
              "action", "input", "output", "values", "json_b64_fields", "skip",
              "_note", "_comment"}
@@ -57,7 +58,7 @@ METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 BUILTINS = {"unique", "ualpha", "region", "zone",
             "vs_server_type_prefix", "vs_server_type", "db_server_type_filter",
             "db_server_type_name_prefix",
-            "today", "today_plus_5y", "this_month", "zone_alt", "zone_fs",
+            "today", "today_plus_5y", "this_month", "zone_alt",
             "scp_access_key", "scp_secret_key",
             "iso_today", "iso_29d_ago", "epoch_now", "epoch_1h_ago",
             "iso_dt_29d_ago", "iso_dt_1h_ago",
@@ -139,7 +140,9 @@ def validate(service_filter=None):
             sname = step.get("name", f"step[{i}]")
             sw = f"{where} step '{sname}'"
             for k in step:
-                if k not in STEP_KEYS:
+                # '_note*' keys are free-form repair/provenance annotations
+                # (e.g. _note_zones, _note_404): documentation, never consumed.
+                if k not in STEP_KEYS and not k.startswith("_note"):
                     warnings.append(f"{sw}: unknown step key '{k}'")
             if "name" not in step:
                 errors.append(f"{sw}: missing 'name'")

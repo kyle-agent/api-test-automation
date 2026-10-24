@@ -255,6 +255,7 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
             "name": "regrvpc{unique}",
             "description": "API regression suite",
             "cidr": "10.123.0.0/20",
@@ -1210,7 +1211,7 @@
             "name": "regrfs{unique}",
             "protocol": "NFS",
             "type_name": "HDD",
-            "zone": "{zone_fs}"
+            "zone": "{zone}"
           },
           "expect_status": [
             200,
@@ -2431,6 +2432,7 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
             "name": "regrvpc{unique}",
             "description": "API regression IGW",
             "cidr": "10.126.0.0/20",
@@ -2607,6 +2609,7 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
             "name": "regrvpc{unique}",
             "description": "API regression SKE",
             "cidr": "10.125.0.0/20",
@@ -2784,7 +2787,7 @@
             "name": "regrfsk{unique}",
             "protocol": "NFS",
             "type_name": "HDD",
-            "zone": "{zone_fs}"
+            "zone": "{zone}"
           },
           "expect_status": [
             200,
@@ -2827,17 +2830,15 @@
           "json": {
             "name": "regrske{unique}",
             "kubernetes_version": "{kube_ver}",
-            "cloud_logging_enabled": "false",
             "vpc_id": "{vpc_id}",
-            "subnet_id": "{subnet_id}",
             "security_group_id_list": [
               "{sg_id}"
             ],
             "private_endpoint_access_control_resources": [],
             "tags": [],
-            "volume_id": "{ske_vol_id}",
             "public_endpoint_access_control_ip": "0.0.0.0/0",
-            "service_watch_logging_enabled": "true"
+            "service_watch_logging_enabled": "true",
+            "default_subnet_id": "{subnet_id}"
           },
           "expect_status": [
             200,
@@ -2851,7 +2852,8 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "ske"
-          }
+          },
+          "_note": "REPAIR 2026-09-21 (run eb41, ske 1.6 핀): ClusterCreateRequestV1Dot6 — subnet_id→default_subnet_id(필수), volume_id·cloud_logging_enabled 제거(모델에서 삭제), additional_subnet_id_list/nfs_volume_id/deletion_protection_enabled 선택. 구 바디는 400 'Field required'."
         },
         {
           "name": "wait-cluster",
@@ -3112,6 +3114,25 @@
           "expect_status": [
             200
           ],
+          "capture": {
+            "np_os_ver": {
+              "list": "$.nodepool_images",
+              "where_prefix": {
+                "kubernetes_version": "{kube_ver}",
+                "os": "ubuntu"
+              },
+              "get": "os_version"
+            },
+            "np_os_ver_next": {
+              "list": "$.nodepool_images",
+              "where_prefix": {
+                "kubernetes_version": "{kube_ver_next}",
+                "os": "ubuntu"
+              },
+              "get": "os_version"
+            }
+          },
+          "_comment": "REPAIR 2026-09-17 (run 915f): 노드 이미지 매트릭스가 k8s 버전마다 다르다 — 실측 v1.36.3/v1.35.5는 ubuntu 24.04·rhel 9.6뿐, ubuntu 22.04는 v1.34.3 이하. 버전 목록이 밀리면(09-17: [0]=v1.36.3, [1]=v1.35.5) 하드코딩 22.04가 create-nodepool 400 invalid-os-image를 만든다. 이제 {kube_ver}/{kube_ver_next}에 맞는 ubuntu os_version을 이 응답에서 캡처해 create-nodepool(image_os_version)과 upgrade-nodepool(os_version)에 주입. 문서(createnodepool 1.5/1.6) 예시는 여전히 22.04+v1.29.8 — 예시가 아니라 listimages가 정본.",
           "_note": "scp_original_image_type is a REQUIRED query (missing -> 400 'Field required', runs 27483895557/27491816948) — this step silently logged a 400 EVERY run behind [200,400]+optional until 2026-07-08. Param proven 200 live 2026-06-20 (15 nodepool_images); hard [200] per ct-ske-image model."
         },
         {
@@ -3147,7 +3168,7 @@
             "max_node_count": "2",
             "server_type_id": "{vs_server_type}",
             "image_os": "ubuntu",
-            "image_os_version": "22.04",
+            "image_os_version": "{np_os_ver}",
             "keypair_name": "regrkey{unique}",
             "volume_size": "104",
             "volume_type_name": "SSD",
@@ -3340,7 +3361,7 @@
           "method": "PUT",
           "path": "/v1/nodepools/{nodepool_id}/upgrade",
           "json": {
-            "os_version": "24.04"
+            "os_version": "{np_os_ver_next}"
           },
           "expect_status": [
             200,
@@ -3404,6 +3425,12 @@
           "service": "ske",
           "method": "PUT",
           "path": "/v1/nodepools/{nodepool_id}",
+          "retry_on_status": [
+            500
+          ],
+          "retries": 3,
+          "retry_interval": 60,
+          "_note": "REPAIR 2026-09-21 (run 643b, ske 1.6): 클러스터 업그레이드(v1.35.5→v1.36.3) 직후 노드풀 scale-up 이 500 ContactAdminForAssistance (PF-60 — 상태 충돌을 5xx 로 표면화, 4xx 상태 에러가 맞는 클래스). 일시 상태면 60s×3 사다리로 흡수, 지속되면 실패 유지(진짜 결함).",
           "json": {
             "desired_node_count": "2",
             "min_node_count": "1",
@@ -3435,6 +3462,26 @@
             "timeout": 1200,
             "interval": 30
           }
+        },
+        {
+          "name": "wait-cluster-running-before-labels",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          },
+          "_note": "REPAIR 2026-09-21 (run ec8b): scale-up 뒤 wait-scale-up 은 노드풀 status 만 폴라 클러스터가 UPDATING 인 채로 set-nodepool-labels 가 400 scp-kubernetes.cluster.status-invalid 'Cluster status (UPDATING) is not Running' → 이후 teardown 노드풀 delete 400 → VPC 409 연쇄. 다른 set-* 앞의 wait-cluster-running-* 와 같은 settle."
         },
         {
           "name": "set-nodepool-labels",
@@ -3638,6 +3685,7 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
             "name": "regrvpc{unique}",
             "description": "API regression VS",
             "cidr": "10.135.0.0/20",
@@ -5013,6 +5061,7 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
             "name": "regrvpc{unique}",
             "description": "API regression DBaaS",
             "cidr": "10.136.0.0/20",
@@ -5184,6 +5233,11 @@
                   {
                     "role_type": "OS",
                     "size_gb": 104,
+                    "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
                     "volume_type": "SSD"
                   }
                 ],
@@ -6150,6 +6204,7 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
             "name": "regrvpc{unique}",
             "description": "API regression PG",
             "cidr": "10.133.0.0/20",
@@ -6345,6 +6400,11 @@
                   {
                     "role_type": "OS",
                     "size_gb": 104,
+                    "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
                     "volume_type": "SSD"
                   }
                 ],
@@ -7371,6 +7431,7 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
             "name": "regrvpc{unique}",
             "description": "API regression shared",
             "cidr": "10.134.0.0/20",
@@ -7547,6 +7608,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -7664,6 +7730,11 @@
                   {
                     "role_type": "OS",
                     "size_gb": 104,
+                    "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
                     "volume_type": "SSD"
                   }
                 ],
@@ -8157,8 +8228,9 @@
             202
           ],
           "capture": {
-            "hosted_zone_id": "$.hosted_zone.id"
+            "hosted_zone_id": "$.id"
           },
+          "_note_capture": "REPAIR 2026-09-21 (run 4beb): createhostedzone 202 응답은 최상위 {id, name, hosted_zone_type, private_dns_id, …}(networking-dns-hosted-zone-private 도 동일 실측) — $.hosted_zone.id 캡처 미스로 set/delete 가 리터럴 토큰(404) → hosted zone 잔존 → private-dns delete 409 → VPC delete 409 related-resource(sweep 이 회수). heavy-shared-networking 은 dns-activate 400 이 그룹을 스킵시켜 이전 런엔 여기까지 오지 않았다.",
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/hosted-zones/{hosted_zone_id}",
@@ -8891,6 +8963,9 @@
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/environment-variables",
           "json": {
+            "encryption": {
+              "server_side_encryption_enabled": false
+            },
             "variables": [
               {
                 "key": "sample",
@@ -8903,7 +8978,8 @@
             202
           ],
           "optional": true,
-          "group": "scf-vars"
+          "group": "scf-vars",
+          "_note": "REPAIR 2026-09-21 (run eb41, scf 1.5 핀): FunctionVariablesV1Dot5 — encryption.server_side_encryption_enabled 필수(구 바디 400 'Field required'). 915f(구 핀)에서는 200."
         },
         {
           "name": "wait-ready-scf-url",
@@ -9226,6 +9302,7 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
+            "zone_type": "PUBLIC",
             "name": "regrvpc{unique}",
             "description": "API regression shared-net",
             "cidr": "10.140.0.0/20",
@@ -9797,8 +9874,9 @@
         {
           "name": "dns-activate",
           "service": "dns",
-          "group": "dns",
+          "group": "dns-activate",
           "optional": true,
+          "_note": "REPAIR 2026-09-21 (run 643b): 400 scp-network.private-dns.max-count-exceed — 계정에 private-dns 활성화 quota 가 이미 소진(활성화는 계정당 1회 성격). 같은 group 'dns' 에 있어 이 400 이 dns-privatedns-wait/zone 체인을 통째로 스킵시켰고, private-dns 가 CREATING 인 채 set/delete 가 400, VPC delete 가 409 related-resource 로 잔존(런 종료 sweep 이 회수). 별도 optional group 으로 분리해 wait 가 항상 돌게 함.",
           "method": "POST",
           "path": "/v1/private-dns/activate",
           "json": {
@@ -9848,8 +9926,9 @@
             "tags": []
           },
           "capture": {
-            "hosted_zone_id": "$.hosted_zone.id"
+            "hosted_zone_id": "$.id"
           },
+          "_note_capture": "REPAIR 2026-09-21 (run 4beb): createhostedzone 202 응답은 최상위 {id, name, hosted_zone_type, private_dns_id, …}(networking-dns-hosted-zone-private 도 동일 실측) — $.hosted_zone.id 캡처 미스로 set/delete 가 리터럴 토큰(404) → hosted zone 잔존 → private-dns delete 409 → VPC delete 409 related-resource(sweep 이 회수). heavy-shared-networking 은 dns-activate 400 이 그룹을 스킵시켜 이전 런엔 여기까지 오지 않았다.",
           "expect_status": [
             200,
             201,
@@ -9868,6 +9947,10 @@
           "optional": true,
           "method": "POST",
           "path": "/v1/hosted-zones/{hosted_zone_id}/records",
+          "capture": {
+            "record_id": "$.id"
+          },
+          "_note_capture": "REPAIR 2026-09-21 (run ec8b): 레코드 id 미캡처 → 존 삭제 전 레코드 삭제 스텝이 없어 dns-zone-delete 409 → private-dns 409 → VPC 409 related-resource 연쇄(hosted zone 캡처 수리로 존 삭제가 처음 실제 실행돼 드러남). networking__dns.json 과 동일 $.id 캡처 + dns-record-delete 선행.",
           "json": {
             "name": "www.regr{ualpha}.example.com",
             "type": "A",
@@ -9939,10 +10022,11 @@
           "optional": true,
           "json": {
             "connected_vpc_ids": [
-              ""
+              "{vpc_id}"
             ],
             "description": "This is description"
           },
+          "_note": "REPAIR 2026-09-21 (run 643b): connected_vpc_ids [\"\"] 는 스펙 예제 빈 문자열 — 실제 VPC id 로 배선. 400 invalid-state(CREATING) 는 dns-activate group 분리로 wait 가 선행되면 해소.",
           "expect_status": [
             200,
             201,
@@ -9958,18 +10042,15 @@
           "optional": true,
           "json": {
             "lb_health_check": {
-              "description": "this is an lb server group",
+              "description": "API regression shared-net hc (set)",
               "health_check_count": 3,
               "health_check_interval": 5,
               "health_check_port": 80,
               "health_check_timeout": 5,
-              "health_check_url": "/test",
-              "http_method": "GET",
-              "protocol": "TCP",
-              "request_data": "username=admin&password=1234",
-              "response_code": "200"
+              "protocol": "TCP"
             }
           },
+          "_note": "REPAIR 2026-09-21 (run 643b): 400 InvalidParameter \"LB Health Check with protocol 'TCP' cannot have 'response_code' or 'http_method' or 'health_check_url' or 'request_data'\" — 스펙 예제(HTTP 필드 동봉)를 TCP hc 에 그대로 보낸 바디. HTTP 전용 필드 제거.",
           "expect_status": [
             200,
             201,
@@ -9985,40 +10066,11 @@
           "optional": true,
           "json": {
             "listener": {
-              "condition_type": "URL_PATH",
-              "description": "",
-              "hsts_max_age": "",
-              "https_redirection": {
-                "port": "",
-                "protocol": "",
-                "response_code": ""
-              },
-              "idle_timeout": "",
-              "insert_client_ip": "",
-              "persistence": "",
-              "response_timeout": "",
-              "server_group_id": "",
-              "session_duration_time": "",
-              "sni_certificate": [
-                {
-                  "domain_name": "regr{unique}",
-                  "not_after_dt": "",
-                  "sni_cert_id": ""
-                }
-              ],
-              "ssl_certificate": {
-                "client_cert_id": "",
-                "client_cert_level": "",
-                "server_cert_level": ""
-              },
-              "support_http2": "",
-              "url_handler": "",
-              "url_redirection": "",
-              "x_forwarded_for": "",
-              "x_forwarded_port": "",
-              "x_forwarded_proto": ""
+              "description": "API regression shared-net (set)",
+              "session_duration_time": 120
             }
           },
+          "_note": "REPAIR 2026-09-21 (run eb41): 스펙 예제 그대로의 빈 문자열('') 바디 — port/idle_timeout/persistence 등 타입 필드에 ''를 보내 400. 최소 타입 바디(description + session_duration_time)로 축소. 그룹 optional 유지.",
           "expect_status": [
             200,
             201,
@@ -10114,6 +10166,25 @@
           ]
         },
         {
+          "name": "dns-record-delete",
+          "service": "dns",
+          "group": "dns",
+          "method": "DELETE",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
           "name": "dns-zone-delete",
           "service": "dns",
           "group": "dns",
@@ -10147,6 +10218,9 @@
           "destructive": true,
           "retry_on_status": [
             409
+          ],
+          "retry_on_error_code": [
+            "scp-network.private-dns.invalid-state"
           ],
           "retries": 6,
           "retry_interval": 15

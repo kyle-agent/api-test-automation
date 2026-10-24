@@ -1158,3 +1158,72 @@ def test_abort_all_empties_queue_first_and_skips_non_abortable(monkeypatch):
     js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
     assert 'id="cap-abort-all"' in js and "function abortAllConfirm" in js
     assert '"/api/abort-all"' in js and "대기열을 먼저 비웁니다" in js
+
+
+# ---- zone guard in pre-flight (2026-09-17 run 89de: stale SCP_ZONE=kr-west1-a) ----
+def test_preflight_carries_zone_verdict_and_blocks_on_invalid(monkeypatch):
+    bad = {"zone": "kr-west1-a", "zone_alt": "kr-west1-b", "source": "env SCP_ZONE",
+           "verdict": "invalid", "detail": "존 핀 'kr-west1-a'은 유효하지 않음"}
+    monkeypatch.setattr(C2, "_zone_preflight", lambda: bad)
+    pf = C2._preflight({"lifecycle_ids": ["iam-role-full"]})
+    assert pf["zone"]["verdict"] == "invalid"
+    assert pf["warnings"][0].startswith("존 검증 실패")
+    # read-only 런은 zone 을 싣는 create 가 없으므로 프로브를 생략한다
+    pf_ro = C2._preflight({"lifecycle_ids": ["iam-role-full"], "read_only": True})
+    assert pf_ro["zone"] is None and not any("존" in w for w in pf_ro["warnings"])
+    # unknown 은 경고 줄만 (차단 아님)
+    monkeypatch.setattr(C2, "_zone_preflight",
+                        lambda: {**bad, "verdict": "unknown", "detail": "프로브 실패"})
+    pf_u = C2._preflight({"lifecycle_ids": ["iam-role-full"]})
+    assert pf_u["zone"]["verdict"] == "unknown" and any(w.startswith("존 검증 불가") for w in pf_u["warnings"])
+    # 프론트 계약: invalid 면 pfFail 로 실행 차단, 모달에 존 줄 표시
+    js = (ROOT / "console2" / "assets" / "console2.js").read_text(encoding="utf-8")
+    assert 'pf.zone.verdict === "invalid"' in js and "zoneLine" in js
+
+
+def test_zone_gate_blocks_only_on_exit_2(monkeypatch, tmp_path):
+    import io
+    import subprocess as _sp
+
+    class P:
+        def __init__(self, rc, out="", err=""):
+            self.returncode, self.stdout, self.stderr = rc, out, err
+
+    log = io.StringIO()
+    monkeypatch.setattr(C2.subprocess, "run", lambda *a, **k: P(0, '{"verdict":"ok"}', "[zone-guard] OK"))
+    assert C2._zone_gate({}, log) is None
+    monkeypatch.setattr(C2.subprocess, "run",
+                        lambda *a, **k: P(2, '{"verdict":"invalid","detail":"핀 틀림"}', "[zone-guard] BLOCK"))
+    assert C2._zone_gate({}, log) == "핀 틀림"
+    def _boom(*a, **k):
+        raise _sp.TimeoutExpired("x", 90)
+    monkeypatch.setattr(C2.subprocess, "run", _boom)
+    assert C2._zone_gate({}, log) is None          # 가드 실패는 런을 막지 않는다
+    assert "[zone-guard] BLOCK" in log.getvalue()
+
+
+def test_resolve_lifecycle_ids_scope_include_and_new_services():
+    """2026-09-21 (run eb41): new-API reachability probes carry ``_scope_include``
+    so a service/whole selection runs them (role derivation untouched — still
+    probe); and the 2026-09 new products are selectable through formal nodes."""
+    m = C2._model()
+    for nid in ("mh-domain", "mh-email", "mh-phone", "ro-account", "cn-cost-analysis"):
+        assert nid in m["nodes"] and m["nodes"][nid]["lifecycle"], nid
+    got = set(C2._resolve_lifecycle_ids({"services": [
+        "application-service/messagehub", "management/resourceoptimizer",
+        "financial-management/costnavigator", "container/ske"]}))
+    # verify-role lifecycles of the new services
+    assert {"resourceoptimizer-readonly"} <= got
+    # owner 2026-09-21: messagehub deferred (_scope_exclude, "프로세스 확인 후 진행") —
+    # out of scope expansion, still runnable by explicit selection.
+    assert not any(lid.startswith("messagehub-") for lid in got)
+    assert "messagehub-domain-lifecycle" in C2._resolve_lifecycle_ids(
+        {"lifecycle_ids": ["messagehub-domain-lifecycle"]})
+    # probe-role lifecycles that opted in
+    for lid in ("costnavigator-reads-newapi-202609",
+                "resourceoptimizer-account-settings", "container-ske-newapi-202609-coverage"):
+        assert m["lifecycles"][lid]["role"] == "probe", lid
+        assert lid in got, lid
+    # a probe WITHOUT the opt-in stays out of scope (org-scoped writes: owner decision pending)
+    assert "resourceoptimizer-organization-settings" not in got
+    assert m["lifecycles"]["resourceoptimizer-organization-settings"]["role"] == "probe"

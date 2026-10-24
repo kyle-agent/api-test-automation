@@ -855,7 +855,8 @@
             "name": "regrvpc{unique}",
             "description": "API regression PG version-upgrade",
             "cidr": "10.143.0.0/20",
-            "tags": []
+            "tags": [],
+            "zone_type": "PUBLIC"
           },
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -870,7 +871,8 @@
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
           },
-          "adopt": "vpc"
+          "adopt": "vpc",
+          "_note": "REPAIR 2026-09-21 (run d961): vpc 핀 1.4 → VpcCreateRequestV1Dot4는 zone_type 필수(enum PUBLIC/PRIVATE/ACCELERATED), zones 선택. 누락 시 create 즉사 → VPC 계열 43 lifecycle 전멸. zone_type=PUBLIC만 전송 — 라이브 실측 2026-09-21: PUBLIC에 zones를 주면 400 scp-network.vpc.zone-cannot-be-specified, PUBLIC 단독은 201이고 서버가 계정 존(kr-west1-b)을 배정."
         },
         {
           "name": "wait-vpc",
@@ -1039,6 +1041,11 @@
                     "role_type": "OS",
                     "size_gb": 104,
                     "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
                   }
                 ],
                 "instances": [
@@ -1076,7 +1083,7 @@
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
           },
-          "_note": "dbaas_engine_version_id = engine_version_old_id (COMMUNITY 17.6) -- deliberate, this is the version-upgrade campaign's starting point. Body otherwise copied VERBATIM from live-proven database-postgresql-cluster / postgresql-cluster-subops-full (verified 2xx in data/baselines/verified_endpoints.json)."
+          "_note": "dbaas_engine_version_id = engine_version_old_id (COMMUNITY 17.6) -- deliberate, this is the version-upgrade campaign's starting point. Body otherwise copied VERBATIM from live-proven database-postgresql-cluster / postgresql-cluster-subops-full (verified 2xx in data/baselines/verified_endpoints.json). || REPAIR 2026-09-17 (run 89de): 400 Dbaas.ValidationError.InvalidBlockStorageDataDiskCount 'ACTIVE instance group must have 1 or more DATA block storage (current: 0)' — DATA 블록스토리지가 create 시점 필수로 바뀜(mysql/postgresql/mariadb/epas 13 lifecycle 동시 실패). cachestore/eventstreams처럼 OS+DATA(56 SSD, 8의 배수)로 생성; 후속 add-block-storages는 [2]로 추가되고 resize 대상 [1]은 여전히 DATA."
         },
         {
           "name": "wait-cluster",

@@ -1,0 +1,72 @@
+# Resource-task model — application-service/messagehub (ap-mh group).
+# 2026-09-21 신규 상품(2026-09 스펙 범프, docs/working/SPEC-DIFF-20260917.md)
+# — 소스 lifecycle: regression/scenarios/lifecycles/generated__messagehub.json.
+# 콘솔 "전체/서비스" 선택은 formal 노드(lifecycle-bearing)로만 서비스를 열거하므로
+# (console2.js allSelectableServices) 노드가 없으면 신규 상품은 모수에서 조용히
+# 빠진다 — run eb41 (2026-09-21) 에서 실측. 이 파일이 그 구멍을 닫는다.
+# provenance: docs — 라이브 2xx 미확보 (다음 전체 런에서 VALIDATED 승격 대상).
+version: 1
+resources:
+  mh-domain:
+    code: "ap-mh-domain"
+    service: application-service/messagehub
+    requires: []
+    create:
+      endpoint: "POST /v1/domains"
+      body: {description: "regression test domain",
+             email_domain: "regr{unique}.example.com", tags: []}
+    capture: {domain_id: "$.resource_id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/domains/{domain_id}", expect_status: [200, 400, 404]}
+    delete: {endpoint: "DELETE /v1/domains/{domain_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: messagehub-domain-lifecycle, steps: [create-domain, get-domain, delete-domain]}
+    notes: "이메일 발신 도메인. create 202 비동기(resource_id 캡처). 소유권 검증(DNS)이 없는 예제 도메인이라 read 가 400/404 로 관용."
+
+  mh-email:
+    code: "ap-mh-email"
+    service: application-service/messagehub
+    requires: []
+    create:
+      endpoint: "POST /v1/emails"
+      body: {description: "regression test email",
+             email_address: "regr{unique}@example.com", tags: []}
+    capture: {email_id: "$.resource_id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/emails/{email_id}", expect_status: [200, 400, 404]}
+    delete: {endpoint: "DELETE /v1/emails/{email_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: messagehub-email-lifecycle, steps: [create-email, get-email, delete-email]}
+    notes: "발신 이메일 주소. description/private-acl/public-acl/private-endpoint setter 는 lifecycle 영역."
+
+  mh-phone:
+    code: "ap-mh-phone"
+    service: application-service/messagehub
+    requires: []
+    create:
+      endpoint: "POST /v1/phones"
+      body: {country_code: "82", description: "regression test phone",
+             owner: "regression-owner", phone_number: "{epoch_now}", tags: []}
+    capture: {phone_id: "$.resource_id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/phones/{phone_id}", expect_status: [200, 400, 404]}
+    delete: {endpoint: "DELETE /v1/phones/{phone_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: messagehub-phone-lifecycle, steps: [create-phone, get-phone, delete-phone]}
+    notes: "발신 전화번호(SMS). phone_number 는 유일성 위해 epoch 초. use-caller 등 setter 는 lifecycle 영역."
+
+  mh-push-application:
+    lookup: true
+    code: "ap-mh-push"
+    service: application-service/messagehub
+    requires: []
+    create:
+      endpoint: "GET /v1/push-applications"
+    capture: {push_application_id: "$.push_applications[0].id"}
+    capture_soft: true  # 푸시 앱은 API 로 생성 불가(콘솔 전용) — 계정에 없으면 하위 스텝 스킵
+    verify:
+      - {name: read, endpoint: "GET /v1/push-applications/{push_application_id}",
+         expect_status: [200, 400, 403, 404]}
+    provenance: docs
+    source: {lifecycle: messagehub-pushapplication-coverage, steps: [list-push-applications]}
+    notes: "lookup 노드 — 푸시 애플리케이션 create 엔드포인트가 스펙에 없음(콘솔에서 만든 앱을 리스팅). 오너가 콘솔에서 앱 1개를 만들어 두면 setter/delete 커버리지가 열린다."

@@ -152,6 +152,9 @@ _RESIDUAL_EXPLICIT = {
 # Genuine waivers: no producer exists (name-addressed / console-only / EOL). Left
 # produced_by=null but tagged producer_kind="waiver" so the worklist is honest.
 _RESIDUAL_WAIVERS = {
+    # 2026-09 spec bump: ske listnamespacedpods addresses a Kubernetes namespace by
+    # NAME — namespaces are created inside the cluster (kubectl), no SCP API produces one.
+    ("ske", "namespace_name"),
     ("resourcemanager", "key"),
     ("resourcemanager", "resource_identifier"),
     ("cloudmonitoring", "addrbookId"),
@@ -170,6 +173,11 @@ def _residual_for(service: str, param: str, key_prefix: str):
             return f"{key_prefix}/{service}showcluster", "$.instance_groups[0].block_storage_groups[0].id", "detail-read"
         if param == "request_id":
             return f"{key_prefix}/{service}createcluster", "$.request_id", "async-op"
+        if param == "instance_name":
+            # 2026-09 spec bump: <engine>showinstance reads ONE instance by its in-cluster
+            # NAME (docs: "ShowCluster 응답의 인스턴스 그룹에서 확인") — detail-read of the
+            # cluster, first instance of the first group.
+            return f"{key_prefix}/{service}showcluster", "$.instance_groups[0].instances[0].name", "detail-read"
     return _RESIDUAL_EXPLICIT.get((service, param), (None, None, None))
 
 

@@ -1,46 +1,81 @@
 #!/usr/bin/env python3
 """Extract all SCP API Reference endpoints into data/api_catalog.json.
 
-The API Reference site (https://docs.e.samsungsdscloud.com/apireference/) renders
-each API on its own page. Every page embeds the HTTP method + path in the
-<head> meta description, e.g.:
+Discovery source (2026-09-17 redesign): the docs site's **search index**
+``https://docs.e.samsungsdscloud.com/search-index.json`` (minisearch v2,
+~86 MB). The old source — per-endpoint hrefs embedded in the ``/apireference/``
+index HTML — died with the 2026-09 site redesign (the index page shrank from a
+5 MB nav embed to a 31 KB category list; the old ``--fresh`` run discovered
+**1** endpoint and truncated the catalog — SPEC-DIFF-20260917 §1). The search
+index's ``storedFields`` still carry every page: ``ref`` (URL path), ``title``,
+``lang`` and ``body`` (the rendered page text). For an endpoint page the body's
+first line is ``"<method> <path> Description ..."`` — validated 0 mismatches
+against the 1,390 catalog rows it overlaps (§7).
 
-    <meta name=description content="get /v1/aimlops-platform Description ...">
+Rules:
+  * ko pages only (en mirrors 1:1); leaf pages
+    ``/apireference/<cat>/<svc>/apis/<name>/<version>/`` only — the ``/apis/``
+    and ``/apis/<name>/`` list pages have EMPTY bodies (client-rendered) even
+    in the index.
+  * the highest version per ``<cat>/<svc>/<name>`` is CURRENT (numeric tuple
+    compare, so 1.10 > 1.9). Historical-version retention in the index is
+    inconsistent per service, so "missing from the index" is never read as
+    "page is dead" — only the max version matters.
+  * rows whose body lacks a parsable method/path fall back to fetching the
+    live page head (``enrich``), exactly as before.
+  * **floor gate**: the new catalog must be ≥ ``FLOOR`` (90%) of the committed
+    one, else nothing is written (``--force`` overrides) — the truncation-to-1
+    incident must never repeat.
 
-Each detail page is ~4.3 MB (it ships the full nav tree), so we use HTTP Range
-requests to fetch only the first few KB — enough to read <title> + meta.
+The 86 MB index is cached at ``data/.search-index.json`` (git-ignored);
+``--fresh`` re-downloads it. Because method/path come from the index itself,
+a re-run with a fresh index DOES detect changed endpoints (the old resumable
+mode could not).
 
-The gateway intermittently returns 503 ("upstream connect ... connection
-timeout"), so every request is retried with exponential backoff. The run is
-resumable: already-collected entries are skipped on a re-run.
+Output: data/api_catalog.json (schema unchanged: key, category, service, name,
+version, doc_path, doc_url, method, http_path, title).
 
-Output: data/api_catalog.json  (same path as the original build_catalog.py)
-
+Also exported for sibling modules: ``discover_models_from_index`` (model
+pages, used by ``spec.scrape_docs``) and ``index_body_texts`` (endpoint page
+text by catalog key, used by ``spec.extract_bodies --from-index`` — the text
+carries the "Request body {…} Example HTTP response" example verbatim, so
+request bodies need no page fetch at all).
 """
 from __future__ import annotations
 
 import html
 import json
 import re
+import ssl
 import sys
 import time
 import urllib.request
 from pathlib import Path
 
 BASE = "https://docs.e.samsungsdscloud.com"
-INDEX = f"{BASE}/apireference/"
+SEARCH_INDEX_URL = f"{BASE}/search-index.json"
 ROOT = Path(__file__).resolve().parent.parent
 CATALOG = ROOT / "data" / "api_catalog.json"
+SEARCH_CACHE = ROOT / "data" / ".search-index.json"   # 86 MB, git-ignored
+# legacy HTML index cache — kept only so old call sites don't break; unused.
 INDEX_CACHE = ROOT / "data" / ".apiref_index.html"
+FLOOR = 0.90            # new catalog must keep >= 90% of the committed size
+CA_BUNDLE = Path("/root/.ccr/ca-bundle.crt")
 
-# href like: /apireference/<category>/<service>/apis/<apiname>/<version>
-HREF_RE = re.compile(
-    r"href=[\"']?(/apireference/([a-z0-9-]+)/([a-z0-9-]+)/apis/([a-z0-9]+)/([0-9.]+))/?[\"' >]"
-)
+ENDPOINT_REF_RE = re.compile(
+    r"^/apireference/([a-z0-9-]+)/([a-z0-9-]+)/apis/([a-z0-9]+)/([0-9.]+)/?$")
+MODEL_REF_RE = re.compile(
+    r"^/apireference/([a-z0-9-]+)/([a-z0-9-]+)/models/([a-zA-Z0-9_.-]+?)/?$")
 META_RE = re.compile(r'<meta name=description content="(.*?)"', re.DOTALL)
-# meta starts with: "<method> <path> Description ..." e.g. "get /v1/aimlops-platform Description ..."
+# meta / body starts with: "<method> <path> Description ..." e.g. "get /v1/aimlops-platform ..."
 METHOD_PATH_RE = re.compile(r"^\s*(get|post|put|delete|patch)\s+(/\S+)", re.IGNORECASE)
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.DOTALL)
+
+
+def _ssl_ctx():
+    if CA_BUNDLE.exists():
+        return ssl.create_default_context(cafile=str(CA_BUNDLE))
+    return ssl.create_default_context()
 
 
 def fetch(url: str, byte_range: str | None = None, tries: int = 6, timeout: int = 60) -> bytes:
@@ -48,11 +83,11 @@ def fetch(url: str, byte_range: str | None = None, tries: int = 6, timeout: int 
     backoff = 2
     last = None
     for attempt in range(1, tries + 1):
-        req = urllib.request.Request(url, headers={"User-Agent": "scp-api-catalog/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "scp-api-catalog/2.0"})
         if byte_range:
             req.add_header("Range", f"bytes={byte_range}")
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx()) as resp:
                 if resp.status in (200, 206):
                     return resp.read()
                 last = f"HTTP {resp.status}"
@@ -64,36 +99,102 @@ def fetch(url: str, byte_range: str | None = None, tries: int = 6, timeout: int 
     raise RuntimeError(f"failed to fetch {url}: {last}")
 
 
-def get_index_html() -> str:
-    """Return the index page HTML, using a local cache when available."""
-    if INDEX_CACHE.exists() and INDEX_CACHE.stat().st_size > 100_000:
-        return INDEX_CACHE.read_text(encoding="utf-8", errors="replace")
-    data = fetch(INDEX)
-    INDEX_CACHE.write_bytes(data)
-    return data.decode("utf-8", errors="replace")
+# ---------------------------------------------------------------- search index
+def get_search_index(*, fresh: bool = False) -> dict:
+    """Return the parsed minisearch index, downloading it when ``fresh`` or when
+    no cache exists. Raises when the payload is not a minisearch document."""
+    if fresh or not SEARCH_CACHE.exists() or SEARCH_CACHE.stat().st_size < 1_000_000:
+        print(f"downloading {SEARCH_INDEX_URL} ...", flush=True)
+        data = fetch(SEARCH_INDEX_URL, timeout=180)
+        SEARCH_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        SEARCH_CACHE.write_bytes(data)
+    idx = json.loads(SEARCH_CACHE.read_text(encoding="utf-8"))
+    if not isinstance(idx, dict) or "storedFields" not in idx:
+        raise RuntimeError("search-index.json is not a minisearch document (no storedFields)")
+    return idx
 
 
-def discover_endpoints(index_html: str) -> list[dict]:
-    """Parse all unique endpoint hrefs from the index page."""
+def _version_key(v: str) -> tuple:
+    try:
+        return tuple(int(p) for p in v.split("."))
+    except ValueError:
+        return (0,)
+
+
+def _ko_rows(index: dict):
+    for v in index.get("storedFields", {}).values():
+        if not isinstance(v, dict) or v.get("lang") != "ko":
+            continue
+        ref = v.get("ref") or ""
+        if ref.startswith("/en/"):
+            continue
+        yield ref, v
+
+
+def discover_endpoints_from_index(index: dict) -> list[dict]:
+    """Every ko endpoint leaf page, reduced to the highest version per key.
+    Method/path come from the body's first line (``None`` when unparsable —
+    the caller enriches those from the live page head)."""
     seen: dict[str, dict] = {}
-    for m in HREF_RE.finditer(index_html):
-        path, category, service, name, version = m.groups()
-        # keep the highest version per (category/service/name)
+    for ref, v in _ko_rows(index):
+        m = ENDPOINT_REF_RE.match(ref)
+        if not m:
+            continue
+        category, service, name, version = m.groups()
         key = f"{category}/{service}/{name}"
         prev = seen.get(key)
-        if prev is None or version > prev["version"]:
-            seen[key] = {
-                "key": key,
-                "category": category,
-                "service": service,
-                "name": name,
-                "version": version,
-                "doc_path": path,
-                "doc_url": f"{BASE}{path}/",
-            }
+        if prev is not None and _version_key(version) <= _version_key(prev["version"]):
+            continue
+        mp = METHOD_PATH_RE.match((v.get("body") or "").strip())
+        path = f"/apireference/{category}/{service}/apis/{name}/{version}"
+        seen[key] = {
+            "key": key, "category": category, "service": service, "name": name,
+            "version": version, "doc_path": path, "doc_url": f"{BASE}{path}/",
+            "method": mp.group(1).upper() if mp else None,
+            "http_path": mp.group(2) if mp else None,
+            "title": (v.get("title") or version).strip() or version,
+        }
     return sorted(seen.values(), key=lambda e: e["key"])
 
 
+def discover_models_from_index(index: dict) -> list[dict]:
+    """Model pages (``/models/<name>/``) — the shape ``spec.scrape_docs`` expects."""
+    seen: dict[str, dict] = {}
+    for ref, _v in _ko_rows(index):
+        m = MODEL_REF_RE.match(ref)
+        if not m:
+            continue
+        c, s, name = m.groups()
+        key = f"{c}/{s}/{name}"
+        seen[key] = {"key": key, "category": c, "service": s, "name": name,
+                     "doc_url": f"{BASE}/apireference/{c}/{s}/models/{name}/"}
+    return sorted(seen.values(), key=lambda e: e["key"])
+
+
+def index_body_texts(index: dict, catalog: list[dict] | None = None) -> dict[str, str]:
+    """``{catalog key: rendered page text}`` for the CURRENT version of every
+    endpoint (or only the given catalog's keys/versions when ``catalog`` is
+    passed). The text carries the request-body example verbatim."""
+    want = {e["key"]: e["version"] for e in (catalog or [])}
+    best: dict[str, tuple[tuple, str]] = {}
+    for ref, v in _ko_rows(index):
+        m = ENDPOINT_REF_RE.match(ref)
+        if not m:
+            continue
+        category, service, name, version = m.groups()
+        key = f"{category}/{service}/{name}"
+        if want:
+            if key not in want or want[key] != version:
+                continue
+            best[key] = (_version_key(version), v.get("body") or "")
+            continue
+        vk = _version_key(version)
+        if key not in best or vk > best[key][0]:
+            best[key] = (vk, v.get("body") or "")
+    return {k: t for k, (_vk, t) in best.items()}
+
+
+# ---------------------------------------------------------------- live fallback
 def enrich(entry: dict) -> dict:
     """Fetch the head of the detail page and extract method/path/title."""
     head = fetch(entry["doc_url"], byte_range="0-12287").decode("utf-8", errors="replace")
@@ -112,54 +213,59 @@ def enrich(entry: dict) -> dict:
     return entry
 
 
-def build_catalog(*, fresh: bool = False) -> int:
-    """Main entry point: discover + enrich all endpoints, write catalog JSON.
+# ---------------------------------------------------------------- build
+def build_catalog(*, fresh: bool = False, force: bool = False) -> int:
+    """Discover from the search index, enrich unparsable rows from the live
+    page head, gate on the size floor, write the catalog.
 
-    ``fresh=True`` — 캐시 전면 무시(재수집): 기존 카탈로그 항목 재사용도, 인덱스
-    캐시도 쓰지 않는다. 기본(resumable) 모드는 method+path가 이미 있는 항목을
-    재수집하지 않으므로 **기존 엔드포인트의 '변경'을 감지하지 못한다** — 스펙
-    변경 diff(예: 배포 직후 spec.diff --mark)를 뜨려면 반드시 --fresh 로 수집
-    (오너 2026-07-14 저녁 API 변경 대비 실측: resumable 재실행은 1372개 전부
-    cache-hit라 no-op였다).
-
-    Returns the process exit code (0 = success).
-    """
+    ``fresh`` re-downloads the search index (needed to see NEW site content;
+    the cached index is otherwise reused). ``force`` bypasses the floor gate.
+    Returns the process exit code (0 = written, 3 = floor gate refused)."""
     CATALOG.parent.mkdir(parents=True, exist_ok=True)
     existing: dict[str, dict] = {}
-    if CATALOG.exists() and not fresh:
-        for e in json.loads(CATALOG.read_text()):
+    if CATALOG.exists():
+        for e in json.loads(CATALOG.read_text(encoding="utf-8")):
             existing[e["key"]] = e
-    if fresh and INDEX_CACHE.exists():
-        INDEX_CACHE.unlink()   # 인덱스도 재수집 (신규/제거 엔드포인트 감지)
 
-    print(f"fetching index ...{' (fresh: cache bypassed)' if fresh else ''}",
-          flush=True)
-    found = discover_endpoints(get_index_html())
-    print(f"discovered {len(found)} endpoints; {len(existing)} already in catalog", flush=True)
+    index = get_search_index(fresh=fresh)
+    found = discover_endpoints_from_index(index)
+    print(f"discovered {len(found)} endpoints in the search index "
+          f"({index.get('documentCount')} documents); catalog has {len(existing)}", flush=True)
 
-    done = 0
-    for i, entry in enumerate(found, 1):
+    floor = int(len(existing) * FLOOR)
+    if existing and len(found) < floor and not force:
+        print(f"REFUSED: discovered {len(found)} < floor {floor} ({FLOOR:.0%} of "
+              f"{len(existing)}) — the index looks incomplete; catalog left untouched "
+              f"(--force to override)", flush=True)
+        return 3
+
+    # unparsable bodies -> live page head (same as the pre-redesign path)
+    todo = [e for e in found if not (e.get("method") and e.get("http_path"))]
+    for i, entry in enumerate(todo, 1):
         cached = existing.get(entry["key"])
-        if cached and cached.get("method") and cached.get("http_path"):
+        if cached and cached.get("method") and cached.get("http_path") \
+                and cached.get("version") == entry["version"]:
             entry.update({k: cached[k] for k in ("method", "http_path", "title")})
-        else:
-            try:
-                enrich(entry)
-            except Exception as exc:
-                entry["method"] = entry.get("method")
-                entry["http_path"] = entry.get("http_path")
-                entry["error"] = str(exc)
-                print(f"  [{i}/{len(found)}] FAIL {entry['key']}: {exc}", flush=True)
-        existing[entry["key"]] = entry
-        done += 1
-        if done % 25 == 0:
-            CATALOG.write_text(json.dumps(sorted(existing.values(), key=lambda e: e["key"]),
-                                          indent=2, ensure_ascii=False))
-            ok = sum(1 for e in existing.values() if e.get("http_path"))
-            print(f"  progress {i}/{len(found)} (resolved={ok})", flush=True)
+            continue
+        try:
+            enrich(entry)
+            print(f"  [{i}/{len(todo)}] enriched {entry['key']} -> {entry['method']} {entry['http_path']}",
+                  flush=True)
+        except Exception as exc:  # noqa: BLE001 — keep the row, mark the failure
+            entry["error"] = str(exc)
+            print(f"  [{i}/{len(todo)}] FAIL {entry['key']}: {exc}", flush=True)
 
-    catalog = sorted(existing.values(), key=lambda e: e["key"])
-    CATALOG.write_text(json.dumps(catalog, indent=2, ensure_ascii=False))
+    new_keys = {e["key"] for e in found}
+    added = sorted(new_keys - set(existing))
+    removed = sorted(set(existing) - new_keys)
+    bumped = sorted(k for k in new_keys & set(existing)
+                    if existing[k].get("version") != next(e["version"] for e in found if e["key"] == k))
+    print(f"added {len(added)} · removed {len(removed)} · version-bumped {len(bumped)}", flush=True)
+    for k in removed:
+        print(f"  removed: {k} (was {existing[k].get('version')})", flush=True)
+
+    catalog = sorted(found, key=lambda e: e["key"])
+    CATALOG.write_text(json.dumps(catalog, indent=2, ensure_ascii=False), encoding="utf-8")
     ok = sum(1 for e in catalog if e.get("http_path"))
     print(f"done: {len(catalog)} endpoints, {ok} with method/path -> {CATALOG}", flush=True)
     return 0
@@ -167,12 +273,16 @@ def build_catalog(*, fresh: bool = False) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     import argparse
-    ap = argparse.ArgumentParser(description=__doc__)
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--fresh", action="store_true",
-                    help="캐시 전면 무시 재수집 — 기존 엔드포인트의 변경 감지용 "
-                         "(스펙 변경 diff 전 필수; 기본 모드는 cache-hit로 no-op)")
+                    help="re-download search-index.json (see NEW site content); "
+                         "otherwise the cached copy is reused")
+    ap.add_argument("--force", action="store_true",
+                    help="bypass the size floor gate (never on a hunch — the floor "
+                         "exists because a broken discovery once wrote a 1-entry catalog)")
     args = ap.parse_args(argv)
-    return build_catalog(fresh=args.fresh)
+    return build_catalog(fresh=args.fresh, force=args.force)
 
 
 if __name__ == "__main__":

@@ -58,9 +58,30 @@ def _forbidden() -> frozenset:
 # responses (Content-Type: application/json, Strict-Transport-Security header present);
 # the regional host sts.<region>.e.samsungsdscloud.com returns the Samsung Cloud
 # Platform web portal HTML 404 page (Content-Type: text/html, wrong gateway).
+# resourceoptimizer: confirmed GLOBAL 2026-09-18 (coverage-agent live probe) —
+# resourceoptimizer.e.samsungsdscloud.com signs+authenticates correctly (real
+# 200s on getaccount/listaccountsettings/getdashboard etc. with the account's
+# HMAC creds); resourceoptimizer.kr-west1.e.samsungsdscloud.com has no route at
+# all (egress proxy rejects the CONNECT — no such regional host), same failure
+# signature as the other account/org-scoped services in this set. Consistent
+# with its domain (account- and organization-level rightsizing settings, no
+# region-scoped resource CRUD — region is just a body/query filter field).
+# costnavigator: confirmed GLOBAL 2026-09-18 (coverage-agent live probe, brand
+# new 2026-09 product) — costnavigator.e.samsungsdscloud.com signs+authenticates
+# correctly (live 200 on getcostdimensionoptions with start_date/end_date query
+# params, live 403-real-JSON on the two POST cost-analysis actions);
+# costnavigator.kr-west1.e.samsungsdscloud.com has NO route at all (proxy 502
+# "Tunnel connection failed" — same no-route signature as the other
+# account-scoped services here, not a real gateway 404/401). NOTE: security/cnapp
+# (also brand-new 2026-09) was tried on BOTH templates and got the SAME 502
+# no-route failure on EACH — unlike costnavigator, neither host works, so cnapp
+# was deliberately NOT added here (see security/cnapp lifecycle _note in
+# generated__newapi-202609.json — likely not provisioned/routed for this
+# account+environment yet, or these are SaaS-vendor-inbound-only endpoints).
 DEFAULT_GLOBAL_SERVICES = frozenset({
-    "billingplan", "budget", "cloudcontrol", "costexplorer", "iam",
-    "organization", "pricing", "product", "quota", "resourcemanager", "sts", "support",
+    "billingplan", "budget", "cloudcontrol", "costexplorer", "costnavigator",
+    "iam", "organization", "pricing", "product", "quota", "resourceoptimizer",
+    "resourcemanager", "sts", "support",
 })
 
 
