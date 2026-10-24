@@ -1,11 +1,43 @@
 {
   "new": [
     {
-      "endpoint": "networking/security-group/createaddressgroup",
+      "endpoint": "networking/vpc/setvpcendpoint",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "docs.async-settle-undocumented"
+      ]
+    },
+    {
+      "endpoint": "security/cnapp/updatecnapptenantstatusbycallback",
       "from": "green",
       "to": "yellow",
       "items": [
         "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "application-service/messagehub/createemail",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "application-service/messagehub/setphonedescription",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/setalertnotificationsactivated",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "param-naming"
       ]
     },
     {
@@ -17,6 +49,15 @@
       ]
     },
     {
+      "endpoint": "networking/loadbalancer/createlbhealthcheck",
+      "from": "green",
+      "to": "red",
+      "items": [
+        "loadbalancer.accept-then-hang",
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
       "endpoint": "database/mariadb/mariadbupgrademajorversion",
       "from": "green",
       "to": "yellow",
@@ -25,11 +66,11 @@
       ]
     },
     {
-      "endpoint": "networking/security-group/setaddressgroup",
+      "endpoint": "networking/vpn/setvpngateway",
       "from": "green",
       "to": "yellow",
       "items": [
-        "no-success-schema"
+        "docs.async-settle-undocumented"
       ]
     },
     {
@@ -49,7 +90,183 @@
       ]
     },
     {
-      "endpoint": "database/sqlserver/sqlserveradddrsecondary",
+      "endpoint": "container/scr/showregistry",
+      "from": "green",
+      "to": "red",
+      "items": [
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
+      "endpoint": "management/resourceoptimizer/getdashboard",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "method-verb"
+      ]
+    },
+    {
+      "endpoint": "networking/vpc/setprivatelinkservice",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "docs.async-settle-undocumented"
+      ]
+    },
+    {
+      "endpoint": "database/postgresql/postgresqlsetparametervalues",
+      "from": "green",
+      "to": "red",
+      "items": [
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
+      "endpoint": "data-analytics/quick-query/validatequickqueryresources",
+      "from": "green",
+      "to": "red",
+      "items": [
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
+      "endpoint": "security/cnapp/sendnotification",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "networking/loadbalancer/showloadbalancerpublicnatip",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "runtime.empty-collection-404"
+      ]
+    },
+    {
+      "endpoint": "database/mysql/mysqlupgrademajorversion",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "application-service/messagehub/setemaildescription",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "application-service/messagehub/createdomain",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "financial-management/costnavigator/analyzecost",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "networking/vpc/deleteprivatelinkservice",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "docs.async-settle-undocumented"
+      ]
+    },
+    {
+      "endpoint": "networking/security-group/createaddressgroup",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/showalertlevelcountsbyservice",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "schema-undocumented-field"
+      ]
+    },
+    {
+      "endpoint": "compute/virtualserver/listserverips",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "versioning.doc-version-not-supported"
+      ]
+    },
+    {
+      "endpoint": "application-service/messagehub/setdomaindescription",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "networking/security-group/setaddressgroup",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "no-success-schema"
+      ]
+    },
+    {
+      "endpoint": "networking/vpc/showsubnet",
+      "from": "green",
+      "to": "red",
+      "items": [
+        "networking.subnet-read-plane-version-drift"
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/listdashboards",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "schema-undocumented-field"
+      ]
+    },
+    {
+      "endpoint": "storage/filestorage/listvolumereplicationregion",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "versioning.doc-version-not-supported"
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/listalerts",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "pagination"
+      ]
+    },
+    {
+      "endpoint": "management/servicewatch/deletebulkalertnotifications",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "param-naming"
+      ]
+    },
+    {
+      "endpoint": "financial-management/costnavigator/analyzecostcomparison",
       "from": "green",
       "to": "yellow",
       "items": [
@@ -65,7 +282,31 @@
       ]
     },
     {
-      "endpoint": "database/mysql/mysqlupgrademajorversion",
+      "endpoint": "application-service/messagehub/createphone",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "security/kms/kmssetaclcidr",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "networking/vpn/setvpntunnel",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "docs.async-settle-undocumented"
+      ]
+    },
+    {
+      "endpoint": "application-service/messagehub/setpushapplicationdescription",
       "from": "green",
       "to": "yellow",
       "items": [
@@ -81,14 +322,273 @@
       ]
     },
     {
-      "endpoint": "security/kms/kmssetaclcidr",
+      "endpoint": "management/resourceoptimizer/getidleresourcelist",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "method-verb"
+      ]
+    },
+    {
+      "endpoint": "networking/vpc/deletevpcendpoint",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "docs.async-settle-undocumented"
+      ]
+    },
+    {
+      "endpoint": "compute/virtualserver/deleteimage",
+      "from": "green",
+      "to": "red",
+      "items": [
+        "compute.image-sharing-delete-during-transfer-unguarded"
+      ]
+    },
+    {
+      "endpoint": "database/sqlserver/sqlserveradddrsecondary",
       "from": "green",
       "to": "yellow",
       "items": [
         "undiscoverable-params"
       ]
+    },
+    {
+      "endpoint": "management/organization/registerdelegatedadministrator",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "undiscoverable-params"
+      ]
+    },
+    {
+      "endpoint": "management/resourceoptimizer/listrecommendationsbybody",
+      "from": "green",
+      "to": "yellow",
+      "items": [
+        "method-verb"
+      ]
     }
   ],
-  "regressed": [],
-  "fixed": []
+  "regressed": [
+    {
+      "endpoint": "networking/vpc/listsubnets",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "pagination",
+        "networking.subnet-read-plane-version-drift"
+      ]
+    },
+    {
+      "endpoint": "application-service/apigateway/approveprivatelinkendpoint",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "undiscoverable-params",
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
+      "endpoint": "database/mysql/mysqlregisterlogexportconfig",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "undiscoverable-params",
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
+      "endpoint": "financial-management/billingplan/createplannedcomputes",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "undiscoverable-params",
+        "errors.detail-python-repr"
+      ]
+    },
+    {
+      "endpoint": "financial-management/billingplan/showcancellationfee",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "method-verb",
+        "errors.detail-python-repr"
+      ]
+    },
+    {
+      "endpoint": "container/ske/createnodepool",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "undiscoverable-params",
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
+      "endpoint": "database/mariadb/mariadbregisterlogexportconfig",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "undiscoverable-params",
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
+      "endpoint": "compute/virtualserver/createsharingimage",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "no-success-schema",
+        "compute.image-sharing-202-empty-body",
+        "compute.image-sharing-orphan-volume-no-cleanup",
+        "docs.image-share-cancellation-undocumented"
+      ]
+    },
+    {
+      "endpoint": "database/epas/epasregisterlogexportconfig",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "undiscoverable-params",
+        "runtime.500-on-client-state"
+      ]
+    },
+    {
+      "endpoint": "database/postgresql/postgresqlregisterlogexportconfig",
+      "from": "yellow",
+      "to": "red",
+      "items": [
+        "undiscoverable-params",
+        "runtime.500-on-client-state"
+      ]
+    }
+  ],
+  "fixed": [
+    {
+      "endpoint": "security/secretvault/listsecretvault",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/createvolumegroup",
+      "from": "red",
+      "to": "yellow"
+    },
+    {
+      "endpoint": "compute/virtualserver/listkeypairs",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "container/ske/showcluster",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "financial-management/pricing/listbillingitemids",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "management/iam/listserviceaccount",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "application-service/queueservice/showqueue",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "storage/filestorage/listvolumes",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "compute/scf/listruntimes",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "financial-management/billingplan/listplannedcomputeservicetypes",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "compute/scf/listsamplecodes",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "financial-management/pricing/listoffering",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "container/ske/listkubernetesversions",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "storage/archivestorage/cancelarchiving",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/createvolume",
+      "from": "red",
+      "to": "yellow"
+    },
+    {
+      "endpoint": "compute/baremetal/listbaremetalproducts",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "ai-ml/aimlops-platform/getaimlopsplatformv1",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "financial-management/billingplan/listostypes",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "storage/archivestorage/cancelrecovery",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "financial-management/billingplan/listcontracttypes",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "storage/backup/listbackupregionrelationship",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "ai-ml/aimlops-platform/validateclusternamespaceforaimlopsplatformv1",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "management/iam/listendpoints",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/listgpunodeproducts",
+      "from": "yellow",
+      "to": "green"
+    },
+    {
+      "endpoint": "container/ske/listnodepools",
+      "from": "yellow",
+      "to": "green"
+    }
+  ]
 }
